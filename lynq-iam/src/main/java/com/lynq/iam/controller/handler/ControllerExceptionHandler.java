@@ -17,7 +17,6 @@ import lombok.extern.log4j.Log4j2;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestControllerAdvice
 @Log4j2
@@ -47,17 +46,6 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
     return ResponseEntity
         .status(HttpStatus.CONFLICT)
         .body(new ErrorRestResponse<>(null, ex.getMessage()));
-  }
-
-  @ExceptionHandler(MethodArgumentNotValidException.class)
-  public ResponseEntity<ErrorRestResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
-    log.error("message= Validation failed", ex);
-    String errors = ex.getBindingResult().getFieldErrors().stream()
-        .map(e -> e.getField() + ": " + e.getDefaultMessage())
-        .collect(Collectors.joining(", "));
-    return ResponseEntity
-        .status(HttpStatus.BAD_REQUEST)
-        .body(new ErrorRestResponse<>(null, errors));
   }
 
   @ExceptionHandler(Exception.class)

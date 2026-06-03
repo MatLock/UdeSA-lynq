@@ -20,10 +20,31 @@ public class RequestUuidFilter extends OncePerRequestFilter {
     private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
     private static final String MDC_REQUEST_ID = "requestId";
 
+    private static final String[] WHITELISTED_PATH_PREFIXES = {
+        "/swagger-ui",
+        "/v3/api-docs",
+        "/swagger-resources",
+        "/webjars"
+    };
+
     private final ObjectMapper objectMapper;
 
     public RequestUuidFilter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
+        if ("/swagger-ui.html".equals(path)) {
+            return true;
+        }
+        for (String prefix : WHITELISTED_PATH_PREFIXES) {
+            if (path.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
