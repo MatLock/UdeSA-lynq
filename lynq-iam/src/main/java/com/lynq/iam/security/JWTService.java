@@ -21,10 +21,14 @@ public class JWTService {
   private static final String USERNAME_CLAIM = "username";
   private static final String EMAIL_CLAIM = "email";
 
-  private String secret;
+  private final String secret;
+  private final long accessTokenExpirationMinutes;
 
-  public JWTService(@Value("${lyqn.security.jwt.secret}") String secret){
+  public JWTService(
+      @Value("${lynq.security.jwt.secret}") String secret,
+      @Value("${lynq.security.jwt.access-token-expiration-minutes}") long accessTokenExpirationMinutes) {
     this.secret = secret;
+    this.accessTokenExpirationMinutes = accessTokenExpirationMinutes;
   }
 
   private Key getSigningKey() {
@@ -40,7 +44,7 @@ public class JWTService {
       .claim(USERNAME_CLAIM, user.getUsername())
       .claim(EMAIL_CLAIM, user.getEmail())
       .issuedAt(Date.from(now))
-      .expiration(Date.from(now.plus(15, ChronoUnit.MINUTES)))
+      .expiration(Date.from(now.plus(accessTokenExpirationMinutes, ChronoUnit.MINUTES)))
       .signWith(getSigningKey())
       .compact();
   }
