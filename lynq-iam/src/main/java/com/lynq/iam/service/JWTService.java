@@ -1,7 +1,8 @@
-package com.lynq.iam.security;
+package com.lynq.iam.service;
 
 import com.lynq.iam.aspect.AuditLog;
 import com.lynq.iam.model.UserEntity;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.log4j.Log4j2;
@@ -51,12 +52,25 @@ public class JWTService {
 
   @AuditLog
   public String extractUserId(String token) {
+    return parseClaims(token).getSubject();
+  }
+
+  @AuditLog
+  public String extractUsername(String token) {
+    return parseClaims(token).get(USERNAME_CLAIM, String.class);
+  }
+
+  @AuditLog
+  public String extractEmail(String token) {
+    return parseClaims(token).get(EMAIL_CLAIM, String.class);
+  }
+
+  private Claims parseClaims(String token) {
     return Jwts.parser()
         .verifyWith(Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8)))
         .build()
         .parseSignedClaims(token)
-        .getPayload()
-        .getSubject();
+        .getPayload();
   }
 
   @AuditLog

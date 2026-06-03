@@ -2,7 +2,7 @@ package com.lynq.iam.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynq.iam.controller.response.ErrorRestResponse;
-import com.lynq.iam.security.JWTService;
+import com.lynq.iam.service.JWTService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

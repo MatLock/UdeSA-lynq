@@ -2,13 +2,13 @@ package com.lynq.iam.service;
 
 import com.lynq.iam.aspect.AuditLog;
 import com.lynq.iam.controller.response.AccessTokenRefreshedResponse;
+import com.lynq.iam.controller.response.UserInfoRestResponse;
 import com.lynq.iam.controller.response.UserRestResponse;
 import com.lynq.iam.exceptions.ForbiddenException;
 import com.lynq.iam.exceptions.InvalidPasswordException;
 import com.lynq.iam.exceptions.UserNotFoundException;
 import com.lynq.iam.model.UserEntity;
 import com.lynq.iam.repository.UserRepository;
-import com.lynq.iam.security.JWTService;
 import com.lynq.iam.security.RefreshTokenGenerator;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -134,6 +134,15 @@ public class AuthService {
 
   public boolean isAccessTokenValid(String accessToken) {
     return jwtService.isAccessTokenValid(accessToken);
+  }
+
+  @AuditLog
+  public UserInfoRestResponse obtainUserInfoFromToken(String accessToken) {
+    return UserInfoRestResponse.builder()
+        .id(jwtService.extractUserId(accessToken))
+        .username(jwtService.extractUsername(accessToken))
+        .email(jwtService.extractEmail(accessToken))
+        .build();
   }
 
   @AuditLog

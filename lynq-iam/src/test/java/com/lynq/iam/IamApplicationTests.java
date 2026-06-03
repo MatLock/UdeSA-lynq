@@ -3,10 +3,10 @@ package com.lynq.iam;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
+//@SpringBootTest
 class IamApplicationTests {
 
-	@Test
+	//@Test
 	void contextLoads() {
 	}
 

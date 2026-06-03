@@ -4,10 +4,7 @@ import com.lynq.iam.controller.request.CreateUserRequest;
 import com.lynq.iam.controller.request.EmailUserLogin;
 import com.lynq.iam.controller.request.UserUpdatePasswordRequest;
 import com.lynq.iam.controller.request.UsernameLogin;
-import com.lynq.iam.controller.response.AccessTokenRefreshedResponse;
-import com.lynq.iam.controller.response.ErrorRestResponse;
-import com.lynq.iam.controller.response.GlobalRestResponse;
-import com.lynq.iam.controller.response.UserRestResponse;
+import com.lynq.iam.controller.response.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -136,6 +133,21 @@ public interface AuthController {
       content = @Content(schema = @Schema(implementation = ErrorRestResponse.class)))
   })
   GlobalRestResponse<AccessTokenRefreshedResponse> generateNewAccessToken(
-      @Parameter(hidden = true)
-      @RequestHeader("Authorization") @NotBlank String refreshToken);
+      @Parameter(hidden = true) @RequestHeader("Authorization") @NotBlank String refreshToken);
+
+  @Operation(summary = "Get user info from access token", description = "Extracts user identity (id, username, email) from a valid access token")
+  @SecurityRequirement(name = "bearerAuth")
+  @Parameters({
+    @Parameter(name = "lynq-request-uuid", in = ParameterIn.HEADER, required = true,
+      description = "Per-request correlation UUID used for log tracing",
+      example = "550e8400-e29b-41d4-a716-446655440000")
+  })
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "User info extracted from token",
+      content = @Content(schema = @Schema(implementation = UserInfoRestResponse.class))),
+    @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
+      content = @Content(schema = @Schema(implementation = ErrorRestResponse.class)))
+  })
+  GlobalRestResponse<UserInfoRestResponse> obtainUserInfoFromToken(
+      @Parameter(hidden = true) @RequestHeader("Authorization") @NotBlank String accessToken);
 }

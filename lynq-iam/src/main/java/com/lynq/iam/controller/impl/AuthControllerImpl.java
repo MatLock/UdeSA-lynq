@@ -7,6 +7,7 @@ import com.lynq.iam.controller.request.UserUpdatePasswordRequest;
 import com.lynq.iam.controller.request.UsernameLogin;
 import com.lynq.iam.controller.response.AccessTokenRefreshedResponse;
 import com.lynq.iam.controller.response.GlobalRestResponse;
+import com.lynq.iam.controller.response.UserInfoRestResponse;
 import com.lynq.iam.controller.response.UserRestResponse;
 import com.lynq.iam.service.AuthService;
 import jakarta.validation.Valid;
@@ -73,5 +74,12 @@ public class AuthControllerImpl implements AuthController {
   public GlobalRestResponse<AccessTokenRefreshedResponse> generateNewAccessToken(@RequestHeader("Authorization") String refreshToken) {
     String token = refreshToken.startsWith(BEARER_PREFIX) ? refreshToken.substring(7) : refreshToken;
     return new GlobalRestResponse<>(true, authService.generateNewAccessToken(token));
+  }
+
+  @Override
+  @GetMapping("/userinfo")
+  public GlobalRestResponse<UserInfoRestResponse> obtainUserInfoFromToken(@RequestHeader("Authorization") String accessToken) {
+    String token = accessToken.startsWith(BEARER_PREFIX) ? accessToken.substring(7) : accessToken;
+    return new GlobalRestResponse<>(true, authService.obtainUserInfoFromToken(token));
   }
 }
