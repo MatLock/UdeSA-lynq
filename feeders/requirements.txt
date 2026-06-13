@@ -1,0 +1,9 @@
+# LinkedIn dataset feeder (linkedin_jobs.py)
+datasets==5.0.0
+
+# Scrapers (computrabajo_jobs.py, bumeran_jobs.py)
+requests==2.34.2
+
+# Computrabajo HTML parsing (computrabajo_jobs.py)
+beautifulsoup4==4.15.0
+lxml==6.1.1

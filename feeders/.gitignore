@@ -1,0 +1,8 @@
+.venv
+__pycache__/
+*.pyc
+
+# Generated data — regenerate with the feeder scripts
+jobs.json
+data/
+outputs/
