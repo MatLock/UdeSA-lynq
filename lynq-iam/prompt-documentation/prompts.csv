@@ -20,3 +20,4 @@ date,prompt
     at org.springframework.web.client.RestTemplate.doExecute(RestTemplate.java:757)
     at org.springframework.web.client.RestTemplate.execute(RestTemplate.java:677)
     at org.springframework.web.client.RestTemplate.exchange(RestTemplate.java:561)```"
+"13-06-2026","is my jacoco and surefire plugin correct for maven coverage in CI?"
