@@ -476,5 +476,6 @@ src/
 │       ├── log4j2-spring.xml
 │       └── changelog/     # Liquibase DDL
 └── test/
-    └── java/com/lynq/iam/ # JUnit tests
+    └── java/com/lynq/iam/unit # JUnit tests
+    |__ java/com/lyqn/iam/e2e # End to End Test 
 ```

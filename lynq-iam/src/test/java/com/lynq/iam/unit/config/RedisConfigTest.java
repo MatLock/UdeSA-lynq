@@ -1,4 +1,4 @@
-package com.lynq.iam.config;
+package com.lynq.iam.unit.config;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
