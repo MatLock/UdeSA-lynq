@@ -1,8 +1,7 @@
-package com.lynq.iam.unit.filter;
+package com.lynq.iam.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynq.iam.controller.response.ErrorRestResponse;
-import com.lynq.iam.service.JWTService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,25 +26,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class AuthHeaderValidationFilterTest {
+class AuthHeaderExistenceFilterTest {
 
   private static final String AUTHORIZATION_HEADER = "Authorization";
-  private static final String BEARER_PREFIX = "Bearer ";
-  private static final String RAW_ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiJ9.access.token";
-  private static final String AUTH_HEADER_WITH_BEARER = BEARER_PREFIX + RAW_ACCESS_TOKEN;
-  private static final String AUTH_HEADER_WITHOUT_BEARER = RAW_ACCESS_TOKEN;
-  private static final String EXPECTED_INVALID_TOKEN_REASON = "Invalid or expired access token";
+  private static final String VALID_AUTH_HEADER_VALUE = "Bearer eyJhbGciOiJIUzI1NiJ9.access.token";
+  private static final String BLANK_HEADER_VALUE = "   ";
+  private static final String EXPECTED_MISSING_AUTH_REASON = "Missing Authorization header";
   private static final int EXPECTED_UNAUTHORIZED_STATUS_CODE = HttpStatus.UNAUTHORIZED.value();
   private static final String EXPECTED_CONTENT_TYPE = MediaType.APPLICATION_JSON_VALUE;
-  private static final boolean TOKEN_VALID = true;
-  private static final boolean TOKEN_INVALID = false;
   private static final boolean EXPECTED_ERROR_SUCCESS_FLAG = false;
+  private static final Object NO_DATA = null;
 
   @Mock
   private ObjectMapper objectMapper;
-
-  @Mock
-  private JWTService jwtService;
 
   @Mock
   private HttpServletRequest request;
@@ -59,37 +52,16 @@ class AuthHeaderValidationFilterTest {
   @Mock
   private PrintWriter responseWriter;
 
-  private AuthHeaderValidationFilter filter;
+  private AuthHeaderExistenceFilter filter;
 
   @BeforeEach
   void setUp() {
-    filter = new AuthHeaderValidationFilter(objectMapper, jwtService);
+    filter = new AuthHeaderExistenceFilter(objectMapper);
   }
 
   @Test
-  void doFilterInternalStripsBearerPrefixBeforeValidatingToken() throws Exception {
-    when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(AUTH_HEADER_WITH_BEARER);
-    when(jwtService.isAccessTokenValid(RAW_ACCESS_TOKEN)).thenReturn(TOKEN_VALID);
-
-    filter.doFilterInternal(request, response, filterChain);
-
-    verify(jwtService).isAccessTokenValid(RAW_ACCESS_TOKEN);
-  }
-
-  @Test
-  void doFilterInternalValidatesRawTokenWhenBearerPrefixAbsent() throws Exception {
-    when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(AUTH_HEADER_WITHOUT_BEARER);
-    when(jwtService.isAccessTokenValid(RAW_ACCESS_TOKEN)).thenReturn(TOKEN_VALID);
-
-    filter.doFilterInternal(request, response, filterChain);
-
-    verify(jwtService).isAccessTokenValid(RAW_ACCESS_TOKEN);
-  }
-
-  @Test
-  void doFilterInternalDelegatesToFilterChainWhenAccessTokenIsValid() throws Exception {
-    when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(AUTH_HEADER_WITH_BEARER);
-    when(jwtService.isAccessTokenValid(RAW_ACCESS_TOKEN)).thenReturn(TOKEN_VALID);
+  void doFilterInternalDelegatesToFilterChainWhenAuthorizationHeaderIsPresent() throws Exception {
+    when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(VALID_AUTH_HEADER_VALUE);
 
     filter.doFilterInternal(request, response, filterChain);
 
@@ -97,9 +69,8 @@ class AuthHeaderValidationFilterTest {
   }
 
   @Test
-  void doFilterInternalWritesUnauthorizedErrorResponseWhenAccessTokenIsInvalid() throws Exception {
-    when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(AUTH_HEADER_WITH_BEARER);
-    when(jwtService.isAccessTokenValid(RAW_ACCESS_TOKEN)).thenReturn(TOKEN_INVALID);
+  void doFilterInternalWritesUnauthorizedErrorResponseWhenAuthorizationHeaderIsNull() throws Exception {
+    when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn((String) NO_DATA);
     when(response.getWriter()).thenReturn(responseWriter);
 
     filter.doFilterInternal(request, response, filterChain);
@@ -110,9 +81,20 @@ class AuthHeaderValidationFilterTest {
   }
 
   @Test
-  void doFilterInternalSerializesErrorResponseWithExpectedReasonAndFlagsWhenTokenInvalid() throws Exception {
-    when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(AUTH_HEADER_WITH_BEARER);
-    when(jwtService.isAccessTokenValid(RAW_ACCESS_TOKEN)).thenReturn(TOKEN_INVALID);
+  void doFilterInternalWritesUnauthorizedErrorResponseWhenAuthorizationHeaderIsBlank() throws Exception {
+    when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(BLANK_HEADER_VALUE);
+    when(response.getWriter()).thenReturn(responseWriter);
+
+    filter.doFilterInternal(request, response, filterChain);
+
+    verify(response).setStatus(EXPECTED_UNAUTHORIZED_STATUS_CODE);
+    verify(response).setContentType(EXPECTED_CONTENT_TYPE);
+    verify(filterChain, never()).doFilter(any(), any());
+  }
+
+  @Test
+  void doFilterInternalSerializesErrorResponseWithExpectedReasonAndFlagsWhenHeaderMissing() throws Exception {
+    when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn((String) NO_DATA);
     when(response.getWriter()).thenReturn(responseWriter);
     ArgumentCaptor<ErrorRestResponse<Void>> errorCaptor = errorRestResponseCaptor();
 
@@ -120,7 +102,7 @@ class AuthHeaderValidationFilterTest {
 
     verify(objectMapper).writeValue(eq(responseWriter), errorCaptor.capture());
     ErrorRestResponse<Void> captured = errorCaptor.getValue();
-    assertThat(captured.getReason(), is(EXPECTED_INVALID_TOKEN_REASON));
+    assertThat(captured.getReason(), is(EXPECTED_MISSING_AUTH_REASON));
     assertThat(captured.isSuccess(), is(EXPECTED_ERROR_SUCCESS_FLAG));
     assertThat(captured.getData(), is(nullValue()));
   }

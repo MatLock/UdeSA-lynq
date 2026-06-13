@@ -1,4 +1,4 @@
-package com.lynq.iam.unit.controller.impl;
+package com.lynq.iam.controller.impl;
 
 import com.lynq.iam.controller.impl.AuthControllerImpl;
 import com.lynq.iam.controller.request.CreateUserRequest;

@@ -1,4 +1,4 @@
-package com.lynq.iam.unit.filter;
+package com.lynq.iam.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynq.iam.controller.response.ErrorRestResponse;

@@ -1,11 +1,11 @@
 date,prompt
-"13-06-2026",scan controller package and build a postman collection, save the file under `postman/lyqn-iam.postman_collection.json`
-"13-06-2026",update README.md with new endpoint information `/userinfo`. add this prompt into `prompt-documentation/prompt.csv` file"13-06-2026","have you loaded the tool to record prompts?"
+"13-06-2026","scan controller package and build a postman collection, save the file under `postman/lyqn-iam.postman_collection.json`"
+"13-06-2026","update README.md with new endpoint information `/userinfo`. add this prompt into `prompt-documentation/prompt.csv` file
 "13-06-2026","add unit testing for class config/AppConfig un class AppConfigTest. Use setUp method if required, use mockito mocks and assertions with harmcrest. for all values use Java constants and do not hardcode any test value on test methods"
-"13-06-2026","add unit testing for class config/FilterConfig un class FilterConfigTest. Use setUp method if required, use mockito mocks and assertions with harmcrest. for all values use Java    
-  constants and do not hardcode any test value on test methods"
-"13-06-2026","create unit test cases for classes in controller.request package. Follow the same pattern and structure that test config package""13-06-2026","add unit test cases for all classes in response package, follow the same pattern as config package"
+"13-06-2026","add unit testing for class config/FilterConfig un class FilterConfigTest. Use setUp method if required, use mockito mocks and assertions with harmcrest. for all values use Java constants and do not hardcode any test value on test methods"
+"13-06-2026","create unit test cases for classes in controller.request package. Follow the same pattern and structure that test config package"
 "13-06-2026","add unit test cases for AuthControllerImpl in class AuthControllerImplTest"
 "13-06-2026","add junit test classes for filter package, follow project pattern for proper template"
 "13-06-2026","add junit test case for UserEntity in package model"
 "13-06-2026","add junit test case for RefreshTokenGenerator in package security"
+"13-06-2026","add junit tests for classes in service package, follow project pattern for proper testing"

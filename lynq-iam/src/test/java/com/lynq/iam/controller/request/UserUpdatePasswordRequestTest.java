@@ -1,4 +1,4 @@
-package com.lynq.iam.unit.controller.request;
+package com.lynq.iam.controller.request;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;

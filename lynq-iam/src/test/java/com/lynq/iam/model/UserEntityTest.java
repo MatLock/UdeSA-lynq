@@ -1,4 +1,4 @@
-package com.lynq.iam.unit.model;
+package com.lynq.iam.model;
 
 import org.junit.jupiter.api.Test;
 

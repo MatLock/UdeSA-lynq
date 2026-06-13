@@ -1,4 +1,4 @@
-package com.lynq.iam.unit.controller.response;
+package com.lynq.iam.controller.response;
 
 import org.junit.jupiter.api.Test;
 
