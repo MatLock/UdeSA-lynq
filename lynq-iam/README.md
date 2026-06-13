@@ -96,11 +96,11 @@ Identity and Access Management service for the Lynq platform. Issues short-lived
 
 Every request passes through an ordered filter chain before reaching a controller:
 
-| Order | Filter                       | Scope                                                     | Purpose                                                                 |
-| :---: | ---------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------- |
-| 0     | `RequestUuidFilter`          | `/*`                                                      | Require `lynq-request-uuid` header; bind it to SLF4J MDC for log correlation. |
-| 1     | `AuthHeaderExistenceFilter`  | `/auth/validate`, `/auth/refresh`, `/auth/update-password` | 401 if `Authorization` is missing or blank.                             |
-| 2     | `AuthHeaderValidationFilter` | `/auth/validate`, `/auth/update-password`                 | 401 if the bearer JWT is invalid or expired.                            |
+| Order | Filter                       | Scope                                                                          | Purpose                                                                 |
+| :---: | ---------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| 0     | `RequestUuidFilter`          | `/*`                                                                           | Require `lynq-request-uuid` header; bind it to SLF4J MDC for log correlation. |
+| 1     | `AuthHeaderExistenceFilter`  | `/auth/validate`, `/auth/refresh`, `/auth/update-password`, `/auth/userinfo`   | 401 if `Authorization` is missing or blank.                             |
+| 2     | `AuthHeaderValidationFilter` | `/auth/validate`, `/auth/update-password`, `/auth/userinfo`                    | 401 if the bearer JWT is invalid or expired.                            |
 
 `/auth/refresh` deliberately skips JWT validation — the access token may already be expired; the refresh token is validated against Redis inside `AuthService`.
 
@@ -231,6 +231,7 @@ All requests must include the `lynq-request-uuid` header.
 | POST   | `/auth/refresh`               | Bearer refresh token | Issue a new 15-min access token.             |
 | GET    | `/auth/validate`              | Bearer access token  | Returns `true` if the access token is valid. |
 | PATCH  | `/auth/update-password`       | Bearer access token  | Rotate password, return fresh tokens.        |
+| GET    | `/auth/userinfo`              | Bearer access token  | Return user identity (id, username, email) extracted from the access token. |
 
 OpenAPI / Swagger UI is exposed at `/lynq-iam/swagger-ui.html` (springdoc default).
 
@@ -301,6 +302,27 @@ curl -X PATCH http://localhost:8080/lynq-iam/auth/update-password \
   -H "lynq-request-uuid: $UUID" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -d '{ "newPassword": "N3wP@ssw0rd!" }'
+```
+
+**Get user info from access token**
+
+```bash
+curl http://localhost:8080/lynq-iam/auth/userinfo \
+  -H "lynq-request-uuid: $UUID" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+Sample success response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "0190d1b0-8b3a-7c00-9f01-1b2c3d4e5f60",
+    "username": "johndoe",
+    "email": "johndoe@example.com"
+  }
+}
 ```
 
 **Sample success response (login / register)**
