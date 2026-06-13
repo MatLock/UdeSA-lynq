@@ -16,15 +16,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.apache.logging.log4j.core.config.plugins.validation.constraints.NotBlank;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
+import jakarta.validation.constraints.NotBlank;
+import org.springframework.http.ResponseEntity;
 
 @Tag(name = "Users", description = "User management operations")
-@Validated
-@RequestMapping("/auth")
 public interface AuthController {
 
   @Operation(summary = "Create a new user", description = "Registers a new user with unique username and email")
@@ -41,7 +36,7 @@ public interface AuthController {
     @ApiResponse(responseCode = "409", description = "Username or email already exists",
       content = @Content(schema = @Schema(implementation = ErrorRestResponse.class)))
   })
-  GlobalRestResponse<UserRestResponse> createUser(@Valid @RequestBody CreateUserRequest request);
+  ResponseEntity<GlobalRestResponse<UserRestResponse>> createUser(@Valid CreateUserRequest request);
 
 
   @Operation(summary = "Update password", description = "Updates the user's password and returns new access and refresh tokens")
@@ -61,10 +56,9 @@ public interface AuthController {
     @ApiResponse(responseCode = "403", description = "User not found",
       content = @Content(schema = @Schema(implementation = ErrorRestResponse.class)))
   })
-  GlobalRestResponse<UserRestResponse> updatePassword(
-      @Parameter(hidden = true)
-      @RequestHeader("Authorization") @NotBlank String accessToken,
-      @Valid @RequestBody UserUpdatePasswordRequest userUpdatePasswordRequest);
+  ResponseEntity<GlobalRestResponse<UserRestResponse>> updatePassword(
+      @Parameter(hidden = true) @NotBlank String accessToken,
+      @Valid UserUpdatePasswordRequest userUpdatePasswordRequest);
 
   @Operation(summary = "Login by username", description = "Authenticates a user by username and password, returns access and refresh tokens")
   @Parameters({
@@ -80,7 +74,7 @@ public interface AuthController {
     @ApiResponse(responseCode = "403", description = "Invalid username or password",
       content = @Content(schema = @Schema(implementation = ErrorRestResponse.class)))
   })
-  GlobalRestResponse<UserRestResponse> loginByUsername(@Valid @RequestBody UsernameLogin usernameLoginRequest);
+  ResponseEntity<GlobalRestResponse<UserRestResponse>> loginByUsername(@Valid UsernameLogin usernameLoginRequest);
 
   @Operation(summary = "Login by email", description = "Authenticates a user by email and password, returns access and refresh tokens")
   @Parameters({
@@ -96,7 +90,7 @@ public interface AuthController {
     @ApiResponse(responseCode = "403", description = "Invalid email or password",
       content = @Content(schema = @Schema(implementation = ErrorRestResponse.class)))
   })
-  GlobalRestResponse<UserRestResponse> loginByEmail(@Valid @RequestBody EmailUserLogin emailUserLoginRequest);
+  ResponseEntity<GlobalRestResponse<UserRestResponse>> loginByEmail(@Valid EmailUserLogin emailUserLoginRequest);
 
   @Operation(summary = "Validate access token", description = "Checks if the provided access token is valid and not expired")
   @SecurityRequirement(name = "bearerAuth")
@@ -111,9 +105,8 @@ public interface AuthController {
     @ApiResponse(responseCode = "401", description = "Missing Authorization header",
       content = @Content(schema = @Schema(implementation = ErrorRestResponse.class)))
   })
-  GlobalRestResponse<Boolean> isAccessTokenValid(
-      @Parameter(hidden = true)
-      @RequestHeader("Authorization") @NotBlank String accessToken);
+  ResponseEntity<GlobalRestResponse<Boolean>> isAccessTokenValid(
+      @Parameter(hidden = true) @NotBlank String accessToken);
 
   @Operation(summary = "Refresh access token", description = "Generates a new access token using a valid refresh token")
   @SecurityRequirement(name = "bearerAuth")
@@ -132,8 +125,8 @@ public interface AuthController {
     @ApiResponse(responseCode = "403", description = "Invalid or expired refresh token",
       content = @Content(schema = @Schema(implementation = ErrorRestResponse.class)))
   })
-  GlobalRestResponse<AccessTokenRefreshedResponse> generateNewAccessToken(
-      @Parameter(hidden = true) @RequestHeader("Authorization") @NotBlank String refreshToken);
+  ResponseEntity<GlobalRestResponse<AccessTokenRefreshedResponse>> generateNewAccessToken(
+      @Parameter(hidden = true) @NotBlank String refreshToken);
 
   @Operation(summary = "Get user info from access token", description = "Extracts user identity (id, username, email) from a valid access token")
   @SecurityRequirement(name = "bearerAuth")
@@ -148,6 +141,7 @@ public interface AuthController {
     @ApiResponse(responseCode = "401", description = "Missing or invalid access token",
       content = @Content(schema = @Schema(implementation = ErrorRestResponse.class)))
   })
-  GlobalRestResponse<UserInfoRestResponse> obtainUserInfoFromToken(
-      @Parameter(hidden = true) @RequestHeader("Authorization") @NotBlank String accessToken);
+  ResponseEntity<GlobalRestResponse<UserInfoRestResponse>> obtainUserInfoFromToken(@Parameter(hidden = true) @NotBlank String accessToken);
+
+
 }
