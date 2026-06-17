@@ -21,3 +21,5 @@ date,prompt
     at org.springframework.web.client.RestTemplate.execute(RestTemplate.java:677)
     at org.springframework.web.client.RestTemplate.exchange(RestTemplate.java:561)```"
 "13-06-2026","is my jacoco and surefire plugin correct for maven coverage in CI?"
+"17-06-2026","read LogAspect.java. I noticed that if password or newPassword is sent as part of an object. the logging of such field happens anyways. Please mask these fields if they are part of an object parameter"
+"17-06-2026","getting error when executing `mvn -e clean install`. error `NoClassDefFound Could not initialize class com.lynq.iam.IamApplicationTests`. If you need to execute test run jdk21 command to set proper jdk"

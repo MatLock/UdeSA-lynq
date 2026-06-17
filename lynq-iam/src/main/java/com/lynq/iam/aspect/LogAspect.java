@@ -2,8 +2,11 @@ package com.lynq.iam.aspect;
 
 import static java.lang.String.format;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import lombok.extern.log4j.Log4j2;
 import org.apache.logging.log4j.LogManager;
@@ -19,8 +22,10 @@ import org.springframework.stereotype.Component;
 @Log4j2
 public class LogAspect {
 
-  private static final String PARAMETER_FORMAT = "%s=%s";
+  private static final String PARAMETER_FORMAT = "%s:%s";
   private static final String PASSWORD_PARAM = "password";
+  private static final String NEW_PASSWORD_PARAM = "newPassword";
+  private static final String MASK = "********";
 
   private final ObjectMapper objectMapper;
 
@@ -51,8 +56,8 @@ public class LogAspect {
     List<String> logParameters = new ArrayList<>();
     for(Integer i = 0; i < parameterNames.length; i++){
       String value;
-      if (PASSWORD_PARAM.equalsIgnoreCase(parameterNames[i])) {
-        value = "****";
+      if (isSensitiveField(parameterNames[i])) {
+        value = MASK;
       } else {
         value = serialize(parameterValues[i]);
       }
@@ -66,10 +71,42 @@ public class LogAspect {
       return String.valueOf(obj);
     }
     try {
-      return objectMapper.writeValueAsString(obj);
+      JsonNode node = objectMapper.valueToTree(obj);
+      maskSensitiveFields(node);
+      return objectMapper.writeValueAsString(node);
     } catch (Exception e) {
       return String.valueOf(obj);
     }
+  }
+
+  private void maskSensitiveFields(JsonNode node) {
+    if (node == null) {
+      return;
+    }
+    if (node.isObject()) {
+      ObjectNode objectNode = (ObjectNode) node;
+      Iterator<String> fieldNames = objectNode.fieldNames();
+      List<String> fieldsToMask = new ArrayList<>();
+      while (fieldNames.hasNext()) {
+        String fieldName = fieldNames.next();
+        if (isSensitiveField(fieldName)) {
+          fieldsToMask.add(fieldName);
+        } else {
+          maskSensitiveFields(objectNode.get(fieldName));
+        }
+      }
+      for (String fieldName : fieldsToMask) {
+        objectNode.put(fieldName, MASK);
+      }
+    } else if (node.isArray()) {
+      for (JsonNode element : node) {
+        maskSensitiveFields(element);
+      }
+    }
+  }
+
+  private boolean isSensitiveField(String fieldName) {
+    return PASSWORD_PARAM.equalsIgnoreCase(fieldName) || NEW_PASSWORD_PARAM.equalsIgnoreCase(fieldName);
   }
 
 
