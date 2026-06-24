@@ -7,7 +7,7 @@ on:
 
 jobs:
   lynq-iam:
-    name: lynq-iam: Test & Coverage
+    name: "lynq-iam: Test & Coverage"
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -54,7 +54,7 @@ jobs:
           file_pattern: .github/badges/jacoco.svg
 
   lynq-app-backend:
-    name: lynq-app-backend: Test & Coverage
+    name: "lynq-app-backend: Test & Coverage"
     runs-on: ubuntu-latest
     permissions:
       contents: write
