@@ -15,12 +15,6 @@ spring:
       idle-timeout: 300000
       connection-timeout: 20000
       max-lifetime: 1200000
-  data:
-    redis:
-      host: ${REDIS_ADDRESS}
-      port: ${REDIS_PORT}
-      username: ${REDIS_USERNAME}
-      password: ${REDIS_PASSWORD}
   jpa:
     open-in-view: false
     properties:
@@ -35,11 +29,7 @@ spring:
     change-log: classpath:changelog/db.changelog-config.xml
 
 lynq:
-  security:
-    jwt:
-      secret: ${JWT_SECRET}
-      access-token-expiration-minutes: ${JWT_ACCESS_TOKEN_EXPIRATION_MINUTES}
-      refresh-token-expiration-days: ${JWT_REFRESH_TOKEN_EXPIRATION_DAYS}
+
 
 server:
   port: 8080
