@@ -1,0 +1,43 @@
+
+spring:
+  application:
+    name: lynq-app-backend-test
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+  datasource:
+    url: jdbc:h2:mem:lynq_iam_test;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ''
+    driver-class-name: org.h2.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        show_sql: false
+  liquibase:
+    enabled: false
+
+lynq:
+  security:
+    jwt:
+      secret: 8d2b6d2a9c5e8f4f8f9d1c7a4e3b5f6d8c9a1e2f3a4b5c6d7e8f9a1b2c3d4e5
+      access-token-expiration-minutes: 15
+      refresh-token-expiration-days: 30
+
+server:
+  port: 0
+  servlet:
+    context-path: '/lynq-app-backend'
+
+management:
+  server:
+    port: -1
+
+logging:
+  level:
+    root: WARN
+    com.lynq: INFO

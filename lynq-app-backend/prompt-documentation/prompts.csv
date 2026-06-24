@@ -1,0 +1,33 @@
+date,prompt
+"24-06-2026","rename every occurence of lyqn-iam to lyqn-app-backend"
+"24-06-2026","yes, rename that"
+"24-06-2026","why intelliJ names this project as [iam]. I want this project to be named app-backend"
+"24-06-2026","add new sql file to changelog. sql language: SQL 8+, file name: ""01-create-users-table.sql"", columns: id [string], username [string] 15 char maximum, email [string], profile_image_url [string], current_position [string], about_me [string], github_url [string], linkedin_url [string], birth_date [date. format yyyy-mm-dd], created_on [date. format yyyy-mm-dd].
+constraints:
+username unique
+email unique
+id primary key
+add search index by email
+add search index by username"
+"24-06-2026","alter users table definition. add type [enum] possible values [CANDIDATE|COMPANY]"
+"24-06-2026","add company table definition  in file 02-create-companies-table.sql columns:
+id [string]
+name [string]
+about [string]
+size [integer]
+profile_image_url [string]
+created_on [date. format yyyy-mm-dd]
+
+constraints: 
+id primary key
+name unique
+add search index by name"
+"24-06-2026","I removed both indexes then"
+"24-06-2026","create job_posts table. columns: id [string], title [string], description [text], remote [boolean], work_type [enum, REMOTE|IN_OFFICE], salary_range_lower, salary_range_top, job_url, job_post_type [enum, LYNQ|LINKEDIN|COMPUTRABAJO|BUMERAN], created_on [date, format 'yyyy-mm-dd']"
+"24-06-2026","add new foreign key for job_posts. columns: created_by_user_id -> users.id, company_id -> companies.id"
+"24-06-2026","add job_post_skills table. columns: id [string], job_id [string], skill [string]. job_id -> job_posts[id]"
+"24-06-2026","add user_resume table. columns id [string], resume [JSON], language [enum, EN,ES,FR,PR], created_on [date, format yyyy-mm-dd], user_id [string]. foreign key user_id -> users.id"
+"24-06-2026","create user_application_job columns: id [string], job_id [string], user_id [string], applied_on [date, format yyyy-mm-dd], application_seen_on [date, format yyyy-mm-dd]. foreign keys job_id -> jobs.id, user_id -> users.id"
+"24-06-2026","add constraint UNIQUE (job_id, user_id)"
+"24-06-2026","do the same we did for job_post_skills but for a new table called user_skills"
+"24-06-2026","apply the constraint of uniquenees for job_post_skills and user-skills"

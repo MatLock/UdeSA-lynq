@@ -1,0 +1,77 @@
+spring:
+  application:
+    name: lynq-backend-app
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+  datasource:
+    url: jdbc:mysql://localhost:3306/lynq_backend_db
+    username: root
+    password: federico
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      username: root
+      password: password
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        proc:
+          param_null_passing: true
+        ddl-auto: none
+        generate_statistics: false
+        dialect: org.hibernate.dialect.MySQLDialect
+        show_sql: false
+  liquibase:
+    change-log: classpath:changelog/db.changelog-config.xml
+
+
+lynq:
+  security:
+    jwt:
+      secret: 8d2b6d2a9c5e8f4f8f9d1c7a4e3b5f6d8c9a1e2f3a4b5c6d7e8f9a1b2c3d4e5
+      access-token-expiration-minutes: 15
+      refresh-token-expiration-days: 30
+
+
+server:
+  port: 8085
+  servlet:
+    context-path: '/lynq-backend-app'
+
+management:
+  server:
+    port: 8086
+  endpoint:
+    health:
+      enabled: true
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: [ health, prometheus ]
+      base-path: /actuator
+
+logging:
+  config: classpath:log4j2-spring.xml
+  level:
+    root: INFO
+    com:
+      lynq:
+        backend: DEBUG
+
