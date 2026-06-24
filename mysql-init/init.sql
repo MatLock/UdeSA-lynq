@@ -1,0 +1,2 @@
+CREATE DATABASE IF NOT EXISTS lynq_iam_db;
+CREATE DATABASE IF NOT EXISTS lynq_backend_db;

@@ -1,11 +1,35 @@
 services:
   lynq-iam:
-    build: .
+    build: ./lynq-iam
     ports:
       - "8080:8080"
       - "8081:8081"
     environment:
+      - SPRING_PROFILES_ACTIVE=production
       - DB_URL=jdbc:mysql://mysql:3306/lynq_iam_db
+      - DB_USERNAME=${DB_USERNAME:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-testpassword123}
+      - REDIS_ADDRESS=redis
+      - REDIS_PORT=6379
+      - REDIS_USERNAME=${REDIS_USERNAME:-}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ACCESS_TOKEN_EXPIRATION_MINUTES=${JWT_ACCESS_TOKEN_EXPIRATION_MINUTES:-15}
+      - JWT_REFRESH_TOKEN_EXPIRATION_DAYS=${JWT_REFRESH_TOKEN_EXPIRATION_DAYS:-30}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  lynq-app-backend:
+    build: ./lynq-app-backend
+    ports:
+      - "8082:8080"
+      - "8083:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=production
+      - DB_URL=jdbc:mysql://mysql:3306/lynq_backend_db
       - DB_USERNAME=${DB_USERNAME:-root}
       - DB_PASSWORD=${DB_PASSWORD:-testpassword123}
       - REDIS_ADDRESS=redis
@@ -27,9 +51,9 @@ services:
       - "3306:3306"
     environment:
       - MYSQL_ROOT_PASSWORD=${DB_PASSWORD:-testpassword123}
-      - MYSQL_DATABASE=lynq_iam_db
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
