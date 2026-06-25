@@ -3,8 +3,6 @@ package com.lynq.backend.controller.handler;
 import com.lynq.backend.controller.response.ErrorRestResponse;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.ForbiddenException;
-import com.lynq.backend.exceptions.InvalidPasswordException;
-import com.lynq.backend.exceptions.UserNotFoundException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -25,22 +23,6 @@ import java.util.Map;
 public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
 
   private static final String INVALID_FIELDS_ERROR_MSG = "Invalid Fields Found";
-
-  @ExceptionHandler(UserNotFoundException.class)
-  public ResponseEntity<ErrorRestResponse<Void>> handleUserNotFound(UserNotFoundException ex) {
-    log.error("message= User not found", ex);
-    return ResponseEntity
-        .status(HttpStatus.FORBIDDEN)
-        .body(new ErrorRestResponse<>(null, ex.getMessage()));
-  }
-
-  @ExceptionHandler(InvalidPasswordException.class)
-  public ResponseEntity<ErrorRestResponse<Void>> handleInvalidPassword(InvalidPasswordException ex) {
-    log.error("message= Invalid password", ex);
-    return ResponseEntity
-        .status(HttpStatus.FORBIDDEN)
-        .body(new ErrorRestResponse<>(null, ex.getMessage()));
-  }
 
   @ExceptionHandler(ForbiddenException.class)
   public ResponseEntity<ErrorRestResponse<Void>> handleForbidden(ForbiddenException ex) {

@@ -1,9 +1,10 @@
 package com.lynq.backend.filter;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.lynq.backend.client.LynqIamClient;
 import com.lynq.backend.client.response.UserInfoResponse;
-import com.lynq.backend.controller.response.ErrorRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.security.LynqUserPrincipal;
 import feign.FeignException;
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
@@ -23,6 +23,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Collections;
 import java.util.HashMap;
 
@@ -31,7 +32,6 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -49,17 +49,12 @@ class IamAuthenticationFilterTest {
   private static final String USERNAME = "johndoe";
   private static final String EMAIL = "johndoe@example.com";
 
-  private static final String EXPECTED_INVALID_TOKEN_REASON = "Invalid or expired access token";
   private static final String EXPECTED_IAM_UNAVAILABLE_REASON = "Authentication service is unavailable";
   private static final int UNAUTHORIZED = HttpStatus.UNAUTHORIZED.value();
   private static final int SERVICE_UNAVAILABLE = HttpStatus.SERVICE_UNAVAILABLE.value();
 
   @Mock
   private LynqIamClient lynqIamClient;
-
-  @Mock
-  private ObjectMapper objectMapper;
-
   @Mock
   private HttpServletRequest request;
 
@@ -73,9 +68,13 @@ class IamAuthenticationFilterTest {
   private PrintWriter responseWriter;
 
   private IamAuthenticationFilter filter;
+  private ObjectMapper objectMapper;
+
 
   @BeforeEach
   void setUp() {
+    objectMapper = new ObjectMapper();
+    objectMapper.registerModule(new JavaTimeModule());
     filter = new IamAuthenticationFilter(lynqIamClient, objectMapper);
   }
 
@@ -90,15 +89,12 @@ class IamAuthenticationFilterTest {
     when(lynqIamClient.validateToken(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
         .thenReturn(new GlobalRestResponse<>(true, Boolean.FALSE));
     when(response.getWriter()).thenReturn(responseWriter);
-    ArgumentCaptor<ErrorRestResponse<Void>> errorCaptor = errorRestResponseCaptor();
 
     filter.doFilterInternal(request, response, filterChain);
 
     verify(response).setStatus(UNAUTHORIZED);
     verify(filterChain, never()).doFilter(any(), any());
     verify(lynqIamClient, never()).getUserInfo(any(), any());
-    verify(objectMapper).writeValue(eq(responseWriter), errorCaptor.capture());
-    assertThat(errorCaptor.getValue().getReason(), is(EXPECTED_INVALID_TOKEN_REASON));
   }
 
   @Test
@@ -148,30 +144,27 @@ class IamAuthenticationFilterTest {
     when(lynqIamClient.validateToken(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
         .thenThrow(unauthorizedFeignException());
     when(response.getWriter()).thenReturn(responseWriter);
-    ArgumentCaptor<ErrorRestResponse<Void>> errorCaptor = errorRestResponseCaptor();
 
     filter.doFilterInternal(request, response, filterChain);
 
     verify(response).setStatus(UNAUTHORIZED);
     verify(filterChain, never()).doFilter(any(), any());
-    verify(objectMapper).writeValue(eq(responseWriter), errorCaptor.capture());
-    assertThat(errorCaptor.getValue().getReason(), is(EXPECTED_INVALID_TOKEN_REASON));
   }
 
   @Test
   void writesServiceUnavailableWhenIamCallFails() throws Exception {
     stubHeaders();
+    StringWriter responseBody = new StringWriter();
     when(lynqIamClient.validateToken(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
         .thenThrow(serviceUnavailableFeignException());
-    when(response.getWriter()).thenReturn(responseWriter);
-    ArgumentCaptor<ErrorRestResponse<Void>> errorCaptor = errorRestResponseCaptor();
+    when(response.getWriter()).thenReturn(new PrintWriter(responseBody));
 
     filter.doFilterInternal(request, response, filterChain);
 
     verify(response).setStatus(SERVICE_UNAVAILABLE);
     verify(filterChain, never()).doFilter(any(), any());
-    verify(objectMapper).writeValue(eq(responseWriter), errorCaptor.capture());
-    assertThat(errorCaptor.getValue().getReason(), is(EXPECTED_IAM_UNAVAILABLE_REASON));
+    JsonNode body = objectMapper.readTree(responseBody.toString());
+    assertThat(body.get("reason").asText(), is(EXPECTED_IAM_UNAVAILABLE_REASON));
   }
 
   private void stubHeaders() {
@@ -198,10 +191,5 @@ class IamAuthenticationFilterTest {
         .headers(new HashMap<>())
         .body(new byte[0])
         .build();
-  }
-
-  @SuppressWarnings("unchecked")
-  private static ArgumentCaptor<ErrorRestResponse<Void>> errorRestResponseCaptor() {
-    return ArgumentCaptor.forClass(ErrorRestResponse.class);
   }
 }

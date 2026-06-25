@@ -1,26 +1,25 @@
 package com.lynq.backend.filter;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lynq.backend.controller.response.ErrorRestResponse;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
 import java.io.PrintWriter;
+import java.io.StringWriter;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -38,9 +37,6 @@ class AuthHeaderExistenceFilterTest {
   private static final Object NO_DATA = null;
 
   @Mock
-  private ObjectMapper objectMapper;
-
-  @Mock
   private HttpServletRequest request;
 
   @Mock
@@ -53,9 +49,13 @@ class AuthHeaderExistenceFilterTest {
   private PrintWriter responseWriter;
 
   private AuthHeaderExistenceFilter filter;
+  private ObjectMapper objectMapper;
+
 
   @BeforeEach
   void setUp() {
+    objectMapper = new ObjectMapper();
+    objectMapper.registerModule(new JavaTimeModule());
     filter = new AuthHeaderExistenceFilter(objectMapper);
   }
 
@@ -94,17 +94,16 @@ class AuthHeaderExistenceFilterTest {
 
   @Test
   void doFilterInternalSerializesErrorResponseWithExpectedReasonAndFlagsWhenHeaderMissing() throws Exception {
+    StringWriter responseBody = new StringWriter();
     when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn((String) NO_DATA);
-    when(response.getWriter()).thenReturn(responseWriter);
-    ArgumentCaptor<ErrorRestResponse<Void>> errorCaptor = errorRestResponseCaptor();
+    when(response.getWriter()).thenReturn(new PrintWriter(responseBody));
 
     filter.doFilterInternal(request, response, filterChain);
 
-    verify(objectMapper).writeValue(eq(responseWriter), errorCaptor.capture());
-    ErrorRestResponse<Void> captured = errorCaptor.getValue();
-    assertThat(captured.getReason(), is(EXPECTED_MISSING_AUTH_REASON));
-    assertThat(captured.isSuccess(), is(EXPECTED_ERROR_SUCCESS_FLAG));
-    assertThat(captured.getData(), is(nullValue()));
+    JsonNode body = objectMapper.readTree(responseBody.toString());
+    assertThat(body.get("reason").asText(), is(EXPECTED_MISSING_AUTH_REASON));
+    assertThat(body.get("success").asBoolean(), is(EXPECTED_ERROR_SUCCESS_FLAG));
+    assertThat(body.get("data").isNull(), is(true));
   }
 
   @Test
@@ -119,10 +118,5 @@ class AuthHeaderExistenceFilterTest {
     when(request.getServletPath()).thenReturn("/api/v1/resource");
 
     assertThat(filter.shouldNotFilter(request), is(false));
-  }
-
-  @SuppressWarnings("unchecked")
-  private static ArgumentCaptor<ErrorRestResponse<Void>> errorRestResponseCaptor() {
-    return ArgumentCaptor.forClass(ErrorRestResponse.class);
   }
 }

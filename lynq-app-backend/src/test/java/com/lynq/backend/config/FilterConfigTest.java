@@ -29,15 +29,14 @@ class FilterConfigTest {
   private static final int IAM_AUTHENTICATION_FILTER_ORDER = 2;
 
   @Mock
-  private ObjectMapper objectMapper;
-
-  @Mock
   private LynqIamClient lynqIamClient;
 
+  private ObjectMapper objectMapper;
   private FilterConfig filterConfig;
 
   @BeforeEach
   void setUp() {
+    objectMapper = new ObjectMapper();
     filterConfig = new FilterConfig();
   }
 

@@ -1,10 +1,8 @@
 package com.lynq.backend.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedConstruction;
 
 import java.time.LocalDateTime;
 import java.time.Month;
@@ -15,9 +13,6 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mockConstruction;
-import static org.mockito.Mockito.verify;
 
 class AppConfigTest {
 
@@ -30,8 +25,6 @@ class AppConfigTest {
   private static final LocalDateTime SAMPLE_DATETIME =
       LocalDateTime.of(SAMPLE_YEAR, SAMPLE_MONTH, SAMPLE_DAY, SAMPLE_HOUR, SAMPLE_MINUTE);
   private static final String EXPECTED_SERIALIZED_YEAR_FRAGMENT = String.valueOf(SAMPLE_YEAR);
-  private static final int FIRST_CONSTRUCTED_INDEX = 0;
-  private static final int EXPECTED_CONSTRUCTED_COUNT = 1;
 
   private AppConfig appConfig;
 
@@ -62,16 +55,5 @@ class AppConfigTest {
     String serialized = objectMapper.writeValueAsString(SAMPLE_DATETIME);
 
     assertThat(serialized, containsString(EXPECTED_SERIALIZED_YEAR_FRAGMENT));
-  }
-
-  @Test
-  void createObjectMapperConstructsObjectMapperAndRegistersJavaTimeModuleOnIt() {
-    try (MockedConstruction<ObjectMapper> mockedObjectMapper = mockConstruction(ObjectMapper.class)) {
-      appConfig.createObjectMapper();
-
-      assertThat(mockedObjectMapper.constructed().size(), is(EXPECTED_CONSTRUCTED_COUNT));
-      ObjectMapper constructedMapper = mockedObjectMapper.constructed().get(FIRST_CONSTRUCTED_INDEX);
-      verify(constructedMapper).registerModule(any(JavaTimeModule.class));
-    }
   }
 }
