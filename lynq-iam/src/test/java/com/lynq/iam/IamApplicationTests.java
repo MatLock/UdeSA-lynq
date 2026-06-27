@@ -29,7 +29,7 @@ class IamApplicationTests extends AbstractE2ETest {
 	private static final String UPDATE_PASSWORD_ENDPOINT = AUTH_PATH + "/update-password";
 	private static final String VALIDATE_ENDPOINT = AUTH_PATH + "/validate";
 	private static final String REFRESH_ENDPOINT = AUTH_PATH + "/refresh";
-	private static final String USERINFO_ENDPOINT = AUTH_PATH + "/userinfo";
+	private static final String USERINFO_ENDPOINT = AUTH_PATH + "/user-info";
 
 	private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
 	private static final String AUTHORIZATION_HEADER = "Authorization";

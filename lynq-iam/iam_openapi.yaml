@@ -1,0 +1,411 @@
+openapi: 3.1.0
+info:
+  title: lynq-iam
+  description: Identity and Access Management service for the Lynq platform
+  version: v1
+servers:
+- url: http://localhost:8080/lynq-iam
+  description: Generated server url
+tags:
+- name: Users
+  description: User management operations
+paths:
+  /auth/register:
+    post:
+      tags:
+      - Users
+      summary: Create a new user
+      description: Registers a new user with unique username and email
+      operationId: createUser
+      parameters:
+      - name: lynq-request-uuid
+        in: header
+        description: Per-request correlation UUID used for log tracing
+        required: true
+        example: 550e8400-e29b-41d4-a716-446655440000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+        required: true
+      responses:
+        "201":
+          description: User created successfully
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UserRestResponse"
+        "400":
+          description: Invalid request fields
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorRestResponse"
+        "409":
+          description: Username or email already exists
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorRestResponse"
+  /auth/refresh:
+    post:
+      tags:
+      - Users
+      summary: Refresh access token
+      description: Generates a new access token using a valid refresh token
+      operationId: generateNewAccessToken
+      parameters:
+      - name: lynq-request-uuid
+        in: header
+        description: Per-request correlation UUID used for log tracing
+        required: true
+        example: 550e8400-e29b-41d4-a716-446655440000
+      responses:
+        "200":
+          description: New access token generated
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AccessTokenRefreshedResponse"
+        "401":
+          description: Missing Authorization header
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorRestResponse"
+        "403":
+          description: Invalid or expired refresh token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorRestResponse"
+      security:
+      - bearerAuth: []
+  /auth/login/username:
+    post:
+      tags:
+      - Users
+      summary: Login by username
+      description: "Authenticates a user by username and password, returns access\
+        \ and refresh tokens"
+      operationId: loginByUsername
+      parameters:
+      - name: lynq-request-uuid
+        in: header
+        description: Per-request correlation UUID used for log tracing
+        required: true
+        example: 550e8400-e29b-41d4-a716-446655440000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UsernameLogin"
+        required: true
+      responses:
+        "200":
+          description: Login successful
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UserRestResponse"
+        "400":
+          description: Invalid request fields
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorRestResponse"
+        "403":
+          description: Invalid username or password
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorRestResponse"
+  /auth/login/email:
+    post:
+      tags:
+      - Users
+      summary: Login by email
+      description: "Authenticates a user by email and password, returns access and\
+        \ refresh tokens"
+      operationId: loginByEmail
+      parameters:
+      - name: lynq-request-uuid
+        in: header
+        description: Per-request correlation UUID used for log tracing
+        required: true
+        example: 550e8400-e29b-41d4-a716-446655440000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailUserLogin"
+        required: true
+      responses:
+        "200":
+          description: Login successful
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UserRestResponse"
+        "400":
+          description: Invalid request fields
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorRestResponse"
+        "403":
+          description: Invalid email or password
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorRestResponse"
+  /auth/update-password:
+    patch:
+      tags:
+      - Users
+      summary: Update password
+      description: Updates the user's password and returns new access and refresh
+        tokens
+      operationId: updatePassword
+      parameters:
+      - name: lynq-request-uuid
+        in: header
+        description: Per-request correlation UUID used for log tracing
+        required: true
+        example: 550e8400-e29b-41d4-a716-446655440000
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdatePasswordRequest"
+        required: true
+      responses:
+        "200":
+          description: Password updated successfully
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UserRestResponse"
+        "400":
+          description: Invalid request fields
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorRestResponse"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorRestResponse"
+        "403":
+          description: User not found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorRestResponse"
+      security:
+      - bearerAuth: []
+  /auth/validate:
+    get:
+      tags:
+      - Users
+      summary: Validate access token
+      description: Checks if the provided access token is valid and not expired
+      operationId: isAccessTokenValid
+      parameters:
+      - name: lynq-request-uuid
+        in: header
+        description: Per-request correlation UUID used for log tracing
+        required: true
+        example: 550e8400-e29b-41d4-a716-446655440000
+      responses:
+        "200":
+          description: Token validation result
+          content:
+            '*/*':
+              schema:
+                type: string
+                example:
+                  success: true
+                  data: true
+        "401":
+          description: Missing Authorization header
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorRestResponse"
+      security:
+      - bearerAuth: []
+  /auth/user-info:
+    get:
+      tags:
+      - Users
+      summary: Get user info from access token
+      description: "Extracts user identity (id, username, email) from a valid access\
+        \ token"
+      operationId: obtainUserInfoFromToken
+      parameters:
+      - name: lynq-request-uuid
+        in: header
+        description: Per-request correlation UUID used for log tracing
+        required: true
+        example: 550e8400-e29b-41d4-a716-446655440000
+      responses:
+        "200":
+          description: User info extracted from token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UserInfoRestResponse"
+        "401":
+          description: Missing or invalid access token
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorRestResponse"
+      security:
+      - bearerAuth: []
+components:
+  schemas:
+    CreateUserRequest:
+      type: object
+      description: Request body for creating a new user
+      properties:
+        username:
+          type: string
+          description: Unique username
+          example: johndoe
+          maxLength: 20
+          minLength: 3
+        password:
+          type: string
+          description: User password
+          example: P@ssw0rd123
+          maxLength: 2147483647
+          minLength: 8
+        email:
+          type: string
+          format: email
+          description: Unique email address
+          example: johndoe@example.com
+          maxLength: 100
+          minLength: 0
+      required:
+      - email
+      - password
+      - username
+    UserRestResponse:
+      type: object
+      description: Successful response containing user data
+      properties:
+        id:
+          type: string
+          description: User ID
+          example: 550e8400-e29b-41d4-a716-446655440000
+        username:
+          type: string
+          description: Username
+          example: johndoe
+        email:
+          type: string
+          description: Email address
+          example: johndoe@example.com
+        creationDate:
+          type: string
+          format: date-time
+          description: Account creation date
+          example: 2026-06-02T19:30:00Z
+        refreshToken:
+          type: string
+          description: Refresh token
+          example: eyJhbGciOiJIUzI1NiJ9...
+        accessToken:
+          type: string
+          description: Access token
+          example: eyJhbGciOiJIUzI1NiJ9...
+    ErrorRestResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data: {}
+        reason:
+          type: string
+    AccessTokenRefreshedResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+    UsernameLogin:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Unique username
+          example: johndoe
+          maxLength: 20
+          minLength: 3
+        password:
+          type: string
+          description: User password
+          example: P@ssw0rd123
+          maxLength: 2147483647
+          minLength: 8
+      required:
+      - password
+      - username
+    EmailUserLogin:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          description: Unique email address
+          example: johndoe@example.com
+          maxLength: 100
+          minLength: 0
+        password:
+          type: string
+          description: User password
+          example: P@ssw0rd123
+          maxLength: 2147483647
+          minLength: 8
+      required:
+      - email
+      - password
+    UserUpdatePasswordRequest:
+      type: object
+      properties:
+        newPassword:
+          type: string
+          description: User password
+          example: P@ssw0rd123
+          maxLength: 2147483647
+          minLength: 8
+      required:
+      - newPassword
+    UserInfoRestResponse:
+      type: object
+      description: User information extracted from the access token
+      properties:
+        id:
+          type: string
+          description: User ID
+          example: 550e8400-e29b-41d4-a716-446655440000
+        username:
+          type: string
+          description: Username
+          example: johndoe
+        email:
+          type: string
+          description: Email address
+          example: johndoe@example.com
+  securitySchemes:
+    bearerAuth:
+      type: http
+      description: Paste the token *without* the `Bearer ` prefix — Swagger UI adds
+        it for you.
+      scheme: bearer
+      bearerFormat: JWT or opaque refresh token

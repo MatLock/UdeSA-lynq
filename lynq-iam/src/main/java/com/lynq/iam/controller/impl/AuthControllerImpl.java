@@ -109,7 +109,7 @@ public class AuthControllerImpl implements AuthController {
   }
 
   @Override
-  @GetMapping("/userinfo")
+  @GetMapping("/user-info")
   @AuditLog
   public ResponseEntity<GlobalRestResponse<UserInfoRestResponse>> obtainUserInfoFromToken(
       @RequestHeader("Authorization") String accessToken) {
