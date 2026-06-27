@@ -14,6 +14,7 @@ public class CreateUserRestResponse {
 
   private String id;
   private UserType userType;
+  private String fullName;
   private String userProfileImageUrl;
   private String currentPosition;
   private String about;

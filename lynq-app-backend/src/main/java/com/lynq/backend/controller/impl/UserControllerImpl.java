@@ -2,8 +2,10 @@ package com.lynq.backend.controller.impl;
 
 import com.lynq.backend.controller.UserController;
 import com.lynq.backend.controller.request.CreateUserRequest;
+import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
+import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.security.LynqUserPrincipal;
 import com.lynq.backend.service.UserService;
@@ -11,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,6 +37,7 @@ public class UserControllerImpl implements UserController {
     UserEntity user = userService.saveNewUser(
         principal.getId(),
         request.getUserType(),
+        request.getFullName(),
         request.getUserProfileImageUrl(),
         request.getCurrentPosition(),
         request.getAbout(),
@@ -44,6 +48,7 @@ public class UserControllerImpl implements UserController {
     CreateUserRestResponse response = CreateUserRestResponse.builder()
         .id(user.getId())
         .userType(user.getType())
+        .fullName(user.getFullName())
         .userProfileImageUrl(user.getProfileImageUrl())
         .currentPosition(user.getCurrentPosition())
         .about(user.getAbout())
@@ -55,6 +60,29 @@ public class UserControllerImpl implements UserController {
 
     return ResponseEntity
         .status(HttpStatus.CREATED)
+        .body(new GlobalRestResponse<>(true, response));
+  }
+
+  @Override
+  @PatchMapping
+  public ResponseEntity<GlobalRestResponse<UpdateUserProfileRestResponse>> updateUserProfile(@RequestBody UpdateUserProfileRequest request, @AuthenticationPrincipal LynqUserPrincipal principal) {
+    UserEntity user = userService.updateUserProfile(principal.getId(), request);
+
+    UpdateUserProfileRestResponse response = UpdateUserProfileRestResponse.builder()
+        .id(user.getId())
+        .userType(user.getType())
+        .fullName(user.getFullName())
+        .userProfileImageUrl(user.getProfileImageUrl())
+        .currentPosition(user.getCurrentPosition())
+        .about(user.getAbout())
+        .githubUrl(user.getGithubUrl())
+        .linkedinUrl(user.getLinkedinUrl())
+        .birthDate(user.getBirthDate())
+        .createdOn(user.getCreatedOn())
+        .build();
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, response));
   }
 

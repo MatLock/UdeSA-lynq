@@ -31,6 +31,7 @@ public class CompanyService {
     UserEntity owner = userService.saveNewUser(
         userId,
         UserType.COMPANY,
+        null,
         request.getUserProfileImageUrl(),
         request.getCurrentPosition(),
         request.getUserAbout(),

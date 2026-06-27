@@ -1,8 +1,10 @@
 package com.lynq.backend.controller;
 
 import com.lynq.backend.controller.request.CreateUserRequest;
+import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
+import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
 import com.lynq.backend.security.LynqUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -127,6 +129,108 @@ public interface UserController {
                     "birthDate": "1995-04-12"
                   }""")))
       @Valid CreateUserRequest request,
+      @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
+      summary = "Update the authenticated user's profile",
+      description = "Partially updates the profile of the authenticated user. The user identity is "
+          + "resolved from the bearer token. Only the fields present in the request body are "
+          + "modified; omitted fields keep their current value.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Profile updated successfully",
+          content = @Content(
+              schema = @Schema(implementation = UpdateUserProfileRestResponse.class),
+              examples = @ExampleObject(
+                  name = "Updated",
+                  value = """
+                      {
+                        "success": true,
+                        "data": {
+                          "id": "550e8400-e29b-41d4-a716-446655440000",
+                          "userType": "CANDIDATE",
+                          "fullName": "Jane Doe",
+                          "userProfileImageUrl": "https://cdn.lynq.com/avatars/jane.png",
+                          "currentPosition": "Staff Engineer",
+                          "about": "Java developer focused on distributed systems.",
+                          "githubUrl": "https://github.com/janedoe",
+                          "linkedinUrl": "https://linkedin.com/in/janedoe",
+                          "birthDate": "1995-04-12",
+                          "createdOn": "2026-06-25"
+                        }
+                      }"""))),
+      @ApiResponse(
+          responseCode = "404",
+          description = "No user exists for the authenticated identity",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "User not found",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "User '550e8400-e29b-41d4-a716-446655440000' not found"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "403",
+          description = "Missing required lynq-request-uuid header",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Missing header",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Missing required header"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "401",
+          description = "Missing or invalid bearer token",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Unauthorized",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Invalid or expired token"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "500",
+          description = "Unexpected server error",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Server error",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Unexpected error"
+                      }""")))
+  })
+  @Parameters({
+      @Parameter(
+          name = "lynq-request-uuid",
+          in = ParameterIn.HEADER,
+          required = true,
+          description = "Unique identifier for the request, echoed back in the response and used "
+              + "for log correlation. Requests without it are rejected with 403.",
+          example = "550e8400-e29b-41d4-a716-446655440000")
+  })
+  ResponseEntity<GlobalRestResponse<UpdateUserProfileRestResponse>> updateUserProfile(
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+          description = "Profile fields to update. Only the supplied fields are modified.",
+          required = true,
+          content = @Content(examples = @ExampleObject(
+              name = "Partial profile update",
+              value = """
+                  {
+                    "fullName": "Jane Doe",
+                    "currentPosition": "Staff Engineer"
+                  }""")))
+      @Valid UpdateUserProfileRequest request,
       @Parameter(hidden = true) LynqUserPrincipal principal);
 
 }

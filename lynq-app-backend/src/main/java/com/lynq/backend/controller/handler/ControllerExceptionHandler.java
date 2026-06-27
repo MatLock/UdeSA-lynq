@@ -3,6 +3,7 @@ package com.lynq.backend.controller.handler;
 import com.lynq.backend.controller.response.ErrorRestResponse;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.ForbiddenException;
+import com.lynq.backend.exceptions.NotFoundException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -37,6 +38,14 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
     log.error("message= Bad request", ex);
     return ResponseEntity
         .status(HttpStatus.BAD_REQUEST)
+        .body(new ErrorRestResponse<>(null, ex.getMessage()));
+  }
+
+  @ExceptionHandler(NotFoundException.class)
+  public ResponseEntity<ErrorRestResponse<Void>> handleNotFound(NotFoundException ex) {
+    log.error("message= Not found", ex);
+    return ResponseEntity
+        .status(HttpStatus.NOT_FOUND)
         .body(new ErrorRestResponse<>(null, ex.getMessage()));
   }
 

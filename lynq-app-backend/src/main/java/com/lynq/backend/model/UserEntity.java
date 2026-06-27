@@ -32,6 +32,9 @@ public class UserEntity {
   @Column(name = "id", length = 36, nullable = false)
   private String id;
 
+  @Column(name = "full_name")
+  private String fullName;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "type", nullable = false)
   private UserType type;
