@@ -41,6 +41,20 @@ services:
       lynq-iam:
         condition: service_started
 
+  lynq-app-frontend:
+    build:
+      context: ./lynq-app-frontend
+      args:
+        # Vite bakes these at build time; the browser runs on the host, so they
+        # point at the host-exposed ports of the IAM and backend services.
+        - LYNQ_IAM_BASE_URL=${LYNQ_IAM_BASE_URL:-http://localhost:8080/lynq-iam}
+        - LYNQ_BACKEND_BASE_URL=${LYNQ_BACKEND_BASE_URL:-http://localhost:8082/lynq-backend-app}
+    ports:
+      - "3000:80"
+    depends_on:
+      - lynq-iam
+      - lynq-app-backend
+
   mysql:
     image: mysql:9.0
     ports:
