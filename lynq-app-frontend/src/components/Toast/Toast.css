@@ -1,0 +1,60 @@
+/* Toast — transient notification. Inherits tokens from index.css. */
+
+.toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 360px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border-left: 4px solid var(--brand-purple);
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 14px;
+  text-align: left;
+  box-shadow: var(--shadow);
+  animation: toast-in 0.2s ease;
+}
+
+.toast-error {
+  border-left-color: #ef4444;
+}
+
+.toast-success {
+  border-left-color: var(--brand-blue-dark);
+}
+
+.toast-message {
+  flex: 1;
+}
+
+.toast-close {
+  flex: none;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.toast-close:hover {
+  color: var(--text-h);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

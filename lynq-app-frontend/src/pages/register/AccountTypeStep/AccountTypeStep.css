@@ -1,0 +1,175 @@
+/* AccountTypeStep — step 1 of the register wizard. Tokens from index.css. */
+
+.account-type-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.account-type-question {
+  font-size: 18px;
+  color: var(--text);
+  margin: 0;
+}
+
+.account-type-helper {
+  font-size: 14px;
+  color: var(--text);
+  margin: 2px 0 0;
+}
+
+.account-type-options {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+  margin-top: 28px;
+}
+
+.account-type-card {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 28px 24px;
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.account-type-card:hover {
+  border-color: var(--brand-purple-light);
+}
+
+.account-type-card.selected {
+  border-color: var(--brand-purple);
+  box-shadow: 0 0 0 1px var(--brand-purple);
+}
+
+/* Native radio is kept for accessibility but hidden; the visual is below. */
+.account-type-card input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.account-type-radio {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  transition: border-color 0.15s ease;
+}
+
+.account-type-card.selected .account-type-radio {
+  border-color: var(--brand-purple);
+}
+
+.account-type-card.selected .account-type-radio::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--brand-purple);
+}
+
+.account-type-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+}
+
+.tone-blue .account-type-icon {
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--brand-blue-dark);
+}
+
+.tone-purple .account-type-icon {
+  background: rgba(168, 85, 247, 0.12);
+  color: var(--brand-purple);
+}
+
+.account-type-card-title {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+.account-type-card-desc {
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.account-type-divider {
+  width: 100%;
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 28px 0 0;
+}
+
+.account-type-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 20px 0 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.account-type-actions {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 28px;
+}
+
+.account-type-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 300px;
+  font: inherit;
+  font-size: 16px;
+  padding: 14px 24px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: #fff;
+  background: var(--brand-gradient);
+  transition: opacity 0.15s ease;
+}
+
+.account-type-actions button:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.account-type-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 560px) {
+  .account-type-options {
+    flex-direction: column;
+  }
+
+  .account-type-actions button {
+    min-width: 100%;
+  }
+}

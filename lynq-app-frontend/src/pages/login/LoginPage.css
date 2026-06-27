@@ -1,0 +1,345 @@
+/* LoginPage — card on a decorated background. Tokens from index.css. */
+
+.login-bg {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: auto;
+  background:
+    radial-gradient(ellipse at top left, #efeafc 0%, transparent 45%),
+    radial-gradient(ellipse at bottom right, #e8f1fc 0%, transparent 45%),
+    #f7f6fb;
+}
+
+/* Soft brand blobs in opposite corners. */
+.login-bg::before,
+.login-bg::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.login-bg::before {
+  top: -140px;
+  left: -140px;
+  width: 380px;
+  height: 380px;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.18), transparent 70%);
+}
+
+.login-bg::after {
+  bottom: -140px;
+  right: -140px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.18), transparent 70%);
+}
+
+/* Dotted grids, top-left and bottom-right. */
+.login-dots {
+  position: absolute;
+  width: 130px;
+  height: 130px;
+  pointer-events: none;
+  background-image: radial-gradient(
+    circle,
+    rgba(56, 189, 248, 0.45) 1.5px,
+    transparent 1.5px
+  );
+  background-size: 16px 16px;
+}
+
+.login-dots-tl {
+  top: 48px;
+  left: 48px;
+}
+
+.login-dots-br {
+  bottom: 48px;
+  right: 48px;
+}
+
+.login-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 480px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(80, 60, 150, 0.12);
+  text-align: center;
+}
+
+.login-title {
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.5px;
+  padding-bottom: 4px;
+  margin: 0;
+}
+
+.login-subtitle {
+  color: var(--text);
+  font-style: italic;
+  font-size: 13px;
+  margin: 2px 0 0;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 18px;
+  text-align: left;
+}
+
+/* Field: icon circle on the left, label + input stacked on the right. */
+.login-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.login-field-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  margin-top: 20px;
+}
+
+.tone-blue {
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--brand-blue-dark);
+}
+
+.tone-purple {
+  background: rgba(168, 85, 247, 0.12);
+  color: var(--brand-purple);
+}
+
+.login-field-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-field-body label {
+  color: var(--text-h);
+  font-size: 13px;
+}
+
+.login-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-form input {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text-h);
+  outline: none;
+}
+
+.login-input-wrap input {
+  padding-right: 44px;
+}
+
+.login-form input:focus {
+  border-color: var(--brand-purple);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.login-form input[aria-invalid='true'] {
+  border-color: #ef4444;
+}
+
+.login-form input[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.login-eye {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.login-eye:hover {
+  color: var(--text-h);
+}
+
+.login-error {
+  color: #ef4444;
+  font-size: 12px;
+  margin: 0;
+}
+
+.login-options {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.login-forgot {
+  font: inherit;
+  font-size: 13px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--brand-purple);
+  cursor: pointer;
+}
+
+.login-forgot:hover {
+  text-decoration: underline;
+}
+
+.login-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.login-actions button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #fff;
+  background: var(--brand-gradient);
+  transition: opacity 0.15s ease;
+}
+
+.login-actions button:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.login-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-secondary {
+  background: transparent !important;
+  color: var(--brand-purple) !important;
+  border: 1.5px solid var(--brand-purple) !important;
+}
+
+/* "ó" divider with a rule on each side. */
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin: 18px 0 12px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.login-continue {
+  color: var(--text);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.login-social {
+  width: 100%;
+}
+
+.login-social-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.login-social-btn:hover {
+  border-color: var(--brand-purple-light);
+  background: var(--social-bg);
+}
+
+.login-security {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 18px 0 0;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.login-security svg {
+  color: var(--brand-purple);
+}
+
+@media (max-width: 560px) {
+  .login-card {
+    padding: 24px 18px;
+  }
+
+  .login-title {
+    font-size: 24px;
+  }
+
+  .login-actions {
+    flex-direction: column;
+  }
+}

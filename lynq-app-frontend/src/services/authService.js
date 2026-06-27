@@ -14,7 +14,7 @@ const IAM_BASE_URL =
  * @returns {Promise<object>} The parsed UserRestResponse payload.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
-async function login(path, body) {
+const login = async (path, body) => {
   const response = await fetch(`${IAM_BASE_URL}${path}`, {
     method: 'POST',
     headers: {
@@ -56,9 +56,8 @@ async function login(path, body) {
  * @throws {Error} If credentials are invalid or the request fails. The thrown
  *   error carries `status` (HTTP code) and `reason` (server-provided message).
  */
-async function user_authenticate(username, password) {
-  return login('/auth/login/username', { username, password });
-}
+const user_authenticate = async (username, password) =>
+  login('/auth/login/username', { username, password });
 
 /**
  * Authenticate a user with their email and password.
@@ -78,9 +77,8 @@ async function user_authenticate(username, password) {
  * @throws {Error} If credentials are invalid or the request fails. The thrown
  *   error carries `status` (HTTP code) and `reason` (server-provided message).
  */
-async function email_authenticate(email, password) {
-  return login('/auth/login/email', { email, password });
-}
+const email_authenticate = async (email, password) =>
+  login('/auth/login/email', { email, password });
 
 /**
  * Register a new user.
@@ -102,7 +100,7 @@ async function email_authenticate(email, password) {
  * @throws {Error} On invalid fields (400) or duplicate username/email (409).
  *   The thrown error carries `status` (HTTP code) and `reason` (server message).
  */
-async function user_register(userInfo) {
+const user_register = async (userInfo) => {
   const response = await fetch(`${IAM_BASE_URL}/auth/register`, {
     method: 'POST',
     headers: {
@@ -146,7 +144,7 @@ async function user_register(userInfo) {
  * @throws {Error} On invalid fields (400), missing/invalid token (401), or user
  *   not found (403). The thrown error carries `status` and `reason`.
  */
-async function user_update_password(newPassword, accessToken) {
+const user_update_password = async (newPassword, accessToken) => {
   const response = await fetch(`${IAM_BASE_URL}/auth/update-password`, {
     method: 'PATCH',
     headers: {
@@ -183,7 +181,7 @@ async function user_update_password(newPassword, accessToken) {
  * @throws {Error} On a missing Authorization header (401) or an invalid/expired
  *   refresh token (403). The thrown error carries `status` and `reason`.
  */
-async function refresh_access_token(refresh_token) {
+const refresh_access_token = async (refresh_token) => {
   const response = await fetch(`${IAM_BASE_URL}/auth/refresh`, {
     method: 'POST',
     headers: {
@@ -217,7 +215,7 @@ async function refresh_access_token(refresh_token) {
  * @throws {Error} On a missing Authorization header (401). The thrown error
  *   carries `status` and `reason`.
  */
-async function validate_access_token(accessToken) {
+const validate_access_token = async (accessToken) => {
   const response = await fetch(`${IAM_BASE_URL}/auth/validate`, {
     method: 'GET',
     headers: {
@@ -252,7 +250,7 @@ async function validate_access_token(accessToken) {
  * @throws {Error} On a missing or invalid access token (401). The thrown error
  *   carries `status` and `reason`.
  */
-async function user_info(accessToken) {
+const user_info = async (accessToken) => {
   const response = await fetch(`${IAM_BASE_URL}/auth/user-info`, {
     method: 'GET',
     headers: {

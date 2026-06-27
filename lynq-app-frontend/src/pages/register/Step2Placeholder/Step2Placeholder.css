@@ -1,0 +1,20 @@
+/* TEMPORARY placeholder styling — remove with the placeholder. */
+
+.step2-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.step2-placeholder a {
+  color: var(--brand-purple);
+  text-decoration: none;
+}
+
+.step2-placeholder a:hover {
+  text-decoration: underline;
+}
