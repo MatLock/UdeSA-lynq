@@ -27,3 +27,5 @@ date,prompt
 "27-06-2026","add a label component that shows the total of steps for the registration to finish. in the case of users LYNQ para candidatos there are only two steps but for companies there are three"
 "27-06-2026","add calendar component next to date of birth input. Make it an isolate component. user can select the date by typping it or selecting the date from the calendar""27-06-2026","display toast with error if backend fails when trying to create an account"
 "27-06-2026","make the toast to appear from the bottom"
+
+"27-06-2026","in login page add a check component with legend ES: recordarme? EN: remember me?"

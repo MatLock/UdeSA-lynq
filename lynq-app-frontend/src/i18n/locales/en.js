@@ -8,6 +8,7 @@ const en = {
     passwordPlaceholder: 'Your password',
     showPassword: 'Show password',
     hidePassword: 'Hide password',
+    rememberMe: 'Remember me?',
     forgotPassword: 'Forgot your password?',
     loginButton: 'Log in',
     registerButton: 'Sign up',

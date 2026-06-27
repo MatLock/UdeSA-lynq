@@ -18,6 +18,7 @@ const LoginPage = () => {
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
   const [toast, setToast] = useState(null)
   const [fieldErrors, setFieldErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
@@ -123,6 +124,14 @@ const LoginPage = () => {
           </div>
 
           <div className="login-options">
+            <label className="login-remember">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(event) => setRememberMe(event.target.checked)}
+              />
+              {t.rememberMe}
+            </label>
             <button type="button" className="login-forgot">
               {t.forgotPassword}
             </button>
