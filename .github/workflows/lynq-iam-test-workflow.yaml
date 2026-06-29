@@ -1,0 +1,54 @@
+name: lynq-iam CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lynq-iam:
+    name: "lynq-iam: Test & Coverage"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+
+      - name: Setup Java Environment
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: temurin
+          architecture: x64
+          cache: maven
+
+      - name: Run tests with coverage
+        working-directory: lynq-iam
+        run: mvn -B clean verify
+
+      - name: Upload JaCoCo HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: lynq-iam/target/site/jacoco/
+
+      - name: Generate JaCoCo coverage badge
+        if: github.ref == 'refs/heads/main'
+        uses: cicirello/jacoco-badge-generator@v2
+        with:
+          jacoco-csv-file: lynq-iam/target/site/jacoco/jacoco.csv
+          badges-directory: .github/badges
+          generate-coverage-badge: true
+          coverage-badge-filename: jacoco.svg
+
+      - name: Commit badge back to main
+        if: github.ref == 'refs/heads/main'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update coverage badge [skip ci]"
+          file_pattern: .github/badges/jacoco.svg
