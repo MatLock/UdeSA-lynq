@@ -34,7 +34,7 @@ public class FilterConfig {
     public FilterRegistrationBean<AuthHeaderValidationFilter> createAuthHeaderValidationFilter(ObjectMapper objectMapper, JWTService jwtService) {
         FilterRegistrationBean<AuthHeaderValidationFilter> registration = new FilterRegistrationBean<>();
         registration.setFilter(new AuthHeaderValidationFilter(objectMapper, jwtService));
-        registration.addUrlPatterns("/auth/validate", "/auth/update-password", "/auth/user-info");
+        registration.addUrlPatterns("/auth/update-password", "/auth/user-info");
         registration.setOrder(2);
         return registration;
     }

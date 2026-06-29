@@ -23,10 +23,10 @@ import static org.hamcrest.Matchers.notNullValue;
 class FilterConfigTest {
 
   private static final String URL_PATTERN_ALL = "/*";
-  private static final String URL_PATTERN_VALIDATE = "/lynq-iam/auth/validate";
-  private static final String URL_PATTERN_REFRESH = "/lynq-iam/auth/refresh";
-  private static final String URL_PATTERN_UPDATE_PASSWORD = "/lynq-iam/auth/update-password";
-  private static final String URL_PATTERN_USERINFO = "/lynq-iam/auth/userinfo";
+  private static final String URL_PATTERN_VALIDATE = "/auth/validate";
+  private static final String URL_PATTERN_REFRESH = "/auth/refresh";
+  private static final String URL_PATTERN_UPDATE_PASSWORD = "/auth/update-password";
+  private static final String URL_PATTERN_USERINFO = "/auth/user-info";
 
   private static final int REQUEST_UUID_FILTER_ORDER = 0;
   private static final int AUTH_HEADER_EXISTENCE_FILTER_ORDER = 1;
@@ -112,7 +112,6 @@ class FilterConfigTest {
         filterConfig.createAuthHeaderValidationFilter(objectMapper, jwtService);
 
     assertThat(registration.getUrlPatterns(), containsInAnyOrder(
-        URL_PATTERN_VALIDATE,
         URL_PATTERN_UPDATE_PASSWORD,
         URL_PATTERN_USERINFO
     ));
