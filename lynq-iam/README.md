@@ -1,7 +1,7 @@
 # lynq-iam
 
-[![CI](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lyqn-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lyqn-test-workflow.yaml)
-[![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lyqn/main/.github/badges/jacoco.svg)](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lyqn-test-workflow.yaml)
+[![CI](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lynq-iam-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lynq-iam-test-workflow.yaml)
+[![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lyqn/main/.github/badges/jacoco.svg)](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lynq-iam-test-workflow.yaml)
 
 Identity and Access Management service for the Lynq platform. Issues short-lived JWT access tokens and opaque, Redis-backed refresh tokens, and exposes endpoints for registration, login (by username or email), token refresh, token validation, and password update.
 
@@ -102,8 +102,8 @@ Every request passes through an ordered filter chain before reaching a controlle
 | Order | Filter                       | Scope                                                                          | Purpose                                                                 |
 | :---: | ---------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
 | 0     | `RequestUuidFilter`          | `/*`                                                                           | Require `lynq-request-uuid` header; bind it to SLF4J MDC for log correlation. |
-| 1     | `AuthHeaderExistenceFilter`  | `/auth/validate`, `/auth/refresh`, `/auth/update-password`, `/auth/userinfo`   | 401 if `Authorization` is missing or blank.                             |
-| 2     | `AuthHeaderValidationFilter` | `/auth/validate`, `/auth/update-password`, `/auth/userinfo`                    | 401 if the bearer JWT is invalid or expired.                            |
+| 1     | `AuthHeaderExistenceFilter`  | `/auth/validate`, `/auth/refresh`, `/auth/update-password`, `/auth/user-info`   | 401 if `Authorization` is missing or blank.                             |
+| 2     | `AuthHeaderValidationFilter` | `/auth/validate`, `/auth/update-password`, `/auth/user-info`                    | 401 if the bearer JWT is invalid or expired.                            |
 
 `/auth/refresh` deliberately skips JWT validation — the access token may already be expired; the refresh token is validated against Redis inside `AuthService`.
 
@@ -234,7 +234,7 @@ All requests must include the `lynq-request-uuid` header.
 | POST   | `/auth/refresh`               | Bearer refresh token | Issue a new 15-min access token.             |
 | GET    | `/auth/validate`              | Bearer access token  | Returns `true` if the access token is valid. |
 | PATCH  | `/auth/update-password`       | Bearer access token  | Rotate password, return fresh tokens.        |
-| GET    | `/auth/userinfo`              | Bearer access token  | Return user identity (id, username, email) extracted from the access token. |
+| GET    | `/auth/user-info`              | Bearer access token  | Return user identity (id, username, email) extracted from the access token. |
 
 OpenAPI / Swagger UI is exposed at `/lynq-iam/swagger-ui.html` (springdoc default).
 
@@ -310,7 +310,7 @@ curl -X PATCH http://localhost:8080/lynq-iam/auth/update-password \
 **Get user info from access token**
 
 ```bash
-curl http://localhost:8080/lynq-iam/auth/userinfo \
+curl http://localhost:8080/lynq-iam/auth/user-info \
   -H "lynq-request-uuid: $UUID" \
   -H "Authorization: Bearer $ACCESS_TOKEN"
 ```
@@ -370,8 +370,8 @@ The default profile in `application.yaml` is preconfigured for `localhost:3306` 
 
 ```bash
 # 1. Start MySQL and Redis however you prefer (Homebrew, Docker, etc.)
-#    Easiest path: use just the data services from docker-compose:
-docker compose up -d mysql redis
+#    Easiest path: use just the data services from the repo-root compose file:
+docker compose -f ../docker-compose.yaml up -d mysql redis
 
 # 2. Build and run
 ./mvnw clean package
@@ -392,17 +392,18 @@ Service URLs:
 
 ## Running with Docker
 
-`docker-compose.yaml` provisions the app, MySQL, and Redis together:
+The repo-root `docker-compose.yaml` provisions the app, MySQL, and Redis together. Run the compose commands from the repository root (one level up from this module):
 
 ```bash
 # Build the jar first (the image just COPYs it in)
 ./mvnw clean package
 
-# Bring everything up
+# Bring everything up from the repo root
+cd ..
 docker compose up --build
 ```
 
-To override credentials, pass them via env vars or a `.env` file alongside the compose file:
+To override credentials, pass them via env vars or a `.env` file alongside the compose file (at the repo root):
 
 ```env
 DB_USERNAME=root
