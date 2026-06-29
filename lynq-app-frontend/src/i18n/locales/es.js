@@ -104,6 +104,11 @@ const es = {
   common: {
     close: 'Cerrar',
   },
+  home: {
+    title: 'Bienvenido a LYNQ',
+    subtitle: 'Tu página de inicio — próximamente',
+    placeholder: 'Esta página es un mock. El comportamiento se definirá más adelante.',
+  },
   datePicker: {
     open: 'Abrir calendario',
     previousMonth: 'Mes anterior',

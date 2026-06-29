@@ -10,6 +10,7 @@
 //                                        company in a single call)
 
 import authService from './authService';
+import requestUuidUtil from '../utils/requestUuid';
 
 const APP_BASE_URL =
   import.meta.env.LYNQ_BACKEND_BASE_URL ?? 'http://localhost:8082/lynq-backend-app';
@@ -21,15 +22,18 @@ const APP_BASE_URL =
  * @param {string} path - Endpoint path relative to the app-backend base URL.
  * @param {object} body - JSON request body.
  * @param {string} accessToken - Bearer access token from registration/login.
+ * @param {string} [requestUuid] - Correlation id for the `lynq-request-uuid`
+ *   header; defaults to a fresh id. Registration passes the same id used for the
+ *   IAM auth call so the whole flow shares one trace.
  * @returns {Promise<object>} The parsed response payload.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
-const postSecured = async (path, body, accessToken) => {
+const postSecured = async (path, body, accessToken, requestUuid = requestUuidUtil.newRequestUuid()) => {
   const response = await fetch(`${APP_BASE_URL}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'lynq-request-uuid': crypto.randomUUID(),
+      'lynq-request-uuid': requestUuid,
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(body),
@@ -61,9 +65,12 @@ const postSecured = async (path, body, accessToken) => {
  * @returns {Promise<object>} The auth response (with tokens).
  */
 const register_candidate = async ({ username, email, password, fullName, birthDate }) => {
-  const auth = await authService.user_register({ username, email, password });
-  const accessToken = auth?.data?.accessToken;
-  await postSecured('/user', { userType: 'CANDIDATE', fullName, birthDate }, accessToken);
+  // One correlation id for the whole functionality: the IAM register call and
+  // the backend profile call below share it so they trace as a single flow.
+  const requestUuid = requestUuidUtil.newRequestUuid();
+  const auth = await authService.user_register({ username, email, password }, requestUuid);
+  const accessToken = auth?.accessToken;
+  await postSecured('/user', { userType: 'CANDIDATE', fullName, birthDate }, accessToken, requestUuid);
   return auth;
 };
 
@@ -87,8 +94,12 @@ const register_company = async ({
   companySize,
   companyProfileImageUrl,
 }) => {
-  const auth = await authService.user_register({ username, email, password });
-  const accessToken = auth?.data?.accessToken;
+  // One correlation id for the whole functionality: the IAM register call and
+  // the backend owner-profile + company call below share it so they trace as a
+  // single flow.
+  const requestUuid = requestUuidUtil.newRequestUuid();
+  const auth = await authService.user_register({ username, email, password }, requestUuid);
+  const accessToken = auth?.accessToken;
   await postSecured(
     '/company',
     {
@@ -101,7 +112,8 @@ const register_company = async ({
       companySize,
       companyProfileImageUrl,
     },
-    accessToken
+    accessToken,
+    requestUuid
   );
   return auth;
 };

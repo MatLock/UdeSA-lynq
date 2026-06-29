@@ -3,7 +3,7 @@ package com.lynq.backend.controller.impl;
 import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.response.CreateJobRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
-import com.lynq.backend.enums.JobPostType;
+import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
@@ -39,7 +39,7 @@ class JobControllerImplTest {
   private static final WorkType WORK_TYPE = WorkType.REMOTE;
   private static final Integer SALARY_RANGE_DOWN = 80000;
   private static final Integer SALARY_RANGE_TOP = 120000;
-  private static final JobPostType JOB_POST_TYPE = JobPostType.LYNQ;
+  private static final JobPostSource JOB_POST_TYPE = JobPostSource.LYNQ;
   private static final List<String> SKILLS = List.of("Java", "Spring");
   private static final LocalDate CREATED_ON = LocalDate.of(2026, 6, 26);
 
@@ -59,7 +59,7 @@ class JobControllerImplTest {
     when(request.getWorkType()).thenReturn(WORK_TYPE);
     when(request.getSalaryRangeDown()).thenReturn(SALARY_RANGE_DOWN);
     when(request.getSalaryRangeTop()).thenReturn(SALARY_RANGE_TOP);
-    when(request.getJobPostType()).thenReturn(JOB_POST_TYPE);
+    when(request.getJobPostSource()).thenReturn(JOB_POST_TYPE);
     when(request.getSkills()).thenReturn(SKILLS);
     when(jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         JOB_POST_TYPE, SKILLS)).thenReturn(savedJob());
@@ -103,7 +103,7 @@ class JobControllerImplTest {
     assertThat(data.getWorkType(), is(WORK_TYPE));
     assertThat(data.getSalaryRangeDown(), is(SALARY_RANGE_DOWN));
     assertThat(data.getSalaryRangeTop(), is(SALARY_RANGE_TOP));
-    assertThat(data.getJobPostType(), is(JOB_POST_TYPE));
+    assertThat(data.getJobPostSource(), is(JOB_POST_TYPE));
     assertThat(data.getCreatedOn(), is(CREATED_ON));
     assertThat(data.getCompanyId(), is(COMPANY_ID));
     assertThat(data.getCreatedByUserId(), is(USER_ID));
@@ -118,7 +118,7 @@ class JobControllerImplTest {
         .workType(WORK_TYPE)
         .salaryRangeDown(SALARY_RANGE_DOWN)
         .salaryRangeTop(SALARY_RANGE_TOP)
-        .jobPostType(JOB_POST_TYPE)
+        .jobPostSource(JOB_POST_TYPE)
         .createdOn(CREATED_ON)
         .createdByUser(UserEntity.builder().id(USER_ID).build())
         .company(CompanyEntity.builder().id(COMPANY_ID).build())

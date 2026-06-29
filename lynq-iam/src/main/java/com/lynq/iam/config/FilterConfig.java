@@ -25,7 +25,7 @@ public class FilterConfig {
     public FilterRegistrationBean<AuthHeaderExistenceFilter> createAuthHeaderExistenceFilter(ObjectMapper objectMapper) {
         FilterRegistrationBean<AuthHeaderExistenceFilter> registration = new FilterRegistrationBean<>();
         registration.setFilter(new AuthHeaderExistenceFilter(objectMapper));
-        registration.addUrlPatterns("/lynq-iam/auth/validate", "/lynq-iam/auth/refresh", "/lynq-iam/auth/update-password", "/lynq-iam/auth/userinfo");
+        registration.addUrlPatterns("/auth/validate", "/auth/refresh", "/auth/update-password", "/auth/user-info");
         registration.setOrder(1);
         return registration;
     }
@@ -34,7 +34,7 @@ public class FilterConfig {
     public FilterRegistrationBean<AuthHeaderValidationFilter> createAuthHeaderValidationFilter(ObjectMapper objectMapper, JWTService jwtService) {
         FilterRegistrationBean<AuthHeaderValidationFilter> registration = new FilterRegistrationBean<>();
         registration.setFilter(new AuthHeaderValidationFilter(objectMapper, jwtService));
-        registration.addUrlPatterns("/lynq-iam/auth/validate", "/lynq-iam/auth/update-password", "/lynq-iam/auth/userinfo");
+        registration.addUrlPatterns("/auth/validate", "/auth/update-password", "/auth/user-info");
         registration.setOrder(2);
         return registration;
     }

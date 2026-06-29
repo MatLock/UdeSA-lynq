@@ -2,7 +2,7 @@ package com.lynq.backend.service;
 
 import com.fasterxml.uuid.Generators;
 import com.lynq.backend.aspect.AuditLog;
-import com.lynq.backend.enums.JobPostType;
+import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.exceptions.BadRequestException;
@@ -41,7 +41,7 @@ public class JobService {
   @AuditLog
   @Transactional
   public JobPostEntity createJob(String title, String description, WorkType workType,
-      Integer salaryRangeDown, Integer salaryRangeTop, JobPostType jobPostType,
+      Integer salaryRangeDown, Integer salaryRangeTop, JobPostSource jobPostSource,
       List<String> skills) {
     UserEntity user = getAuthenticatedUser();
 
@@ -59,7 +59,7 @@ public class JobService {
         .workType(workType)
         .salaryRangeDown(salaryRangeDown)
         .salaryRangeTop(salaryRangeTop)
-        .jobPostType(jobPostType)
+        .jobPostSource(jobPostSource)
         .createdOn(LocalDate.now())
         .createdByUser(user)
         .company(company)

@@ -4,7 +4,7 @@ import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
-import com.lynq.backend.enums.JobPostType;
+import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.model.CompanyEntity;
@@ -44,7 +44,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String CREATE_COMPANY_PATH = "/company";
   private static final String CREATE_JOB_PATH = "/job";
   private static final String VALIDATE_PATH = "/auth/validate";
-  private static final String USERINFO_PATH = "/auth/userinfo";
+  private static final String USERINFO_PATH = "/auth/user-info";
 
   private static final String AUTHORIZATION_HEADER = "Authorization";
   private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
@@ -78,7 +78,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final WorkType JOB_WORK_TYPE = WorkType.REMOTE;
   private static final Integer JOB_SALARY_RANGE_DOWN = 80000;
   private static final Integer JOB_SALARY_RANGE_TOP = 120000;
-  private static final JobPostType JOB_POST_TYPE = JobPostType.LYNQ;
+  private static final JobPostSource JOB_POST_TYPE = JobPostSource.LYNQ;
   private static final List<String> JOB_SKILLS = List.of("Java", "Spring", "PostgreSQL");
 
   @LocalServerPort
@@ -289,7 +289,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(data.get("workType"), is(JOB_WORK_TYPE.name()));
     assertThat(data.get("salaryRangeDown"), is(JOB_SALARY_RANGE_DOWN));
     assertThat(data.get("salaryRangeTop"), is(JOB_SALARY_RANGE_TOP));
-    assertThat(data.get("jobPostType"), is(JOB_POST_TYPE.name()));
+    assertThat(data.get("jobPostSource"), is(JOB_POST_TYPE.name()));
     assertThat(data.get("createdOn"), is(notNullValue()));
     assertThat(data.get("companyId"), is(COMPANY_ID));
     assertThat(data.get("createdByUserId"), is(USER_ID));
@@ -534,7 +534,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     request.setWorkType(JOB_WORK_TYPE);
     request.setSalaryRangeDown(JOB_SALARY_RANGE_DOWN);
     request.setSalaryRangeTop(JOB_SALARY_RANGE_TOP);
-    request.setJobPostType(JOB_POST_TYPE);
+    request.setJobPostSource(JOB_POST_TYPE);
     request.setSkills(skills);
     return request;
   }

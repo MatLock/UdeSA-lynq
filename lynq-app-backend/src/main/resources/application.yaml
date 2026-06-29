@@ -35,7 +35,7 @@ lynq:
 
 
 server:
-  port: 8085
+  port: 8082
   servlet:
     context-path: '/lynq-backend-app'
 
@@ -47,7 +47,7 @@ springdoc:
 
 management:
   server:
-    port: 8086
+    port: 8083
   endpoint:
     health:
       enabled: true
@@ -70,5 +70,5 @@ logging:
     root: INFO
     com:
       lynq:
-        backend: DEBUG
+        backend: INFO
 

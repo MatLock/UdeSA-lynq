@@ -1,0 +1,14 @@
+/* HomePage — mock placeholder. Reuses the auth card design from LoginPage
+   (.login-bg / .login-dots / .login-card / .login-title) and brand tokens
+   from index.css. Behaviour to be defined later. */
+
+.home-card {
+  gap: 12px;
+}
+
+.home-placeholder {
+  margin-top: 18px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}

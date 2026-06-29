@@ -1,6 +1,6 @@
 package com.lynq.backend.controller.request;
 
-import com.lynq.backend.enums.JobPostType;
+import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.WorkType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -26,6 +26,6 @@ public class CreateJobRequest {
   @Positive
   private Integer salaryRangeTop;
   @NotNull
-  private JobPostType jobPostType;
+  private JobPostSource jobPostSource;
   private List<String> skills;
 }

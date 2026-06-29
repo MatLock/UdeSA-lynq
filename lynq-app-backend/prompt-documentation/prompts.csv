@@ -96,3 +96,5 @@ parameters:
 "27-06-2026","add Full Name to userEntity"
 "27-06-2026","add fullName as part of the request of `createUser`"
 "27-06-2026","create a new endpoint. PATCH to modify userProfile fields. fields allowed to be modified in the request. birthDate, linkedinUrl, githubUrl, about, currentPosition, userProfileImageUrl, fullName""27-06-2026","how can I generate openapi specification of all the endpoints in this service"
+"28-06-2026","getting a 503 for http://localhost:8082/lynq-backend-app/user when creating an user"
+"28-06-2026","add `owner_user_id` to table companies like it is defined in CompanyEntity.java"

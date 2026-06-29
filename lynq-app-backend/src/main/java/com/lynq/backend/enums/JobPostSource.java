@@ -1,6 +1,6 @@
 package com.lynq.backend.enums;
 
-public enum JobPostType {
+public enum JobPostSource {
   LYNQ,
   LINKEDIN,
   COMPUTRABAJO,

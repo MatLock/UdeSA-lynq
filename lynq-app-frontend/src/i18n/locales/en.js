@@ -104,6 +104,11 @@ const en = {
   common: {
     close: 'Close',
   },
+  home: {
+    title: 'Welcome to LYNQ',
+    subtitle: 'Your home page — coming soon',
+    placeholder: 'This page is a mock. Behaviour will be defined later.',
+  },
   datePicker: {
     open: 'Open calendar',
     previousMonth: 'Previous month',

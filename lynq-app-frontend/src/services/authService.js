@@ -1,6 +1,8 @@
 // Auth service — talks to the lynq-iam API.
 // Spec: lynq-iam/iam_openapi.yaml
 
+import requestUuidUtil from '../utils/requestUuid';
+
 const IAM_BASE_URL =
   import.meta.env.LYNQ_IAM_BASE_URL ?? 'http://localhost:8080/lynq-iam';
 
@@ -11,15 +13,18 @@ const IAM_BASE_URL =
  *
  * @param {string} path - Endpoint path relative to the IAM base URL.
  * @param {object} body - JSON request body for the endpoint.
+ * @param {string} [requestUuid] - Correlation id for the `lynq-request-uuid`
+ *   header; defaults to a fresh id. Pass a shared id to trace a multi-call
+ *   functionality across services.
  * @returns {Promise<object>} The parsed UserRestResponse payload.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
-const login = async (path, body) => {
+const login = async (path, body, requestUuid = requestUuidUtil.newRequestUuid()) => {
   const response = await fetch(`${IAM_BASE_URL}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'lynq-request-uuid': crypto.randomUUID(),
+      'lynq-request-uuid': requestUuid,
     },
     body: JSON.stringify(body),
   });
@@ -35,7 +40,9 @@ const login = async (path, body) => {
     throw error;
   }
 
-  return payload;
+  // Success responses wrap the payload in a GlobalRestResponse ({ success, data });
+  // unwrap so callers receive the flat UserRestResponse.
+  return payload?.data;
 }
 
 /**
@@ -56,8 +63,8 @@ const login = async (path, body) => {
  * @throws {Error} If credentials are invalid or the request fails. The thrown
  *   error carries `status` (HTTP code) and `reason` (server-provided message).
  */
-const user_authenticate = async (username, password) =>
-  login('/auth/login/username', { username, password });
+const user_authenticate = async (username, password, requestUuid) =>
+  login('/auth/login/username', { username, password }, requestUuid);
 
 /**
  * Authenticate a user with their email and password.
@@ -77,8 +84,8 @@ const user_authenticate = async (username, password) =>
  * @throws {Error} If credentials are invalid or the request fails. The thrown
  *   error carries `status` (HTTP code) and `reason` (server-provided message).
  */
-const email_authenticate = async (email, password) =>
-  login('/auth/login/email', { email, password });
+const email_authenticate = async (email, password, requestUuid) =>
+  login('/auth/login/email', { email, password }, requestUuid);
 
 /**
  * Register a new user.
@@ -89,6 +96,9 @@ const email_authenticate = async (email, password) =>
  * @param {string} userInfo.username - Unique username (3–20 chars).
  * @param {string} userInfo.password - User password (min 8 chars).
  * @param {string} userInfo.email - Unique email address (max 100 chars).
+ * @param {string} [requestUuid] - Correlation id for the `lynq-request-uuid`
+ *   header; defaults to a fresh id. Registration passes a shared id so the IAM
+ *   call and the subsequent backend profile/company call share one trace.
  * @returns {Promise<{
  *   id: string,
  *   username: string,
@@ -100,12 +110,12 @@ const email_authenticate = async (email, password) =>
  * @throws {Error} On invalid fields (400) or duplicate username/email (409).
  *   The thrown error carries `status` (HTTP code) and `reason` (server message).
  */
-const user_register = async (userInfo) => {
+const user_register = async (userInfo, requestUuid = requestUuidUtil.newRequestUuid()) => {
   const response = await fetch(`${IAM_BASE_URL}/auth/register`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'lynq-request-uuid': crypto.randomUUID(),
+      'lynq-request-uuid': requestUuid,
     },
     body: JSON.stringify(userInfo),
   });
@@ -121,7 +131,9 @@ const user_register = async (userInfo) => {
     throw error;
   }
 
-  return payload;
+  // Unwrap the GlobalRestResponse envelope ({ success, data }) so callers get the
+  // flat UserRestResponse with the new user's id and access/refresh tokens.
+  return payload?.data;
 }
 
 /**
@@ -144,12 +156,12 @@ const user_register = async (userInfo) => {
  * @throws {Error} On invalid fields (400), missing/invalid token (401), or user
  *   not found (403). The thrown error carries `status` and `reason`.
  */
-const user_update_password = async (newPassword, accessToken) => {
+const user_update_password = async (newPassword, accessToken, requestUuid = requestUuidUtil.newRequestUuid()) => {
   const response = await fetch(`${IAM_BASE_URL}/auth/update-password`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      'lynq-request-uuid': crypto.randomUUID(),
+      'lynq-request-uuid': requestUuid,
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({ newPassword }),
@@ -166,7 +178,8 @@ const user_update_password = async (newPassword, accessToken) => {
     throw error;
   }
 
-  return payload;
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
+  return payload?.data;
 }
 
 /**
@@ -181,11 +194,11 @@ const user_update_password = async (newPassword, accessToken) => {
  * @throws {Error} On a missing Authorization header (401) or an invalid/expired
  *   refresh token (403). The thrown error carries `status` and `reason`.
  */
-const refresh_access_token = async (refresh_token) => {
+const refresh_access_token = async (refresh_token, requestUuid = requestUuidUtil.newRequestUuid()) => {
   const response = await fetch(`${IAM_BASE_URL}/auth/refresh`, {
     method: 'POST',
     headers: {
-      'lynq-request-uuid': crypto.randomUUID(),
+      'lynq-request-uuid': requestUuid,
       Authorization: `Bearer ${refresh_token}`,
     },
   });
@@ -201,7 +214,8 @@ const refresh_access_token = async (refresh_token) => {
     throw error;
   }
 
-  return payload?.accessToken;
+  // AccessTokenRefreshedResponse is wrapped in a GlobalRestResponse ({ data }).
+  return payload?.data?.accessToken;
 }
 
 /**
@@ -215,11 +229,11 @@ const refresh_access_token = async (refresh_token) => {
  * @throws {Error} On a missing Authorization header (401). The thrown error
  *   carries `status` and `reason`.
  */
-const validate_access_token = async (accessToken) => {
+const validate_access_token = async (accessToken, requestUuid = requestUuidUtil.newRequestUuid()) => {
   const response = await fetch(`${IAM_BASE_URL}/auth/validate`, {
     method: 'GET',
     headers: {
-      'lynq-request-uuid': crypto.randomUUID(),
+      'lynq-request-uuid': requestUuid,
       Authorization: `Bearer ${accessToken}`,
     },
   });
@@ -250,11 +264,11 @@ const validate_access_token = async (accessToken) => {
  * @throws {Error} On a missing or invalid access token (401). The thrown error
  *   carries `status` and `reason`.
  */
-const user_info = async (accessToken) => {
+const user_info = async (accessToken, requestUuid = requestUuidUtil.newRequestUuid()) => {
   const response = await fetch(`${IAM_BASE_URL}/auth/user-info`, {
     method: 'GET',
     headers: {
-      'lynq-request-uuid': crypto.randomUUID(),
+      'lynq-request-uuid': requestUuid,
       Authorization: `Bearer ${accessToken}`,
     },
   });
@@ -270,7 +284,8 @@ const user_info = async (accessToken) => {
     throw error;
   }
 
-  return payload;
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
+  return payload?.data;
 }
 
 export default {

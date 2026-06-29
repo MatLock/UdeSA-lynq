@@ -1,6 +1,6 @@
 package com.lynq.backend.model;
 
-import com.lynq.backend.enums.JobPostType;
+import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.WorkType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -58,8 +58,8 @@ public class JobPostEntity {
   private LocalDate createdOn;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "job_post_type", nullable = false)
-  private JobPostType jobPostType;
+  @Column(name = "job_post_source", nullable = false)
+  private JobPostSource jobPostSource;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "created_by_user_id")

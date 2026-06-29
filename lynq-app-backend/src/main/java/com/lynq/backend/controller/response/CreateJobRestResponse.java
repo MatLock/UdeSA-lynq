@@ -1,6 +1,6 @@
 package com.lynq.backend.controller.response;
 
-import com.lynq.backend.enums.JobPostType;
+import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.WorkType;
 import java.time.LocalDate;
 import java.util.List;
@@ -23,7 +23,7 @@ public class CreateJobRestResponse {
   private WorkType workType;
   private Integer salaryRangeDown;
   private Integer salaryRangeTop;
-  private JobPostType jobPostType;
+  private JobPostSource jobPostSource;
   private LocalDate createdOn;
   private String companyId;
   private String createdByUserId;

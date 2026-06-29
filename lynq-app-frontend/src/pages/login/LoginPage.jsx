@@ -7,6 +7,7 @@ import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined'
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import authService from '../../services/authService'
+import useAuth from '../../hooks/useAuth'
 import Toast from '../../components/Toast/Toast'
 import GoogleIcon from '../../components/GoogleIcon/GoogleIcon'
 import strings from '../../i18n'
@@ -24,6 +25,7 @@ const LoginPage = () => {
   const [submitting, setSubmitting] = useState(false)
 
   const navigate = useNavigate()
+  const { login } = useAuth()
   const t = strings.login
 
   const validate = () => {
@@ -40,11 +42,11 @@ const LoginPage = () => {
     if (!validate()) return
     setSubmitting(true)
     try {
-      if (isEmail(identifier)) {
-        await authService.email_authenticate(identifier, password)
-      } else {
-        await authService.user_authenticate(identifier, password)
-      }
+      const user = isEmail(identifier)
+        ? await authService.email_authenticate(identifier, password)
+        : await authService.user_authenticate(identifier, password)
+      login(user, rememberMe)
+      navigate('/home')
     } catch (err) {
       setToast(err?.message || t.errors.loginFailed)
     } finally {

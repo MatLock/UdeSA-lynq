@@ -35,7 +35,7 @@ public class JobControllerImpl implements JobController {
         request.getWorkType(),
         request.getSalaryRangeDown(),
         request.getSalaryRangeTop(),
-        request.getJobPostType(),
+        request.getJobPostSource(),
         request.getSkills());
 
     CreateJobRestResponse response = CreateJobRestResponse.builder()
@@ -45,7 +45,7 @@ public class JobControllerImpl implements JobController {
         .workType(job.getWorkType())
         .salaryRangeDown(job.getSalaryRangeDown())
         .salaryRangeTop(job.getSalaryRangeTop())
-        .jobPostType(job.getJobPostType())
+        .jobPostSource(job.getJobPostSource())
         .createdOn(job.getCreatedOn())
         .companyId(job.getCompany().getId())
         .createdByUserId(job.getCreatedByUser().getId())

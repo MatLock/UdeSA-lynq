@@ -23,7 +23,7 @@ public interface LynqIamClient {
       @RequestHeader(AUTHORIZATION_HEADER) String authorization,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
 
-  @GetMapping("/auth/userinfo")
+  @GetMapping("/auth/user-info")
   GlobalRestResponse<UserInfoResponse> getUserInfo(
       @RequestHeader(AUTHORIZATION_HEADER) String authorization,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);

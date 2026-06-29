@@ -1,6 +1,6 @@
 package com.lynq.backend.service;
 
-import com.lynq.backend.enums.JobPostType;
+import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.exceptions.BadRequestException;
@@ -51,7 +51,7 @@ class JobServiceTest {
   private static final WorkType WORK_TYPE = WorkType.REMOTE;
   private static final Integer SALARY_RANGE_DOWN = 80000;
   private static final Integer SALARY_RANGE_TOP = 120000;
-  private static final JobPostType JOB_POST_TYPE = JobPostType.LYNQ;
+  private static final JobPostSource JOB_POST_TYPE = JobPostSource.LYNQ;
   private static final List<String> NO_SKILLS = null;
   private static final List<String> SKILLS = List.of("Java", "Spring", "PostgreSQL");
 
@@ -101,7 +101,7 @@ class JobServiceTest {
     assertThat(saved.getWorkType(), is(WORK_TYPE));
     assertThat(saved.getSalaryRangeDown(), is(SALARY_RANGE_DOWN));
     assertThat(saved.getSalaryRangeTop(), is(SALARY_RANGE_TOP));
-    assertThat(saved.getJobPostType(), is(JOB_POST_TYPE));
+    assertThat(saved.getJobPostSource(), is(JOB_POST_TYPE));
     assertThat(saved.getCreatedOn(), is(LocalDate.now()));
     assertThat(saved.getCreatedByUser(), is(sameInstance(user)));
     assertThat(saved.getCompany(), is(sameInstance(company)));
