@@ -98,6 +98,23 @@ class UserServiceTest {
   }
 
   @Test
+  void getUserReturnsEntityFoundByRepository() {
+    UserEntity existing = existingUser();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+
+    UserEntity result = userService.getUser(USER_ID);
+
+    assertThat(result, is(sameInstance(existing)));
+  }
+
+  @Test
+  void getUserThrowsNotFoundWhenUserDoesNotExist() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+    assertThrows(NotFoundException.class, () -> userService.getUser(USER_ID));
+  }
+
+  @Test
   void updateUserProfileAppliesSuppliedFieldsToExistingUser() {
     UserEntity existing = existingUser();
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));

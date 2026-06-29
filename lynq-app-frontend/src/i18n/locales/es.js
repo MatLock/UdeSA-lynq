@@ -109,6 +109,42 @@ const es = {
     subtitle: 'Tu página de inicio — próximamente',
     placeholder: 'Esta página es un mock. El comportamiento se definirá más adelante.',
   },
+  sidebar: {
+    collapse: 'Contraer menú',
+    expand: 'Expandir menú',
+    avatarAlt: 'Foto de perfil',
+    fullName: 'Nombre completo',
+    home: 'Página principal',
+    profile: 'Perfil',
+    resume: 'Mi CV',
+    applications: 'Mis Postulaciones',
+    company: 'Mi empresa',
+    jobPosts: 'Mis publicaciones',
+    language: 'Cambiar idioma',
+    logout: 'Cerrar sesión',
+  },
+  pages: {
+    profile: {
+      title: 'Perfil',
+      subtitle: 'Tu perfil — próximamente',
+    },
+    resume: {
+      title: 'Mi CV',
+      subtitle: 'Tu currículum — próximamente',
+    },
+    applications: {
+      title: 'Mis Postulaciones',
+      subtitle: 'Tus postulaciones — próximamente',
+    },
+    company: {
+      title: 'Mi empresa',
+      subtitle: 'Tu empresa — próximamente',
+    },
+    jobPosts: {
+      title: 'Mis publicaciones',
+      subtitle: 'Tus publicaciones de empleo — próximamente',
+    },
+  },
   datePicker: {
     open: 'Abrir calendario',
     previousMonth: 'Mes anterior',

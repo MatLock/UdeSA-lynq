@@ -7,6 +7,8 @@ import {
   useState,
 } from 'react'
 import authService from '../services/authService'
+import userService from '../services/userService'
+import useReduxDevtools from '../hooks/useReduxDevtools'
 
 // Holds the authenticated session: the access/refresh tokens and the user
 // identity. RequireAuth treats a session as valid only when all three are set.
@@ -57,6 +59,25 @@ const persistSession = (session) => {
   }
 }
 
+// Merge an app-backend profile (GetUserRestResponse from GET /user) into a base
+// user. The avatar field is normalized to `profileImageUrl` so consumers (e.g.
+// the sidebar) read a single name. Returns the base user unchanged when no
+// profile is given.
+const withProfile = (user, profile) =>
+  profile
+    ? {
+        ...user,
+        fullName: profile.fullName,
+        profileImageUrl: profile.userProfileImageUrl,
+        userType: profile.userType,
+        currentPosition: profile.currentPosition,
+        about: profile.about,
+        githubUrl: profile.githubUrl,
+        linkedinUrl: profile.linkedinUrl,
+        birthDate: profile.birthDate,
+      }
+    : user
+
 const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(readSession)
   // Bootstrap is only needed when there's no in-tab session but there may be a
@@ -91,10 +112,22 @@ const AuthProvider = ({ children }) => {
           persisted.refreshToken,
         )
         if (cancelled) return
+
+        // Refresh the profile so a remembered session doesn't show stale data.
+        // Non-fatal: fall back to the persisted user if the lookup fails.
+        let user = persisted.user
+        try {
+          const profile = await userService.get_user(accessToken)
+          user = withProfile(persisted.user, profile)
+        } catch {
+          // Keep the persisted user — backend unreachable or no profile.
+        }
+        if (cancelled) return
+
         setSession({
           accessToken,
           refreshToken: persisted.refreshToken,
-          user: persisted.user,
+          user,
           remembered: true,
         })
       } catch {
@@ -118,16 +151,23 @@ const AuthProvider = ({ children }) => {
 
   // Accepts the UserRestResponse returned by authService login/register:
   // { id, username, email, creationDate, accessToken, refreshToken }.
-  const login = useCallback((payload, rememberMe = false) => {
+  //
+  // `profile` is the optional GetUserRestResponse from the app-backend (GET
+  // /user). When present its fields are merged into the stored user so consumers
+  // (e.g. the sidebar) get fullName / profileImageUrl without a second lookup.
+  const login = useCallback((payload, rememberMe = false, profile = null) => {
     const next = {
       accessToken: payload.accessToken,
       refreshToken: payload.refreshToken,
-      user: {
-        id: payload.id,
-        username: payload.username,
-        email: payload.email,
-        creationDate: payload.creationDate,
-      },
+      user: withProfile(
+        {
+          id: payload.id,
+          username: payload.username,
+          email: payload.email,
+          creationDate: payload.creationDate,
+        },
+        profile,
+      ),
       remembered: rememberMe,
     }
     persistSession(next)
@@ -184,6 +224,18 @@ const AuthProvider = ({ children }) => {
     }),
     [session, loading, login, logout, refreshSession],
   )
+
+  // Mirror the auth state into the Redux DevTools extension (dev only). Tokens
+  // are reduced to presence flags to keep the inspector readable and avoid
+  // dumping raw credentials into its timeline.
+  useReduxDevtools('auth', {
+    isAuthenticated: value.isAuthenticated,
+    loading,
+    user: value.user,
+    remembered: session?.remembered ?? false,
+    hasAccessToken: Boolean(session?.accessToken),
+    hasRefreshToken: Boolean(session?.refreshToken),
+  })
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

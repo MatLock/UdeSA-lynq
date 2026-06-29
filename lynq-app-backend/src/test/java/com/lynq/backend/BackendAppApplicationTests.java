@@ -149,6 +149,53 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   @Test
+  void getUserAuthenticatesAndReturnsFullProfile() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCandidateUser();
+
+    HttpResponse<String> response = getUser();
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> body = parse(response.body());
+    assertThat(body.get("success"), is(true));
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> data = (Map<String, Object>) body.get("data");
+    assertThat(data.get("id"), is(USER_ID));
+    assertThat(data.get("userType"), is(UserType.CANDIDATE.name()));
+    assertThat(data.get("fullName"), is(FULL_NAME));
+    assertThat(data.get("userProfileImageUrl"), is(PROFILE_IMAGE_URL));
+    assertThat(data.get("currentPosition"), is(CURRENT_POSITION));
+    assertThat(data.get("about"), is(ABOUT));
+    assertThat(data.get("githubUrl"), is(GITHUB_URL));
+    assertThat(data.get("linkedinUrl"), is(LINKEDIN_URL));
+    assertThat(data.get("birthDate"), is(BIRTH_DATE.toString()));
+    assertThat(data.get("createdOn"), is(notNullValue()));
+  }
+
+  @Test
+  void getUserReturnsNotFoundWhenUserDoesNotExist() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+
+    HttpResponse<String> response = getUser();
+
+    assertThat(response.statusCode(), is(404));
+    assertThat(parse(response.body()).get("success"), is(false));
+  }
+
+  @Test
+  void getUserReturnsUnauthorizedWhenIamRejectsToken() throws Exception {
+    stubIamInvalidToken();
+    seedCandidateUser();
+
+    HttpResponse<String> response = getUser();
+
+    assertThat(response.statusCode(), is(401));
+  }
+
+  @Test
   void updateUserProfileAuthenticatesAppliesSuppliedFieldsAndReturnsOk() throws Exception {
     stubIamValidateToken();
     stubIamUserInfo();
@@ -399,6 +446,16 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .birthDate(BIRTH_DATE)
         .createdOn(LocalDate.now())
         .build());
+  }
+
+  private HttpResponse<String> getUser() throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(createUserUrl()))
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .GET()
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
   }
 
   private HttpResponse<String> patchUserProfile(UpdateUserProfileRequest updateRequest) throws Exception {

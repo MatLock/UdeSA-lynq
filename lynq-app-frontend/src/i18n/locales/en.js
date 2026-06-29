@@ -109,6 +109,42 @@ const en = {
     subtitle: 'Your home page — coming soon',
     placeholder: 'This page is a mock. Behaviour will be defined later.',
   },
+  sidebar: {
+    collapse: 'Collapse menu',
+    expand: 'Expand menu',
+    avatarAlt: 'Profile picture',
+    fullName: 'Full Name',
+    home: 'Home',
+    profile: 'Profile',
+    resume: 'My Resume',
+    applications: 'My Applications',
+    company: 'My Company',
+    jobPosts: 'My Job Posts',
+    language: 'Change language',
+    logout: 'Logout',
+  },
+  pages: {
+    profile: {
+      title: 'Profile',
+      subtitle: 'Your profile — coming soon',
+    },
+    resume: {
+      title: 'My Resume',
+      subtitle: 'Your resume — coming soon',
+    },
+    applications: {
+      title: 'My Applications',
+      subtitle: 'Your applications — coming soon',
+    },
+    company: {
+      title: 'My Company',
+      subtitle: 'Your company — coming soon',
+    },
+    jobPosts: {
+      title: 'My Job Posts',
+      subtitle: 'Your job posts — coming soon',
+    },
+  },
   datePicker: {
     open: 'Open calendar',
     previousMonth: 'Previous month',

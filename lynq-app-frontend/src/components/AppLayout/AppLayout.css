@@ -1,0 +1,6 @@
+/* Authenticated-area shell: persistent Sidebar on the left, the active page
+   (via <Outlet />) fills the rest. Pages render only their own content. */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}

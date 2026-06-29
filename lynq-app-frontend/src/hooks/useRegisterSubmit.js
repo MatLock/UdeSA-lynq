@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuth from './useAuth'
+import userService from '../services/userService'
 import strings from '../i18n'
 
 // Drives the final registration submit from whichever step is last (DetailsStep
@@ -21,7 +22,18 @@ const useRegisterSubmit = () => {
     setSubmitting(true)
     try {
       const auth = await action()
-      login(auth)
+
+      // Enrich the session with the freshly-created profile (fullName, avatar,
+      // and crucially userType, which drives the sidebar menu). Non-fatal: the
+      // user is still logged in if the lookup fails.
+      let profile = null
+      try {
+        profile = await userService.get_user(auth.accessToken)
+      } catch {
+        // Profile not yet readable or backend unreachable — proceed without it.
+      }
+
+      login(auth, false, profile)
       navigate('/home')
       return true
     } catch (err) {

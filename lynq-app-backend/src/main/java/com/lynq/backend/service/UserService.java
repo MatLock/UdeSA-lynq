@@ -40,6 +40,13 @@ public class UserService {
   }
 
   @AuditLog
+  @Transactional(readOnly = true)
+  public UserEntity getUser(String userId) {
+    return userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException("User '" + userId + "' not found"));
+  }
+
+  @AuditLog
   @Transactional
   public UserEntity updateUserProfile(String userId, UpdateUserProfileRequest request) {
     UserEntity user = userRepository.findById(userId)

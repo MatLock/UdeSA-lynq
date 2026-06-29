@@ -1,0 +1,14 @@
+/* MockPage — shared placeholder shell. .login-bg is position:fixed/inset:0 on
+   the auth pages; inside the AppLayout shell it must instead flow next to the
+   sidebar, so reset it to a normal flex child that fills the remaining space. */
+.mock-page {
+  position: relative;
+  inset: auto;
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+}
+
+.mock-card {
+  gap: 12px;
+}

@@ -4,6 +4,7 @@ import com.lynq.backend.controller.UserController;
 import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
+import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
 import com.lynq.backend.model.UserEntity;
@@ -13,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,6 +31,29 @@ public class UserControllerImpl implements UserController {
 
   public UserControllerImpl(UserService userService){
     this.userService = userService;
+  }
+
+  @Override
+  @GetMapping
+  public ResponseEntity<GlobalRestResponse<GetUserRestResponse>> getUser(@AuthenticationPrincipal LynqUserPrincipal principal) {
+    UserEntity user = userService.getUser(principal.getId());
+
+    GetUserRestResponse response = GetUserRestResponse.builder()
+        .id(user.getId())
+        .userType(user.getType())
+        .fullName(user.getFullName())
+        .userProfileImageUrl(user.getProfileImageUrl())
+        .currentPosition(user.getCurrentPosition())
+        .about(user.getAbout())
+        .githubUrl(user.getGithubUrl())
+        .linkedinUrl(user.getLinkedinUrl())
+        .birthDate(user.getBirthDate())
+        .createdOn(user.getCreatedOn())
+        .build();
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, response));
   }
 
   @Override

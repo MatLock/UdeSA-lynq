@@ -7,7 +7,9 @@ import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined'
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded'
 import authService from '../../services/authService'
+import userService from '../../services/userService'
 import useAuth from '../../hooks/useAuth'
+import requestUuidUtil from '../../utils/requestUuid'
 import Toast from '../../components/Toast/Toast'
 import GoogleIcon from '../../components/GoogleIcon/GoogleIcon'
 import strings from '../../i18n'
@@ -42,10 +44,23 @@ const LoginPage = () => {
     if (!validate()) return
     setSubmitting(true)
     try {
-      const user = isEmail(identifier)
-        ? await authService.email_authenticate(identifier, password)
-        : await authService.user_authenticate(identifier, password)
-      login(user, rememberMe)
+      // One correlation id for the whole login functionality: the IAM auth call
+      // and the app-backend profile fetch below share it so they trace together.
+      const requestUuid = requestUuidUtil.newRequestUuid()
+      const auth = isEmail(identifier)
+        ? await authService.email_authenticate(identifier, password, requestUuid)
+        : await authService.user_authenticate(identifier, password, requestUuid)
+
+      // Enrich the session with the user's profile (fullName, avatar, …).
+      // Non-fatal: if the profile lookup fails, the user is still logged in.
+      let profile = null
+      try {
+        profile = await userService.get_user(auth.accessToken, requestUuid)
+      } catch {
+        // No profile yet, or the backend is unreachable — proceed without it.
+      }
+
+      login(auth, rememberMe, profile)
       navigate('/home')
     } catch (err) {
       setToast(err?.message || t.errors.loginFailed)

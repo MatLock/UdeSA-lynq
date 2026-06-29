@@ -1,0 +1,191 @@
+/* Sidebar — collapsible left navigation bar. Uses the brand tokens from
+   index.css (--brand-blue / --brand-purple / --brand-gradient). Behaviour
+   (navigation, active state) to be defined later. */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 172.8px;
+  flex-shrink: 0;
+  height: 100vh;
+  padding: 16px 12px;
+  box-sizing: border-box;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  transition: width 0.2s ease;
+  overflow: hidden;
+}
+
+.sidebar-collapsed {
+  width: 46.08px;
+}
+
+/* Header bar: user avatar + full name on the left, collapse toggle on the right. */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding-bottom: 12px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+
+/* Collapsed: stack avatar above the toggle since the row won't fit the rail. */
+.sidebar-collapsed .sidebar-header {
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.sidebar-collapsed .sidebar-toggle {
+  margin-left: 0;
+}
+
+/* Collapsed: the rail shows only the toggle — hide the avatar. */
+.sidebar-collapsed .sidebar-avatar {
+  display: none;
+}
+
+.sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--brand-purple);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.sidebar-toggle:hover {
+  border-color: var(--brand-purple);
+  background: color-mix(in srgb, var(--brand-purple) 8%, transparent);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-item:hover {
+  background: color-mix(in srgb, var(--brand-blue) 12%, transparent);
+  color: var(--text-h);
+}
+
+/* Active route — brand gradient tint + accent text. */
+.sidebar-item-active,
+.sidebar-item-active:hover {
+  background: color-mix(in srgb, var(--brand-purple) 14%, transparent);
+  color: var(--brand-purple-dark);
+  font-weight: 600;
+}
+
+.sidebar-collapsed .sidebar-item {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.sidebar-item-icon {
+  font-size: 14.4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.sidebar-item-icon svg {
+  display: block;
+  width: 14.4px;
+  height: 14.4px;
+}
+
+.sidebar-item-label {
+  font-size: 11.2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Avatar — user image or fallback icon, shown in the header. */
+.sidebar-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--brand-gradient);
+  color: #fff;
+}
+
+.sidebar-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sidebar-avatar svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sidebar-username {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.2px;
+  font-weight: 600;
+  color: var(--text-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Footer (language + logout) pinned to the bottom of the bar. */
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: auto;
+}
+
+.sidebar-logout {
+  color: var(--brand-purple-dark);
+}
+
+.sidebar-logout:hover {
+  background: color-mix(in srgb, var(--brand-purple) 12%, transparent);
+}
+
+/* Language switch — the current locale code sits in a small brand pill. */
+.sidebar-lang .sidebar-item-label {
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--brand-purple);
+}

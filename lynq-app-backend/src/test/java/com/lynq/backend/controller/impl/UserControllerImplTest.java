@@ -3,6 +3,7 @@ package com.lynq.backend.controller.impl;
 import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
+import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
 import com.lynq.backend.enums.UserType;
@@ -67,6 +68,48 @@ class UserControllerImplTest {
     when(request.getGithubUrl()).thenReturn(GITHUB_URL);
     when(request.getLinkedinUrl()).thenReturn(LINKEDIN_URL);
     when(request.getBirthDate()).thenReturn(BIRTH_DATE);
+  }
+
+  @Test
+  void getUserDelegatesToServiceWithPrincipalId() {
+    when(userService.getUser(USER_ID)).thenReturn(savedUser());
+
+    userController.getUser(principal);
+
+    verify(userService).getUser(USER_ID);
+  }
+
+  @Test
+  void getUserRespondsWithOkStatus() {
+    when(userService.getUser(USER_ID)).thenReturn(savedUser());
+
+    ResponseEntity<GlobalRestResponse<GetUserRestResponse>> response =
+        userController.getUser(principal);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void getUserMapsEntityIntoResponseData() {
+    when(userService.getUser(USER_ID)).thenReturn(savedUser());
+
+    ResponseEntity<GlobalRestResponse<GetUserRestResponse>> response =
+        userController.getUser(principal);
+
+    GlobalRestResponse<GetUserRestResponse> body = response.getBody();
+    assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    GetUserRestResponse data = body.getData();
+    assertThat(data.getId(), is(USER_ID));
+    assertThat(data.getUserType(), is(USER_TYPE));
+    assertThat(data.getFullName(), is(FULL_NAME));
+    assertThat(data.getUserProfileImageUrl(), is(PROFILE_IMAGE_URL));
+    assertThat(data.getCurrentPosition(), is(CURRENT_POSITION));
+    assertThat(data.getAbout(), is(ABOUT));
+    assertThat(data.getGithubUrl(), is(GITHUB_URL));
+    assertThat(data.getLinkedinUrl(), is(LINKEDIN_URL));
+    assertThat(data.getBirthDate(), is(BIRTH_DATE));
+    assertThat(data.getCreatedOn(), is(CREATED_ON));
   }
 
   @Test
