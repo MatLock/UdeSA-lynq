@@ -95,4 +95,15 @@ public class UserService {
     return preSignedUploadUrl.url();
   }
 
+  @AuditLog
+  @Transactional(readOnly = true)
+  public String obtainProfileImagePreSignedUrl(String userId) {
+    UserEntity user = userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException("User '" + userId + "' not found"));
+    if (user.getProfileImageUrl() == null || user.getProfileImageUrl().isBlank()) {
+      return null;
+    }
+    return storageService.obtainUserProfilePreSignedUrl(user);
+  }
+
 }

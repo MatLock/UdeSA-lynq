@@ -115,4 +115,4 @@ parameters:
 "30-06-2026","delete the old s3 object on replacement"
 "30-06-2026","add integration test for s3 push and obtain using testcontainer + localstack"
 "30-06-2026","remove getUserProfileImageUrl from `CreateUserRequest` in `createUser` endpoint implementation"
-"30-06-2026","remove getUserProfileImageUrl from `CreateUserRequest` in `createUser` endpoint implementation"
+"30-06-2026","alter method `getUser` and `createUser` if the profileImageUrl is not null. generate the presigned url to point to the image in S3"

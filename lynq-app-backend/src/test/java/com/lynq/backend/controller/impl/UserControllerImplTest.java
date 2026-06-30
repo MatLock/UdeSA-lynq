@@ -95,6 +95,7 @@ class UserControllerImplTest {
   @Test
   void getUserMapsEntityIntoResponseData() {
     when(userService.getUser(USER_ID)).thenReturn(savedUser());
+    when(userService.obtainProfileImagePreSignedUrl(USER_ID)).thenReturn(PRE_SIGNED_URL);
 
     ResponseEntity<GlobalRestResponse<GetUserRestResponse>> response =
         userController.getUser(principal);
@@ -106,7 +107,7 @@ class UserControllerImplTest {
     assertThat(data.getId(), is(USER_ID));
     assertThat(data.getUserType(), is(USER_TYPE));
     assertThat(data.getFullName(), is(FULL_NAME));
-    assertThat(data.getUserProfileImageUrl(), is(PROFILE_IMAGE_URL));
+    assertThat(data.getUserProfileImageUrl(), is(PRE_SIGNED_URL));
     assertThat(data.getCurrentPosition(), is(CURRENT_POSITION));
     assertThat(data.getAbout(), is(ABOUT));
     assertThat(data.getGithubUrl(), is(GITHUB_URL));
@@ -158,6 +159,7 @@ class UserControllerImplTest {
     stubCreateRequestFields();
     when(userService.saveNewUser(USER_ID, USER_TYPE, FULL_NAME, CURRENT_POSITION, ABOUT,
         GITHUB_URL, LINKEDIN_URL, BIRTH_DATE)).thenReturn(savedUser());
+    when(userService.obtainProfileImagePreSignedUrl(USER_ID)).thenReturn(PRE_SIGNED_URL);
 
     ResponseEntity<GlobalRestResponse<CreateUserRestResponse>> response =
         userController.createUser(request, principal);
@@ -166,7 +168,7 @@ class UserControllerImplTest {
     assertThat(data.getId(), is(USER_ID));
     assertThat(data.getUserType(), is(USER_TYPE));
     assertThat(data.getFullName(), is(FULL_NAME));
-    assertThat(data.getUserProfileImageUrl(), is(PROFILE_IMAGE_URL));
+    assertThat(data.getUserProfileImageUrl(), is(PRE_SIGNED_URL));
     assertThat(data.getCurrentPosition(), is(CURRENT_POSITION));
     assertThat(data.getAbout(), is(ABOUT));
     assertThat(data.getGithubUrl(), is(GITHUB_URL));
