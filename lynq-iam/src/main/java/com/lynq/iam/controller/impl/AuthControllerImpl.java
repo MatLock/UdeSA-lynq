@@ -7,6 +7,8 @@ import com.lynq.iam.controller.request.EmailUserLogin;
 import com.lynq.iam.controller.request.UserUpdatePasswordRequest;
 import com.lynq.iam.controller.request.UsernameLogin;
 import com.lynq.iam.controller.response.AccessTokenRefreshedResponse;
+import com.lynq.iam.controller.response.CheckEmailResponse;
+import com.lynq.iam.controller.response.CheckUsernameResponse;
 import com.lynq.iam.controller.response.GlobalRestResponse;
 import com.lynq.iam.controller.response.UserInfoRestResponse;
 import com.lynq.iam.controller.response.UserRestResponse;
@@ -116,6 +118,30 @@ public class AuthControllerImpl implements AuthController {
     String token = accessToken.startsWith(BEARER_PREFIX) ? accessToken.substring(7) : accessToken;
     GlobalRestResponse<UserInfoRestResponse> body = new GlobalRestResponse<>(true,
         authService.obtainUserInfoFromToken(token));
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(body);
+  }
+
+  @Override
+  @GetMapping("/check-username")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<CheckUsernameResponse>> checkUsername(
+      @RequestParam("username") String username) {
+    GlobalRestResponse<CheckUsernameResponse> body =
+        new GlobalRestResponse<>(true, authService.checkUsername(username));
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(body);
+  }
+
+  @Override
+  @GetMapping("/check-email")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<CheckEmailResponse>> checkEmail(
+      @RequestParam("email") String email) {
+    GlobalRestResponse<CheckEmailResponse> body =
+        new GlobalRestResponse<>(true, authService.checkEmail(email));
     return ResponseEntity.ok()
         .contentType(MediaType.APPLICATION_JSON)
         .body(body);

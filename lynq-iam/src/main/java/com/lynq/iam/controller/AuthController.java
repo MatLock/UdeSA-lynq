@@ -143,5 +143,33 @@ public interface AuthController {
   })
   ResponseEntity<GlobalRestResponse<UserInfoRestResponse>> obtainUserInfoFromToken(@Parameter(hidden = true) @NotBlank String accessToken);
 
+  @Operation(summary = "Check username", description = "Checks whether a username has a valid format and is available. Public endpoint; no bearer token required")
+  @Parameters({
+    @Parameter(name = "lynq-request-uuid", in = ParameterIn.HEADER, required = true,
+      description = "Per-request correlation UUID used for log tracing",
+      example = "550e8400-e29b-41d4-a716-446655440000"),
+    @Parameter(name = "username", in = ParameterIn.QUERY, required = true,
+      description = "Username to validate", example = "johndoe")
+  })
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Username check result",
+      content = @Content(schema = @Schema(implementation = CheckUsernameResponse.class)))
+  })
+  ResponseEntity<GlobalRestResponse<CheckUsernameResponse>> checkUsername(String username);
+
+  @Operation(summary = "Check email", description = "Checks whether an email has a valid format and is available. Public endpoint; no bearer token required")
+  @Parameters({
+    @Parameter(name = "lynq-request-uuid", in = ParameterIn.HEADER, required = true,
+      description = "Per-request correlation UUID used for log tracing",
+      example = "550e8400-e29b-41d4-a716-446655440000"),
+    @Parameter(name = "email", in = ParameterIn.QUERY, required = true,
+      description = "Email to validate", example = "johndoe@example.com")
+  })
+  @ApiResponses({
+    @ApiResponse(responseCode = "200", description = "Email check result",
+      content = @Content(schema = @Schema(implementation = CheckEmailResponse.class)))
+  })
+  ResponseEntity<GlobalRestResponse<CheckEmailResponse>> checkEmail(String email);
+
 
 }
