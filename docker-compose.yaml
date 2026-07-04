@@ -34,9 +34,10 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-testpassword123}
       - LYNQ_IAM_URL=http://lynq-iam:8080/lynq-iam
       - AWS_REGION=${AWS_REGION:-us-east-1}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_BUCKET_NAME=${AWS_BUCKET_NAME}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+      - AWS_BUCKET_NAME=${AWS_BUCKET_NAME:-lynq-bucket}
+      - AWS_ENDPOINT=${AWS_ENDPOINT:-http://localstack:4566}
     depends_on:
       mysql:
         condition: service_healthy
@@ -44,6 +45,8 @@ services:
         condition: service_healthy
       lynq-iam:
         condition: service_started
+      localstack:
+        condition: service_healthy
 
   lynq-app-frontend:
     build:
@@ -70,6 +73,27 @@ services:
       - ./mysql-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  localstack:
+    # Pinned to the last community (free) release. The `latest` tag now points at
+    # the Pro image, which exits with code 55 unless a LOCALSTACK_AUTH_TOKEN is
+    # provided. S3 is a free community service, so this needs no token/license.
+    image: localstack/localstack:4.5.0
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
+      - AWS_DEFAULT_REGION=${AWS_REGION:-us-east-1}
+      - AWS_BUCKET_NAME=${AWS_BUCKET_NAME:-lynq-bucket}
+    volumes:
+      # Init hook: creates the bucket + CORS once S3 is ready.
+      - ./localstack-init:/etc/localstack/init/ready.d:ro
+      - localstack_data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health | grep -q '\"s3\": \"\\(running\\|available\\)\"'"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -101,3 +125,4 @@ services:
 volumes:
   mysql_data:
   redis_data:
+  localstack_data:
