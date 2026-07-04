@@ -17,6 +17,26 @@
   text-align: left;
 }
 
+/* Optional company logo — a file field in the same row layout as the text
+   fields. The native file input sits where the URL text used to; its picker
+   button is brand-tinted to match. */
+.company-logo-input {
+  color: var(--text);
+  cursor: pointer;
+}
+
+.company-logo-input::file-selector-button {
+  margin-right: 10px;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 12px;
+  color: #fff;
+  background: var(--brand-gradient);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
 /* label on top, then an icon + control row that stays vertically centered. */
 .company-field {
   display: flex;

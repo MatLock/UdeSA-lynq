@@ -78,8 +78,14 @@ const register_candidate = async ({ username, email, password, fullName, birthDa
  * Register a company: create the auth user, then the owner profile + company
  * together (CompanyController.createUserWithCompany).
  *
+ * The company logo is NOT sent here: it uploads separately, after this call, via
+ * the pre-signed-URL flow (companyService) which needs the company to already
+ * exist. That's why this returns the created company too — callers use its
+ * `companyId` for the subsequent logo upload.
+ *
  * @param {object} info - Auth, owner-profile and company fields.
- * @returns {Promise<object>} The auth response (with tokens).
+ * @returns {Promise<{ auth: object, company: object }>} The auth response (with
+ *   tokens) and the created company (CreateUserWithCompanyRestResponse).
  */
 const register_company = async ({
   username,
@@ -92,7 +98,6 @@ const register_company = async ({
   companyName,
   companyAbout,
   companySize,
-  companyProfileImageUrl,
 }) => {
   // One correlation id for the whole functionality: the IAM register call and
   // the backend owner-profile + company call below share it so they trace as a
@@ -100,7 +105,7 @@ const register_company = async ({
   const requestUuid = requestUuidUtil.newRequestUuid();
   const auth = await authService.user_register({ username, email, password }, requestUuid);
   const accessToken = auth?.accessToken;
-  await postSecured(
+  const companyResponse = await postSecured(
     '/company',
     {
       currentPosition,
@@ -110,12 +115,13 @@ const register_company = async ({
       companyName,
       companyAbout,
       companySize,
-      companyProfileImageUrl,
     },
     accessToken,
     requestUuid
   );
-  return auth;
+  // postSecured returns the raw GlobalRestResponse ({ success, data }); expose
+  // the flat company payload so callers can upload the logo against companyId.
+  return { auth, company: companyResponse?.data };
 };
 
 export default {
