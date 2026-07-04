@@ -1,0 +1,2 @@
+date,prompt
+"04-07-2026","add a function in resume_reader that it takes a presignedURL from s3. pull the document read its content and returns it. If you need it create a separate file for s3_client in a different python package"
