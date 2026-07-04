@@ -36,6 +36,9 @@ lynq:
     access-key-id: ${AWS_ACCESS_KEY_ID}
     secret-access-key: ${AWS_SECRET_ACCESS_KEY}
     bucket-name: ${AWS_BUCKET_NAME}
+    # Empty by default (real AWS). Set AWS_ENDPOINT to target LocalStack in the
+    # Docker Compose stack (http://localstack:4566).
+    endpoint: ${AWS_ENDPOINT:}
 
 
 server:
