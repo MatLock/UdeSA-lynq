@@ -105,9 +105,25 @@ const en = {
     close: 'Close',
   },
   home: {
-    title: 'Welcome to LYNQ',
-    subtitle: 'Your home page — coming soon',
-    placeholder: 'This page is a mock. Behaviour will be defined later.',
+    searchPlaceholder: 'Search jobs by title, company or skill…',
+    searchButton: 'Search',
+    loading: 'Loading jobs…',
+    error: 'Something went wrong loading jobs. Please try again.',
+    empty: 'No jobs found. Try a different search.',
+  },
+  jobCard: {
+    postedBy: 'Posted by:',
+    apply: 'Apply',
+    unknownPoster: 'Unknown',
+    workType: {
+      REMOTE: 'Remote',
+      IN_OFFICE: 'In office',
+    },
+  },
+  pagination: {
+    label: 'Pagination',
+    previous: 'Previous page',
+    next: 'Next page',
   },
   sidebar: {
     collapse: 'Collapse menu',

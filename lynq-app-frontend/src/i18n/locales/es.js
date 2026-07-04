@@ -105,9 +105,25 @@ const es = {
     close: 'Cerrar',
   },
   home: {
-    title: 'Bienvenido a LYNQ',
-    subtitle: 'Tu página de inicio — próximamente',
-    placeholder: 'Esta página es un mock. El comportamiento se definirá más adelante.',
+    searchPlaceholder: 'Buscá empleos por título, empresa o habilidad…',
+    searchButton: 'Buscar',
+    loading: 'Cargando empleos…',
+    error: 'Ocurrió un error al cargar los empleos. Intentá de nuevo.',
+    empty: 'No se encontraron empleos. Probá otra búsqueda.',
+  },
+  jobCard: {
+    postedBy: 'Publicado por:',
+    apply: 'Postularme',
+    unknownPoster: 'Desconocido',
+    workType: {
+      REMOTE: 'Remoto',
+      IN_OFFICE: 'Presencial',
+    },
+  },
+  pagination: {
+    label: 'Paginación',
+    previous: 'Página anterior',
+    next: 'Página siguiente',
   },
   sidebar: {
     collapse: 'Contraer menú',

@@ -1,0 +1,60 @@
+/* Pagination — numbered page controls. Brand tokens from index.css. */
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pagination-page,
+.pagination-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.pagination-page:hover:not(.is-active),
+.pagination-arrow:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  color: var(--brand-purple-dark);
+}
+
+.pagination-page.is-active {
+  color: #fff;
+  background: var(--brand-gradient);
+  border-color: transparent;
+  cursor: default;
+}
+
+.pagination-arrow {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.pagination-arrow:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pagination-ellipsis {
+  padding: 0 4px;
+  color: var(--text);
+  user-select: none;
+}

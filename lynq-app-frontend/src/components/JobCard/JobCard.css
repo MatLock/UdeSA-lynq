@@ -1,0 +1,161 @@
+/* JobCard — a single job post. Brand tokens from index.css; white card with a
+   soft shadow to match the auth/login card language. */
+
+.job-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+  height: 100%;
+  padding: 20px;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(80, 60, 150, 0.08);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.job-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(80, 60, 150, 0.14);
+}
+
+/* Header: centered title with the work-type tag below it. */
+.job-card-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-card-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--text-h);
+}
+
+.job-card-worktype {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: #fff;
+  border-radius: 999px;
+}
+
+.job-card-worktype-remote {
+  background: var(--brand-blue);
+}
+
+.job-card-worktype-in_office {
+  background: var(--brand-purple);
+}
+
+/* Fallback for any future/unknown work type: the brand blend. */
+.job-card-worktype:not(.job-card-worktype-remote):not(.job-card-worktype-in_office) {
+  background: var(--brand-gradient);
+}
+
+.job-card-description {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* Posted-by row: label + avatar + name. */
+.job-card-poster {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.job-card-poster-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.job-card-poster-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  color: var(--brand-purple);
+}
+
+.job-card-poster-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.job-card-poster-avatar svg {
+  width: 18px;
+  height: 18px;
+}
+
+.job-card-poster-name {
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+/* Footer pinned to the bottom: skills on the left, Apply on the right. */
+.job-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.job-card-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.job-card-skill {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+}
+
+.job-card-apply {
+  flex-shrink: 0;
+  padding: 8px 18px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-gradient);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.job-card-apply:hover {
+  opacity: 0.92;
+}

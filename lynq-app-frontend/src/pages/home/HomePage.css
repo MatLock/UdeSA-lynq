@@ -1,9 +1,124 @@
-/* HomePage — mock placeholder built on MockPage (which owns the card shell).
-   Only the extra placeholder line is page-specific. */
+/* HomePage — job listing landing page. Fills the AppLayout outlet next to the
+   sidebar. Brand tokens from index.css. */
 
-.home-placeholder {
-  margin-top: 18px;
+.home-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 32px;
+  gap: 28px;
+  text-align: initial;
+  background:
+    radial-gradient(ellipse at top left, #efeafc 0%, transparent 45%),
+    radial-gradient(ellipse at bottom right, #e8f1fc 0%, transparent 45%),
+    #f7f6fb;
+}
+
+/* Centered LYNQ banner + search. */
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.home-banner {
+  margin: 0;
+  font-size: 35px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  line-height: 1;
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.home-search {
+  display: flex;
+  width: 100%;
+  max-width: 600px;
+  gap: 5px;
+}
+
+.home-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-h);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  outline: none;
+  box-shadow: 0 6px 18px rgba(80, 60, 150, 0.06);
+  transition: border-color 0.15s ease;
+}
+
+.home-search-input:focus {
+  border-color: var(--accent-border);
+}
+
+.home-search-button {
+  flex-shrink: 0;
+  padding: 6px 13px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-gradient);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.home-search-button:hover {
+  opacity: 0.92;
+}
+
+/* Results area grows to push the pagination to the bottom. */
+.home-results {
+  flex: 1;
+}
+
+.home-jobs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  align-items: stretch;
+}
+
+/* Loading / empty / error states, centered in the results area. */
+.home-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  margin: 0;
+  font-size: 15px;
   color: var(--text);
-  font-size: 14px;
-  line-height: 1.5;
+}
+
+.home-error {
+  color: var(--brand-purple-dark);
+}
+
+.home-pagination {
+  display: flex;
+  justify-content: center;
+}
+
+@media (max-width: 1024px) {
+  .home-page {
+    padding: 20px;
+  }
+
+  .home-banner {
+    font-size: 20px;
+  }
 }
