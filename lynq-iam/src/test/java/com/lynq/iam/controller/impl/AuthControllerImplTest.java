@@ -6,6 +6,8 @@ import com.lynq.iam.controller.request.EmailUserLogin;
 import com.lynq.iam.controller.request.UserUpdatePasswordRequest;
 import com.lynq.iam.controller.request.UsernameLogin;
 import com.lynq.iam.controller.response.AccessTokenRefreshedResponse;
+import com.lynq.iam.controller.response.CheckEmailResponse;
+import com.lynq.iam.controller.response.CheckUsernameResponse;
 import com.lynq.iam.controller.response.GlobalRestResponse;
 import com.lynq.iam.controller.response.UserInfoRestResponse;
 import com.lynq.iam.controller.response.UserRestResponse;
@@ -56,6 +58,12 @@ class AuthControllerImplTest {
 
   @Mock
   private AccessTokenRefreshedResponse accessTokenRefreshedResponse;
+
+  @Mock
+  private CheckUsernameResponse checkUsernameResponse;
+
+  @Mock
+  private CheckEmailResponse checkEmailResponse;
 
   private AuthControllerImpl authController;
 
@@ -238,5 +246,49 @@ class AuthControllerImplTest {
     assertThat(result.getHeaders().getContentType(), is(EXPECTED_CONTENT_TYPE));
     assertThat(result.getBody().isSuccess(), is(SERVICE_RESULT_SUCCESS_FLAG));
     assertThat(result.getBody().getData(), is(sameInstance(userInfoRestResponse)));
+  }
+
+  @Test
+  void checkUsernameReturnsOkStatusWithServiceResultBody() {
+    when(authService.checkUsername(SAMPLE_USERNAME)).thenReturn(checkUsernameResponse);
+
+    ResponseEntity<GlobalRestResponse<CheckUsernameResponse>> result =
+        authController.checkUsername(SAMPLE_USERNAME);
+
+    assertThat(result.getStatusCode(), is(EXPECTED_OK_STATUS));
+    assertThat(result.getHeaders().getContentType(), is(EXPECTED_CONTENT_TYPE));
+    assertThat(result.getBody().isSuccess(), is(SERVICE_RESULT_SUCCESS_FLAG));
+    assertThat(result.getBody().getData(), is(sameInstance(checkUsernameResponse)));
+  }
+
+  @Test
+  void checkUsernameDelegatesToAuthServiceWithUsername() {
+    when(authService.checkUsername(SAMPLE_USERNAME)).thenReturn(checkUsernameResponse);
+
+    authController.checkUsername(SAMPLE_USERNAME);
+
+    verify(authService).checkUsername(SAMPLE_USERNAME);
+  }
+
+  @Test
+  void checkEmailReturnsOkStatusWithServiceResultBody() {
+    when(authService.checkEmail(SAMPLE_EMAIL)).thenReturn(checkEmailResponse);
+
+    ResponseEntity<GlobalRestResponse<CheckEmailResponse>> result =
+        authController.checkEmail(SAMPLE_EMAIL);
+
+    assertThat(result.getStatusCode(), is(EXPECTED_OK_STATUS));
+    assertThat(result.getHeaders().getContentType(), is(EXPECTED_CONTENT_TYPE));
+    assertThat(result.getBody().isSuccess(), is(SERVICE_RESULT_SUCCESS_FLAG));
+    assertThat(result.getBody().getData(), is(sameInstance(checkEmailResponse)));
+  }
+
+  @Test
+  void checkEmailDelegatesToAuthServiceWithEmail() {
+    when(authService.checkEmail(SAMPLE_EMAIL)).thenReturn(checkEmailResponse);
+
+    authController.checkEmail(SAMPLE_EMAIL);
+
+    verify(authService).checkEmail(SAMPLE_EMAIL);
   }
 }

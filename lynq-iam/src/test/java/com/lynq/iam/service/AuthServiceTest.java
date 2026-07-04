@@ -1,6 +1,8 @@
 package com.lynq.iam.service;
 
 import com.lynq.iam.controller.response.AccessTokenRefreshedResponse;
+import com.lynq.iam.controller.response.CheckEmailResponse;
+import com.lynq.iam.controller.response.CheckUsernameResponse;
 import com.lynq.iam.controller.response.UserInfoRestResponse;
 import com.lynq.iam.controller.response.UserRestResponse;
 import com.lynq.iam.exceptions.ForbiddenException;
@@ -25,6 +27,7 @@ import java.util.Optional;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -51,6 +54,19 @@ class AuthServiceTest {
   private static final String INVALID_EMAIL_OR_PASSWORD_MESSAGE = "Invalid email or password";
   private static final boolean EXPECTED_VALID = true;
   private static final boolean EXPECTED_INVALID = false;
+  private static final String BLANK_USERNAME = "   ";
+  private static final String TOO_SHORT_USERNAME = "jo";
+  private static final String TOO_LONG_USERNAME = "thisusernameiswaytoolongtobevalid";
+  private static final String USERNAME_BLANK_REASON = "Username must not be blank";
+  private static final String USERNAME_LENGTH_REASON = "Username must be between 3 and 20 characters";
+  private static final String USERNAME_TAKEN_REASON = "Username is already taken";
+  private static final String BLANK_EMAIL = "   ";
+  private static final String TOO_LONG_EMAIL = "a".repeat(95) + "@e.com";
+  private static final String MALFORMED_EMAIL = "not-an-email";
+  private static final String EMAIL_BLANK_REASON = "Email must not be blank";
+  private static final String EMAIL_LENGTH_REASON = "Email must not exceed 100 characters";
+  private static final String EMAIL_FORMAT_REASON = "Email format is invalid";
+  private static final String EMAIL_TAKEN_REASON = "Email is already taken";
 
   @Mock
   private UserService userService;
@@ -242,6 +258,118 @@ class AuthServiceTest {
     boolean result = authService.isAccessTokenValid(SAMPLE_ACCESS_TOKEN);
 
     assertThat(result, is(EXPECTED_INVALID));
+  }
+
+  @Test
+  void checkUsernameReturnsValidWithoutReasonWhenFormatIsValidAndUsernameAvailable() {
+    when(userRepository.existsByUsername(SAMPLE_USERNAME)).thenReturn(false);
+
+    CheckUsernameResponse response = authService.checkUsername(SAMPLE_USERNAME);
+
+    assertThat(response.isValid(), is(EXPECTED_VALID));
+    assertThat(response.getReason(), is(nullValue()));
+  }
+
+  @Test
+  void checkUsernameReturnsInvalidWithBlankReasonWhenUsernameIsBlank() {
+    CheckUsernameResponse response = authService.checkUsername(BLANK_USERNAME);
+
+    assertThat(response.isValid(), is(EXPECTED_INVALID));
+    assertThat(response.getReason(), is(USERNAME_BLANK_REASON));
+    verify(userRepository, never()).existsByUsername(any());
+  }
+
+  @Test
+  void checkUsernameReturnsInvalidWithBlankReasonWhenUsernameIsNull() {
+    CheckUsernameResponse response = authService.checkUsername(null);
+
+    assertThat(response.isValid(), is(EXPECTED_INVALID));
+    assertThat(response.getReason(), is(USERNAME_BLANK_REASON));
+    verify(userRepository, never()).existsByUsername(any());
+  }
+
+  @Test
+  void checkUsernameReturnsInvalidWithLengthReasonWhenUsernameTooShort() {
+    CheckUsernameResponse response = authService.checkUsername(TOO_SHORT_USERNAME);
+
+    assertThat(response.isValid(), is(EXPECTED_INVALID));
+    assertThat(response.getReason(), is(USERNAME_LENGTH_REASON));
+    verify(userRepository, never()).existsByUsername(any());
+  }
+
+  @Test
+  void checkUsernameReturnsInvalidWithLengthReasonWhenUsernameTooLong() {
+    CheckUsernameResponse response = authService.checkUsername(TOO_LONG_USERNAME);
+
+    assertThat(response.isValid(), is(EXPECTED_INVALID));
+    assertThat(response.getReason(), is(USERNAME_LENGTH_REASON));
+    verify(userRepository, never()).existsByUsername(any());
+  }
+
+  @Test
+  void checkUsernameReturnsInvalidWithTakenReasonWhenUsernameAlreadyExists() {
+    when(userRepository.existsByUsername(SAMPLE_USERNAME)).thenReturn(true);
+
+    CheckUsernameResponse response = authService.checkUsername(SAMPLE_USERNAME);
+
+    assertThat(response.isValid(), is(EXPECTED_INVALID));
+    assertThat(response.getReason(), is(USERNAME_TAKEN_REASON));
+  }
+
+  @Test
+  void checkEmailReturnsValidWithoutReasonWhenFormatIsValidAndEmailAvailable() {
+    when(userRepository.existsByEmail(SAMPLE_EMAIL)).thenReturn(false);
+
+    CheckEmailResponse response = authService.checkEmail(SAMPLE_EMAIL);
+
+    assertThat(response.isValid(), is(EXPECTED_VALID));
+    assertThat(response.getReason(), is(nullValue()));
+  }
+
+  @Test
+  void checkEmailReturnsInvalidWithBlankReasonWhenEmailIsBlank() {
+    CheckEmailResponse response = authService.checkEmail(BLANK_EMAIL);
+
+    assertThat(response.isValid(), is(EXPECTED_INVALID));
+    assertThat(response.getReason(), is(EMAIL_BLANK_REASON));
+    verify(userRepository, never()).existsByEmail(any());
+  }
+
+  @Test
+  void checkEmailReturnsInvalidWithBlankReasonWhenEmailIsNull() {
+    CheckEmailResponse response = authService.checkEmail(null);
+
+    assertThat(response.isValid(), is(EXPECTED_INVALID));
+    assertThat(response.getReason(), is(EMAIL_BLANK_REASON));
+    verify(userRepository, never()).existsByEmail(any());
+  }
+
+  @Test
+  void checkEmailReturnsInvalidWithLengthReasonWhenEmailTooLong() {
+    CheckEmailResponse response = authService.checkEmail(TOO_LONG_EMAIL);
+
+    assertThat(response.isValid(), is(EXPECTED_INVALID));
+    assertThat(response.getReason(), is(EMAIL_LENGTH_REASON));
+    verify(userRepository, never()).existsByEmail(any());
+  }
+
+  @Test
+  void checkEmailReturnsInvalidWithFormatReasonWhenEmailMalformed() {
+    CheckEmailResponse response = authService.checkEmail(MALFORMED_EMAIL);
+
+    assertThat(response.isValid(), is(EXPECTED_INVALID));
+    assertThat(response.getReason(), is(EMAIL_FORMAT_REASON));
+    verify(userRepository, never()).existsByEmail(any());
+  }
+
+  @Test
+  void checkEmailReturnsInvalidWithTakenReasonWhenEmailAlreadyExists() {
+    when(userRepository.existsByEmail(SAMPLE_EMAIL)).thenReturn(true);
+
+    CheckEmailResponse response = authService.checkEmail(SAMPLE_EMAIL);
+
+    assertThat(response.isValid(), is(EXPECTED_INVALID));
+    assertThat(response.getReason(), is(EMAIL_TAKEN_REASON));
   }
 
   @Test
