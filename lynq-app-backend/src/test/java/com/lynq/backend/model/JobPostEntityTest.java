@@ -1,6 +1,7 @@
 package com.lynq.backend.model;
 
 import com.lynq.backend.enums.JobPostSource;
+import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.WorkType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,6 +64,20 @@ class JobPostEntityTest {
     assertThat(jobPostEntity.getJobUrl(), is(JOB_URL));
     assertThat(jobPostEntity.getJobPostSource(), is(JOB_POST_TYPE));
     assertThat(jobPostEntity.getCreatedOn(), is(CREATED_ON));
+  }
+
+  @Test
+  void builderDefaultsJobStatusToOpen() {
+    assertThat(jobPostEntity.getJobStatus(), is(JobStatus.OPEN));
+  }
+
+  @Test
+  void settersUpdateJobStatus() {
+    JobPostEntity target = new JobPostEntity();
+
+    target.setJobStatus(JobStatus.CLOSE);
+
+    assertThat(target.getJobStatus(), is(JobStatus.CLOSE));
   }
 
   @Test
