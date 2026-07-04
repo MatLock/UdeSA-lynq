@@ -1,0 +1,24 @@
+/* LoadingOverlay — full-viewport blocking scrim with a brand spinner + caption.
+   Uses the brand tokens from index.css. */
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 6, 13, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.loading-overlay-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 36px;
+  border-radius: 16px;
+  background: var(--bg);
+  box-shadow: 0 12px 40px rgba(8, 6, 13, 0.25);
+}

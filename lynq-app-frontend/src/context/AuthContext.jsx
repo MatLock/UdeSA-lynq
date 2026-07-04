@@ -8,6 +8,8 @@ import {
 } from 'react'
 import authService from '../services/authService'
 import userService from '../services/userService'
+import profileImageCache from '../utils/profileImageCache'
+import fileToDataUrl from '../utils/fileToDataUrl'
 import useReduxDevtools from '../hooks/useReduxDevtools'
 
 // Holds the authenticated session: the access/refresh tokens and the user
@@ -68,7 +70,12 @@ const withProfile = (user, profile) =>
     ? {
         ...user,
         fullName: profile.fullName,
-        profileImageUrl: profile.userProfileImageUrl,
+        // The backend URL is a pre-signed link that expires after 15 minutes;
+        // prefer a locally cached image (from a prior upload on this device) so
+        // the avatar stays visible past that window. Falls back to the backend
+        // URL when nothing is cached.
+        profileImageUrl:
+          profileImageCache.read(user.id) ?? profile.userProfileImageUrl,
         userType: profile.userType,
         currentPosition: profile.currentPosition,
         about: profile.about,
@@ -91,6 +98,54 @@ const AuthProvider = ({ children }) => {
   useEffect(() => {
     sessionRef.current = session
   }, [session])
+
+  // Merge partial fields into the stored user and persist. Consumers (e.g. the
+  // sidebar) react immediately — used to reflect a freshly picked profile image
+  // before the backend update round-trips.
+  const updateUser = useCallback((partial) => {
+    const current = sessionRef.current
+    if (!current) return
+    const next = { ...current, user: { ...current.user, ...partial } }
+    persistSession(next)
+    setSession(next)
+  }, [])
+
+  // Replace the session's access/refresh tokens (preserving the remembered
+  // flag), e.g. after a password change that rotates both tokens server-side.
+  const applyTokens = useCallback(({ accessToken, refreshToken }) => {
+    const current = sessionRef.current
+    if (!current) return
+    const next = { ...current, accessToken, refreshToken }
+    persistSession(next)
+    setSession(next)
+  }, [])
+
+  // Reconcile the locally cached avatar with the pre-signed URL the backend
+  // hands back at login/refresh. That URL is short-lived and its signature
+  // changes on every request, so we can't compare URLs — we fetch the image
+  // bytes and compare them (as a data URL) against the cache. On any difference
+  // (a first-ever image, or one changed from another device) we refresh the
+  // cache and the displayed avatar. Best-effort: if the image can't be fetched
+  // (offline, CORS, no image) the existing cache stands.
+  const syncProfileImageCache = useCallback(
+    async (userId, backendImageUrl) => {
+      if (!userId || !backendImageUrl) return
+      try {
+        const response = await fetch(backendImageUrl)
+        if (!response.ok) return
+        const dataUrl = await fileToDataUrl(await response.blob())
+        if (!dataUrl || dataUrl === profileImageCache.read(userId)) return
+        profileImageCache.write(userId, dataUrl)
+        // Only touch the displayed avatar if this is still the active user.
+        if (sessionRef.current?.user?.id === userId) {
+          updateUser({ profileImageUrl: dataUrl })
+        }
+      } catch {
+        // Network/CORS error or the image is gone — keep the current cache.
+      }
+    },
+    [updateUser],
+  )
 
   // Dedupes concurrent refreshes: many in-flight requests that 401 at once share
   // a single /auth/refresh call instead of each firing their own.
@@ -116,8 +171,9 @@ const AuthProvider = ({ children }) => {
         // Refresh the profile so a remembered session doesn't show stale data.
         // Non-fatal: fall back to the persisted user if the lookup fails.
         let user = persisted.user
+        let profile = null
         try {
-          const profile = await userService.get_user(accessToken)
+          profile = await userService.get_user(accessToken)
           user = withProfile(persisted.user, profile)
         } catch {
           // Keep the persisted user — backend unreachable or no profile.
@@ -130,6 +186,8 @@ const AuthProvider = ({ children }) => {
           user,
           remembered: true,
         })
+        // Refresh the cached avatar if the backend's image differs from cache.
+        void syncProfileImageCache(user.id, profile?.userProfileImageUrl)
       } catch {
         // Refresh token expired/invalid — drop the remembered session.
         if (!cancelled) {
@@ -173,7 +231,10 @@ const AuthProvider = ({ children }) => {
     persistSession(next)
     setSession(next)
     setLoading(false)
-  }, [])
+    // Refresh the cached avatar from the backend's fresh pre-signed URL if the
+    // image changed since it was last cached on this device.
+    void syncProfileImageCache(next.user.id, profile?.userProfileImageUrl)
+  }, [syncProfileImageCache])
 
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
@@ -220,9 +281,11 @@ const AuthProvider = ({ children }) => {
       loading,
       login,
       logout,
+      updateUser,
+      applyTokens,
       refreshSession,
     }),
-    [session, loading, login, logout, refreshSession],
+    [session, loading, login, logout, updateUser, applyTokens, refreshSession],
   )
 
   // Mirror the auth state into the Redux DevTools extension (dev only). Tokens

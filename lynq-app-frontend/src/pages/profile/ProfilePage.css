@@ -32,6 +32,101 @@
   text-align: left;
 }
 
+/* Centered loader shown in place of the form during the initial profile fetch. */
+.profile-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+
+/* Fetch failure banner, shown at the top of the form. */
+.profile-load-error {
+  margin: 0 0 4px;
+  text-align: center;
+}
+
+/* Editable avatar at the top of the form. Mirrors the sidebar avatar (round,
+   brand-gradient fallback) but larger, and reveals a pencil overlay on hover so
+   it reads as clickable. */
+.profile-avatar-field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.profile-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46.08px;
+  height: 46.08px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--brand-gradient);
+  color: #fff;
+  cursor: pointer;
+}
+
+.profile-avatar:focus-visible {
+  outline: 2px solid var(--brand-purple);
+  outline-offset: 2px;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-avatar svg {
+  width: 23.04px;
+  height: 23.04px;
+}
+
+/* Pencil overlay — hidden until the avatar is hovered or focused. */
+.profile-avatar-edit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.profile-avatar:hover .profile-avatar-edit,
+.profile-avatar:focus-visible .profile-avatar-edit {
+  opacity: 1;
+}
+
+/* The real <input type=file> is triggered via the avatar button, not shown. */
+.profile-avatar-input {
+  display: none;
+}
+
+.profile-avatar-hint {
+  margin: 0;
+  text-align: center;
+}
+
+.profile-avatar-error {
+  margin: 0;
+  text-align: center;
+}
+
+.profile-avatar:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
 /* Field: label on top, then an icon + control row. --icon-col aligns the label
    and hint with the input edge, to the right of the icon. */
 .profile-field {
@@ -177,6 +272,11 @@
 
 .profile-save:hover {
   opacity: 0.92;
+}
+
+.profile-save:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 @media (max-width: 560px) {
