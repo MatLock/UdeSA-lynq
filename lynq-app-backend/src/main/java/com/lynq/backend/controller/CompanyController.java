@@ -2,6 +2,7 @@ package com.lynq.backend.controller;
 
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
 import com.lynq.backend.controller.response.CreateUserWithCompanyRestResponse;
+import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.security.LynqUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -128,6 +129,85 @@ public interface CompanyController {
                     "companyProfileImageUrl": "https://cdn.lynq.com/logos/lynq.png"
                   }""")))
       @Valid CreateUserWithCompanyRequest request,
+      @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
+      summary = "Generate a pre-signed URL to upload the authenticated owner's company logo",
+      description = "Builds the S3 path for the given file name, persists it as the profile image "
+          + "reference of the company owned by the authenticated user, and returns a short-lived "
+          + "pre-signed URL. The frontend uploads the image binary directly to S3 with an HTTP PUT "
+          + "against the returned URL. Calling this endpoint again replaces the stored reference, "
+          + "so the company logo can be changed at any time.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Pre-signed upload URL generated successfully",
+          content = @Content(
+              schema = @Schema(implementation = GenerateUploadImageRestResponse.class),
+              examples = @ExampleObject(
+                  name = "Pre-signed URL",
+                  value = """
+                      {
+                        "success": true,
+                        "data": {
+                          "preSignedUrl": "https://lynq-bucket.s3.amazonaws.com/lynq/companies/018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60/profile/logo.png?X-Amz-Signature=..."
+                        }
+                      }"""))),
+      @ApiResponse(
+          responseCode = "404",
+          description = "No company is owned by the authenticated user",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Company not found",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "No company owned by user '550e8400-e29b-41d4-a716-446655440000'"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "403",
+          description = "Missing required lynq-request-uuid header",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Missing header",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Missing required header"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "401",
+          description = "Missing or invalid bearer token",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Unauthorized",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Invalid or expired token"
+                      }""")))
+  })
+  @Parameters({
+      @Parameter(
+          name = "lynq-request-uuid",
+          in = ParameterIn.HEADER,
+          required = true,
+          description = "Unique identifier for the request, echoed back in the response and used "
+              + "for log correlation. Requests without it are rejected with 403.",
+          example = "550e8400-e29b-41d4-a716-446655440000"),
+      @Parameter(
+          name = "file-name",
+          in = ParameterIn.QUERY,
+          required = true,
+          description = "Name of the company logo file to upload. Used to build the S3 object key.",
+          example = "logo.png")
+  })
+  ResponseEntity<GlobalRestResponse<GenerateUploadImageRestResponse>> generateCompanyImageUploadUrl(
+      String fileName,
       @Parameter(hidden = true) LynqUserPrincipal principal);
 
 }

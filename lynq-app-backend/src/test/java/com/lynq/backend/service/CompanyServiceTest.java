@@ -3,6 +3,7 @@ package com.lynq.backend.service;
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.exceptions.BadRequestException;
+import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.repository.CompanyRepository;
@@ -14,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -41,6 +43,10 @@ class CompanyServiceTest {
   private static final String COMPANY_PROFILE_IMAGE_URL = "https://cdn.lynq.com/logos/lynq.png";
   private static final String NO_GITHUB_URL = null;
   private static final String NO_FULL_NAME = null;
+  private static final String FILE_NAME = "logo.png";
+  private static final String S3_PATH = "lynq/companies/company-1/profile/logo.png";
+  private static final String PREVIOUS_S3_PATH = "lynq/companies/company-1/profile/old.png";
+  private static final String PRE_SIGNED_URL = "https://lynq-bucket.s3.amazonaws.com/logo.png?sig=abc";
 
   @Mock
   private UserService userService;
@@ -51,11 +57,14 @@ class CompanyServiceTest {
   @Mock
   private CreateUserWithCompanyRequest request;
 
+  @Mock
+  private StorageService storageService;
+
   private CompanyService companyService;
 
   @BeforeEach
   void setUp() {
-    companyService = new CompanyService(userService, companyRepository);
+    companyService = new CompanyService(userService, companyRepository, storageService);
   }
 
   @Test
@@ -135,6 +144,90 @@ class CompanyServiceTest {
 
     verify(userService, never()).saveNewUser(any(), any(), any(), any(), any(), any(), any(), any());
     verify(companyRepository, never()).save(any());
+  }
+
+  @Test
+  void generateCompanyImageUploadUrlPersistsS3PathAndReturnsPreSignedUrl() {
+    UserEntity owner = UserEntity.builder().id(USER_ID).build();
+    CompanyEntity company = companyOwnedBy(owner);
+    when(userService.getUser(USER_ID)).thenReturn(owner);
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
+    when(storageService.createCompanyProfilePreSignedUrl(company, FILE_NAME))
+        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+    ArgumentCaptor<CompanyEntity> companyCaptor = ArgumentCaptor.forClass(CompanyEntity.class);
+
+    String result = companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME);
+
+    assertThat(result, is(PRE_SIGNED_URL));
+    verify(companyRepository).save(companyCaptor.capture());
+    assertThat(companyCaptor.getValue().getProfileImageUrl(), is(S3_PATH));
+  }
+
+  @Test
+  void generateCompanyImageUploadUrlDeletesPreviousObjectWhenPathChanges() {
+    UserEntity owner = UserEntity.builder().id(USER_ID).build();
+    CompanyEntity company = companyOwnedBy(owner);
+    company.setProfileImageUrl(PREVIOUS_S3_PATH);
+    when(userService.getUser(USER_ID)).thenReturn(owner);
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
+    when(storageService.createCompanyProfilePreSignedUrl(company, FILE_NAME))
+        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+
+    companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME);
+
+    verify(storageService).deleteObject(PREVIOUS_S3_PATH);
+  }
+
+  @Test
+  void generateCompanyImageUploadUrlDoesNotDeleteWhenNoPreviousObjectExists() {
+    UserEntity owner = UserEntity.builder().id(USER_ID).build();
+    CompanyEntity company = companyOwnedBy(owner);
+    company.setProfileImageUrl(null);
+    when(userService.getUser(USER_ID)).thenReturn(owner);
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
+    when(storageService.createCompanyProfilePreSignedUrl(company, FILE_NAME))
+        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+
+    companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME);
+
+    verify(storageService, never()).deleteObject(any());
+  }
+
+  @Test
+  void generateCompanyImageUploadUrlDoesNotDeleteWhenPathIsUnchanged() {
+    UserEntity owner = UserEntity.builder().id(USER_ID).build();
+    CompanyEntity company = companyOwnedBy(owner);
+    company.setProfileImageUrl(S3_PATH);
+    when(userService.getUser(USER_ID)).thenReturn(owner);
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
+    when(storageService.createCompanyProfilePreSignedUrl(company, FILE_NAME))
+        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+
+    companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME);
+
+    verify(storageService, never()).deleteObject(any());
+  }
+
+  @Test
+  void generateCompanyImageUploadUrlThrowsNotFoundWhenUserOwnsNoCompany() {
+    UserEntity owner = UserEntity.builder().id(USER_ID).build();
+    when(userService.getUser(USER_ID)).thenReturn(owner);
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.empty());
+
+    assertThrows(NotFoundException.class,
+        () -> companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME));
+    verify(companyRepository, never()).save(any());
+  }
+
+  private CompanyEntity companyOwnedBy(UserEntity owner) {
+    return CompanyEntity.builder()
+        .id("company-1")
+        .name(COMPANY_NAME)
+        .about(COMPANY_ABOUT)
+        .size(COMPANY_SIZE)
+        .createdOn(LocalDate.of(2026, 6, 25))
+        .owner(owner)
+        .build();
   }
 
   private void stubRequestFields() {

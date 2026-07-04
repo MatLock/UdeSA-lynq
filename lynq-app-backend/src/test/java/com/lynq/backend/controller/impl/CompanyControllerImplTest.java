@@ -2,6 +2,7 @@ package com.lynq.backend.controller.impl;
 
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
 import com.lynq.backend.controller.response.CreateUserWithCompanyRestResponse;
+import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.UserEntity;
@@ -20,6 +21,7 @@ import java.time.LocalDate;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,6 +35,9 @@ class CompanyControllerImplTest {
   private static final Integer COMPANY_SIZE = 250;
   private static final String COMPANY_PROFILE_IMAGE_URL = "https://cdn.lynq.com/logos/lynq.png";
   private static final LocalDate CREATED_ON = LocalDate.of(2026, 6, 25);
+  private static final String FILE_NAME = "logo.png";
+  private static final String PRE_SIGNED_URL =
+      "https://lynq-bucket.s3.amazonaws.com/logo.png?sig=abc";
 
   @Mock
   private CompanyService companyService;
@@ -49,7 +54,10 @@ class CompanyControllerImplTest {
   void setUp() {
     companyController = new CompanyControllerImpl(companyService);
     when(principal.getId()).thenReturn(USER_ID);
-    when(companyService.createUserWithCompany(USER_ID, request)).thenReturn(savedCompany());
+    // Used by the create tests only; lenient so the logo-upload tests don't trip
+    // strict stubbing.
+    lenient().when(companyService.createUserWithCompany(USER_ID, request))
+        .thenReturn(savedCompany());
   }
 
   @Test
@@ -90,6 +98,29 @@ class CompanyControllerImplTest {
     assertThat(data.getCompanyProfileImageUrl(), is(COMPANY_PROFILE_IMAGE_URL));
     assertThat(data.getCompanyCreatedOn(), is(CREATED_ON));
     assertThat(data.getOwnerUserId(), is(USER_ID));
+  }
+
+  @Test
+  void generateCompanyImageUploadUrlDelegatesToServiceWithPrincipalIdAndFileName() {
+    when(companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME)).thenReturn(PRE_SIGNED_URL);
+
+    companyController.generateCompanyImageUploadUrl(FILE_NAME, principal);
+
+    verify(companyService).generateCompanyImageUploadUrl(USER_ID, FILE_NAME);
+  }
+
+  @Test
+  void generateCompanyImageUploadUrlRespondsWithOkStatusAndPreSignedUrl() {
+    when(companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME)).thenReturn(PRE_SIGNED_URL);
+
+    ResponseEntity<GlobalRestResponse<GenerateUploadImageRestResponse>> response =
+        companyController.generateCompanyImageUploadUrl(FILE_NAME, principal);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+    GlobalRestResponse<GenerateUploadImageRestResponse> body = response.getBody();
+    assertThat(body, is(notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData().getPreSignedUrl(), is(PRE_SIGNED_URL));
   }
 
   private CompanyEntity savedCompany() {

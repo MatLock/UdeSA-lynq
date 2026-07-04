@@ -5,6 +5,7 @@ import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.exceptions.BadRequestException;
+import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.repository.CompanyRepository;
@@ -17,10 +18,13 @@ public class CompanyService {
 
   private final UserService userService;
   private final CompanyRepository companyRepository;
+  private final StorageService storageService;
 
-  public CompanyService(UserService userService, CompanyRepository companyRepository) {
+  public CompanyService(UserService userService, CompanyRepository companyRepository,
+      StorageService storageService) {
     this.userService = userService;
     this.companyRepository = companyRepository;
+    this.storageService = storageService;
   }
 
   @AuditLog
@@ -49,6 +53,34 @@ public class CompanyService {
         .build();
 
     return companyRepository.save(company);
+  }
+
+  /**
+   * Build the S3 path for the company logo of the company owned by the given user, persist it as the
+   * company's profile image reference, and return a short-lived pre-signed upload URL. Mirrors
+   * {@link UserService#generateProfileImageUploadUrl}: calling it again replaces the stored
+   * reference and best-effort deletes the previous object.
+   */
+  @AuditLog
+  @Transactional
+  public String generateCompanyImageUploadUrl(String userId, String fileName) {
+    UserEntity owner = userService.getUser(userId);
+    CompanyEntity company = companyRepository.findByOwner(owner)
+        .orElseThrow(() -> new NotFoundException("No company owned by user '" + userId + "'"));
+
+    String previousImagePath = company.getProfileImageUrl();
+    PreSignedUploadUrl preSignedUploadUrl =
+        storageService.createCompanyProfilePreSignedUrl(company, fileName);
+
+    company.setProfileImageUrl(preSignedUploadUrl.s3Path());
+    companyRepository.save(company);
+
+    if (previousImagePath != null && !previousImagePath.isBlank()
+        && !previousImagePath.equals(preSignedUploadUrl.s3Path())) {
+      storageService.deleteObject(previousImagePath);
+    }
+
+    return preSignedUploadUrl.url();
   }
 
   private void validateCompanyNameIsUnique(String companyName) {
