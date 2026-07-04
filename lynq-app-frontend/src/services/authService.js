@@ -288,6 +288,82 @@ const user_info = async (accessToken, requestUuid = requestUuidUtil.newRequestUu
   return payload?.data;
 }
 
+/**
+ * Check whether a username has a valid format and is still available.
+ *
+ * Calls GET /auth/check-username?username=<username> (operationId: checkUsername).
+ * Public endpoint — no bearer token required. Used by the registration form to
+ * flag a taken username as the user leaves the field, before submitting.
+ *
+ * @param {string} username - The username to check.
+ * @param {string} [requestUuid] - Correlation id for the `lynq-request-uuid`
+ *   header; defaults to a fresh id.
+ * @returns {Promise<{ valid: boolean, reason: string | null }>} Whether the
+ *   username is valid/available and, when not, the reason.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const check_username = async (username, requestUuid = requestUuidUtil.newRequestUuid()) => {
+  const query = new URLSearchParams({ username });
+  const response = await fetch(`${IAM_BASE_URL}/auth/check-username?${query}`, {
+    method: 'GET',
+    headers: {
+      'lynq-request-uuid': requestUuid,
+    },
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const error = new Error(
+      payload?.reason ?? `Username check failed with status ${response.status}`
+    );
+    error.status = response.status;
+    error.reason = payload?.reason;
+    throw error;
+  }
+
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
+  return payload?.data;
+}
+
+/**
+ * Check whether an email has a valid format and is still available.
+ *
+ * Calls GET /auth/check-email?email=<email> (operationId: checkEmail). Public
+ * endpoint — no bearer token required. Used by the registration form to flag a
+ * taken email as the user leaves the field, before submitting.
+ *
+ * @param {string} email - The email to check.
+ * @param {string} [requestUuid] - Correlation id for the `lynq-request-uuid`
+ *   header; defaults to a fresh id.
+ * @returns {Promise<{ valid: boolean, reason: string | null }>} Whether the
+ *   email is valid/available and, when not, the reason.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const check_email = async (email, requestUuid = requestUuidUtil.newRequestUuid()) => {
+  const query = new URLSearchParams({ email });
+  const response = await fetch(`${IAM_BASE_URL}/auth/check-email?${query}`, {
+    method: 'GET',
+    headers: {
+      'lynq-request-uuid': requestUuid,
+    },
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const error = new Error(
+      payload?.reason ?? `Email check failed with status ${response.status}`
+    );
+    error.status = response.status;
+    error.reason = payload?.reason;
+    throw error;
+  }
+
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
+  return payload?.data;
+}
+
 export default {
   user_authenticate,
   email_authenticate,
@@ -296,4 +372,6 @@ export default {
   refresh_access_token,
   validate_access_token,
   user_info,
+  check_username,
+  check_email,
 };

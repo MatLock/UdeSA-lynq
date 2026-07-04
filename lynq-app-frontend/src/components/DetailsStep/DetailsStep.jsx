@@ -6,9 +6,12 @@ import MailOutlineRoundedIcon from '@mui/icons-material/MailOutlineRounded'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined'
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded'
+import ErrorOutlineRoundedIcon from '@mui/icons-material/ErrorOutlineRounded'
 import useRegister from '../../hooks/useRegister'
 import useRegisterSubmit from '../../hooks/useRegisterSubmit'
 import registrationService from '../../services/registrationService'
+import authService from '../../services/authService'
 import DatePicker from '../DatePicker/DatePicker'
 import Toast from '../Toast/Toast'
 import StepIndicator from '../StepIndicator/StepIndicator'
@@ -36,6 +39,87 @@ const DetailsStep = ({ active, isLast, stepNumber, totalSteps }) => {
   const [showPassword, setShowPassword] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
 
+  // Live availability of username/email, checked against IAM as the user leaves
+  // the field. status: 'idle' | 'checking' | 'available' | 'taken'; reason holds
+  // the server message when taken.
+  const [check, setCheck] = useState({
+    username: { status: 'idle', reason: '' },
+    email: { status: 'idle', reason: '' },
+  })
+
+  // Ask IAM whether the value is available once the field loses focus. Skips the
+  // call for empty/malformed input (submit-time validation covers those) and
+  // fails open on network errors so a flaky check never blocks the user.
+  const runAvailabilityCheck = async (field, rawValue, checkFn, isWellFormed) => {
+    const value = rawValue.trim()
+    if (!value || !isWellFormed(value)) {
+      setCheck((prev) => ({ ...prev, [field]: { status: 'idle', reason: '' } }))
+      return
+    }
+    setCheck((prev) => ({ ...prev, [field]: { status: 'checking', reason: '' } }))
+    try {
+      const result = await checkFn(value)
+      setCheck((prev) => ({
+        ...prev,
+        [field]: result?.valid
+          ? { status: 'available', reason: '' }
+          : { status: 'taken', reason: result?.reason ?? '' },
+      }))
+    } catch {
+      setCheck((prev) => ({ ...prev, [field]: { status: 'idle', reason: '' } }))
+    }
+  }
+
+  const handleUsernameBlur = () =>
+    runAvailabilityCheck(
+      'username',
+      username,
+      authService.check_username,
+      (value) => value.length >= 3 && value.length <= 20,
+    )
+
+  const handleEmailBlur = () =>
+    runAvailabilityCheck('email', email, authService.check_email, isEmail)
+
+  // Editing a field clears its prior verdict so a stale "taken/available" badge
+  // never lingers over new input; the next blur re-checks.
+  const resetCheck = (field) =>
+    setCheck((prev) => ({ ...prev, [field]: { status: 'idle', reason: '' } }))
+
+  // Combined per-field error: local format errors take precedence, then a
+  // server "taken" verdict (with its reason, falling back to a generic message).
+  const usernameError =
+    fieldErrors.username ||
+    (check.username.status === 'taken'
+      ? check.username.reason || td.errors.usernameTaken
+      : '')
+  const emailError =
+    fieldErrors.email ||
+    (check.email.status === 'taken' ? check.email.reason || td.errors.emailTaken : '')
+
+  // Right-aligned status badge inside the input: spinner while checking, green
+  // tick when available, red alert when taken.
+  const renderCheckStatus = (field) => {
+    const { status } = check[field]
+    if (status === 'checking')
+      return <span className="details-status details-status-checking" aria-hidden="true" />
+    if (status === 'available')
+      return (
+        <CheckCircleRoundedIcon
+          className="details-status details-status-ok"
+          sx={{ fontSize: 16 }}
+        />
+      )
+    if (status === 'taken')
+      return (
+        <ErrorOutlineRoundedIcon
+          className="details-status details-status-error"
+          sx={{ fontSize: 16 }}
+        />
+      )
+    return null
+  }
+
   const validate = () => {
     const errors = {}
     if (!name.trim()) errors.name = td.errors.nameRequired
@@ -62,6 +146,8 @@ const DetailsStep = ({ active, isLast, stepNumber, totalSteps }) => {
   // advance to the owner/company steps.
   const runPrimary = () => {
     if (!validate()) return
+    // Block on a username/email already flagged as taken by the blur check.
+    if (check.username.status === 'taken' || check.email.status === 'taken') return
     persist()
     if (isLast) {
       run(() =>
@@ -137,16 +223,26 @@ const DetailsStep = ({ active, isLast, stepNumber, totalSteps }) => {
             <span className="details-field-icon tone-purple">
               <BadgeOutlinedIcon sx={{ fontSize: 18 }} />
             </span>
-            <input
-              id="reg-username"
-              placeholder={td.usernamePlaceholder}
-              value={username}
-              aria-invalid={Boolean(fieldErrors.username)}
-              onChange={(event) => setUsername(event.target.value)}
-            />
+            <div className="details-input-wrap">
+              <input
+                id="reg-username"
+                placeholder={td.usernamePlaceholder}
+                value={username}
+                aria-invalid={Boolean(usernameError)}
+                onChange={(event) => {
+                  setUsername(event.target.value)
+                  resetCheck('username')
+                }}
+                onBlur={handleUsernameBlur}
+              />
+              {renderCheckStatus('username')}
+            </div>
           </div>
-          {fieldErrors.username && (
-            <p className="details-error" role="alert">{fieldErrors.username}</p>
+          {usernameError && (
+            <p className="details-error" role="alert">{usernameError}</p>
+          )}
+          {check.username.status === 'available' && (
+            <p className="details-ok" role="status">{td.usernameAvailable}</p>
           )}
         </div>
 
@@ -176,17 +272,27 @@ const DetailsStep = ({ active, isLast, stepNumber, totalSteps }) => {
             <span className="details-field-icon tone-blue">
               <MailOutlineRoundedIcon sx={{ fontSize: 18 }} />
             </span>
-            <input
-              id="reg-email"
-              type="email"
-              placeholder={td.emailPlaceholder}
-              value={email}
-              aria-invalid={Boolean(fieldErrors.email)}
-              onChange={(event) => setEmail(event.target.value)}
-            />
+            <div className="details-input-wrap">
+              <input
+                id="reg-email"
+                type="email"
+                placeholder={td.emailPlaceholder}
+                value={email}
+                aria-invalid={Boolean(emailError)}
+                onChange={(event) => {
+                  setEmail(event.target.value)
+                  resetCheck('email')
+                }}
+                onBlur={handleEmailBlur}
+              />
+              {renderCheckStatus('email')}
+            </div>
           </div>
-          {fieldErrors.email && (
-            <p className="details-error" role="alert">{fieldErrors.email}</p>
+          {emailError && (
+            <p className="details-error" role="alert">{emailError}</p>
+          )}
+          {check.email.status === 'available' && (
+            <p className="details-ok" role="status">{td.emailAvailable}</p>
           )}
         </div>
 

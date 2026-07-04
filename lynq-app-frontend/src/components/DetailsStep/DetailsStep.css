@@ -129,6 +129,54 @@
   margin: 0 0 0 var(--icon-col);
 }
 
+/* Positive availability line (green), aligned with the input like the error. */
+.details-ok {
+  color: #16a34a;
+  font-size: 11px;
+  margin: 0 0 0 var(--icon-col);
+}
+
+/* Right-aligned availability badge inside username/email inputs. Shares the
+   input-wrap's padding-right with the password eye. */
+.details-status {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.details-status-ok {
+  color: #16a34a;
+}
+
+.details-status-error {
+  color: #ef4444;
+}
+
+/* Small spinning ring shown while the availability check is in flight. */
+.details-status-checking {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-bg);
+  border-top-color: var(--brand-purple);
+  animation: details-status-spin 0.7s linear infinite;
+}
+
+@keyframes details-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .details-status-checking {
+    animation-duration: 2s;
+  }
+}
+
 /* Visually-hidden submit so pressing Enter in a field still submits the form,
    even though the visible action buttons live in the static RegisterFooter. */
 .details-hidden-submit {
