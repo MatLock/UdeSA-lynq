@@ -5,10 +5,12 @@ import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.enums.JobPostSource;
+import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
+import com.lynq.backend.model.JobPostSkillEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
@@ -30,6 +32,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -83,7 +86,30 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final Integer JOB_SALARY_RANGE_DOWN = 80000;
   private static final Integer JOB_SALARY_RANGE_TOP = 120000;
   private static final JobPostSource JOB_POST_TYPE = JobPostSource.LYNQ;
-  private static final List<String> JOB_SKILLS = List.of("Java", "Spring", "PostgreSQL");
+  private static final String SKILL_JAVA = "Java";
+  private static final String SKILL_SPRING = "Spring";
+  private static final String SKILL_POSTGRES = "PostgreSQL";
+  private static final String SKILL_REACT = "React";
+  private static final String SKILL_GO = "Go";
+  private static final String SKILL_KOTLIN = "Kotlin";
+  private static final String SKILL_PYTHON = "Python";
+  private static final String SKILL_SALES = "Sales";
+  private static final List<String> JOB_SKILLS = List.of(SKILL_JAVA, SKILL_SPRING, SKILL_POSTGRES);
+
+  private static final String POSTER_FULL_NAME = "Nora Poster";
+  private static final String POSTER_CURRENT_POSITION = "Hiring Manager";
+  private static final String SECOND_USER_ID = "44444444-4444-4444-4444-444444444444";
+  private static final String SECOND_COMPANY_ID = "33333333-3333-3333-3333-333333333333";
+  private static final String SECOND_COMPANY_NAME = "Globex Corporation";
+  private static final String JOB_ID_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+  private static final String JOB_ID_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+  private static final String JOB_ID_C = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+  private static final LocalDate JOB_CREATED_OLD = LocalDate.of(2026, 6, 1);
+  private static final LocalDate JOB_CREATED_MID = LocalDate.of(2026, 6, 10);
+  private static final LocalDate JOB_CREATED_NEW = LocalDate.of(2026, 6, 20);
+  private static final String PLACEHOLDER_DESCRIPTION = "d";
+  private static final String PRE_SIGNED_URL_SIGNATURE_MARKER = "X-Amz-Signature";
+  private static final String LISTED_NEWEST_JOB_TITLE = "Frontend Engineer";
 
   @LocalServerPort
   private int port;
@@ -172,7 +198,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     // the stored profile image reference is returned as a pre-signed download URL
     String userProfileImageUrl = (String) data.get("userProfileImageUrl");
     assertThat(userProfileImageUrl, is(notNullValue()));
-    assertThat(userProfileImageUrl, containsString("X-Amz-Signature"));
+    assertThat(userProfileImageUrl, containsString(PRE_SIGNED_URL_SIGNATURE_MARKER));
     assertThat(userProfileImageUrl, containsString(PROFILE_IMAGE_URL.substring("https://".length())));
     assertThat(data.get("currentPosition"), is(CURRENT_POSITION));
     assertThat(data.get("about"), is(ABOUT));
@@ -426,7 +452,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .map(skill -> skill.getSkill())
         .sorted()
         .toList();
-    assertThat(persistedSkills, contains("Java", "PostgreSQL", "Spring"));
+    assertThat(persistedSkills, contains(SKILL_JAVA, SKILL_POSTGRES, SKILL_SPRING));
   }
 
   @Test
@@ -472,6 +498,280 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
     assertThat(response.statusCode(), is(401));
     assertThat(jobPostRepository.count(), is(0L));
+  }
+
+  @Test
+  void getJobsReturnsAvailableJobsNewestFirstWithCompanyAndPosterAndSkipsUnavailable()
+      throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION,
+        PROFILE_IMAGE_URL);
+    CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
+    seedJob(JOB_ID_A, "Backend Engineer", "Older post", WorkType.REMOTE, JOB_CREATED_OLD, JobStatus.OPEN,
+        company, poster, List.of(SKILL_JAVA));
+    seedJob(JOB_ID_B, LISTED_NEWEST_JOB_TITLE, "Newer post", WorkType.IN_OFFICE, JOB_CREATED_NEW,
+        JobStatus.OPEN, company, poster, List.of(SKILL_REACT));
+    seedJob(JOB_ID_C, "Hidden Engineer", "Unavailable post", WorkType.REMOTE, JOB_CREATED_MID,
+        JobStatus.CLOSE, company, poster, List.of(SKILL_GO));
+
+    HttpResponse<String> response = getJobs(null);
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> body = parse(response.body());
+    assertThat(body.get("success"), is(true));
+
+    Map<String, Object> data = dataOf(body);
+    assertThat(data.get("totalElements"), is(2));
+    List<Map<String, Object>> content = contentOf(data);
+    assertThat(jobIdsOf(content), contains(JOB_ID_B, JOB_ID_A));
+
+    Map<String, Object> newest = content.get(0);
+    assertThat(newest.get("title"), is(LISTED_NEWEST_JOB_TITLE));
+    assertThat(newest.get("workType"), is(WorkType.IN_OFFICE.name()));
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> companyData = (Map<String, Object>) newest.get("company");
+    assertThat(companyData.get("id"), is(COMPANY_ID));
+    assertThat(companyData.get("name"), is(COMPANY_NAME));
+    assertThat(companyData.get("about"), is(COMPANY_ABOUT));
+    assertThat(companyData.get("size"), is(COMPANY_SIZE));
+    // the stored company logo reference is returned as a pre-signed download URL
+    String companyProfileImageUrl = (String) companyData.get("profileImageUrl");
+    assertThat(companyProfileImageUrl, is(notNullValue()));
+    assertThat(companyProfileImageUrl, containsString(PRE_SIGNED_URL_SIGNATURE_MARKER));
+    assertThat(companyProfileImageUrl,
+        containsString(COMPANY_PROFILE_IMAGE_URL.substring("https://".length())));
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> postedBy = (Map<String, Object>) newest.get("postedBy");
+    assertThat(postedBy.get("id"), is(USER_ID));
+    assertThat(postedBy.get("fullName"), is(POSTER_FULL_NAME));
+    assertThat(postedBy.get("currentPosition"), is(POSTER_CURRENT_POSITION));
+    // the stored profile image reference is returned as a pre-signed download URL
+    String posterProfileImageUrl = (String) postedBy.get("profileImageUrl");
+    assertThat(posterProfileImageUrl, is(notNullValue()));
+    assertThat(posterProfileImageUrl, containsString(PRE_SIGNED_URL_SIGNATURE_MARKER));
+    assertThat(posterProfileImageUrl,
+        containsString(PROFILE_IMAGE_URL.substring("https://".length())));
+
+    @SuppressWarnings("unchecked")
+    List<String> skills = (List<String>) newest.get("skills");
+    assertThat(skills, contains(SKILL_REACT));
+  }
+
+  @Test
+  void getJobsPaginatesResultsNewestFirst() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
+    CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
+    seedJob(JOB_ID_A, "First", PLACEHOLDER_DESCRIPTION, WorkType.REMOTE, JOB_CREATED_OLD, JobStatus.OPEN, company, poster, null);
+    seedJob(JOB_ID_B, "Second", PLACEHOLDER_DESCRIPTION, WorkType.REMOTE, JOB_CREATED_MID, JobStatus.OPEN, company, poster, null);
+    seedJob(JOB_ID_C, "Third", PLACEHOLDER_DESCRIPTION, WorkType.REMOTE, JOB_CREATED_NEW, JobStatus.OPEN, company, poster, null);
+
+    Map<String, Object> firstPage = dataOf(parse(getJobs("page=0&size=2").body()));
+    assertThat(firstPage.get("page"), is(0));
+    assertThat(firstPage.get("size"), is(2));
+    assertThat(firstPage.get("totalElements"), is(3));
+    assertThat(firstPage.get("totalPages"), is(2));
+    assertThat(firstPage.get("hasNext"), is(true));
+    assertThat(firstPage.get("hasPrevious"), is(false));
+    assertThat(jobIdsOf(contentOf(firstPage)), contains(JOB_ID_C, JOB_ID_B));
+
+    Map<String, Object> secondPage = dataOf(parse(getJobs("page=1&size=2").body()));
+    assertThat(secondPage.get("hasNext"), is(false));
+    assertThat(secondPage.get("hasPrevious"), is(true));
+    assertThat(jobIdsOf(contentOf(secondPage)), contains(JOB_ID_A));
+  }
+
+  @Test
+  void getJobsFiltersByTitleContainsCaseInsensitive() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
+    CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
+    seedJob(JOB_ID_A, "Senior Backend Engineer", PLACEHOLDER_DESCRIPTION, WorkType.REMOTE, JOB_CREATED_OLD, JobStatus.OPEN,
+        company, poster, null);
+    seedJob(JOB_ID_B, "Frontend Developer", PLACEHOLDER_DESCRIPTION, WorkType.REMOTE, JOB_CREATED_NEW, JobStatus.OPEN, company,
+        poster, null);
+
+    Map<String, Object> data = dataOf(parse(getJobs("filterValue=backend").body()));
+
+    assertThat(data.get("totalElements"), is(1));
+    assertThat(jobIdsOf(contentOf(data)), contains(JOB_ID_A));
+  }
+
+  @Test
+  void getJobsFiltersByDescriptionContainsCaseInsensitive() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
+    CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
+    seedJob(JOB_ID_A, "Job A", "Work on distributed systems", WorkType.REMOTE, JOB_CREATED_OLD,
+        JobStatus.OPEN, company, poster, null);
+    seedJob(JOB_ID_B, "Job B", "Design marketing pages", WorkType.REMOTE, JOB_CREATED_NEW, JobStatus.OPEN,
+        company, poster, null);
+
+    Map<String, Object> data = dataOf(parse(getJobs("filterValue=DISTRIBUTED").body()));
+
+    assertThat(data.get("totalElements"), is(1));
+    assertThat(jobIdsOf(contentOf(data)), contains(JOB_ID_A));
+  }
+
+  @Test
+  void getJobsFiltersByWorkType() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
+    CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
+    seedJob(JOB_ID_A, "Remote job", PLACEHOLDER_DESCRIPTION, WorkType.REMOTE, JOB_CREATED_OLD, JobStatus.OPEN, company, poster,
+        null);
+    seedJob(JOB_ID_B, "Office job", PLACEHOLDER_DESCRIPTION, WorkType.IN_OFFICE, JOB_CREATED_NEW, JobStatus.OPEN, company, poster,
+        null);
+
+    Map<String, Object> data = dataOf(parse(getJobs("filterValue=IN_OFFICE").body()));
+
+    assertThat(data.get("totalElements"), is(1));
+    assertThat(jobIdsOf(contentOf(data)), contains(JOB_ID_B));
+  }
+
+  @Test
+  void getJobsFiltersBySkillCaseInsensitive() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
+    CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
+    seedJob(JOB_ID_A, "Java job", PLACEHOLDER_DESCRIPTION, WorkType.REMOTE, JOB_CREATED_OLD, JobStatus.OPEN, company, poster,
+        List.of(SKILL_JAVA, SKILL_SPRING));
+    seedJob(JOB_ID_B, "Python job", PLACEHOLDER_DESCRIPTION, WorkType.REMOTE, JOB_CREATED_NEW, JobStatus.OPEN, company, poster,
+        List.of(SKILL_PYTHON));
+
+    Map<String, Object> data = dataOf(parse(getJobs("filterValue=java").body()));
+
+    assertThat(data.get("totalElements"), is(1));
+    assertThat(jobIdsOf(contentOf(data)), contains(JOB_ID_A));
+  }
+
+  @Test
+  void getJobsFiltersByCompanyNameContainsCaseInsensitive() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    UserEntity lynqOwner = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
+    CompanyEntity lynq = seedCompany(COMPANY_ID, COMPANY_NAME, lynqOwner);
+    UserEntity globexOwner = seedCompanyUser(SECOND_USER_ID, "Hank", "Recruiter", null);
+    CompanyEntity globex = seedCompany(SECOND_COMPANY_ID, SECOND_COMPANY_NAME, globexOwner);
+    seedJob(JOB_ID_A, "Lynq job", PLACEHOLDER_DESCRIPTION, WorkType.REMOTE, JOB_CREATED_OLD, JobStatus.OPEN, lynq, lynqOwner,
+        null);
+    seedJob(JOB_ID_B, "Globex job", PLACEHOLDER_DESCRIPTION, WorkType.REMOTE, JOB_CREATED_NEW, JobStatus.OPEN, globex, globexOwner,
+        null);
+
+    Map<String, Object> data = dataOf(parse(getJobs("filterValue=globex").body()));
+
+    assertThat(data.get("totalElements"), is(1));
+    assertThat(jobIdsOf(contentOf(data)), contains(JOB_ID_B));
+  }
+
+  @Test
+  void getJobsMatchesFilterValueAcrossColumnsWithOr() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
+    CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
+    seedJob(JOB_ID_A, "Kotlin Engineer", PLACEHOLDER_DESCRIPTION, WorkType.REMOTE, JOB_CREATED_OLD, JobStatus.OPEN,
+        company, poster, List.of(SKILL_GO));
+    seedJob(JOB_ID_B, "Designer", PLACEHOLDER_DESCRIPTION, WorkType.REMOTE, JOB_CREATED_NEW, JobStatus.OPEN,
+        company, poster, List.of(SKILL_KOTLIN));
+    seedJob(JOB_ID_C, "Recruiter", PLACEHOLDER_DESCRIPTION, WorkType.IN_OFFICE, JOB_CREATED_MID, JobStatus.OPEN,
+        company, poster, List.of(SKILL_SALES));
+
+    Map<String, Object> data = dataOf(parse(getJobs("filterValue=kotlin").body()));
+
+    assertThat(data.get("totalElements"), is(2));
+    assertThat(jobIdsOf(contentOf(data)), contains(JOB_ID_B, JOB_ID_A));
+  }
+
+  @Test
+  void getJobsReturnsUnauthorizedWhenIamRejectsToken() throws Exception {
+    stubIamInvalidToken();
+
+    HttpResponse<String> response = getJobs(null);
+
+    assertThat(response.statusCode(), is(401));
+  }
+
+  private UserEntity seedCompanyUser(String id, String fullName, String currentPosition,
+      String profileImageUrl) {
+    return userRepository.save(UserEntity.builder()
+        .id(id)
+        .type(UserType.COMPANY)
+        .fullName(fullName)
+        .currentPosition(currentPosition)
+        .profileImageUrl(profileImageUrl)
+        .createdOn(LocalDate.now())
+        .build());
+  }
+
+  private CompanyEntity seedCompany(String companyId, String name, UserEntity owner) {
+    return companyRepository.save(CompanyEntity.builder()
+        .id(companyId)
+        .name(name)
+        .about(COMPANY_ABOUT)
+        .size(COMPANY_SIZE)
+        .profileImageUrl(COMPANY_PROFILE_IMAGE_URL)
+        .createdOn(LocalDate.now())
+        .owner(owner)
+        .build());
+  }
+
+  private JobPostEntity seedJob(String id, String title, String description, WorkType workType,
+      LocalDate createdOn, JobStatus jobStatus, CompanyEntity company, UserEntity poster,
+      List<String> skills) {
+    JobPostEntity job = JobPostEntity.builder()
+        .id(id)
+        .title(title)
+        .description(description)
+        .workType(workType)
+        .jobPostSource(JOB_POST_TYPE)
+        .createdOn(createdOn)
+        .jobStatus(jobStatus)
+        .company(company)
+        .createdByUser(poster)
+        .build();
+    if (skills != null) {
+      skills.forEach(skill -> job.getSkills().add(JobPostSkillEntity.builder()
+          .id(UUID.randomUUID().toString())
+          .jobPost(job)
+          .skill(skill)
+          .build()));
+    }
+    return jobPostRepository.save(job);
+  }
+
+  private HttpResponse<String> getJobs(String queryString) throws Exception {
+    String url = createJobUrl()
+        + (queryString == null || queryString.isBlank() ? "" : "?" + queryString);
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(url))
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .GET()
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> dataOf(Map<String, Object> body) {
+    return (Map<String, Object>) body.get("data");
+  }
+
+  @SuppressWarnings("unchecked")
+  private List<Map<String, Object>> contentOf(Map<String, Object> data) {
+    return (List<Map<String, Object>>) data.get("content");
+  }
+
+  private List<String> jobIdsOf(List<Map<String, Object>> content) {
+    return content.stream().map(item -> (String) item.get("jobId")).toList();
   }
 
   private void seedCompanyOwnerWithCompany() {
