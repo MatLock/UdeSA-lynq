@@ -1,6 +1,7 @@
 package com.lynq.backend.service;
 
 import com.lynq.backend.aspect.AuditLog;
+import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.UserEntity;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 public class StorageService {
 
   private static final String USER_PROFILE_PATH_FORMAT = "lynq/users/%s/profile/%s";
+  private static final String COMPANY_PROFILE_PATH_FORMAT = "lynq/companies/%s/profile/%s";
   private static final Duration PRE_SIGNED_URL_EXPIRATION = Duration.ofMinutes(15);
 
   private final S3Presigner s3Presigner;
@@ -49,9 +51,30 @@ public class StorageService {
   }
 
   @AuditLog
-  public String obtainUserProfilePreSignedUrl(UserEntity userEntity) {
+  public PreSignedUploadUrl createCompanyProfilePreSignedUrl(CompanyEntity companyEntity, String fileName) {
 
-    String s3Path = userEntity.getProfileImageUrl();
+    String s3Path = String.format(COMPANY_PROFILE_PATH_FORMAT, companyEntity.getId(), fileName);
+    PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+        .bucket(bucketName)
+        .key(s3Path)
+        .build();
+    PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+        .signatureDuration(PRE_SIGNED_URL_EXPIRATION)
+        .putObjectRequest(putObjectRequest)
+        .build();
+    PresignedPutObjectRequest presignedRequest = s3Presigner.presignPutObject(presignRequest);
+
+    return new PreSignedUploadUrl(s3Path, presignedRequest.url().toString());
+  }
+
+  @AuditLog
+  public String obtainUserProfilePreSignedUrl(UserEntity userEntity) {
+    return obtainProfilePreSignedUrl(userEntity.getProfileImageUrl());
+  }
+
+  @AuditLog
+  public String obtainProfilePreSignedUrl(String s3Path) {
+
     GetObjectRequest getObjectRequest = GetObjectRequest.builder()
         .bucket(bucketName)
         .key(s3Path)
