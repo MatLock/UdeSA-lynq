@@ -3,7 +3,7 @@
 [![CI](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lynq-iam-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lynq-iam-test-workflow.yaml)
 [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lyqn/main/.github/badges/jacoco.svg)](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lynq-iam-test-workflow.yaml)
 
-Identity and Access Management service for the Lynq platform. Issues short-lived JWT access tokens and opaque, Redis-backed refresh tokens, and exposes endpoints for registration, login (by username or email), token refresh, token validation, and password update.
+Identity and Access Management service for the Lynq platform. Issues short-lived JWT access tokens and opaque, Redis-backed refresh tokens, and exposes endpoints for registration, login (by username or email), token refresh, token validation, password update, and pre-registration availability checks for usernames and emails.
 
 ---
 
@@ -107,7 +107,7 @@ Every request passes through an ordered filter chain before reaching a controlle
 
 `/auth/refresh` deliberately skips JWT validation — the access token may already be expired; the refresh token is validated against Redis inside `AuthService`.
 
-Public routes (`/auth/register`, `/auth/login/username`, `/auth/login/email`) still require `lynq-request-uuid`.
+Public routes (`/auth/register`, `/auth/login/username`, `/auth/login/email`, `/auth/check-username`, `/auth/check-email`) still require `lynq-request-uuid`.
 
 ---
 
@@ -235,6 +235,21 @@ All requests must include the `lynq-request-uuid` header.
 | GET    | `/auth/validate`              | Bearer access token  | Returns `true` if the access token is valid. |
 | PATCH  | `/auth/update-password`       | Bearer access token  | Rotate password, return fresh tokens.        |
 | GET    | `/auth/user-info`              | Bearer access token  | Return user identity (id, username, email) extracted from the access token. |
+| GET    | `/auth/check-username`         | —                    | Check whether a username has a valid format and is available. |
+| GET    | `/auth/check-email`            | —                    | Check whether an email has a valid format and is available. |
+
+The two `check-*` endpoints are public (no bearer token) but, like every route, still require the `lynq-request-uuid` header. They accept the value to test as a query parameter (`?username=` / `?email=`) and always return `200 OK` with a body describing the result — validation failures are reported in the payload rather than as HTTP errors:
+
+```json
+{ "success": true, "data": { "valid": false, "reason": "Username is already taken" } }
+```
+
+`reason` is `null` when `valid` is `true`. The checks applied are:
+
+| Endpoint         | Rules                                                                    |
+| ---------------- | ------------------------------------------------------------------------ |
+| `/auth/check-username` | Not blank; length 3–20 characters; not already taken.              |
+| `/auth/check-email`    | Not blank; max 100 characters; valid email format; not already taken. |
 
 OpenAPI / Swagger UI is exposed at `/lynq-iam/swagger-ui.html` (springdoc default).
 
@@ -324,6 +339,32 @@ Sample success response:
     "id": "0190d1b0-8b3a-7c00-9f01-1b2c3d4e5f60",
     "username": "johndoe",
     "email": "johndoe@example.com"
+  }
+}
+```
+
+**Check username availability**
+
+```bash
+curl "http://localhost:8080/lynq-iam/auth/check-username?username=johndoe" \
+  -H "lynq-request-uuid: $UUID"
+```
+
+**Check email availability**
+
+```bash
+curl "http://localhost:8080/lynq-iam/auth/check-email?email=johndoe@example.com" \
+  -H "lynq-request-uuid: $UUID"
+```
+
+Sample response (either check):
+
+```json
+{
+  "success": true,
+  "data": {
+    "valid": false,
+    "reason": "Username is already taken"
   }
 }
 ```

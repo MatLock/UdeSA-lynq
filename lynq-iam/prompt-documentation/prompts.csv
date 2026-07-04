@@ -11,7 +11,6 @@ date,prompt
 "13-06-2026","add junit tests for classes in service package, follow project pattern for proper testing"
 "13-06-2026"," getting no bean of type TestRestTemplateFound in class IamApplicationTests"
 "13-06-2026","what is the cause of this error, happens when calling `updatePasswordEndpointReturnsOkAndReissuesTokensWhenAccessTokenIsValid` stacktrace:  ```org.springframework.http.converter.HttpMessageConversionException: Type definition error: [simple type, class com.fasterxml.jackson.databind.JsonNode]
-
     at org.springframework.http.converter.AbstractJacksonHttpMessageConverter.readJavaType(AbstractJacksonHttpMessageConverter.java:360)
     at org.springframework.http.converter.AbstractJacksonHttpMessageConverter.read(AbstractJacksonHttpMessageConverter.java:319)
     at org.springframework.web.client.HttpMessageConverterExtractor.extractData(HttpMessageConverterExtractor.java:112)
@@ -27,4 +26,5 @@ date,prompt
 "23-06-2026","read LogAspect.java I need to mask refreshToken and accessToken as well"
 "25-06-2026","modify log Aspect to log the real class and not the aspectJ class log in log4j"
 "04-07-2026","create new endpoint called check-username. given a username name it check if it is valid or not. This endpoint shouldn't be secured with bearer but it should request lynq-request-id header"
-"04-07-2026","add another endpoint to check email. same rules an pattern""04-07-2026","are the commits pushed?"
+"04-07-2026","add another endpoint to check email. same rules an pattern"
+"04-07-2026","update lynq-iam readme.md with new endpoints"
