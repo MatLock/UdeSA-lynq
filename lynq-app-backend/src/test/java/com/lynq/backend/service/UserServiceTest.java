@@ -120,10 +120,9 @@ class UserServiceTest {
   void obtainProfileImagePreSignedUrlReturnsPreSignedUrlWhenImagePresent() {
     UserEntity existing = existingUser();
     existing.setProfileImageUrl(S3_PATH);
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
     when(storageService.obtainUserProfilePreSignedUrl(existing)).thenReturn(PRE_SIGNED_URL);
 
-    String result = userService.obtainProfileImagePreSignedUrl(USER_ID);
+    String result = userService.obtainProfileImagePreSignedUrl(existing);
 
     assertThat(result, is(PRE_SIGNED_URL));
   }
@@ -132,20 +131,11 @@ class UserServiceTest {
   void obtainProfileImagePreSignedUrlReturnsNullWhenImageAbsent() {
     UserEntity existing = existingUser();
     existing.setProfileImageUrl(null);
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
 
-    String result = userService.obtainProfileImagePreSignedUrl(USER_ID);
+    String result = userService.obtainProfileImagePreSignedUrl(existing);
 
     assertThat(result, is(org.hamcrest.Matchers.nullValue()));
     verify(storageService, never()).obtainUserProfilePreSignedUrl(any());
-  }
-
-  @Test
-  void obtainProfileImagePreSignedUrlThrowsNotFoundWhenUserDoesNotExist() {
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
-
-    assertThrows(NotFoundException.class,
-        () -> userService.obtainProfileImagePreSignedUrl(USER_ID));
   }
 
   @Test

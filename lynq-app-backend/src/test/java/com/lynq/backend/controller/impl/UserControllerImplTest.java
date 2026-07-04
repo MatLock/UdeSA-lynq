@@ -94,8 +94,9 @@ class UserControllerImplTest {
 
   @Test
   void getUserMapsEntityIntoResponseData() {
-    when(userService.getUser(USER_ID)).thenReturn(savedUser());
-    when(userService.obtainProfileImagePreSignedUrl(USER_ID)).thenReturn(PRE_SIGNED_URL);
+    UserEntity user = savedUser();
+    when(userService.getUser(USER_ID)).thenReturn(user);
+    when(userService.obtainProfileImagePreSignedUrl(user)).thenReturn(PRE_SIGNED_URL);
 
     ResponseEntity<GlobalRestResponse<GetUserRestResponse>> response =
         userController.getUser(principal);
@@ -157,9 +158,10 @@ class UserControllerImplTest {
   @Test
   void createUserMapsSavedEntityIntoResponseData() {
     stubCreateRequestFields();
+    UserEntity user = savedUser();
     when(userService.saveNewUser(USER_ID, USER_TYPE, FULL_NAME, CURRENT_POSITION, ABOUT,
-        GITHUB_URL, LINKEDIN_URL, BIRTH_DATE)).thenReturn(savedUser());
-    when(userService.obtainProfileImagePreSignedUrl(USER_ID)).thenReturn(PRE_SIGNED_URL);
+        GITHUB_URL, LINKEDIN_URL, BIRTH_DATE)).thenReturn(user);
+    when(userService.obtainProfileImagePreSignedUrl(user)).thenReturn(PRE_SIGNED_URL);
 
     ResponseEntity<GlobalRestResponse<CreateUserRestResponse>> response =
         userController.createUser(request, principal);

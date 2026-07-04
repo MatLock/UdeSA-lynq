@@ -41,7 +41,7 @@ public class UserControllerImpl implements UserController {
   @AuditLog
   public ResponseEntity<GlobalRestResponse<GetUserRestResponse>> getUser(@AuthenticationPrincipal LynqUserPrincipal principal) {
     UserEntity user = userService.getUser(principal.getId());
-    String profileImageUrl = userService.obtainProfileImagePreSignedUrl(user.getId());
+    String profileImageUrl = userService.obtainProfileImagePreSignedUrl(user);
 
     GetUserRestResponse response = GetUserRestResponse.builder()
         .id(user.getId())
@@ -75,7 +75,7 @@ public class UserControllerImpl implements UserController {
         request.getLinkedinUrl(),
         request.getBirthDate());
 
-    String profileImageUrl = userService.obtainProfileImagePreSignedUrl(user.getId());
+    String profileImageUrl = userService.obtainProfileImagePreSignedUrl(user);
 
     CreateUserRestResponse response = CreateUserRestResponse.builder()
         .id(user.getId())

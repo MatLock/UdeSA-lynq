@@ -97,9 +97,7 @@ public class UserService {
 
   @AuditLog
   @Transactional(readOnly = true)
-  public String obtainProfileImagePreSignedUrl(String userId) {
-    UserEntity user = userRepository.findById(userId)
-        .orElseThrow(() -> new NotFoundException("User '" + userId + "' not found"));
+  public String obtainProfileImagePreSignedUrl(UserEntity user) {
     if (user.getProfileImageUrl() == null || user.getProfileImageUrl().isBlank()) {
       return null;
     }
