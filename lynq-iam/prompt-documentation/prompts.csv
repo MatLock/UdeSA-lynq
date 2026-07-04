@@ -27,4 +27,4 @@ date,prompt
 "23-06-2026","read LogAspect.java I need to mask refreshToken and accessToken as well"
 "25-06-2026","modify log Aspect to log the real class and not the aspectJ class log in log4j"
 "04-07-2026","create new endpoint called check-username. given a username name it check if it is valid or not. This endpoint shouldn't be secured with bearer but it should request lynq-request-id header"
-"04-07-2026","add another endpoint to check email. same rules an pattern"
+"04-07-2026","add another endpoint to check email. same rules an pattern""04-07-2026","are the commits pushed?"
