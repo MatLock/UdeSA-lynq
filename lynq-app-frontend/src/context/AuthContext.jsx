@@ -8,6 +8,7 @@ import {
 } from 'react'
 import authService from '../services/authService'
 import userService from '../services/userService'
+import securedFetch from '../utils/securedFetch'
 import profileImageCache from '../utils/profileImageCache'
 import fileToDataUrl from '../utils/fileToDataUrl'
 import useReduxDevtools from '../hooks/useReduxDevtools'
@@ -173,7 +174,9 @@ const AuthProvider = ({ children }) => {
         let user = persisted.user
         let profile = null
         try {
-          profile = await userService.get_user(accessToken)
+          // Pre-session bootstrap: the access token was just minted, so a plain
+          // token-bound fetcher (no refresh loop) is the right fit here.
+          profile = await userService.get_user(securedFetch.tokenFetcher(accessToken))
           user = withProfile(persisted.user, profile)
         } catch {
           // Keep the persisted user — backend unreachable or no profile.

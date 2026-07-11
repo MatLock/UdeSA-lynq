@@ -143,8 +143,13 @@ const user_register = async (userInfo, requestUuid = requestUuidUtil.newRequestU
  * is secured, so a valid access token is required; on success it returns the
  * user with a freshly generated access and refresh token.
  *
+ * Goes through the caller's `authFetch` (see useApi) so an expired access token
+ * is refreshed and the request retried once. This is an IAM endpoint, so the
+ * absolute IAM URL is passed — securedFetch resolves absolute URLs as-is.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
  * @param {string} newPassword - The new password (min 8 chars).
- * @param {string} accessToken - The current valid access token (Bearer auth).
  * @returns {Promise<{
  *   id: string,
  *   username: string,
@@ -156,27 +161,11 @@ const user_register = async (userInfo, requestUuid = requestUuidUtil.newRequestU
  * @throws {Error} On invalid fields (400), missing/invalid token (401), or user
  *   not found (403). The thrown error carries `status` and `reason`.
  */
-const user_update_password = async (newPassword, accessToken, requestUuid = requestUuidUtil.newRequestUuid()) => {
-  const response = await fetch(`${IAM_BASE_URL}/auth/update-password`, {
+const user_update_password = async (authFetch, newPassword) => {
+  const payload = await authFetch(`${IAM_BASE_URL}/auth/update-password`, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'lynq-request-uuid': requestUuid,
-      Authorization: `Bearer ${accessToken}`,
-    },
     body: JSON.stringify({ newPassword }),
   });
-
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const error = new Error(
-      payload?.reason ?? `Password update failed with status ${response.status}`
-    );
-    error.status = response.status;
-    error.reason = payload?.reason;
-    throw error;
-  }
 
   // Unwrap the GlobalRestResponse envelope ({ success, data }).
   return payload?.data;

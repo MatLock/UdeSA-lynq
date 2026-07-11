@@ -1,27 +1,23 @@
 // Job service — talks to the secured app-backend (lynq-backend-app).
 // Spec: lynq-app-backend JobController (GET /job).
 
-import requestUuidUtil from '../utils/requestUuid';
-
-const APP_BASE_URL =
-  import.meta.env.LYNQ_BACKEND_BASE_URL ?? 'http://localhost:8082/lynq-backend-app';
-
 /**
  * Fetch a page of available job posts, newest first.
  *
- * Calls GET /job (JobController.getJobs). The endpoint is secured, so it needs
- * the bearer access token and the `lynq-request-uuid` correlation header. A
- * single free-text `filterValue` is matched (case-insensitive, contains) across
- * the job title, description, company name, work type and skills; omit it to
- * list everything.
+ * Calls GET /job (JobController.getJobs) through the caller's `authFetch` (see
+ * useApi), which injects the bearer token and `lynq-request-uuid` header and —
+ * crucially — refreshes the access token and retries once when it has expired
+ * (backend replies 401 "Invalid or expired access token"). A single free-text
+ * `filterValue` is matched (case-insensitive, contains) across the job title,
+ * description, company name, work type and skills; omit it to list everything.
  *
- * @param {string} accessToken - Bearer access token from login/register.
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   authenticated fetcher from useApi. Returns the parsed GlobalRestResponse
+ *   envelope and throws on a non-OK response (with `status`/`reason`).
  * @param {object} [params] - Query parameters.
  * @param {number} [params.page=0] - Zero-based page index.
  * @param {number} [params.size=20] - Page size.
  * @param {string} [params.filterValue] - Free-text search; omitted when blank.
- * @param {string} [requestUuid] - Correlation id for the `lynq-request-uuid`
- *   header; defaults to a fresh id.
  * @returns {Promise<{
  *   content: Array<{
  *     jobId: string,
@@ -46,41 +42,105 @@ const APP_BASE_URL =
  * }>} The unwrapped PagedRestResponse.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
-const get_jobs = async (
-  accessToken,
-  { page = 0, size = 20, filterValue } = {},
-  requestUuid = requestUuidUtil.newRequestUuid(),
-) => {
+const get_jobs = async (authFetch, { page = 0, size = 20, filterValue } = {}) => {
   const query = new URLSearchParams({ page: String(page), size: String(size) });
   if (filterValue) {
     query.set('filterValue', filterValue);
   }
 
-  const response = await fetch(`${APP_BASE_URL}/job?${query}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'lynq-request-uuid': requestUuid,
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  // authFetch prepends the app-backend base URL, attaches auth/correlation
+  // headers, and unwraps nothing — so read `.data` off the GlobalRestResponse
+  // envelope to hand callers the flat PagedRestResponse.
+  const payload = await authFetch(`/job?${query}`, { method: 'GET' });
+  return payload?.data;
+};
 
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const error = new Error(
-      payload?.reason ?? `Request failed with status ${response.status}`
-    );
-    error.status = response.status;
-    error.reason = payload?.reason;
-    throw error;
+/**
+ * Create a job post for the authenticated user's company.
+ *
+ * Calls POST /job (JobController.createJob) through `authFetch`. The backend
+ * derives the company and posting user from the bearer token (and rejects
+ * non-company users), so the request body only carries the job's own fields.
+ * Posts created here always originate in LYNQ, so `jobPostSource` is fixed to
+ * 'LYNQ'. Empty/omitted salary bounds and skills are dropped so they don't fail
+ * the backend's @Positive validation.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch
+ * @param {object} job
+ * @param {string} job.title
+ * @param {string} job.description
+ * @param {'REMOTE' | 'IN_OFFICE'} job.workType
+ * @param {number} [job.salaryRangeDown]
+ * @param {number} [job.salaryRangeTop]
+ * @param {string[]} [job.skills]
+ * @returns {Promise<object>} The unwrapped CreateJobRestResponse.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+/**
+ * Ask the backend to AI-generate a list of suggested skills for a job.
+ *
+ * Calls POST /job/generate-skills through `authFetch` with the job's title,
+ * description and (optional) work type — the fields the model reasons over. The
+ * caller (create-job form) lets the company owner review and edit the returned
+ * skills before they are sent with the actual job post, so this endpoint only
+ * proposes; it never persists anything.
+ *
+ * NOTE: the backend endpoint is provided separately. If its path or payload
+ * shape differs, adjust the URL and the `payload.data` read below — the form
+ * only depends on getting back a `string[]` of skills.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch
+ * @param {object} job
+ * @param {string} job.title
+ * @param {string} job.description
+ * @param {'REMOTE' | 'IN_OFFICE'} [job.workType]
+ * @returns {Promise<string[]>} The suggested skills.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const generate_skills = async (authFetch, { title, description, workType } = {}) => {
+  const body = { title, description };
+  if (workType) {
+    body.workType = workType;
   }
 
-  // Success responses wrap the payload in a GlobalRestResponse ({ success, data });
-  // unwrap so callers receive the flat PagedRestResponse.
+  const payload = await authFetch('/job/generate-skills', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  // Tolerate either { data: { skills: [] } } or { data: [] } envelopes.
+  const data = payload?.data;
+  return Array.isArray(data) ? data : (data?.skills ?? []);
+};
+
+const create_job = async (
+  authFetch,
+  { title, description, workType, salaryRangeDown, salaryRangeTop, skills } = {},
+) => {
+  const body = {
+    title,
+    description,
+    workType,
+    jobPostSource: 'LYNQ',
+  };
+  if (salaryRangeDown != null && salaryRangeDown !== '') {
+    body.salaryRangeDown = Number(salaryRangeDown);
+  }
+  if (salaryRangeTop != null && salaryRangeTop !== '') {
+    body.salaryRangeTop = Number(salaryRangeTop);
+  }
+  if (skills?.length) {
+    body.skills = skills;
+  }
+
+  const payload = await authFetch('/job', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
   return payload?.data;
 };
 
 export default {
   get_jobs,
+  generate_skills,
+  create_job,
 };

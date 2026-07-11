@@ -15,6 +15,7 @@ import LoadingOverlay from '../../components/LoadingOverlay/LoadingOverlay'
 import Spinner from '../../components/Spinner/Spinner'
 import Toast from '../../components/Toast/Toast'
 import useAuth from '../../hooks/useAuth'
+import useApi from '../../hooks/useApi'
 import userService from '../../services/userService'
 import authService from '../../services/authService'
 import profileImageCache from '../../utils/profileImageCache'
@@ -30,6 +31,10 @@ import './ProfilePage.css'
 const ProfilePage = () => {
   const t = strings.pages.profile
   const { user, accessToken, updateUser, applyTokens } = useAuth()
+  // Refresh-aware fetcher: transparently mints a new access token and retries
+  // when the current one has expired, so leaving the profile tab open past the
+  // token lifetime still loads/saves.
+  const { authFetch } = useApi()
 
   // Initial profile fetch state. Only "loading" when there's a token to fetch
   // with, so the empty form never flashes before the fetch starts.
@@ -69,7 +74,7 @@ const ProfilePage = () => {
       setLoading(true)
       setLoadError('')
       try {
-        const profile = await userService.get_user(accessToken)
+        const profile = await userService.get_user(authFetch)
         if (cancelled) return
         setFullName(profile.fullName ?? '')
         setCurrentPosition(profile.currentPosition ?? '')
@@ -93,7 +98,7 @@ const ProfilePage = () => {
     return () => {
       cancelled = true
     }
-  }, [accessToken, user?.id])
+  }, [accessToken, authFetch, user?.id])
 
   // Clicking the avatar opens the OS file picker.
   const handleAvatarClick = () => fileInputRef.current?.click()
@@ -111,8 +116,8 @@ const ProfilePage = () => {
     setUploading(true)
     try {
       const preSignedUrl = await userService.generate_profile_image_upload_url(
+        authFetch,
         file.name,
-        accessToken,
       )
       await userService.upload_profile_image(preSignedUrl, file)
 
@@ -143,17 +148,14 @@ const ProfilePage = () => {
       // Update the profile fields (PATCH /user). birthDate must be null (not an
       // empty string) when unset, since the backend parses it as a date. The
       // profile image isn't part of this call — it uploads on pick.
-      const updated = await userService.update_user_profile(
-        {
-          fullName,
-          currentPosition,
-          about,
-          githubUrl,
-          linkedinUrl,
-          birthDate: birthDate || null,
-        },
-        accessToken,
-      )
+      const updated = await userService.update_user_profile(authFetch, {
+        fullName,
+        currentPosition,
+        about,
+        githubUrl,
+        linkedinUrl,
+        birthDate: birthDate || null,
+      })
       // Reflect the saved values in the session so the sidebar stays in sync.
       updateUser({
         fullName: updated.fullName,
@@ -167,7 +169,7 @@ const ProfilePage = () => {
       // Password change is a separate IAM call and rotates both tokens; only
       // run it when a new password was actually entered.
       if (password) {
-        const auth = await authService.user_update_password(password, accessToken)
+        const auth = await authService.user_update_password(authFetch, password)
         applyTokens({
           accessToken: auth.accessToken,
           refreshToken: auth.refreshToken,

@@ -1,0 +1,207 @@
+/* CreateJobPage — company job-post form. Reuses the auth card design + field
+   styling (matches login / register / profile), with tokens from index.css. */
+
+/* .login-bg is position:fixed/centered on the auth pages; inside the AppLayout
+   shell it must flow next to the sidebar and scroll when the form is tall. */
+.create-job-page {
+  position: relative;
+  inset: auto;
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+  align-items: flex-start;
+  padding: 32px 24px;
+}
+
+/* Constrained, centered card (a form reads better narrow than full-width). */
+.create-job-card {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 32px;
+  gap: 4px;
+}
+
+.create-job-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 18px;
+  text-align: left;
+}
+
+/* Field: label on top, then an icon + control row. --icon-col aligns the label
+   and hint with the input edge, to the right of the icon. */
+.create-job-field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  --icon-col: 34px;
+}
+
+.create-job-field > label {
+  color: var(--text-h);
+  font-size: 11px;
+  margin-left: var(--icon-col);
+}
+
+/* Salary bounds share a row on wide viewports. */
+.create-job-row {
+  display: flex;
+  gap: 12px;
+}
+
+.create-job-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The description textarea is multi-line, so pin the icon to the top. */
+.create-job-control--textarea {
+  align-items: flex-start;
+}
+
+.create-job-field-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}
+
+.create-job-field-icon.tone-blue {
+  background: var(--accent-blue-bg);
+  color: var(--brand-blue-dark);
+}
+
+.create-job-field-icon.tone-purple {
+  background: var(--accent-bg);
+  color: var(--brand-purple);
+}
+
+.create-job-control > input,
+.create-job-control > .create-job-select,
+.create-job-control > .create-job-textarea {
+  flex: 1;
+  min-width: 0;
+}
+
+.create-job-field input,
+.create-job-select,
+.create-job-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text-h);
+  outline: none;
+}
+
+.create-job-textarea {
+  resize: vertical;
+  min-height: 96px;
+  line-height: 1.5;
+}
+
+.create-job-field input:focus,
+.create-job-select:focus,
+.create-job-textarea:focus {
+  border-color: var(--brand-purple);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.create-job-field input[aria-invalid='true'],
+.create-job-select[aria-invalid='true'],
+.create-job-textarea[aria-invalid='true'] {
+  border-color: #ef4444;
+}
+
+.create-job-field input[aria-invalid='true']:focus,
+.create-job-select[aria-invalid='true']:focus,
+.create-job-textarea[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.create-job-error {
+  margin: 0 0 0 var(--icon-col);
+  font-size: 11px;
+  color: #ef4444;
+}
+
+.create-job-hint {
+  margin: 0 0 0 var(--icon-col);
+  font-size: 11px;
+  color: var(--text);
+}
+
+/* Footer actions: cancel (ghost) + submit (gradient), pinned right. */
+.create-job-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.create-job-cancel,
+.create-job-submit {
+  min-width: 140px;
+  padding: 9px 20px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.create-job-cancel {
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+}
+
+.create-job-cancel:hover {
+  opacity: 0.85;
+}
+
+.create-job-submit {
+  color: #fff;
+  background: var(--brand-gradient);
+  border: none;
+}
+
+.create-job-submit:hover {
+  opacity: 0.92;
+}
+
+.create-job-cancel:disabled,
+.create-job-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 560px) {
+  .create-job-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .create-job-actions {
+    flex-direction: column-reverse;
+  }
+
+  .create-job-cancel,
+  .create-job-submit {
+    width: 100%;
+  }
+}

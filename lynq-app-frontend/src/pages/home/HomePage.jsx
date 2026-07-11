@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import strings from '../../i18n'
+import useApi from '../../hooks/useApi'
 import useAuth from '../../hooks/useAuth'
 import jobService from '../../services/jobService'
 import JobCard from '../../components/JobCard/JobCard.jsx'
@@ -15,7 +17,13 @@ const PAGE_SIZE = 20
 
 const HomePage = () => {
   const t = strings.home
-  const { accessToken } = useAuth()
+  // authFetch transparently refreshes an expired access token and retries once
+  // before surfacing an error, so the feed survives token expiry.
+  const { authFetch } = useApi()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  // Only company owners can publish jobs, so the action is theirs alone.
+  const isCompany = user?.userType === 'COMPANY'
 
   const [query, setQuery] = useState('')
   const [filterValue, setFilterValue] = useState('')
@@ -28,14 +36,12 @@ const HomePage = () => {
   // the result of a superseded request so a slow earlier fetch can't overwrite a
   // newer one.
   useEffect(() => {
-    if (!accessToken) return undefined
-
     let cancelled = false
     const loadJobs = async () => {
       setLoading(true)
       setError(false)
       try {
-        const result = await jobService.get_jobs(accessToken, {
+        const result = await jobService.get_jobs(authFetch, {
           page,
           size: PAGE_SIZE,
           filterValue: filterValue || undefined,
@@ -52,7 +58,7 @@ const HomePage = () => {
     return () => {
       cancelled = true
     }
-  }, [accessToken, page, filterValue])
+  }, [authFetch, page, filterValue])
 
   // Applying a new search always restarts at the first page.
   const handleSearch = useCallback(
@@ -71,17 +77,45 @@ const HomePage = () => {
       <header className="home-hero">
         <h1 className="home-banner">LYNQ</h1>
         <form className="home-search" role="search" onSubmit={handleSearch}>
-          <input
-            type="search"
-            className="home-search-input"
-            placeholder={t.searchPlaceholder}
-            aria-label={t.searchPlaceholder}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
+          <div className="home-search-field">
+            <svg
+              className="home-search-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+              <path
+                d="m20 20-3.5-3.5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+            <input
+              type="search"
+              className="home-search-input"
+              placeholder={t.searchPlaceholder}
+              aria-label={t.searchPlaceholder}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
           <button type="submit" className="home-search-button">
             {t.searchButton}
           </button>
+          {isCompany && (
+            <button
+              type="button"
+              className="home-create-button"
+              onClick={() => navigate('/create-job')}
+            >
+              <span className="home-create-plus" aria-hidden="true">
+                +
+              </span>
+              {t.createJob}
+            </button>
+          )}
         </form>
       </header>
 

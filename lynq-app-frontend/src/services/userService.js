@@ -1,21 +1,18 @@
 // User service — talks to the secured app-backend (lynq-backend-app).
 // Spec: lynq-app-backend/openapi.yaml (UserController).
-
-import requestUuidUtil from '../utils/requestUuid';
-
-const APP_BASE_URL =
-  import.meta.env.LYNQ_BACKEND_BASE_URL ?? 'http://localhost:8082/lynq-backend-app';
+//
+// The secured calls take an `authFetch`-shaped fetcher ((path, options) =>
+// Promise<payload>) rather than a raw token: in-session pages pass useApi's
+// authFetch (auto-refreshes an expired token), while pre-session flows (login,
+// register, remembered-session bootstrap) pass securedFetch.tokenFetcher(token).
 
 /**
  * Fetch the authenticated user's profile.
  *
- * Calls GET /user (UserController.getUser). The endpoint is secured, so it needs
- * the bearer access token and the `lynq-request-uuid` correlation header.
+ * Calls GET /user (UserController.getUser).
  *
- * @param {string} accessToken - Bearer access token from login/register.
- * @param {string} [requestUuid] - Correlation id for the `lynq-request-uuid`
- *   header; defaults to a fresh id. Pass a shared id to trace a multi-call
- *   functionality across services.
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch, or a tokenFetcher for pre-session use).
  * @returns {Promise<{
  *   id: string,
  *   userType: string,
@@ -30,40 +27,21 @@ const APP_BASE_URL =
  * }>} The user profile (the unwrapped GetUserRestResponse).
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
-const get_user = async (accessToken, requestUuid = requestUuidUtil.newRequestUuid()) => {
-  const response = await fetch(`${APP_BASE_URL}/user`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'lynq-request-uuid': requestUuid,
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const error = new Error(
-      payload?.reason ?? `Request failed with status ${response.status}`
-    );
-    error.status = response.status;
-    error.reason = payload?.reason;
-    throw error;
-  }
-
-  // Success responses wrap the payload in a GlobalRestResponse ({ success, data });
-  // unwrap so callers receive the flat GetUserRestResponse.
+const get_user = async (authFetch) => {
+  const payload = await authFetch('/user', { method: 'GET' });
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
   return payload?.data;
 };
 
 /**
  * Update the authenticated user's profile.
  *
- * Calls PATCH /user (UserController.updateUserProfile). The endpoint is secured
- * and partial: only the fields present in the body are modified, so pass `null`
- * for fields that should keep their current value. The user identity is resolved
- * from the bearer token.
+ * Calls PATCH /user (UserController.updateUserProfile). Partial: only the fields
+ * present in the body are modified, so pass `null` for fields that should keep
+ * their current value. The user identity is resolved from the bearer token.
  *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
  * @param {{
  *   fullName?: string,
  *   currentPosition?: string,
@@ -72,41 +50,16 @@ const get_user = async (accessToken, requestUuid = requestUuidUtil.newRequestUui
  *   linkedinUrl?: string,
  *   birthDate?: string,
  * }} profile - Fields to update (UpdateUserProfileRequest shape).
- * @param {string} accessToken - Bearer access token.
- * @param {string} [requestUuid] - Correlation id for the `lynq-request-uuid`
- *   header; defaults to a fresh id.
  * @returns {Promise<object>} The updated profile (unwrapped
  *   UpdateUserProfileRestResponse).
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
-const update_user_profile = async (
-  profile,
-  accessToken,
-  requestUuid = requestUuidUtil.newRequestUuid(),
-) => {
-  const response = await fetch(`${APP_BASE_URL}/user`, {
+const update_user_profile = async (authFetch, profile) => {
+  const payload = await authFetch('/user', {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'lynq-request-uuid': requestUuid,
-      Authorization: `Bearer ${accessToken}`,
-    },
     body: JSON.stringify(profile),
   });
-
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const error = new Error(
-      payload?.reason ?? `Request failed with status ${response.status}`
-    );
-    error.status = response.status;
-    error.reason = payload?.reason;
-    throw error;
-  }
-
-  // Success responses wrap the payload in a GlobalRestResponse ({ success, data });
-  // unwrap so callers receive the flat UpdateUserProfileRestResponse.
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
   return payload?.data;
 };
 
@@ -119,42 +72,19 @@ const update_user_profile = async (
  * side effect, persists the S3 object key as the user's profile image reference
  * — so the returned URL is a pre-signed HTTP PUT target valid for ~15 minutes.
  *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
  * @param {string} fileName - Name of the file to upload; used to build the S3
  *   object key (e.g. `avatar.png`).
- * @param {string} accessToken - Bearer access token from login/register.
- * @param {string} [requestUuid] - Correlation id for the `lynq-request-uuid`
- *   header; defaults to a fresh id.
  * @returns {Promise<string>} The pre-signed upload URL (data.preSignedUrl).
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
-const generate_profile_image_upload_url = async (
-  fileName,
-  accessToken,
-  requestUuid = requestUuidUtil.newRequestUuid(),
-) => {
+const generate_profile_image_upload_url = async (authFetch, fileName) => {
   const query = new URLSearchParams({ 'file-name': fileName });
-  const response = await fetch(`${APP_BASE_URL}/user/generate-upload-image?${query}`, {
+  const payload = await authFetch(`/user/generate-upload-image?${query}`, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'lynq-request-uuid': requestUuid,
-      Authorization: `Bearer ${accessToken}`,
-    },
   });
-
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const error = new Error(
-      payload?.reason ?? `Request failed with status ${response.status}`
-    );
-    error.status = response.status;
-    error.reason = payload?.reason;
-    throw error;
-  }
-
-  // Success responses wrap the payload in a GlobalRestResponse ({ success, data });
-  // unwrap so callers receive the flat GenerateUploadImageRestResponse.
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
   return payload?.data?.preSignedUrl;
 };
 

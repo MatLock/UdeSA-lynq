@@ -1,59 +1,40 @@
 import { useCallback } from 'react'
 import useAuth from './useAuth'
 import requestUuidUtil from '../utils/requestUuid'
+import securedFetch from '../utils/securedFetch'
 
-// Base URL for the secured app backend (mirrors registrationService).
-const APP_BASE_URL =
-  import.meta.env.LYNQ_BACKEND_BASE_URL ?? 'http://localhost:8082/lynq-backend-app'
-
-
+// Authenticated fetcher for in-session pages/components. Delegates the actual
+// request to securedFetch.sendSecured and adds the piece a bare token can't
+// provide: when the access token has expired (backend replies 401), it refreshes
+// the token via the session and retries the request once before surfacing the
+// error. Concurrent refreshes are deduped inside AuthContext.refreshSession.
 const useApi = () => {
   const { accessToken, refreshSession, logout } = useAuth()
 
   const authFetch = useCallback(
     async (path, options = {}) => {
-      const url = path.startsWith('http') ? path : `${APP_BASE_URL}${path}`
-      const requestUuid = options.requestUuid ?? requestUuidUtil.newRequestUuid()
+      // A caller may pin a correlation id via options.requestUuid so a multi-call
+      // flow traces as one; it isn't a real fetch option, so keep it out of them.
+      const { requestUuid: pinnedUuid, ...fetchOptions } = options
+      const requestUuid = pinnedUuid ?? requestUuidUtil.newRequestUuid()
 
-      const send = (token) =>
-        fetch(url, {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            'lynq-request-uuid': requestUuid,
-            ...options.headers,
-            Authorization: `Bearer ${token}`,
-          },
-        })
+      try {
+        return await securedFetch.sendSecured(accessToken, path, fetchOptions, requestUuid)
+      } catch (error) {
+        if (error.status !== 401) throw error
 
-      let response = await send(accessToken)
-
-      // Access token likely expired — refresh once and retry.
-      if (response.status === 401) {
+        // Access token expired — refresh once and retry with the fresh token.
         let freshToken
         try {
           freshToken = await refreshSession()
         } catch {
           logout()
-          const error = new Error('Session expired. Please log in again.')
-          error.status = 401
-          throw error
+          const sessionError = new Error('Session expired. Please log in again.')
+          sessionError.status = 401
+          throw sessionError
         }
-        response = await send(freshToken)
+        return await securedFetch.sendSecured(freshToken, path, fetchOptions, requestUuid)
       }
-
-      const payload = await response.json().catch(() => null)
-
-      if (!response.ok) {
-        const error = new Error(
-          payload?.reason ?? `Request failed with status ${response.status}`,
-        )
-        error.status = response.status
-        error.reason = payload?.reason
-        throw error
-      }
-
-      return payload
     },
     [accessToken, refreshSession, logout],
   )

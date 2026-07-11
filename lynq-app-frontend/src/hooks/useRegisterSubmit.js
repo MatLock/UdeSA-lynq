@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuth from './useAuth'
 import userService from '../services/userService'
+import securedFetch from '../utils/securedFetch'
 import strings from '../i18n'
 
 // Drives the final registration submit from whichever step is last (DetailsStep
@@ -28,7 +29,8 @@ const useRegisterSubmit = () => {
       // user is still logged in if the lookup fails.
       let profile = null
       try {
-        profile = await userService.get_user(auth.accessToken)
+        // Fresh token from the registration just completed — no refresh needed.
+        profile = await userService.get_user(securedFetch.tokenFetcher(auth.accessToken))
       } catch {
         // Profile not yet readable or backend unreachable — proceed without it.
       }

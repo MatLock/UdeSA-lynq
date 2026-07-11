@@ -6,6 +6,7 @@ import LoginPage from './pages/login/LoginPage.jsx'
 import RegisterProvider from './context/RegisterContext.jsx'
 import RegisterPage from './pages/register/RegisterPage.jsx'
 import HomePage from './pages/home/HomePage.jsx'
+import CreateJobPage from './pages/create-job/CreateJobPage.jsx'
 import ProfilePage from './pages/profile/ProfilePage.jsx'
 import MyResumePage from './pages/my-resume/MyResumePage.jsx'
 import ApplicationsPage from './pages/applications/ApplicationsPage.jsx'
@@ -41,6 +42,7 @@ createRoot(document.getElementById('root')).render(
             }
           >
             <Route path="/home" element={<HomePage />} />
+            <Route path="/create-job" element={<CreateJobPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             {/* Candidate sections */}
             <Route path="/my-resume" element={<MyResumePage />} />

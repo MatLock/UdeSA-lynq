@@ -10,6 +10,7 @@ import authService from '../../services/authService'
 import userService from '../../services/userService'
 import useAuth from '../../hooks/useAuth'
 import requestUuidUtil from '../../utils/requestUuid'
+import securedFetch from '../../utils/securedFetch'
 import Toast from '../../components/Toast/Toast'
 import GoogleIcon from '../../components/GoogleIcon/GoogleIcon'
 import strings from '../../i18n'
@@ -55,7 +56,11 @@ const LoginPage = () => {
       // Non-fatal: if the profile lookup fails, the user is still logged in.
       let profile = null
       try {
-        profile = await userService.get_user(auth.accessToken, requestUuid)
+        // Fresh token from the login just above; share the requestUuid so the
+        // auth call and this profile fetch trace as one flow.
+        profile = await userService.get_user(
+          securedFetch.tokenFetcher(auth.accessToken, requestUuid),
+        )
       } catch {
         // No profile yet, or the backend is unreachable — proceed without it.
       }

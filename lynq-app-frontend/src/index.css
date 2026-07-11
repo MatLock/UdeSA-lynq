@@ -14,6 +14,7 @@
     var(--brand-blue) 0%,
     var(--brand-purple) 100%
   );
+
   /* ──────────────────────────────────────────────────────────────────── */
 
   --text: #6b6375;
@@ -24,6 +25,8 @@
   --accent: var(--brand-purple);
   --accent-bg: rgba(168, 85, 247, 0.1);
   --accent-border: rgba(168, 85, 247, 0.5);
+  --accent-blue-bg: rgba(56, 189, 248, 0.12);
+  --accent-blue-border: rgba(56, 189, 248, 0.4);
   --social-bg: rgba(244, 243, 236, 0.5);
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;

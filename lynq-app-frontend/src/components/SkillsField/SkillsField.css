@@ -1,0 +1,274 @@
+/* SkillsField — AI-generate panel + editable skills list for the create-job
+   form. Self-contained; brand tokens come from index.css. */
+
+.skills-field {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+/* Header: gradient icon + heading + subtitle. */
+.skills-field-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.skills-field-header-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: #fff;
+  background: var(--brand-gradient);
+}
+
+.skills-field-heading {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.skills-field-subtitle {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+/* Two panels; the generate panel is narrower so the editable list gets room. */
+.skills-field-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.skills-field-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Left panel gets a subtle tinted background to read as an action area. */
+.skills-field-generate-panel {
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+}
+
+.skills-field-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skills-field-panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+/* Small pill showing how many skills are selected. */
+.skills-field-count {
+  margin-left: auto;
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--brand-purple-dark);
+  background: var(--accent-blue-bg);
+}
+
+.skills-field-hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+/* Compact generate button: sits left, sized to its content. */
+.skills-field-generate {
+  align-self: flex-start;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand-gradient);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.skills-field-generate:hover {
+  opacity: 0.92;
+}
+
+.skills-field-generate:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Editable list box: chips, or a dashed empty state. */
+.skills-field-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  min-height: 84px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.skills-field-box--empty {
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+}
+
+.skills-field-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+}
+
+.skills-field-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 2px;
+  border-radius: 50%;
+  color: var(--brand-purple);
+  background: var(--accent-bg);
+}
+
+.skills-field-empty-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-purple-dark);
+}
+
+.skills-field-empty-subtitle {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text);
+}
+
+/* Chip: skill label + remove button. */
+.skills-field-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: fit-content;
+  padding: 3px 5px 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--brand-purple-dark);
+  background: var(--accent-blue-bg);
+  border: 1px solid var(--accent-border);
+}
+
+.skills-field-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  color: var(--brand-purple);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.skills-field-chip-remove:hover {
+  background: var(--accent-bg);
+}
+
+/* Add-your-own row. */
+.skills-field-add-label {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-h);
+}
+
+.skills-field-add {
+  display: flex;
+  gap: 8px;
+}
+
+.skills-field-input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text-h);
+  outline: none;
+}
+
+.skills-field-input:focus {
+  border-color: var(--brand-purple);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.skills-field-add-button {
+  flex: none;
+  padding: 6px 14px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.skills-field-add-button:hover {
+  opacity: 0.85;
+}
+
+.skills-field-add-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 560px) {
+  .skills-field-grid {
+    grid-template-columns: 1fr;
+  }
+}
