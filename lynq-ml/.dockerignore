@@ -1,0 +1,33 @@
+# Version control
+.git
+.gitignore
+
+# Virtual environments
+.venv
+venv
+
+# Python caches / build artifacts
+__pycache__
+**/__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Local tooling / IDE
+.idea
+.vscode
+.claude
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Secrets and local env
+openai_key.txt
+.env
+*.env
+
+# Docs not needed at runtime
+prompt-documentation
