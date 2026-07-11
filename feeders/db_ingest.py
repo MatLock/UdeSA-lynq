@@ -55,6 +55,9 @@ NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "lynq.feeders")
 _WORK_TYPES = {"REMOTE", "IN_OFFICE"}
 _JOB_POST_SOURCES = {"LYNQ", "LINKEDIN", "COMPUTRABAJO", "BUMERAN"}
 
+# Skills longer than this are treated as scraping noise and dropped on ingest.
+MAX_SKILL_LENGTH = 15
+
 
 def _det_uuid(*parts) -> str:
     """A stable 36-char UUIDv5 from the given parts (used as a table PK)."""
@@ -102,14 +105,21 @@ def _job_post_source(listing) -> str:
 
 
 def _skills(listing) -> list[str]:
-    """Split the comma-separated `skills` string into unique, non-empty tokens."""
+    """Split the comma-separated `skills` string into unique, non-empty tokens.
+
+    Overly long tokens are almost always scraping noise (a sentence caught in the
+    skills section rather than a real tag), so anything longer than
+    ``MAX_SKILL_LENGTH`` characters is skipped rather than stored.
+    """
     raw = listing.get("skills")
     if not raw:
         return []
     seen, out = set(), []
     for token in str(raw).split(","):
-        skill = _truncate(token.strip(), 255)
-        if skill and skill.lower() not in seen:
+        skill = token.strip()
+        if not skill or len(skill) > MAX_SKILL_LENGTH:
+            continue
+        if skill.lower() not in seen:
             seen.add(skill.lower())
             out.append(skill)
     return out
