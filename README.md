@@ -18,6 +18,29 @@ The identity and access management module for Lynq. It handles user accounts and
 
 The core application backend for Lynq. It exposes the platform's REST API, enforcing authenticated and audited access on top of the identity provided by lynq-iam, and backs the candidate-facing experience — listings, applications, and tracking — with persistent storage and caching.
 
+### lynq-app-frontend
+
+The candidate-facing web app for Lynq, built with React 19 and Vite. It delivers the interactive experience — sign-in, the job feed, profiles, applications, and job creation — talking to lynq-iam for identity and to lynq-app-backend for platform data.
+
+### lynq-ml
+
+The machine-learning service for Lynq, a FastAPI app that augments the platform with LLM-backed features. It currently exposes a skill-enhancement endpoint and pluggable LLM clients (OpenAI or a local Ollama model), returning results in the platform's standard response envelope.
+
+### lynq-home
+
+The public landing page for Lynq — a static site served from Cloudflare Workers and deployed with Wrangler.
+
 ### feeders
 
 Tooling to seed Lynq with realistic job-listing data for development. Bundles three feeders that normalize to a shared listing schema: a LinkedIn dataset loader (bulk seed data from Hugging Face) and polite live scrapers for Computrabajo Argentina and Bumeran Argentina.
+
+
+## Running the stack
+
+The full platform is orchestrated with Docker Compose. From the repository root:
+
+```bash
+docker compose up
+```
+
+This brings up the application modules (`lynq-iam`, `lynq-app-backend`, `lynq-app-frontend`, `lynq-ml`) together with their infrastructure dependencies: MySQL, Redis, LocalStack, and an Ollama model server (pulled on first start). Each module can also be built and run on its own — see the individual module READMEs for details.
