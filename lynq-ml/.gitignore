@@ -1,3 +1,6 @@
 .venv
 .claude
 .idea
+openai_key.txt
+llm_client/__pycache__
+*__pycache__*
