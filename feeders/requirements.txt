@@ -7,3 +7,6 @@ requests==2.34.2
 # Computrabajo HTML parsing (computrabajo_jobs.py)
 beautifulsoup4==4.15.0
 lxml==6.1.1
+
+# Database ingestion (db_ingest.py)
+PyMySQL==1.1.1

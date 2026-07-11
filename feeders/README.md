@@ -13,6 +13,9 @@ Three feeders are available:
 
 All three normalize to the same listing shape used by the rest of the platform.
 
+A fourth helper, **`db_ingest.py`**, loads that normalized output straight into
+the `lynq_backend_db` database (see below).
+
 ## Setup
 
 Dependencies are already installed in `.venv/` (`datasets`, `requests`,
@@ -207,3 +210,44 @@ Output is an array of listings:
 ```
 
 Dataset: https://huggingface.co/datasets/datastax/linkedin_job_listings
+
+---
+
+# Database ingestion (`db_ingest.py`)
+
+Reads one or more feeder output files and inserts the listings into the
+`lynq_backend_db` MySQL schema owned by `lynq-app-backend`, mapping each listing
+onto the `companies`, `job_posts` and `job_post_skills` tables (schema taken from
+`lynq-app-backend/src/main/resources/changelog/ddl`).
+
+```bash
+# ingest a single feeder's output
+.venv/bin/python db_ingest.py outputs/linked_jobs_output.json
+
+# ingest all three feeds at once
+.venv/bin/python db_ingest.py outputs/*.json
+
+# override connection settings (defaults shown)
+.venv/bin/python db_ingest.py outputs/bumeran_jobs_output.json \
+    --host 127.0.0.1 --port 3306 --user root --password federico \
+    --database lynq_backend_db
+```
+
+**Idempotent.** Every primary key is a deterministic UUIDv5 derived from stable
+inputs (`source`+listing `id` for a job, name for a company, job+skill for a
+skill), so re-running the same feed updates rows in place via
+`INSERT ... ON DUPLICATE KEY UPDATE` rather than creating duplicates. The whole
+batch runs in one transaction and only commits if every listing succeeds.
+
+**Mapping notes:**
+- `remote` → `work_type` (`REMOTE` / `IN_OFFICE`); `source` → `job_post_source`
+  (`LINKEDIN` / `COMPUTRABAJO` / `BUMERAN`, falling back to `LYNQ`).
+- `salary.min` / `salary.max` → `salary_range_down` / `salary_range_top`.
+- `postedAt` (epoch millis) → `created_on`; every new job defaults to `OPEN`.
+- `company` is upserted by name; the comma-separated `skills` string is split
+  into one `job_post_skills` row per skill.
+- Listings without a `title` are skipped (the column is `NOT NULL`).
+
+`insert_jobs(listings, host=..., port=..., user=..., password=..., database=...)`
+is also importable if you want to ingest in-memory listings directly rather than
+via a file.
