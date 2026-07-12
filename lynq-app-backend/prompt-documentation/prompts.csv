@@ -125,6 +125,12 @@ parameters:
 "04-07-2026","for the profileImageUrl of `JobPostedByRestResponse` follow the same logic as the userProfileImageUrl. The job post owner is another LYNQ user. so, it has its profile picture in s3 and a method to generate a public url was provided"
 "04-07-2026","create presign urls for company too. S3 key must be ""lynq/companies/%s/profile/%s"""
 "04-07-2026","modify jobPost endpoint. It will only receive 1 parameter in string. called ""filterValue"" and it should look any match across all the possible filtration columns using like.
-The columns that this filtration should be applied agaist are: title, description, companyName, workType, skill alter the query and make it OR condition"
+The columns that this filtration should be applied against are: title, description, companyName, workType, skill alter the query and make it OR condition"
 "04-07-2026","add SkillList for jobPost in GetJobRestResponse"
 "04-07-2026","I'm noticing a lot of hardcoding in the tests, specially when you are doing asserts. move all hardcoding into constant"
+"12-07-2026","create feign client called LynqMLClient and integrate with lynq-ml. lynq-ml url will be localhost:8084 for application.yaml and for production it will be the same url as default or LYNQ_ML_URL env var"
+"12-07-2026","create a new controller called ""LynqMLProxyController"" whose base path will be ""lynq-ml"" and create endpoint ""/lynq-ml"" that will call the actual endpoint in lynq-ml python project. this endpoint must be protected by all filters and pass the headers required by the ml endpoint"
+"12-07-2026","modify proxy controller to get lynq-request-uuid from request header not from the MDC"
+"12-07-2026","create Junit test cases and integration tests"
+"12-07-2026","include lynq score calculation for each of the jobPost returned in ""searchAvailableJobs"". and add this field in the response as well"
+"12-07-2026","fill README.md with all the details about this project. follow lynq-iam/README.md examples"
