@@ -124,8 +124,7 @@ parameters:
 "04-07-2026","JobRestResponse. split the classes I don't like inner classes"
 "04-07-2026","for the profileImageUrl of `JobPostedByRestResponse` follow the same logic as the userProfileImageUrl. The job post owner is another LYNQ user. so, it has its profile picture in s3 and a method to generate a public url was provided"
 "04-07-2026","create presign urls for company too. S3 key must be ""lynq/companies/%s/profile/%s"""
-"04-07-2026","modify jobPost endpoint. It will only receive 1 parameter in string. called ""filterValue"" and it should look any match across all the possible filtration columns using like.
-The columns that this filtration should be applied against are: title, description, companyName, workType, skill alter the query and make it OR condition"
+"04-07-2026","modify jobPost endpoint. It will only receive 1 parameter in string. called ""filterValue"" and it should look any match across all the possible filtration columns using like. The columns that this filtration should be applied against are: title, description, companyName, workType, skill alter the query and make it OR condition"
 "04-07-2026","add SkillList for jobPost in GetJobRestResponse"
 "04-07-2026","I'm noticing a lot of hardcoding in the tests, specially when you are doing asserts. move all hardcoding into constant"
 "12-07-2026","create feign client called LynqMLClient and integrate with lynq-ml. lynq-ml url will be localhost:8084 for application.yaml and for production it will be the same url as default or LYNQ_ML_URL env var"

@@ -23,7 +23,6 @@ date,prompt
 "17-06-2026","read LogAspect.java. I noticed that if password or newPassword is sent as part of an object. the logging of such field happens anyways. Please mask these fields if they are part of an object parameter"
 "17-06-2026","getting error when executing `mvn -e clean install`. error `NoClassDefFound Could not initialize class com.lynq.iam.IamApplicationTests`. If you need to execute test run jdk21 command to set proper jdk"
 "23-06-2026","read LogAspect.java I need to mask refreshToken and accessToken as well"
-"23-06-2026","read LogAspect.java I need to mask refreshToken and accessToken as well"
 "25-06-2026","modify log Aspect to log the real class and not the aspectJ class log in log4j"
 "04-07-2026","create new endpoint called check-username. given a username name it check if it is valid or not. This endpoint shouldn't be secured with bearer but it should request lynq-request-id header"
 "04-07-2026","add another endpoint to check email. same rules an pattern"
