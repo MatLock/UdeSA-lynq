@@ -123,6 +123,7 @@ const en = {
     apply: 'See details',
     unknownPoster: 'Unknown',
     companyLogoAlt: 'Company logo',
+    showAllSkills: 'Show all skills',
     workType: {
       REMOTE: 'Remote',
       IN_OFFICE: 'In office',
@@ -223,7 +224,7 @@ const en = {
       generate: 'Generate skills',
       regenerate: 'Regenerate',
       generating: 'Generating skills…',
-      generateHint: 'Add a title and description first to generate skills.',
+      generateHint: 'Add a title, description and work type first to generate skills.',
       skillsEmpty: 'No skills yet — generate them or add your own below.',
       removeSkill: 'Remove skill',
       addSkill: 'Add',

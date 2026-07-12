@@ -32,6 +32,7 @@
  *     company: { id: string, name: string, about: string, size: number, profileImageUrl: string },
  *     postedBy: { id: string, fullName: string, profileImageUrl: string, currentPosition: string },
  *     skills: string[],
+ *     lynqScore: number | null,
  *   }>,
  *   page: number,
  *   size: number,
@@ -79,37 +80,31 @@ const get_jobs = async (authFetch, { page = 0, size = 20, filterValue } = {}) =>
 /**
  * Ask the backend to AI-generate a list of suggested skills for a job.
  *
- * Calls POST /job/generate-skills through `authFetch` with the job's title,
- * description and (optional) work type — the fields the model reasons over. The
- * caller (create-job form) lets the company owner review and edit the returned
- * skills before they are sent with the actual job post, so this endpoint only
- * proposes; it never persists anything.
+ * Calls POST /ml/skill-enhance (LynqMLProxyController.enhanceSkills) through
+ * `authFetch`, which proxies to the lynq-ml service to extract key technical
+ * skills from the job's title, description and work type — the fields the model
+ * reasons over. The caller (create-job form) lets the company owner review and
+ * edit the returned skills before they are sent with the actual job post, so
+ * this endpoint only proposes; it never persists anything.
  *
- * NOTE: the backend endpoint is provided separately. If its path or payload
- * shape differs, adjust the URL and the `payload.data` read below — the form
- * only depends on getting back a `string[]` of skills.
+ * All three fields are required by the backend (SkillEnhanceRequest: title and
+ * description are @NotBlank, workType is @NotNull), and the response is the
+ * GlobalRestResponse envelope { success, data: { skills: [] } }.
  *
  * @param {(path: string, options?: object) => Promise<object>} authFetch
  * @param {object} job
  * @param {string} job.title
  * @param {string} job.description
- * @param {'REMOTE' | 'IN_OFFICE'} [job.workType]
+ * @param {'REMOTE' | 'IN_OFFICE'} job.workType
  * @returns {Promise<string[]>} The suggested skills.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
 const generate_skills = async (authFetch, { title, description, workType } = {}) => {
-  const body = { title, description };
-  if (workType) {
-    body.workType = workType;
-  }
-
-  const payload = await authFetch('/job/generate-skills', {
+  const payload = await authFetch('/ml/skill-enhance', {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ title, description, workType }),
   });
-  // Tolerate either { data: { skills: [] } } or { data: [] } envelopes.
-  const data = payload?.data;
-  return Array.isArray(data) ? data : (data?.skills ?? []);
+  return payload?.data?.skills ?? [];
 };
 
 const create_job = async (

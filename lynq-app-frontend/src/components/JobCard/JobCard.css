@@ -121,8 +121,27 @@
 }
 
 .job-card-poster-name {
-  font-weight: 600;
-  color: var(--text-h);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Muted "Posted by:" prefix — de-emphasized so the name reads as the subject. */
+.job-card-poster-label {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* The poster's name, styled as a link to their user detail page. */
+.job-card-poster-value {
+  font-weight: 700;
+  color: var(--brand-purple-dark);
+  text-decoration: none;
+}
+
+a.job-card-poster-value:hover,
+a.job-card-poster-value:focus-visible {
+  text-decoration: underline;
 }
 
 /* External-source badge: a compact tinted pill with a globe glyph, shown in

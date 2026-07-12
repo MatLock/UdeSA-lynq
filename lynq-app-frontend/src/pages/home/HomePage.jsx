@@ -131,7 +131,7 @@ const HomePage = () => {
         ) : (
           <div className="home-jobs">
             {jobs.map((job) => (
-              <JobCard key={job.jobId} job={job} />
+              <JobCard key={job.jobId} job={job} showScore={!isCompany} />
             ))}
           </div>
         )}

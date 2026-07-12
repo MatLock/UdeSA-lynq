@@ -27,6 +27,14 @@
   --accent-border: rgba(168, 85, 247, 0.5);
   --accent-blue-bg: rgba(56, 189, 248, 0.12);
   --accent-blue-border: rgba(56, 189, 248, 0.4);
+
+  /* LYNQ-score scale — job relevance shown to candidates, banded 0–100:
+     0–20 red · 21–40 orange · 41–60 yellow · 61–80 light green · 81–100 green */
+  --score-red: #ef4444;
+  --score-orange: #f97316;
+  --score-yellow: #eab308;
+  --score-light-green: #84cc16;
+  --score-green: #22c55e;
   --social-bg: rgba(244, 243, 236, 0.5);
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;

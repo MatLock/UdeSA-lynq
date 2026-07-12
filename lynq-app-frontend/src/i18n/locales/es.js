@@ -123,6 +123,7 @@ const es = {
     apply: 'Ver detalles',
     unknownPoster: 'Desconocido',
     companyLogoAlt: 'Logo de la empresa',
+    showAllSkills: 'Ver todas las habilidades',
     workType: {
       REMOTE: 'Remoto',
       IN_OFFICE: 'Presencial',
@@ -223,7 +224,7 @@ const es = {
       generate: 'Generar habilidades',
       regenerate: 'Regenerar',
       generating: 'Generando habilidades…',
-      generateHint: 'Agregá un título y una descripción para generar las habilidades.',
+      generateHint: 'Agregá un título, una descripción y un tipo de trabajo para generar las habilidades.',
       skillsEmpty: 'Todavía no hay habilidades — generalas o agregá las tuyas abajo.',
       removeSkill: 'Quitar habilidad',
       addSkill: 'Agregar',

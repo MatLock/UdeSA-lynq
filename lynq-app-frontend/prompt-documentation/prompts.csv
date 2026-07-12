@@ -79,3 +79,8 @@ date,prompt
 "11-07-2026","show lynq-score chip with color=warning variant=outlined and alpha(theme.palette.warning.main, 0.12) background"
 "11-07-2026","button apply label should be \"see details\""
 "11-07-2026","In create job form. Skills are AI generated. The idea is that once user completes the form. they click a button to generate ""skills"" (put a note informing this in the UI). and then the user will have the option of updating before sending to the backend"
+"12-07-2026","skill generation feature delays a little bit when user click the button. Display a nice Loading component or spinner when this feature is triggered. Also Block all buttons so the user is not able to perform any other action"
+"12-07-2026","remove chip for posted By component for username. make the name a link to a user detail page that will be created later (NOT user profile)"
+"12-07-2026","for job post card. if the job has more than 3 skills. add another chip for ""..."". If this chip is clicked, it should display all skills for this job"
+"12-07-2026","modify lynq score component in home page. Lynq-score component should not be rendered if the user is a ""Company"" user. Lynq-Score should be rendered with the following color pallete based on the scoring. 0-20 red 21-40 orange 41-60 yellow 61-80 light green 81-100 green"
+"12-07-2026","backend is now providing lynq-score for each job post. remove the hardcoding value"

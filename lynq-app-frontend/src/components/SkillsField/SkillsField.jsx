@@ -2,6 +2,7 @@ import { useState } from 'react'
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined'
 import CloseOutlinedIcon from '@mui/icons-material/CloseOutlined'
 import SellOutlinedIcon from '@mui/icons-material/SellOutlined'
+import LoadingOverlay from '../LoadingOverlay/LoadingOverlay'
 import jobService from '../../services/jobService'
 import strings from '../../i18n'
 import './SkillsField.css'
@@ -25,9 +26,10 @@ const SkillsField = ({
   const [skillInput, setSkillInput] = useState('')
   const [generating, setGenerating] = useState(false)
 
-  // Skills are generated from the title + description, so only enable it once
-  // both are filled in.
-  const canGenerate = Boolean(title.trim() && description.trim())
+  // Skills are generated from the title, description and work type — all three
+  // are required by the backend (POST /ml/skill-enhance), so only enable it
+  // once they are all filled in.
+  const canGenerate = Boolean(title.trim() && description.trim() && workType)
 
   // Append new skills, keeping order and dropping blanks / case-insensitive
   // duplicates (mirrors how the feed renders skill chips).
@@ -69,7 +71,7 @@ const SkillsField = ({
       const generated = await jobService.generate_skills(authFetch, {
         title: title.trim(),
         description: description.trim(),
-        workType: workType || undefined,
+        workType,
       })
       onChange(mergeSkills(generated))
     } catch (error) {
@@ -81,6 +83,10 @@ const SkillsField = ({
 
   return (
     <section className="skills-field">
+      {/* Skill generation can take a moment; block the whole page with the brand
+          overlay so no other action (submit, cancel, edits) can be triggered
+          mid-flight. */}
+      {generating && <LoadingOverlay label={t.generating} />}
       <header className="skills-field-header">
         <span className="skills-field-header-icon">
           <AutoAwesomeOutlinedIcon sx={{ fontSize: 18 }} />

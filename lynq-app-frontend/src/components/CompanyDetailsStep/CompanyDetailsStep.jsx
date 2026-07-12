@@ -59,6 +59,7 @@ const CompanyDetailsStep = ({ active, stepNumber, totalSteps }) => {
         username: data.username,
         email: data.email,
         password: data.password,
+        fullName: data.name,
         currentPosition: data.currentPosition,
         userAbout: data.userAbout,
         birthDate: data.dob,

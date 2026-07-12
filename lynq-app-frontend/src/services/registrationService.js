@@ -91,6 +91,7 @@ const register_company = async ({
   username,
   email,
   password,
+  fullName,
   currentPosition,
   userAbout,
   birthDate,
@@ -108,6 +109,7 @@ const register_company = async ({
   const companyResponse = await postSecured(
     '/company',
     {
+      fullName,
       currentPosition,
       userAbout,
       birthDate,
