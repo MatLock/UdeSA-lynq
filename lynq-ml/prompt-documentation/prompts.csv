@@ -2,3 +2,4 @@ date,prompt
 "04-07-2026","add a function in resume_reader that it takes a presignedURL from s3. pull the document read its content and returns it. If you need it create a separate file for s3_client in a different python package"
 "11-07-2026","in docker-compose add image container with llama3.1 and set the default env vars to use docker llama as default"
 "11-07-2026","add lynq-ml into docker-compose"
+"12-07-2026","create test package with unittest"
