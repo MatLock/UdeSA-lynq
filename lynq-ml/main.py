@@ -7,8 +7,68 @@ from middleware.request_uuid import require_request_uuid
 from response import ErrorRestResponse
 from skill_enhance.router import router as skill_enhance_router
 
+import logging
+import logging.config
 import os
 import uvicorn
+
+
+def _build_logging_config() -> dict:
+  """Colour logs per level (INFO cyan, WARNING yellow, ERROR red).
+
+  Reuses uvicorn's colourising formatters so the service's own loggers and
+  uvicorn's match, and streams to stdout (stderr is coloured red wholesale by
+  many consoles/IDEs). ``LOG_COLORS=false`` disables colour for file/CI output.
+  """
+  level = os.getenv("LOG_LEVEL", "INFO").upper()
+  use_colors = os.getenv("LOG_COLORS", "true").lower() not in ("0", "false", "no")
+  return {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+      "request_uuid": {"()": "logging_context.RequestUuidFilter"},
+    },
+    "formatters": {
+      "default": {
+        "()": "uvicorn.logging.DefaultFormatter",
+        "fmt": "%(asctime)s %(levelprefix)s [%(lynq_request_uuid)s] %(name)s - %(message)s",
+        "use_colors": use_colors,
+      },
+      "access": {
+        "()": "uvicorn.logging.AccessFormatter",
+        "fmt": '%(asctime)s %(levelprefix)s [%(lynq_request_uuid)s] %(client_addr)s - "%(request_line)s" %(status_code)s',
+        "use_colors": use_colors,
+      },
+    },
+    "handlers": {
+      "default": {
+        "class": "logging.StreamHandler",
+        "formatter": "default",
+        "filters": ["request_uuid"],
+        "stream": "ext://sys.stdout",
+      },
+      "access": {
+        "class": "logging.StreamHandler",
+        "formatter": "access",
+        "filters": ["request_uuid"],
+        "stream": "ext://sys.stdout",
+      },
+    },
+    "loggers": {
+      "uvicorn": {"handlers": ["default"], "level": level, "propagate": False},
+      "uvicorn.error": {"level": level},
+      "uvicorn.access": {"handlers": ["access"], "level": level, "propagate": False},
+    },
+    "root": {"handlers": ["default"], "level": level},
+  }
+
+
+# Configure logging before the app starts so the service's own loggers (e.g.
+# skill_enhance.router) actually emit. Without this the root logger defaults to
+# WARNING with no handler and every log.info(...) is silently dropped. Applied
+# at import so it also covers `uvicorn main:app`, not just `python main.py`.
+LOGGING_CONFIG = _build_logging_config()
+logging.config.dictConfig(LOGGING_CONFIG)
 
 app = FastAPI()
 
@@ -76,4 +136,5 @@ if __name__ == "__main__":
     app,
     host=os.getenv("HOST", "0.0.0.0"),
     port=int(os.getenv("PORT", "8084")),
+    log_config=LOGGING_CONFIG,
   )
