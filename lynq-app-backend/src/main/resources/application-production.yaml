@@ -31,6 +31,8 @@ spring:
 lynq:
   iam:
     url: ${LYNQ_IAM_URL:http://lynq-iam:8080/lynq-iam}
+  ml:
+    url: ${LYNQ_ML_URL:http://localhost:8084/lynq-ml}
   aws:
     region: ${AWS_REGION:us-east-1}
     access-key-id: ${AWS_ACCESS_KEY_ID}

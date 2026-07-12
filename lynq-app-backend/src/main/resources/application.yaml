@@ -32,10 +32,9 @@ spring:
 lynq:
   iam:
     url: http://localhost:8080/lynq-iam
+  ml:
+    url: http://localhost:8084/lynq-ml
   aws:
-    # Local development targets the LocalStack S3 container (see docker-compose).
-    # LocalStack accepts any credentials, so these dummy `test` keys are its
-    # documented defaults; override via env vars to hit real AWS.
     region: ${AWS_REGION:us-east-1}
     access-key-id: ${AWS_ACCESS_KEY_ID:test}
     secret-access-key: ${AWS_SECRET_ACCESS_KEY:test}
