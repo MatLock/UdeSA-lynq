@@ -42,7 +42,7 @@ class CompanyServiceTest {
   private static final Integer COMPANY_SIZE = 250;
   private static final String COMPANY_PROFILE_IMAGE_URL = "https://cdn.lynq.com/logos/lynq.png";
   private static final String NO_GITHUB_URL = null;
-  private static final String NO_FULL_NAME = null;
+  private static final String FULL_NAME = "Jane Doe";
   private static final String FILE_NAME = "logo.png";
   private static final String S3_PATH = "lynq/companies/company-1/profile/logo.png";
   private static final String PREVIOUS_S3_PATH = "lynq/companies/company-1/profile/old.png";
@@ -73,7 +73,7 @@ class CompanyServiceTest {
 
     companyService.createUserWithCompany(USER_ID, request);
 
-    verify(userService).saveNewUser(USER_ID, UserType.COMPANY, NO_FULL_NAME,
+    verify(userService).saveNewUser(USER_ID, UserType.COMPANY, FULL_NAME,
         CURRENT_POSITION, USER_ABOUT, NO_GITHUB_URL, LINKEDIN_URL, BIRTH_DATE);
   }
 
@@ -81,7 +81,7 @@ class CompanyServiceTest {
   void createUserWithCompanyPersistsCompanyBuiltFromRequestAndOwner() {
     stubRequestFields();
     UserEntity owner = UserEntity.builder().id(USER_ID).build();
-    when(userService.saveNewUser(USER_ID, UserType.COMPANY, NO_FULL_NAME,
+    when(userService.saveNewUser(USER_ID, UserType.COMPANY, FULL_NAME,
         CURRENT_POSITION, USER_ABOUT, NO_GITHUB_URL, LINKEDIN_URL, BIRTH_DATE)).thenReturn(owner);
     when(companyRepository.save(any(CompanyEntity.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
@@ -232,6 +232,7 @@ class CompanyServiceTest {
 
   private void stubRequestFields() {
     when(request.getCompanyName()).thenReturn(COMPANY_NAME);
+    when(request.getFullName()).thenReturn(FULL_NAME);
     when(request.getCurrentPosition()).thenReturn(CURRENT_POSITION);
     when(request.getUserAbout()).thenReturn(USER_ABOUT);
     when(request.getLinkedinUrl()).thenReturn(LINKEDIN_URL);

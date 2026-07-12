@@ -16,6 +16,8 @@ public class CreateUserWithCompanyRequest {
 
   private String userProfileImageUrl;
   @NotBlank
+  private String fullName;
+  @NotBlank
   private String currentPosition;
   @NotBlank
   private String userAbout;
