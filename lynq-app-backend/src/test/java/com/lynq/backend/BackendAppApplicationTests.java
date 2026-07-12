@@ -941,6 +941,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private CreateUserWithCompanyRequest validCompanyRequest() {
     CreateUserWithCompanyRequest request = new CreateUserWithCompanyRequest();
     request.setUserProfileImageUrl(PROFILE_IMAGE_URL);
+    request.setFullName(FULL_NAME);
     request.setCurrentPosition(CURRENT_POSITION);
     request.setUserAbout(ABOUT);
     request.setLinkedinUrl(LINKEDIN_URL);
