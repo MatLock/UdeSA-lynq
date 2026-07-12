@@ -9,8 +9,7 @@ from .base import LLMClient, LLMProvider
 
 class OllamaClient(LLMClient):
     """Calls Ollama's ``/api/generate`` endpoint in raw mode.
-
-    The ``key_extractor/ollama.jinja`` template already embeds the model's
+    The ``skill_extractor/ollama.jinja`` template already embeds the model's
     chat special tokens, so requests are sent with ``raw=True`` to bypass
     Ollama's own chat templating.
     """
