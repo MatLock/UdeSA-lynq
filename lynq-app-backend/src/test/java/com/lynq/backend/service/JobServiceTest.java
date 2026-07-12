@@ -10,6 +10,7 @@ import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSkillEntity;
 import com.lynq.backend.model.UserEntity;
+import com.lynq.backend.model.UserSkillsEntity;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
 import com.lynq.backend.repository.UserRepository;
@@ -19,6 +20,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +42,7 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -90,6 +93,8 @@ class JobServiceTest {
 
   private static final String RAW_FILTER_VALUE = "  Java  ";
   private static final String NORMALIZED_FILTER_VALUE = "Java";
+
+  private static final Pageable DEFAULT_PAGEABLE = PageRequest.of(0, 20);
 
   private static final String AUTHENTICATED_USER_NOT_FOUND = "Authenticated user not found";
   private static final String ONLY_COMPANY_USERS_CAN_CREATE_JOBS =
@@ -259,6 +264,7 @@ class JobServiceTest {
   void searchAvailableJobsMapsProjectionFieldsIncludingCompanyAndPoster() {
     JobFilter filter = new JobFilter(null);
     Pageable pageable = PageRequest.of(0, 20);
+    stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA, SKILL_SPRING)));
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         JOB_URL, JOB_POST_TYPE, CREATED_ON,
@@ -295,12 +301,14 @@ class JobServiceTest {
     assertThat(job.getPostedBy().getProfileImageUrl(), is(POSTER_IMAGE_URL));
     assertThat(job.getPostedBy().getCurrentPosition(), is(POSTER_CURRENT_POSITION));
     assertThat(job.getSkills(), contains(SKILL_JAVA, SKILL_SPRING));
+    assertThat(job.getLynqScore(), is(100));
   }
 
   @Test
   void searchAvailableJobsNormalizesBlankFiltersAndForwardsPageableToRepository() {
     JobFilter filter = new JobFilter(RAW_FILTER_VALUE);
     Pageable pageable = PageRequest.of(1, 5);
+    stubAuthenticatedUser(candidateUser(null));
     when(jobPostRepository.searchAvailableJobs(NORMALIZED_FILTER_VALUE, pageable))
         .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
@@ -313,6 +321,7 @@ class JobServiceTest {
   void searchAvailableJobsMapsPaginationMetadataAndPreservesOrder() {
     JobFilter filter = new JobFilter(null);
     Pageable pageable = PageRequest.of(1, 2);
+    stubAuthenticatedUser(candidateUser(null));
     Page<JobWithDetailsProjection> page = new PageImpl<>(
         List.of(projectionWithId(JOB_ID_NEWEST), projectionWithId(JOB_ID_OLDEST)), pageable, 6);
     when(jobPostRepository.searchAvailableJobs(null, pageable))
@@ -334,6 +343,7 @@ class JobServiceTest {
   void searchAvailableJobsReturnsEmptyContentWhenRepositoryReturnsNoJobs() {
     JobFilter filter = new JobFilter(null);
     Pageable pageable = PageRequest.of(0, 20);
+    stubAuthenticatedUser(candidateUser(null));
     when(jobPostRepository.searchAvailableJobs(null, pageable))
         .thenReturn(new PageImpl<>(List.of(), pageable, 0));
 
@@ -341,6 +351,46 @@ class JobServiceTest {
 
     assertThat(result.getContent(), is(empty()));
     assertThat(result.getTotalElements(), is(0L));
+  }
+
+  @Test
+  void searchAvailableJobsScoresLynqAsPercentageOfMatchingJobSkills() {
+    stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA)));
+    stubSingleJob(JOB_SKILLS_CONCATENATED);
+
+    assertThat(searchSingleJobLynqScore(), is(50));
+  }
+
+  @Test
+  void searchAvailableJobsMatchesSkillsCaseInsensitively() {
+    stubAuthenticatedUser(candidateUser(List.of("java", "SPRING")));
+    stubSingleJob(JOB_SKILLS_CONCATENATED);
+
+    assertThat(searchSingleJobLynqScore(), is(100));
+  }
+
+  @Test
+  void searchAvailableJobsDoesNotScoreLynqWhenUserIsCompany() {
+    stubAuthenticatedUser(companyUser());
+    stubSingleJob(JOB_SKILLS_CONCATENATED);
+
+    assertThat(searchSingleJobLynqScore(), is(nullValue()));
+  }
+
+  @Test
+  void searchAvailableJobsDoesNotScoreLynqWhenCandidateHasNoSkills() {
+    stubAuthenticatedUser(candidateUser(null));
+    stubSingleJob(JOB_SKILLS_CONCATENATED);
+
+    assertThat(searchSingleJobLynqScore(), is(nullValue()));
+  }
+
+  @Test
+  void searchAvailableJobsDoesNotScoreLynqWhenJobHasNoSkills() {
+    stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA)));
+    stubSingleJob(null);
+
+    assertThat(searchSingleJobLynqScore(), is(nullValue()));
   }
 
   private JobWithDetailsProjection projectionWithId(String jobId) {
@@ -353,6 +403,36 @@ class JobServiceTest {
 
   private UserEntity companyUser() {
     return UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
+  }
+
+  private UserEntity candidateUser(List<String> skillNames) {
+    UserEntity user = UserEntity.builder().id(USER_ID).type(UserType.CANDIDATE).build();
+    if (skillNames != null) {
+      user.setSkills(skillNames.stream()
+          .map(name -> UserSkillsEntity.builder().skill(name).user(user).build())
+          .collect(Collectors.toList()));
+    }
+    return user;
+  }
+
+  private void stubAuthenticatedUser(UserEntity user) {
+    stubAuthenticatedPrincipal();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+  }
+
+  private void stubSingleJob(String concatenatedSkills) {
+    JobWithDetailsProjection projection = new JobWithDetailsProjection(
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_URL, JOB_POST_TYPE, CREATED_ON,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, null,
+        POSTER_ID, POSTER_FULL_NAME, null, POSTER_CURRENT_POSITION, concatenatedSkills);
+    when(jobPostRepository.searchAvailableJobs(null, DEFAULT_PAGEABLE))
+        .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
+  }
+
+  private Integer searchSingleJobLynqScore() {
+    return jobService.searchAvailableJobs(new JobFilter(null), DEFAULT_PAGEABLE)
+        .getContent().get(0).getLynqScore();
   }
 
   private void stubAuthenticatedPrincipal() {

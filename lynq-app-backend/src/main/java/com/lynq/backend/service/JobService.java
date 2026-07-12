@@ -14,6 +14,7 @@ import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSkillEntity;
 import com.lynq.backend.model.UserEntity;
+import com.lynq.backend.model.UserSkillsEntity;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
 import com.lynq.backend.repository.UserRepository;
@@ -22,6 +23,9 @@ import com.lynq.backend.security.LynqUserPrincipal;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -83,13 +87,15 @@ public class JobService {
   @Transactional(readOnly = true)
   public PagedRestResponse<GetJobRestResponse> searchAvailableJobs(JobFilter filter,
       Pageable pageable) {
+    UserEntity user = getAuthenticatedUser();
     return PagedRestResponse.from(jobPostRepository.searchAvailableJobs(
             filter.filterValue(),
             pageable)
-        .map(this::toResponse));
+        .map(projection -> toResponse(projection, user)));
   }
 
-  private GetJobRestResponse toResponse(JobWithDetailsProjection projection) {
+  private GetJobRestResponse toResponse(JobWithDetailsProjection projection, UserEntity user) {
+    List<String> skills = splitSkills(projection.skills());
     return GetJobRestResponse.builder()
         .jobId(projection.jobId())
         .title(projection.title())
@@ -113,7 +119,8 @@ public class JobService {
             .profileImageUrl(obtainProfileImageUrl(projection.userProfileImageUrl()))
             .currentPosition(projection.userCurrentPosition())
             .build())
-        .skills(splitSkills(projection.skills()))
+        .skills(skills)
+        .lynqScore(calculateLyNQScore(skills, user))
         .build();
   }
 
@@ -146,6 +153,54 @@ public class JobService {
             .skill(skill)
             .build())
         .forEach(job.getSkills()::add);
+  }
+
+  private Integer calculateLyNQScore(JobPostEntity jobPost, UserEntity user) {
+    if (jobPost == null) {
+      return null;
+    }
+
+    List<String> jobSkillNames = jobPost.getSkills() == null ? null : jobPost.getSkills().stream()
+        .map(JobPostSkillEntity::getSkill)
+        .toList();
+
+    return calculateLyNQScore(jobSkillNames, user);
+  }
+
+  private Integer calculateLyNQScore(List<String> jobSkillNames, UserEntity user) {
+    if (user == null || user.getType() != UserType.CANDIDATE) {
+      return null;
+    }
+
+    List<UserSkillsEntity> userSkills = user.getSkills();
+
+    if (jobSkillNames == null || jobSkillNames.isEmpty() || userSkills == null
+        || userSkills.isEmpty()) {
+      return null;
+    }
+
+    Set<String> normalizedUserSkills = userSkills.stream()
+        .map(UserSkillsEntity::getSkill)
+        .filter(Objects::nonNull)
+        .map(skill -> skill.trim().toLowerCase())
+        .filter(skill -> !skill.isEmpty())
+        .collect(Collectors.toSet());
+
+    Set<String> normalizedJobSkills = jobSkillNames.stream()
+        .filter(Objects::nonNull)
+        .map(skill -> skill.trim().toLowerCase())
+        .filter(skill -> !skill.isEmpty())
+        .collect(Collectors.toSet());
+
+    if (normalizedJobSkills.isEmpty() || normalizedUserSkills.isEmpty()) {
+      return null;
+    }
+
+    long matches = normalizedJobSkills.stream()
+        .filter(normalizedUserSkills::contains)
+        .count();
+
+    return (int) Math.round((matches * 100.0) / normalizedJobSkills.size());
   }
 
   private UserEntity getAuthenticatedUser() {

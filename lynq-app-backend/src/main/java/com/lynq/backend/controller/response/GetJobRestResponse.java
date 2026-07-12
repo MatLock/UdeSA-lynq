@@ -29,5 +29,6 @@ public class GetJobRestResponse {
   private JobCompanyRestResponse company;
   private JobPostedByRestResponse postedBy;
   private List<String> skills;
+  private Integer lynqScore;
 
 }
