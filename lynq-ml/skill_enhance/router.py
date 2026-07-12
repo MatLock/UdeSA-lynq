@@ -18,7 +18,9 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_LOG_CONTEXT = "lynq_request_uuid=%s, user_id=%s, company_id=%s"
+# The lynq-request-uuid is rendered by the log formatter (MDC-style), so it is
+# not repeated here — only the request-specific identifiers the format omits.
+_LOG_CONTEXT = "user_id=%s, company_id=%s"
 
 
 @router.post("/skill-enhance", response_model=GlobalRestResponse[SkillEnhanceResponse])
@@ -31,7 +33,6 @@ async def skill_enhance(
     """Extract 5-15 key technical skills from a job posting."""
     log.info(
         "message= Started skill-enhance, " + _LOG_CONTEXT,
-        lynq_request_uuid,
         user_id,
         company_id,
     )
@@ -50,7 +51,6 @@ async def skill_enhance(
         log.error(
             "message= Error when executing skill-enhance, LLM request failed, "
             + _LOG_CONTEXT,
-            lynq_request_uuid,
             user_id,
             company_id,
             exc_info=exc,
@@ -65,7 +65,6 @@ async def skill_enhance(
         log.error(
             "message= Error when executing skill-enhance, LLM returned malformed output, "
             + _LOG_CONTEXT,
-            lynq_request_uuid,
             user_id,
             company_id,
             exc_info=exc,
@@ -74,7 +73,6 @@ async def skill_enhance(
 
     log.info(
         "message= Finished skill-enhance, " + _LOG_CONTEXT + ", skill_count=%s",
-        lynq_request_uuid,
         user_id,
         company_id,
         len(skills),
