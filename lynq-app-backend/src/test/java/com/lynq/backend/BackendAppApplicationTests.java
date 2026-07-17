@@ -3,23 +3,31 @@ package com.lynq.backend;
 import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
+import com.lynq.backend.controller.request.SkillEnhanceRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
+import com.lynq.backend.enums.Language;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSkillEntity;
+import com.lynq.backend.model.UserApplicationJobEntity;
 import com.lynq.backend.model.UserEntity;
+import com.lynq.backend.model.UserResumeEntity;
+import com.lynq.backend.model.UserSkillsEntity;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
 import com.lynq.backend.repository.JobPostSkillRepository;
+import com.lynq.backend.repository.UserApplicationJobRepository;
 import com.lynq.backend.repository.UserRepository;
+import com.lynq.backend.repository.UserResumeRepository;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockserver.model.MediaType;
+import org.mockserver.verify.VerificationTimes;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import tools.jackson.databind.ObjectMapper;
@@ -39,8 +47,10 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
+import static org.mockserver.model.StringBody.subString;
 
 class BackendAppApplicationTests extends AbstractE2ETest {
 
@@ -49,11 +59,16 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String GENERATE_UPLOAD_IMAGE_PATH = "/user/generate-upload-image";
   private static final String CREATE_COMPANY_PATH = "/company";
   private static final String CREATE_JOB_PATH = "/job";
+  private static final String RESUME_PATH = "/user/resume";
+  private static final String SKILL_ENHANCE_PROXY_PATH = "/ml/skill-enhance";
+  private static final String ML_SKILL_ENHANCE_PATH = "/skill-enhance";
   private static final String VALIDATE_PATH = "/auth/validate";
   private static final String USERINFO_PATH = "/auth/user-info";
 
   private static final String AUTHORIZATION_HEADER = "Authorization";
   private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
+  private static final String USER_ID_HEADER = "user-id";
+  private static final String COMPANY_ID_HEADER = "company-id";
   private static final String CONTENT_TYPE_HEADER = "Content-Type";
   private static final String APPLICATION_JSON = "application/json";
   private static final String BEARER_TOKEN = "Bearer test-access-token";
@@ -111,6 +126,30 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String PRE_SIGNED_URL_SIGNATURE_MARKER = "X-Amz-Signature";
   private static final String LISTED_NEWEST_JOB_TITLE = "Frontend Engineer";
 
+  private static final String JOB_ID = "77777777-7777-7777-7777-777777777777";
+  private static final String UNKNOWN_JOB_ID = "99999999-9999-9999-9999-999999999999";
+  private static final Long INITIAL_SEEN = 4L;
+  private static final int DEFAULT_PAGE_SIZE = 10;
+  private static final int MATCHING_LYNQ_SCORE = 50;
+
+  private static final String CANDIDATE_A_ID = "a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1";
+  private static final String CANDIDATE_A_NAME = "Alice Applicant";
+  private static final String CANDIDATE_A_POSITION = "Backend Engineer";
+  private static final String CANDIDATE_B_ID = "b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1";
+  private static final String CANDIDATE_B_NAME = "Bob Applicant";
+  private static final String CANDIDATE_B_POSITION = "Frontend Engineer";
+  private static final String APPLICATION_NEWEST_ID = "a4a4a4a4-a4a4-a4a4-a4a4-a4a4a4a4a4a4";
+  private static final String APPLICATION_OLDEST_ID = "a5a5a5a5-a5a5-a5a5-a5a5-a5a5a5a5a5a5";
+
+  private static final String RESUME_ID = "66666666-6666-6666-6666-666666666666";
+  private static final String RESUME_NAME = "Jane Doe - Backend";
+  private static final Language RESUME_LANGUAGE = Language.EN;
+  private static final String RESUME_SUMMARY = "Backend engineer";
+  private static final int RESUME_YEARS = 8;
+  private static final String RESUME_JSON =
+      "{\"summary\":\"" + RESUME_SUMMARY + "\",\"years\":" + RESUME_YEARS + "}";
+  private static final String RESUME_STORAGE_PATH = "lynq/users/" + USER_ID + "/resume/cv.pdf";
+
   @LocalServerPort
   private int port;
 
@@ -129,11 +168,20 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Autowired
   private JobPostSkillRepository jobPostSkillRepository;
 
+  @Autowired
+  private UserApplicationJobRepository userApplicationJobRepository;
+
+  @Autowired
+  private UserResumeRepository userResumeRepository;
+
   private final HttpClient httpClient = HttpClient.newHttpClient();
 
   @BeforeEach
   void setUp() {
     lynqIamMock.reset();
+    lynqMlMock.reset();
+    userApplicationJobRepository.deleteAll();
+    userResumeRepository.deleteAll();
     jobPostSkillRepository.deleteAll();
     jobPostRepository.deleteAll();
     companyRepository.deleteAll();
@@ -963,5 +1011,561 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     request.setJobPostSource(JOB_POST_TYPE);
     request.setSkills(skills);
     return request;
+  }
+
+  // ---------------------------------------------------------------------------
+  // ML skill-enhance proxy
+  // ---------------------------------------------------------------------------
+
+  @Test
+  void enhanceSkillsAuthenticatesProxiesToMlWithHeadersAndReturnsSkills() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCompanyOwnerWithCompany();
+    stubMlSkillEnhance();
+
+    HttpResponse<String> response = postSkillEnhance();
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> body = parse(response.body());
+    assertThat(body.get("success"), is(true));
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> data = (Map<String, Object>) body.get("data");
+    @SuppressWarnings("unchecked")
+    List<String> skills = (List<String>) data.get("skills");
+    assertThat(skills, contains(SKILL_JAVA, SKILL_SPRING));
+
+    // the outbound body honours @JsonProperty("work_type") on the ML client DTO:
+    // lynq-ml (pydantic) receives the snake_cased key, not the camelCase field name
+    lynqMlMock.verify(request()
+        .withMethod("POST")
+        .withPath(ML_SKILL_ENHANCE_PATH)
+        .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .withHeader(USER_ID_HEADER, USER_ID)
+        .withHeader(COMPANY_ID_HEADER, COMPANY_ID)
+        .withBody(subString("\"work_type\"")));
+  }
+
+  @Test
+  void enhanceSkillsReturnsUnauthorizedWhenIamRejectsTokenAndDoesNotCallMl() throws Exception {
+    stubIamInvalidToken();
+    seedCompanyOwnerWithCompany();
+    stubMlSkillEnhance();
+
+    HttpResponse<String> response = postSkillEnhance();
+
+    assertThat(response.statusCode(), is(401));
+    lynqMlMock.verify(request().withPath(ML_SKILL_ENHANCE_PATH), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void enhanceSkillsReturnsForbiddenWhenRequestUuidHeaderMissing() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCompanyOwnerWithCompany();
+    stubMlSkillEnhance();
+
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(skillEnhanceUrl()))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .POST(HttpRequest.BodyPublishers.ofString(skillEnhanceRequestBody()))
+        .build();
+    HttpResponse<String> response =
+        httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(response.statusCode(), is(403));
+    lynqMlMock.verify(request().withPath(ML_SKILL_ENHANCE_PATH), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void enhanceSkillsReturnsBadRequestWhenUserIsNotCompanyType() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedUser(UserType.CANDIDATE);
+    stubMlSkillEnhance();
+
+    HttpResponse<String> response = postSkillEnhance();
+
+    assertThat(response.statusCode(), is(400));
+    assertThat(parse(response.body()).get("success"), is(false));
+    lynqMlMock.verify(request().withPath(ML_SKILL_ENHANCE_PATH), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void enhanceSkillsReturnsBadRequestWhenCompanyOwnerHasNoCompany() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedUser(UserType.COMPANY);
+    stubMlSkillEnhance();
+
+    HttpResponse<String> response = postSkillEnhance();
+
+    assertThat(response.statusCode(), is(400));
+    assertThat(parse(response.body()).get("success"), is(false));
+    lynqMlMock.verify(request().withPath(ML_SKILL_ENHANCE_PATH), VerificationTimes.exactly(0));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Job increase-seen
+  // ---------------------------------------------------------------------------
+
+  @Test
+  void increaseSeenIncrementsCounterAndReturnsUpdatedValue() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedSingleJob(INITIAL_SEEN);
+
+    HttpResponse<String> response = patchIncreaseSeen(JOB_ID);
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> body = parse(response.body());
+    assertThat(body.get("success"), is(true));
+    assertThat(((Number) body.get("data")).longValue(), is(INITIAL_SEEN + 1));
+    assertThat(jobPostRepository.findById(JOB_ID).orElseThrow().getTotalSeen(),
+        is(INITIAL_SEEN + 1));
+  }
+
+  @Test
+  void increaseSeenTwiceAddsUpOnPersistedCounter() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedSingleJob(INITIAL_SEEN);
+
+    patchIncreaseSeen(JOB_ID);
+    HttpResponse<String> response = patchIncreaseSeen(JOB_ID);
+
+    assertThat(response.statusCode(), is(200));
+    assertThat(((Number) parse(response.body()).get("data")).longValue(), is(INITIAL_SEEN + 2));
+    assertThat(jobPostRepository.findById(JOB_ID).orElseThrow().getTotalSeen(),
+        is(INITIAL_SEEN + 2));
+  }
+
+  @Test
+  void increaseSeenReturnsNotFoundWhenJobDoesNotExist() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+
+    HttpResponse<String> response = patchIncreaseSeen(UNKNOWN_JOB_ID);
+
+    assertThat(response.statusCode(), is(404));
+    assertThat(parse(response.body()).get("success"), is(false));
+  }
+
+  @Test
+  void increaseSeenReturnsUnauthorizedWhenIamRejectsToken() throws Exception {
+    stubIamInvalidToken();
+    seedSingleJob(INITIAL_SEEN);
+
+    HttpResponse<String> response = patchIncreaseSeen(JOB_ID);
+
+    assertThat(response.statusCode(), is(401));
+    assertThat(jobPostRepository.findById(JOB_ID).orElseThrow().getTotalSeen(), is(INITIAL_SEEN));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Job apply
+  // ---------------------------------------------------------------------------
+
+  @Test
+  void applyToJobPersistsApplicationAndReturnsCreated() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedUser(UserType.CANDIDATE);
+    seedSingleJob(INITIAL_SEEN);
+
+    HttpResponse<String> response = postApply(JOB_ID);
+
+    assertThat(response.statusCode(), is(201));
+    Map<String, Object> body = parse(response.body());
+    assertThat(body.get("success"), is(true));
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> data = (Map<String, Object>) body.get("data");
+    assertThat(data.get("jobId"), is(JOB_ID));
+    assertThat(data.get("userId"), is(USER_ID));
+    assertThat(data.get("applicationId"), is(notNullValue()));
+    assertThat(userApplicationJobRepository.existsByJobIdAndUserId(JOB_ID, USER_ID), is(true));
+  }
+
+  @Test
+  void applyToJobTwiceReturnsBadRequestAndDoesNotCreateSecondApplication() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedUser(UserType.CANDIDATE);
+    seedSingleJob(INITIAL_SEEN);
+
+    assertThat(postApply(JOB_ID).statusCode(), is(201));
+    HttpResponse<String> response = postApply(JOB_ID);
+
+    assertThat(response.statusCode(), is(400));
+    assertThat(parse(response.body()).get("success"), is(false));
+    assertThat(userApplicationJobRepository.count(), is(1L));
+  }
+
+  @Test
+  void applyToJobReturnsNotFoundWhenJobDoesNotExist() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedUser(UserType.CANDIDATE);
+
+    HttpResponse<String> response = postApply(UNKNOWN_JOB_ID);
+
+    assertThat(response.statusCode(), is(404));
+    assertThat(parse(response.body()).get("success"), is(false));
+    assertThat(userApplicationJobRepository.count(), is(0L));
+  }
+
+  @Test
+  void applyToJobReturnsBadRequestWhenUserIsNotCandidate() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedUser(UserType.COMPANY);
+    seedSingleJob(INITIAL_SEEN);
+
+    HttpResponse<String> response = postApply(JOB_ID);
+
+    assertThat(response.statusCode(), is(400));
+    assertThat(parse(response.body()).get("success"), is(false));
+    assertThat(userApplicationJobRepository.count(), is(0L));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Job candidates
+  // ---------------------------------------------------------------------------
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void getJobCandidatesReturnsAppliedCandidatesNewestFirst() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedSingleJob(INITIAL_SEEN);
+    seedCandidate(CANDIDATE_A_ID, CANDIDATE_A_NAME, CANDIDATE_A_POSITION);
+    seedCandidate(CANDIDATE_B_ID, CANDIDATE_B_NAME, CANDIDATE_B_POSITION);
+    seedApplication(APPLICATION_OLDEST_ID, CANDIDATE_B_ID, LocalDate.now().minusDays(3));
+    seedApplication(APPLICATION_NEWEST_ID, CANDIDATE_A_ID, LocalDate.now());
+
+    HttpResponse<String> response = getCandidates(JOB_ID, null, null);
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> body = parse(response.body());
+    assertThat(body.get("success"), is(true));
+
+    Map<String, Object> data = (Map<String, Object>) body.get("data");
+    List<Map<String, Object>> content = (List<Map<String, Object>>) data.get("content");
+    assertThat(content.size(), is(2));
+
+    Map<String, Object> newest = content.get(0);
+    assertThat(newest.get("id"), is(APPLICATION_NEWEST_ID));
+    assertThat(newest.get("userId"), is(CANDIDATE_A_ID));
+    assertThat(newest.get("jobId"), is(JOB_ID));
+    assertThat(newest.get("userFullName"), is(CANDIDATE_A_NAME));
+    assertThat(newest.get("userCurrentPosition"), is(CANDIDATE_A_POSITION));
+    assertThat(newest.get("userProfileImage"), is(nullValue()));
+    assertThat(content.get(1).get("id"), is(APPLICATION_OLDEST_ID));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void getJobCandidatesDefaultsPageSizeToTen() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedSingleJob(INITIAL_SEEN);
+    seedCandidate(CANDIDATE_A_ID, CANDIDATE_A_NAME, CANDIDATE_A_POSITION);
+    seedApplication(APPLICATION_NEWEST_ID, CANDIDATE_A_ID, LocalDate.now());
+
+    HttpResponse<String> response = getCandidates(JOB_ID, null, null);
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> data = (Map<String, Object>) parse(response.body()).get("data");
+    assertThat(((Number) data.get("size")).intValue(), is(DEFAULT_PAGE_SIZE));
+    assertThat(((Number) data.get("totalElements")).longValue(), is(1L));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void getJobCandidatesReturnsEmptyContentWhenNoApplications() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedSingleJob(INITIAL_SEEN);
+
+    HttpResponse<String> response = getCandidates(JOB_ID, null, null);
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> data = (Map<String, Object>) parse(response.body()).get("data");
+    List<Map<String, Object>> content = (List<Map<String, Object>>) data.get("content");
+    assertThat(content.isEmpty(), is(true));
+    assertThat(((Number) data.get("totalElements")).longValue(), is(0L));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void getJobCandidatesIncludesLynqScoreFromMatchingSkills() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedSingleJobWithSkills(List.of(SKILL_JAVA, SKILL_SPRING));
+    seedCandidateWithSkills(CANDIDATE_A_ID, CANDIDATE_A_NAME, CANDIDATE_A_POSITION,
+        List.of(SKILL_JAVA));
+    seedApplication(APPLICATION_NEWEST_ID, CANDIDATE_A_ID, LocalDate.now());
+
+    HttpResponse<String> response = getCandidates(JOB_ID, null, null);
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> data = (Map<String, Object>) parse(response.body()).get("data");
+    List<Map<String, Object>> content = (List<Map<String, Object>>) data.get("content");
+    assertThat(content.size(), is(1));
+    assertThat(((Number) content.get(0).get("lynqScore")).intValue(), is(MATCHING_LYNQ_SCORE));
+  }
+
+  // ---------------------------------------------------------------------------
+  // User resumes
+  // ---------------------------------------------------------------------------
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void getUserResumesReturnsJsonAndPdfLinkForCandidate() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCandidateUser();
+    seedResume();
+
+    HttpResponse<String> response = getResumes();
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> body = parse(response.body());
+    assertThat(body.get("success"), is(true));
+
+    List<Map<String, Object>> data = (List<Map<String, Object>>) body.get("data");
+    assertThat(data.size(), is(1));
+    Map<String, Object> resume = data.get(0);
+    assertThat(resume.get("id"), is(RESUME_ID));
+    assertThat(resume.get("name"), is(RESUME_NAME));
+    assertThat(resume.get("language"), is(RESUME_LANGUAGE.name()));
+    assertThat(resume.get("pdfUrl"), is(notNullValue()));
+
+    Map<String, Object> resumeJson = (Map<String, Object>) resume.get("resume");
+    assertThat(resumeJson.get("summary"), is(RESUME_SUMMARY));
+    assertThat(((Number) resumeJson.get("years")).intValue(), is(RESUME_YEARS));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void getUserResumesReturnsEmptyWhenCandidateHasNoResumes() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCandidateUser();
+
+    HttpResponse<String> response = getResumes();
+
+    assertThat(response.statusCode(), is(200));
+    List<Map<String, Object>> data = (List<Map<String, Object>>) parse(response.body()).get("data");
+    assertThat(data.isEmpty(), is(true));
+  }
+
+  @Test
+  void getUserResumesReturnsBadRequestWhenUserIsNotCandidate() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedUser(UserType.COMPANY);
+    seedResume();
+
+    HttpResponse<String> response = getResumes();
+
+    assertThat(response.statusCode(), is(400));
+    assertThat(parse(response.body()).get("success"), is(false));
+  }
+
+  @Test
+  void getUserResumesReturnsNotFoundWhenUserDoesNotExist() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+
+    HttpResponse<String> response = getResumes();
+
+    assertThat(response.statusCode(), is(404));
+    assertThat(parse(response.body()).get("success"), is(false));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers for the merged endpoints
+  // ---------------------------------------------------------------------------
+
+  private void seedUser(UserType type) {
+    userRepository.save(UserEntity.builder()
+        .id(USER_ID)
+        .type(type)
+        .createdOn(LocalDate.now())
+        .build());
+  }
+
+  private void seedSingleJob(Long totalSeen) {
+    jobPostRepository.save(JobPostEntity.builder()
+        .id(JOB_ID)
+        .title(JOB_TITLE)
+        .workType(JOB_WORK_TYPE)
+        .jobPostSource(JOB_POST_TYPE)
+        .createdOn(LocalDate.now())
+        .totalSeen(totalSeen)
+        .build());
+  }
+
+  private void seedSingleJobWithSkills(List<String> skills) {
+    JobPostEntity job = JobPostEntity.builder()
+        .id(JOB_ID)
+        .title(JOB_TITLE)
+        .workType(JOB_WORK_TYPE)
+        .jobPostSource(JOB_POST_TYPE)
+        .createdOn(LocalDate.now())
+        .totalSeen(INITIAL_SEEN)
+        .build();
+    skills.forEach(skill -> job.getSkills().add(JobPostSkillEntity.builder()
+        .id("jskill-" + skill)
+        .jobPost(job)
+        .skill(skill)
+        .build()));
+    jobPostRepository.save(job);
+  }
+
+  private void seedCandidate(String userId, String fullName, String position) {
+    userRepository.save(UserEntity.builder()
+        .id(userId)
+        .type(UserType.CANDIDATE)
+        .fullName(fullName)
+        .currentPosition(position)
+        .createdOn(LocalDate.now())
+        .build());
+  }
+
+  private void seedCandidateWithSkills(String userId, String fullName, String position,
+      List<String> skills) {
+    UserEntity user = UserEntity.builder()
+        .id(userId)
+        .type(UserType.CANDIDATE)
+        .fullName(fullName)
+        .currentPosition(position)
+        .createdOn(LocalDate.now())
+        .build();
+    skills.forEach(skill -> user.getSkills().add(UserSkillsEntity.builder()
+        .id("uskill-" + skill)
+        .user(user)
+        .skill(skill)
+        .build()));
+    userRepository.save(user);
+  }
+
+  private void seedApplication(String applicationId, String userId, LocalDate appliedOn) {
+    UserEntity user = userRepository.findById(userId).orElseThrow();
+    JobPostEntity job = jobPostRepository.findById(JOB_ID).orElseThrow();
+    userApplicationJobRepository.save(UserApplicationJobEntity.builder()
+        .id(applicationId)
+        .jobPost(job)
+        .user(user)
+        .appliedOn(appliedOn)
+        .build());
+  }
+
+  private void seedResume() {
+    UserEntity user = userRepository.findById(USER_ID).orElseThrow();
+    userResumeRepository.save(UserResumeEntity.builder()
+        .id(RESUME_ID)
+        .name(RESUME_NAME)
+        .language(RESUME_LANGUAGE)
+        .createdOn(LocalDate.now())
+        .resume(RESUME_JSON)
+        .storagePath(RESUME_STORAGE_PATH)
+        .user(user)
+        .build());
+  }
+
+  private HttpResponse<String> postSkillEnhance() throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(skillEnhanceUrl()))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .POST(HttpRequest.BodyPublishers.ofString(skillEnhanceRequestBody()))
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> patchIncreaseSeen(String jobId) throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(jobSubResourceUrl(jobId, "increase-seen")))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .method("PATCH", HttpRequest.BodyPublishers.noBody())
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> postApply(String jobId) throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(jobSubResourceUrl(jobId, "apply")))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .POST(HttpRequest.BodyPublishers.noBody())
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> getCandidates(String jobId, Integer page, Integer pageSize)
+      throws Exception {
+    StringBuilder url = new StringBuilder(jobSubResourceUrl(jobId, "candidates"));
+    if (page != null || pageSize != null) {
+      url.append("?");
+      if (page != null) {
+        url.append("page=").append(page).append("&");
+      }
+      if (pageSize != null) {
+        url.append("pageSize=").append(pageSize);
+      }
+    }
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(url.toString()))
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .GET()
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> getResumes() throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create("http://localhost:" + port + CONTEXT_PATH + RESUME_PATH))
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .GET()
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private void stubMlSkillEnhance() {
+    lynqMlMock.when(request().withMethod("POST").withPath(ML_SKILL_ENHANCE_PATH))
+        .respond(response()
+            .withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody("""
+                {"success": true, "data": {"skills": ["%s", "%s"]}}"""
+                .formatted(SKILL_JAVA, SKILL_SPRING)));
+  }
+
+  private String skillEnhanceRequestBody() {
+    SkillEnhanceRequest request = new SkillEnhanceRequest();
+    request.setTitle(JOB_TITLE);
+    request.setDescription(JOB_DESCRIPTION);
+    request.setWorkType(JOB_WORK_TYPE);
+    return objectMapper.writeValueAsString(request);
+  }
+
+  private String skillEnhanceUrl() {
+    return "http://localhost:" + port + CONTEXT_PATH + SKILL_ENHANCE_PROXY_PATH;
+  }
+
+  private String jobSubResourceUrl(String jobId, String subResource) {
+    return "http://localhost:" + port + CONTEXT_PATH + CREATE_JOB_PATH + "/" + jobId + "/"
+        + subResource;
   }
 }
