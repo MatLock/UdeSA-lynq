@@ -3,21 +3,27 @@ package com.lynq.backend.service;
 import com.fasterxml.uuid.Generators;
 import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.controller.response.GetJobRestResponse;
+import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.JobCompanyRestResponse;
 import com.lynq.backend.controller.response.JobPostedByRestResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.enums.WorkType;
+import com.lynq.backend.exceptions.AlreadyAppliedToJobException;
 import com.lynq.backend.exceptions.BadRequestException;
+import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSkillEntity;
+import com.lynq.backend.model.UserApplicationJobEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.model.UserSkillsEntity;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
+import com.lynq.backend.repository.UserApplicationJobRepository;
 import com.lynq.backend.repository.UserRepository;
+import com.lynq.backend.repository.projection.JobCandidateProjection;
 import com.lynq.backend.repository.projection.JobWithDetailsProjection;
 import com.lynq.backend.security.LynqUserPrincipal;
 import java.time.LocalDate;
@@ -35,19 +41,25 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobService {
 
   private static final String ONLY_COMPANY_USERS_CAN_CREATE_JOBS = "Only users of type COMPANY can create jobs";
+  private static final String ONLY_CANDIDATE_USERS_CAN_APPLY = "Only users of type CANDIDATE can apply to jobs";
   private static final String USER_NOT_LINKED_TO_COMPANY = "User is not linked to any company";
   private static final String AUTHENTICATED_USER_NOT_FOUND = "Authenticated user not found";
+  private static final String JOB_POST_NOT_FOUND = "Job post not found";
+  private static final String ALREADY_APPLIED_TO_JOB = "User has already applied to this job";
 
   private final JobPostRepository jobPostRepository;
   private final CompanyRepository companyRepository;
   private final UserRepository userRepository;
+  private final UserApplicationJobRepository userApplicationJobRepository;
   private final StorageService storageService;
 
   public JobService(JobPostRepository jobPostRepository, CompanyRepository companyRepository,
-      UserRepository userRepository, StorageService storageService) {
+      UserRepository userRepository, UserApplicationJobRepository userApplicationJobRepository,
+      StorageService storageService) {
     this.jobPostRepository = jobPostRepository;
     this.companyRepository = companyRepository;
     this.userRepository = userRepository;
+    this.userApplicationJobRepository = userApplicationJobRepository;
     this.storageService = storageService;
   }
 
@@ -84,6 +96,65 @@ public class JobService {
   }
 
   @AuditLog
+  @Transactional
+  public JobPostEntity increaseSeen(String jobId) {
+    if (jobPostRepository.increaseTotalSeen(jobId) == 0) {
+      throw new NotFoundException(JOB_POST_NOT_FOUND);
+    }
+    return jobPostRepository.findById(jobId)
+        .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
+  }
+
+  @AuditLog
+  @Transactional
+  public UserApplicationJobEntity applyToJob(String jobId) {
+    UserEntity user = getAuthenticatedUser();
+
+    if (user.getType() != UserType.CANDIDATE) {
+      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_APPLY);
+    }
+
+    JobPostEntity job = jobPostRepository.findById(jobId)
+        .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
+
+    if (userApplicationJobRepository.existsByJobIdAndUserId(jobId, user.getId())) {
+      throw new AlreadyAppliedToJobException(ALREADY_APPLIED_TO_JOB);
+    }
+
+    UserApplicationJobEntity application = UserApplicationJobEntity.builder()
+        .id(Generators.timeBasedEpochGenerator().generate().toString())
+        .jobPost(job)
+        .user(user)
+        .appliedOn(LocalDate.now())
+        .build();
+
+    return userApplicationJobRepository.save(application);
+  }
+
+  @AuditLog
+  @Transactional(readOnly = true)
+  public PagedRestResponse<JobCandidateResponse> getJobCandidates(String jobId, Pageable pageable) {
+    return PagedRestResponse.from(userApplicationJobRepository
+        .findCandidatesByJobId(jobId, pageable)
+        .map(this::toCandidateResponse));
+  }
+
+  private JobCandidateResponse toCandidateResponse(JobCandidateProjection projection) {
+    List<String> jobSkills = splitSkills(projection.jobSkills());
+    List<String> candidateSkills = splitSkills(projection.userSkills());
+    return JobCandidateResponse.builder()
+        .id(projection.id())
+        .userId(projection.userId())
+        .jobId(projection.jobId())
+        .userFullName(projection.userFullName())
+        .userProfileImage(obtainProfileImageUrl(projection.userProfileImageUrl()))
+        .userCurrentPosition(projection.userCurrentPosition())
+        .userAppliedOn(projection.appliedOn())
+        .lynqScore(calculateLyNQScore(jobSkills, candidateSkills))
+        .build();
+  }
+
+  @AuditLog
   @Transactional(readOnly = true)
   public PagedRestResponse<GetJobRestResponse> searchAvailableJobs(JobFilter filter,
       Pageable pageable) {
@@ -106,6 +177,7 @@ public class JobService {
         .jobUrl(projection.jobUrl())
         .jobPostSource(projection.jobPostSource())
         .createdOn(projection.createdOn())
+        .totalSeen(projection.totalSeen())
         .company(JobCompanyRestResponse.builder()
             .id(projection.companyId())
             .name(projection.companyName())
@@ -155,32 +227,26 @@ public class JobService {
         .forEach(job.getSkills()::add);
   }
 
-  private Integer calculateLyNQScore(JobPostEntity jobPost, UserEntity user) {
-    if (jobPost == null) {
-      return null;
-    }
-
-    List<String> jobSkillNames = jobPost.getSkills() == null ? null : jobPost.getSkills().stream()
-        .map(JobPostSkillEntity::getSkill)
-        .toList();
-
-    return calculateLyNQScore(jobSkillNames, user);
-  }
-
   private Integer calculateLyNQScore(List<String> jobSkillNames, UserEntity user) {
     if (user == null || user.getType() != UserType.CANDIDATE) {
       return null;
     }
 
     List<UserSkillsEntity> userSkills = user.getSkills();
+    List<String> userSkillNames = userSkills == null ? null : userSkills.stream()
+        .map(UserSkillsEntity::getSkill)
+        .toList();
 
-    if (jobSkillNames == null || jobSkillNames.isEmpty() || userSkills == null
-        || userSkills.isEmpty()) {
+    return calculateLyNQScore(jobSkillNames, userSkillNames);
+  }
+
+  private Integer calculateLyNQScore(List<String> jobSkillNames, List<String> userSkillNames) {
+    if (jobSkillNames == null || jobSkillNames.isEmpty() || userSkillNames == null
+        || userSkillNames.isEmpty()) {
       return null;
     }
 
-    Set<String> normalizedUserSkills = userSkills.stream()
-        .map(UserSkillsEntity::getSkill)
+    Set<String> normalizedUserSkills = userSkillNames.stream()
         .filter(Objects::nonNull)
         .map(skill -> skill.trim().toLowerCase())
         .filter(skill -> !skill.isEmpty())

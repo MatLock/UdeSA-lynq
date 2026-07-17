@@ -58,6 +58,10 @@ public class JobPostEntity {
   @Column(name = "created_on", nullable = false)
   private LocalDate createdOn;
 
+  @Column(name = "total_seen", nullable = false)
+  @Builder.Default
+  private Long totalSeen = 0L;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "job_status", nullable = false)
   @Builder.Default

@@ -1,8 +1,10 @@
 package com.lynq.backend.controller;
 
 import com.lynq.backend.controller.request.CreateJobRequest;
+import com.lynq.backend.controller.response.ApplyJobRestResponse;
 import com.lynq.backend.controller.response.CreateJobRestResponse;
 import com.lynq.backend.controller.response.GetJobRestResponse;
+import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,5 +38,34 @@ public interface JobController {
       Integer page,
       Integer size,
       String filterValue);
+
+  @Operation(
+      summary = "Increase the seen counter of a job post",
+      description = "Atomically increments the total seen counter of the job post identified by "
+          + "the given id and returns the updated counter value. Fails with 404 when no job post "
+          + "matches the id.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<Long>> increaseSeen(String jobId);
+
+  @Operation(
+      summary = "Apply to a job post",
+      description = "Registers an application of the authenticated user to the job post identified "
+          + "by the given id. The applicant identity is resolved from the bearer token. Fails with "
+          + "404 when no job post matches the id, and with 400 when the user has already applied to "
+          + "the same job.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<ApplyJobRestResponse>> applyToJob(String jobId);
+
+  @Operation(
+      summary = "List the candidates that applied to a job post",
+      description = "Returns a page of the candidates who applied to the job post identified by the "
+          + "given id, newest application first. Each item includes the applicant's public profile "
+          + "fields and the date the application was submitted. Pagination is controlled with the "
+          + "'page' (zero-based) and 'pageSize' (default 10) request parameters.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<PagedRestResponse<JobCandidateResponse>>> getJobCandidates(
+      String jobId,
+      Integer page,
+      Integer pageSize);
 
 }

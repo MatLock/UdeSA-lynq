@@ -5,6 +5,7 @@ import com.lynq.backend.repository.projection.JobWithDetailsProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -12,9 +13,13 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface JobPostRepository extends JpaRepository<JobPostEntity, String> {
 
+  @Modifying(clearAutomatically = true)
+  @Query("UPDATE JobPostEntity j SET j.totalSeen = j.totalSeen + 1 WHERE j.id = :jobId")
+  int increaseTotalSeen(@Param("jobId") String jobId);
+
   @Query(value = "SELECT new com.lynq.backend.repository.projection.JobWithDetailsProjection("
       + "j.id, j.title, j.description, j.workType, j.salaryRangeDown, j.salaryRangeTop, j.jobUrl, "
-      + "j.jobPostSource, j.createdOn, "
+      + "j.jobPostSource, j.createdOn, j.totalSeen, "
       + "c.id, c.name, c.about, c.size, c.profileImageUrl, "
       + "u.id, u.fullName, u.profileImageUrl, u.currentPosition, "
       + "CAST((SELECT function('group_concat', sk.skill) FROM JobPostSkillEntity sk "
@@ -42,8 +47,6 @@ public interface JobPostRepository extends JpaRepository<JobPostEntity, String> 
       + "OR LOWER(CAST(j.workType AS string)) LIKE LOWER(CONCAT('%', :filterValue, '%')) "
       + "OR EXISTS (SELECT 1 FROM JobPostSkillEntity s "
       + "WHERE s.jobPost = j AND LOWER(s.skill) LIKE LOWER(CONCAT('%', :filterValue, '%')))))")
-  Page<JobWithDetailsProjection> searchAvailableJobs(
-      @Param("filterValue") String filterValue,
-      Pageable pageable);
+  Page<JobWithDetailsProjection> searchAvailableJobs(@Param("filterValue") String filterValue, Pageable pageable);
 
 }

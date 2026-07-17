@@ -25,6 +25,7 @@ public class CreateJobRestResponse {
   private Integer salaryRangeTop;
   private JobPostSource jobPostSource;
   private LocalDate createdOn;
+  private Long totalSeen;
   private String companyId;
   private String createdByUserId;
   private List<String> skills;

@@ -40,7 +40,4 @@ public class UserApplicationJobEntity {
   @Column(name = "applied_on", nullable = false)
   private LocalDate appliedOn;
 
-  @Column(name = "application_seen_on")
-  private LocalDate applicationSeenOn;
-
 }

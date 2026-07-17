@@ -1,8 +1,10 @@
 package com.lynq.backend.controller.handler;
 
 import com.lynq.backend.controller.response.ErrorRestResponse;
+import com.lynq.backend.exceptions.AlreadyAppliedToJobException;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.ForbiddenException;
+import com.lynq.backend.exceptions.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +59,33 @@ class ControllerExceptionHandlerTest {
     when(exception.getMessage()).thenReturn(ERROR_MESSAGE);
 
     ResponseEntity<ErrorRestResponse<Void>> response = handler.handleBadRequest(exception);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.BAD_REQUEST));
+    assertThat(response.getBody().isSuccess(), is(false));
+    assertThat(response.getBody().getReason(), is(ERROR_MESSAGE));
+    assertThat(response.getBody().getData(), is(nullValue()));
+  }
+
+  @Test
+  void handleNotFoundReturnsNotFoundStatusWithMessage() {
+    NotFoundException exception = mock(NotFoundException.class);
+    when(exception.getMessage()).thenReturn(ERROR_MESSAGE);
+
+    ResponseEntity<ErrorRestResponse<Void>> response = handler.handleNotFound(exception);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.NOT_FOUND));
+    assertThat(response.getBody().isSuccess(), is(false));
+    assertThat(response.getBody().getReason(), is(ERROR_MESSAGE));
+    assertThat(response.getBody().getData(), is(nullValue()));
+  }
+
+  @Test
+  void handleAlreadyAppliedToJobReturnsBadRequestStatusWithMessage() {
+    AlreadyAppliedToJobException exception = mock(AlreadyAppliedToJobException.class);
+    when(exception.getMessage()).thenReturn(ERROR_MESSAGE);
+
+    ResponseEntity<ErrorRestResponse<Void>> response =
+        handler.handleAlreadyAppliedToJob(exception);
 
     assertThat(response.getStatusCode(), is(HttpStatus.BAD_REQUEST));
     assertThat(response.getBody().isSuccess(), is(false));

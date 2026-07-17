@@ -1,15 +1,18 @@
 package com.lynq.backend.controller.impl;
 
 import com.lynq.backend.controller.request.CreateJobRequest;
+import com.lynq.backend.controller.response.ApplyJobRestResponse;
 import com.lynq.backend.controller.response.CreateJobRestResponse;
 import com.lynq.backend.controller.response.GetJobRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
+import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSkillEntity;
+import com.lynq.backend.model.UserApplicationJobEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.service.JobFilter;
 import com.lynq.backend.service.JobService;
@@ -32,6 +35,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -58,6 +62,9 @@ class JobControllerImplTest {
   private static final int REQUESTED_SIZE = 15;
   private static final int DEFAULT_PAGE = 0;
   private static final int DEFAULT_SIZE = 20;
+  private static final Long SEEN_COUNT = 7L;
+  private static final String APPLICATION_ID = "018f9c3a-2b1d-7c4e-9a6f-bbbbbbbbbbbb";
+  private static final LocalDate APPLIED_ON = LocalDate.of(2026, 7, 17);
 
   @Mock
   private JobService jobService;
@@ -179,6 +186,135 @@ class JobControllerImplTest {
     assertThat(body.isSuccess(), is(true));
     assertThat(body.getData().getContent(), hasSize(1));
     assertThat(body.getData().getContent().get(0).getJobId(), is(JOB_ID));
+  }
+
+  @Test
+  void increaseSeenDelegatesToServiceWithJobId() {
+    when(jobService.increaseSeen(JOB_ID)).thenReturn(seenJob(SEEN_COUNT));
+
+    jobController.increaseSeen(JOB_ID);
+
+    verify(jobService).increaseSeen(JOB_ID);
+  }
+
+  @Test
+  void increaseSeenRespondsWithOkStatus() {
+    when(jobService.increaseSeen(JOB_ID)).thenReturn(seenJob(SEEN_COUNT));
+
+    ResponseEntity<GlobalRestResponse<Long>> response = jobController.increaseSeen(JOB_ID);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void increaseSeenWrapsUpdatedCounterInSuccessfulEnvelope() {
+    when(jobService.increaseSeen(JOB_ID)).thenReturn(seenJob(SEEN_COUNT));
+
+    ResponseEntity<GlobalRestResponse<Long>> response = jobController.increaseSeen(JOB_ID);
+
+    GlobalRestResponse<Long> body = response.getBody();
+    assertThat(body, is(notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData(), is(SEEN_COUNT));
+  }
+
+  private JobPostEntity seenJob(Long totalSeen) {
+    return JobPostEntity.builder().id(JOB_ID).totalSeen(totalSeen).build();
+  }
+
+  @Test
+  void applyToJobDelegatesToServiceWithJobId() {
+    when(jobService.applyToJob(JOB_ID)).thenReturn(application());
+
+    jobController.applyToJob(JOB_ID);
+
+    verify(jobService).applyToJob(JOB_ID);
+  }
+
+  @Test
+  void applyToJobRespondsWithCreatedStatus() {
+    when(jobService.applyToJob(JOB_ID)).thenReturn(application());
+
+    ResponseEntity<GlobalRestResponse<ApplyJobRestResponse>> response =
+        jobController.applyToJob(JOB_ID);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
+  }
+
+  @Test
+  void applyToJobMapsApplicationIntoSuccessfulResponseData() {
+    when(jobService.applyToJob(JOB_ID)).thenReturn(application());
+
+    ResponseEntity<GlobalRestResponse<ApplyJobRestResponse>> response =
+        jobController.applyToJob(JOB_ID);
+
+    GlobalRestResponse<ApplyJobRestResponse> body = response.getBody();
+    assertThat(body, is(notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    ApplyJobRestResponse data = body.getData();
+    assertThat(data.getApplicationId(), is(APPLICATION_ID));
+    assertThat(data.getJobId(), is(JOB_ID));
+    assertThat(data.getUserId(), is(USER_ID));
+    assertThat(data.getAppliedOn(), is(APPLIED_ON));
+  }
+
+  @Test
+  void getJobCandidatesDelegatesToServiceWithJobIdAndPageable() {
+    when(jobService.getJobCandidates(eq(JOB_ID), any(Pageable.class)))
+        .thenReturn(emptyCandidates());
+
+    jobController.getJobCandidates(JOB_ID, REQUESTED_PAGE, REQUESTED_SIZE);
+
+    ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+    verify(jobService).getJobCandidates(eq(JOB_ID), pageableCaptor.capture());
+    Pageable pageable = pageableCaptor.getValue();
+    assertThat(pageable.getPageNumber(), is(REQUESTED_PAGE));
+    assertThat(pageable.getPageSize(), is(REQUESTED_SIZE));
+  }
+
+  @Test
+  void getJobCandidatesRespondsWithOkStatus() {
+    when(jobService.getJobCandidates(eq(JOB_ID), any(Pageable.class)))
+        .thenReturn(emptyCandidates());
+
+    ResponseEntity<GlobalRestResponse<PagedRestResponse<JobCandidateResponse>>> response =
+        jobController.getJobCandidates(JOB_ID, DEFAULT_PAGE, DEFAULT_SIZE);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void getJobCandidatesWrapsServiceResultInSuccessfulEnvelope() {
+    JobCandidateResponse candidate = JobCandidateResponse.builder()
+        .id(APPLICATION_ID)
+        .jobId(JOB_ID)
+        .userId(USER_ID)
+        .build();
+    PagedRestResponse<JobCandidateResponse> paged =
+        PagedRestResponse.<JobCandidateResponse>builder().content(List.of(candidate)).build();
+    when(jobService.getJobCandidates(eq(JOB_ID), any(Pageable.class))).thenReturn(paged);
+
+    ResponseEntity<GlobalRestResponse<PagedRestResponse<JobCandidateResponse>>> response =
+        jobController.getJobCandidates(JOB_ID, DEFAULT_PAGE, DEFAULT_SIZE);
+
+    GlobalRestResponse<PagedRestResponse<JobCandidateResponse>> body = response.getBody();
+    assertThat(body, is(notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData().getContent(), hasSize(1));
+    assertThat(body.getData().getContent().get(0).getId(), is(APPLICATION_ID));
+  }
+
+  private PagedRestResponse<JobCandidateResponse> emptyCandidates() {
+    return PagedRestResponse.<JobCandidateResponse>builder().content(List.of()).build();
+  }
+
+  private UserApplicationJobEntity application() {
+    return UserApplicationJobEntity.builder()
+        .id(APPLICATION_ID)
+        .jobPost(JobPostEntity.builder().id(JOB_ID).build())
+        .user(UserEntity.builder().id(USER_ID).build())
+        .appliedOn(APPLIED_ON)
+        .build();
   }
 
   private PagedRestResponse<GetJobRestResponse> emptyPaged() {

@@ -21,6 +21,7 @@ public record JobWithDetailsProjection(
     String jobUrl,
     JobPostSource jobPostSource,
     LocalDate createdOn,
+    Long totalSeen,
     String companyId,
     String companyName,
     String companyAbout,

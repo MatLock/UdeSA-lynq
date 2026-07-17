@@ -26,6 +26,7 @@ public class GetJobRestResponse {
   private String jobUrl;
   private JobPostSource jobPostSource;
   private LocalDate createdOn;
+  private Long totalSeen;
   private JobCompanyRestResponse company;
   private JobPostedByRestResponse postedBy;
   private List<String> skills;

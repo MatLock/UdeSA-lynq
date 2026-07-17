@@ -1,6 +1,7 @@
 package com.lynq.backend.controller.handler;
 
 import com.lynq.backend.controller.response.ErrorRestResponse;
+import com.lynq.backend.exceptions.AlreadyAppliedToJobException;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.ForbiddenException;
 import com.lynq.backend.exceptions.NotFoundException;
@@ -36,6 +37,15 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(BadRequestException.class)
   public ResponseEntity<ErrorRestResponse<Void>> handleBadRequest(BadRequestException ex) {
     log.error("message= Bad request", ex);
+    return ResponseEntity
+        .status(HttpStatus.BAD_REQUEST)
+        .body(new ErrorRestResponse<>(null, ex.getMessage()));
+  }
+
+  @ExceptionHandler(AlreadyAppliedToJobException.class)
+  public ResponseEntity<ErrorRestResponse<Void>> handleAlreadyAppliedToJob(
+      AlreadyAppliedToJobException ex) {
+    log.error("message= Already applied to job", ex);
     return ResponseEntity
         .status(HttpStatus.BAD_REQUEST)
         .body(new ErrorRestResponse<>(null, ex.getMessage()));
