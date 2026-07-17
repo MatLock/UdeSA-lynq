@@ -5,6 +5,7 @@ import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
+import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
 import com.lynq.backend.enums.UserType;
@@ -20,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -42,6 +44,8 @@ class UserControllerImplTest {
   private static final String FILE_NAME = "avatar.png";
   private static final String PRE_SIGNED_URL =
       "https://lynq-bucket.s3.amazonaws.com/lynq/users/" + USER_ID + "/profile/" + FILE_NAME + "?X-Amz-Signature=abc";
+  private static final String RESUME_ID = "resume-1";
+  private static final String RESUME_NAME = "Jane Doe - Backend";
 
   @Mock
   private UserService userService;
@@ -242,6 +246,43 @@ class UserControllerImplTest {
     assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
     assertThat(body.isSuccess(), is(true));
     assertThat(body.getData().getPreSignedUrl(), is(PRE_SIGNED_URL));
+  }
+
+  @Test
+  void getUserResumesDelegatesToServiceWithPrincipalId() {
+    when(userService.getUserResumes(USER_ID)).thenReturn(List.of());
+
+    userController.getUserResumes(principal);
+
+    verify(userService).getUserResumes(USER_ID);
+  }
+
+  @Test
+  void getUserResumesRespondsWithOkStatus() {
+    when(userService.getUserResumes(USER_ID)).thenReturn(List.of());
+
+    ResponseEntity<GlobalRestResponse<List<GetUserResumeRestResponse>>> response =
+        userController.getUserResumes(principal);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void getUserResumesWrapsServiceResultInSuccessfulEnvelope() {
+    GetUserResumeRestResponse resume = GetUserResumeRestResponse.builder()
+        .id(RESUME_ID)
+        .name(RESUME_NAME)
+        .build();
+    when(userService.getUserResumes(USER_ID)).thenReturn(List.of(resume));
+
+    ResponseEntity<GlobalRestResponse<List<GetUserResumeRestResponse>>> response =
+        userController.getUserResumes(principal);
+
+    GlobalRestResponse<List<GetUserResumeRestResponse>> body = response.getBody();
+    assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData(), is(org.hamcrest.Matchers.hasSize(1)));
+    assertThat(body.getData().get(0).getId(), is(RESUME_ID));
   }
 
   private UserEntity savedUser() {

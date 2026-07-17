@@ -5,9 +5,11 @@ import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
+import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
 import com.lynq.backend.security.LynqUserPrincipal;
+import java.util.List;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -412,6 +414,16 @@ public interface UserController {
   })
   ResponseEntity<GlobalRestResponse<GenerateUploadImageRestResponse>> generateUploadImageUrl(
       String fileName,
+      @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
+      summary = "Get the authenticated user's resumes",
+      description = "Returns every resume of the authenticated user in both formats: the structured "
+          + "JSON content and a short-lived public link to the PDF stored in S3. The user identity "
+          + "is resolved from the bearer token, so no parameters are required. Only users of type "
+          + "CANDIDATE can access resumes; any other type is rejected with 400.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<List<GetUserResumeRestResponse>>> getUserResumes(
       @Parameter(hidden = true) LynqUserPrincipal principal);
 
 }

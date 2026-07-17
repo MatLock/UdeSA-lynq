@@ -1,24 +1,41 @@
 package com.lynq.backend.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
+import com.lynq.backend.controller.response.GetUserResumeRestResponse;
+import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.model.UserEntity;
+import com.lynq.backend.model.UserResumeEntity;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.repository.UserRepository;
+import com.lynq.backend.repository.UserResumeRepository;
 import java.time.LocalDate;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserService {
 
-  private final UserRepository userRepository;
-  private final StorageService storageService;
+  private static final String USER_NOT_FOUND = "User '%s' not found";
+  private static final String ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES =
+      "Only users of type CANDIDATE can access resumes";
+  private static final String RESUME_NOT_VALID_JSON = "Stored resume is not valid JSON";
 
-  public UserService(UserRepository userRepository, StorageService storageService){
+  private final UserRepository userRepository;
+  private final UserResumeRepository userResumeRepository;
+  private final StorageService storageService;
+  private final ObjectMapper objectMapper;
+
+  public UserService(UserRepository userRepository, UserResumeRepository userResumeRepository,
+      StorageService storageService, ObjectMapper objectMapper){
     this.userRepository = userRepository;
+    this.userResumeRepository = userResumeRepository;
     this.storageService = storageService;
+    this.objectMapper = objectMapper;
   }
 
   @AuditLog
@@ -102,6 +119,50 @@ public class UserService {
       return null;
     }
     return storageService.obtainUserProfilePreSignedUrl(user);
+  }
+
+  @AuditLog
+  @Transactional(readOnly = true)
+  public List<GetUserResumeRestResponse> getUserResumes(String userId) {
+    UserEntity user = userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
+
+    if (user.getType() != UserType.CANDIDATE) {
+      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES);
+    }
+
+    return userResumeRepository.findByUserId(userId).stream()
+        .map(this::toResponse)
+        .toList();
+  }
+
+  private GetUserResumeRestResponse toResponse(UserResumeEntity resume) {
+    return GetUserResumeRestResponse.builder()
+        .id(resume.getId())
+        .name(resume.getName())
+        .language(resume.getLanguage())
+        .createdOn(resume.getCreatedOn())
+        .resume(parseResume(resume.getResume()))
+        .pdfUrl(obtainPdfUrl(resume.getStoragePath()))
+        .build();
+  }
+
+  private Object parseResume(String resume) {
+    if (resume == null || resume.isBlank()) {
+      return null;
+    }
+    try {
+      return objectMapper.readValue(resume, Object.class);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException(RESUME_NOT_VALID_JSON, e);
+    }
+  }
+
+  private String obtainPdfUrl(String storagePath) {
+    if (storagePath == null || storagePath.isBlank()) {
+      return null;
+    }
+    return storageService.obtainProfilePreSignedUrl(storagePath);
   }
 
 }

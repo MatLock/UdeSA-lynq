@@ -1,10 +1,16 @@
 package com.lynq.backend.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
+import com.lynq.backend.controller.response.GetUserResumeRestResponse;
+import com.lynq.backend.enums.Language;
 import com.lynq.backend.enums.UserType;
+import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.model.UserEntity;
+import com.lynq.backend.model.UserResumeEntity;
 import com.lynq.backend.repository.UserRepository;
+import com.lynq.backend.repository.UserResumeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,10 +19,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,8 +57,23 @@ class UserServiceTest {
   private static final String PRE_SIGNED_URL =
       "https://lynq-bucket.s3.amazonaws.com/" + S3_PATH + "?X-Amz-Signature=abc";
 
+  private static final String RESUME_ID = "resume-1";
+  private static final String RESUME_NAME = "Jane Doe - Backend";
+  private static final Language RESUME_LANGUAGE = Language.EN;
+  private static final LocalDate RESUME_CREATED_ON = LocalDate.of(2026, 7, 17);
+  private static final String RESUME_JSON = "{\"summary\":\"Backend engineer\",\"years\":8}";
+  private static final String RESUME_STORAGE_PATH = "lynq/users/" + USER_ID + "/resume/cv.pdf";
+  private static final String RESUME_PDF_URL = "https://presigned/cv.pdf";
+
+  private static final String USER_NOT_FOUND = "User '" + USER_ID + "' not found";
+  private static final String ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES =
+      "Only users of type CANDIDATE can access resumes";
+
   @Mock
   private UserRepository userRepository;
+
+  @Mock
+  private UserResumeRepository userResumeRepository;
 
   @Mock
   private UpdateUserProfileRequest updateRequest;
@@ -55,11 +81,14 @@ class UserServiceTest {
   @Mock
   private StorageService storageService;
 
+  private final ObjectMapper objectMapper = new ObjectMapper();
+
   private UserService userService;
 
   @BeforeEach
   void setUp() {
-    userService = new UserService(userRepository, storageService);
+    userService = new UserService(userRepository, userResumeRepository, storageService,
+        objectMapper);
   }
 
   @Test
@@ -265,6 +294,96 @@ class UserServiceTest {
     assertThrows(NotFoundException.class,
         () -> userService.generateProfileImageUploadUrl(USER_ID, FILE_NAME));
     verify(userRepository, never()).save(any());
+  }
+
+  @Test
+  void getUserResumesMapsEntitiesWithParsedJsonAndPresignedPdfUrl() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
+    when(userResumeRepository.findByUserId(USER_ID))
+        .thenReturn(List.of(resume(RESUME_JSON, RESUME_STORAGE_PATH)));
+    when(storageService.obtainProfilePreSignedUrl(RESUME_STORAGE_PATH)).thenReturn(RESUME_PDF_URL);
+
+    List<GetUserResumeRestResponse> result = userService.getUserResumes(USER_ID);
+
+    assertThat(result, hasSize(1));
+    GetUserResumeRestResponse response = result.get(0);
+    assertThat(response.getId(), is(RESUME_ID));
+    assertThat(response.getName(), is(RESUME_NAME));
+    assertThat(response.getLanguage(), is(RESUME_LANGUAGE));
+    assertThat(response.getCreatedOn(), is(RESUME_CREATED_ON));
+    assertThat(response.getPdfUrl(), is(RESUME_PDF_URL));
+    @SuppressWarnings("unchecked")
+    Map<String, Object> resumeJson = (Map<String, Object>) response.getResume();
+    assertThat(resumeJson.get("summary"), is("Backend engineer"));
+    assertThat(resumeJson.get("years"), is(8));
+  }
+
+  @Test
+  void getUserResumesLeavesPdfUrlNullWhenStoragePathIsBlank() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
+    when(userResumeRepository.findByUserId(USER_ID))
+        .thenReturn(List.of(resume(RESUME_JSON, null)));
+
+    GetUserResumeRestResponse response = userService.getUserResumes(USER_ID).get(0);
+
+    assertThat(response.getPdfUrl(), is(nullValue()));
+    verify(storageService, never()).obtainProfilePreSignedUrl(any());
+  }
+
+  @Test
+  void getUserResumesLeavesResumeNullWhenJsonIsBlank() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
+    when(userResumeRepository.findByUserId(USER_ID))
+        .thenReturn(List.of(resume(null, RESUME_STORAGE_PATH)));
+    when(storageService.obtainProfilePreSignedUrl(RESUME_STORAGE_PATH)).thenReturn(RESUME_PDF_URL);
+
+    GetUserResumeRestResponse response = userService.getUserResumes(USER_ID).get(0);
+
+    assertThat(response.getResume(), is(nullValue()));
+  }
+
+  @Test
+  void getUserResumesReturnsEmptyWhenCandidateHasNoResumes() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
+
+    assertThat(userService.getUserResumes(USER_ID), is(empty()));
+  }
+
+  @Test
+  void getUserResumesThrowsBadRequestWhenUserIsNotCandidate() {
+    UserEntity company = UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(company));
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> userService.getUserResumes(USER_ID));
+    assertThat(exception.getMessage(), is(ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES));
+    verify(userResumeRepository, never()).findByUserId(any());
+  }
+
+  @Test
+  void getUserResumesThrowsNotFoundWhenUserDoesNotExist() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> userService.getUserResumes(USER_ID));
+    assertThat(exception.getMessage(), is(USER_NOT_FOUND));
+    verify(userResumeRepository, never()).findByUserId(any());
+  }
+
+  private UserEntity candidate() {
+    return UserEntity.builder().id(USER_ID).type(UserType.CANDIDATE).build();
+  }
+
+  private UserResumeEntity resume(String resumeJson, String storagePath) {
+    return UserResumeEntity.builder()
+        .id(RESUME_ID)
+        .name(RESUME_NAME)
+        .language(RESUME_LANGUAGE)
+        .createdOn(RESUME_CREATED_ON)
+        .resume(resumeJson)
+        .storagePath(storagePath)
+        .build();
   }
 
   private UserEntity existingUser() {
