@@ -58,6 +58,9 @@ public class JobPostEntity {
   @Column(name = "created_on", nullable = false)
   private LocalDate createdOn;
 
+  @Column(name = "closed_on")
+  private LocalDate closedOn;
+
   @Column(name = "total_seen", nullable = false)
   @Builder.Default
   private Long totalSeen = 0L;

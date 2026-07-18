@@ -4,11 +4,14 @@ import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.controller.JobController;
 import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.response.ApplyJobRestResponse;
+import com.lynq.backend.controller.response.CloseJobRestResponse;
 import com.lynq.backend.controller.response.CreateJobRestResponse;
+import com.lynq.backend.controller.response.GetJobDetailForCandidateRestResponse;
 import com.lynq.backend.controller.response.GetJobRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
+import com.lynq.backend.controller.response.RefreshJobRestResponse;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSkillEntity;
 import com.lynq.backend.model.UserApplicationJobEntity;
@@ -81,6 +84,18 @@ public class JobControllerImpl implements JobController {
   }
 
   @Override
+  @GetMapping("/{jobId}/details")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<GetJobDetailForCandidateRestResponse>> getJobDetails(
+      @PathVariable String jobId) {
+    GetJobDetailForCandidateRestResponse job = jobService.getJobDetails(jobId);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, job));
+  }
+
+  @Override
   @PatchMapping("/{jobId}/increase-seen")
   @AuditLog
   public ResponseEntity<GlobalRestResponse<Long>> increaseSeen(@PathVariable String jobId) {
@@ -89,6 +104,42 @@ public class JobControllerImpl implements JobController {
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, job.getTotalSeen()));
+  }
+
+  @Override
+  @PatchMapping("/{jobId}/refresh")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<RefreshJobRestResponse>> refreshJob(
+      @PathVariable String jobId) {
+    JobPostEntity job = jobService.refreshJob(jobId);
+
+    RefreshJobRestResponse response = RefreshJobRestResponse.builder()
+        .jobId(job.getId())
+        .jobStatus(job.getJobStatus())
+        .createdOn(job.getCreatedOn())
+        .build();
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, response));
+  }
+
+  @Override
+  @PatchMapping("/{jobId}/close")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<CloseJobRestResponse>> closeJob(
+      @PathVariable String jobId) {
+    JobPostEntity job = jobService.closeJob(jobId);
+
+    CloseJobRestResponse response = CloseJobRestResponse.builder()
+        .jobId(job.getId())
+        .jobStatus(job.getJobStatus())
+        .closedOn(job.getClosedOn())
+        .build();
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, response));
   }
 
   @Override

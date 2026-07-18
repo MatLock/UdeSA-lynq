@@ -2,16 +2,19 @@ package com.lynq.backend.service;
 
 import com.fasterxml.uuid.Generators;
 import com.lynq.backend.aspect.AuditLog;
+import com.lynq.backend.controller.response.GetJobDetailForCandidateRestResponse;
 import com.lynq.backend.controller.response.GetJobRestResponse;
 import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.JobCompanyRestResponse;
 import com.lynq.backend.controller.response.JobPostedByRestResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.enums.JobPostSource;
+import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.exceptions.AlreadyAppliedToJobException;
 import com.lynq.backend.exceptions.BadRequestException;
+import com.lynq.backend.exceptions.ForbiddenException;
 import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
@@ -46,6 +49,10 @@ public class JobService {
   private static final String AUTHENTICATED_USER_NOT_FOUND = "Authenticated user not found";
   private static final String JOB_POST_NOT_FOUND = "Job post not found";
   private static final String ALREADY_APPLIED_TO_JOB = "User has already applied to this job";
+  private static final String ONLY_JOB_OWNER_CAN_REFRESH = "Only the owner of the job post can refresh it";
+  private static final String ONLY_CLOSED_JOBS_CAN_BE_REFRESHED = "Only closed job posts can be refreshed";
+  private static final String ONLY_JOB_OWNER_CAN_CLOSE = "Only the owner of the job post can close it";
+  private static final String ONLY_OPEN_JOBS_CAN_BE_CLOSED = "Only open job posts can be closed";
 
   private final JobPostRepository jobPostRepository;
   private final CompanyRepository companyRepository;
@@ -107,6 +114,51 @@ public class JobService {
 
   @AuditLog
   @Transactional
+  public JobPostEntity refreshJob(String jobId) {
+    UserEntity user = getAuthenticatedUser();
+    JobPostEntity job = getOwnedJob(jobId, user, ONLY_JOB_OWNER_CAN_REFRESH);
+
+    if (job.getJobStatus() != JobStatus.CLOSE) {
+      throw new BadRequestException(ONLY_CLOSED_JOBS_CAN_BE_REFRESHED);
+    }
+
+    job.setJobStatus(JobStatus.OPEN);
+    job.setCreatedOn(LocalDate.now());
+    job.setClosedOn(null);
+
+    return jobPostRepository.save(job);
+  }
+
+  @AuditLog
+  @Transactional
+  public JobPostEntity closeJob(String jobId) {
+    UserEntity user = getAuthenticatedUser();
+    JobPostEntity job = getOwnedJob(jobId, user, ONLY_JOB_OWNER_CAN_CLOSE);
+
+    if (job.getJobStatus() != JobStatus.OPEN) {
+      throw new BadRequestException(ONLY_OPEN_JOBS_CAN_BE_CLOSED);
+    }
+
+    job.setJobStatus(JobStatus.CLOSE);
+    job.setClosedOn(LocalDate.now());
+
+    return jobPostRepository.save(job);
+  }
+
+  private JobPostEntity getOwnedJob(String jobId, UserEntity user, String forbiddenMessage) {
+    JobPostEntity job = jobPostRepository.findById(jobId)
+        .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
+
+    if (job.getCreatedByUser() == null
+        || !job.getCreatedByUser().getId().equals(user.getId())) {
+      throw new ForbiddenException(forbiddenMessage);
+    }
+
+    return job;
+  }
+
+  @AuditLog
+  @Transactional
   public UserApplicationJobEntity applyToJob(String jobId) {
     UserEntity user = getAuthenticatedUser();
 
@@ -139,6 +191,30 @@ public class JobService {
         .map(this::toCandidateResponse));
   }
 
+  @AuditLog
+  @Transactional(readOnly = true)
+  public PagedRestResponse<GetJobRestResponse> searchAvailableJobs(JobFilter filter,
+      Pageable pageable) {
+    UserEntity user = getAuthenticatedUser();
+    return PagedRestResponse.from(jobPostRepository.searchAvailableJobs(
+            filter.filterValue(),
+            pageable)
+        .map(projection -> toResponse(projection, user)));
+  }
+
+  @AuditLog
+  @Transactional(readOnly = true)
+  public GetJobDetailForCandidateRestResponse getJobDetails(String jobId) {
+    UserEntity user = getAuthenticatedUser();
+    JobWithDetailsProjection projection = jobPostRepository.findJobDetailsById(jobId)
+        .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
+
+    return GetJobDetailForCandidateRestResponse.from(
+        toResponse(projection, user),
+        userApplicationJobRepository.countByJobId(jobId));
+  }
+
+
   private JobCandidateResponse toCandidateResponse(JobCandidateProjection projection) {
     List<String> jobSkills = splitSkills(projection.jobSkills());
     List<String> candidateSkills = splitSkills(projection.userSkills());
@@ -152,17 +228,6 @@ public class JobService {
         .userAppliedOn(projection.appliedOn())
         .lynqScore(calculateLyNQScore(jobSkills, candidateSkills))
         .build();
-  }
-
-  @AuditLog
-  @Transactional(readOnly = true)
-  public PagedRestResponse<GetJobRestResponse> searchAvailableJobs(JobFilter filter,
-      Pageable pageable) {
-    UserEntity user = getAuthenticatedUser();
-    return PagedRestResponse.from(jobPostRepository.searchAvailableJobs(
-            filter.filterValue(),
-            pageable)
-        .map(projection -> toResponse(projection, user)));
   }
 
   private GetJobRestResponse toResponse(JobWithDetailsProjection projection, UserEntity user) {
@@ -241,9 +306,12 @@ public class JobService {
   }
 
   private Integer calculateLyNQScore(List<String> jobSkillNames, List<String> userSkillNames) {
-    if (jobSkillNames == null || jobSkillNames.isEmpty() || userSkillNames == null
-        || userSkillNames.isEmpty()) {
-      return null;
+    if (userSkillNames == null || userSkillNames.isEmpty()) {
+      return 0;
+    }
+
+    if (jobSkillNames == null || jobSkillNames.isEmpty()) {
+      return 0;
     }
 
     Set<String> normalizedUserSkills = userSkillNames.stream()
@@ -258,8 +326,12 @@ public class JobService {
         .filter(skill -> !skill.isEmpty())
         .collect(Collectors.toSet());
 
-    if (normalizedJobSkills.isEmpty() || normalizedUserSkills.isEmpty()) {
-      return null;
+    if (normalizedUserSkills.isEmpty()) {
+      return 0;
+    }
+
+    if (normalizedJobSkills.isEmpty()) {
+      return 0;
     }
 
     long matches = normalizedJobSkills.stream()

@@ -2,6 +2,8 @@ package com.lynq.backend.repository;
 
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.repository.projection.JobWithDetailsProjection;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -48,5 +50,24 @@ public interface JobPostRepository extends JpaRepository<JobPostEntity, String> 
       + "OR EXISTS (SELECT 1 FROM JobPostSkillEntity s "
       + "WHERE s.jobPost = j AND LOWER(s.skill) LIKE LOWER(CONCAT('%', :filterValue, '%')))))")
   Page<JobWithDetailsProjection> searchAvailableJobs(@Param("filterValue") String filterValue, Pageable pageable);
+
+  @Query("SELECT new com.lynq.backend.repository.projection.JobWithDetailsProjection("
+      + "j.id, j.title, j.description, j.workType, j.salaryRangeDown, j.salaryRangeTop, j.jobUrl, "
+      + "j.jobPostSource, j.createdOn, j.totalSeen, "
+      + "c.id, c.name, c.about, c.size, c.profileImageUrl, "
+      + "u.id, u.fullName, u.profileImageUrl, u.currentPosition, "
+      + "CAST((SELECT function('group_concat', sk.skill) FROM JobPostSkillEntity sk "
+      + "WHERE sk.jobPost = j) AS string)) "
+      + "FROM JobPostEntity j "
+      + "LEFT JOIN j.company c "
+      + "LEFT JOIN j.createdByUser u "
+      + "WHERE j.id = :jobId")
+  Optional<JobWithDetailsProjection> findJobDetailsById(@Param("jobId") String jobId);
+
+  @Query("SELECT j FROM JobPostEntity j WHERE j.createdByUser.id = :userId ORDER BY j.createdOn DESC")
+  List<JobPostEntity> findByCreatedByUserId(@Param("userId") String userId);
+
+  @Query("SELECT j FROM JobPostEntity j WHERE j.company.id = :companyId ORDER BY j.createdOn DESC")
+  List<JobPostEntity> findByCompanyId(@Param("companyId") String companyId);
 
 }

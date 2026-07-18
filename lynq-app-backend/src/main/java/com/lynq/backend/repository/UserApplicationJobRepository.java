@@ -16,6 +16,9 @@ public interface UserApplicationJobRepository extends JpaRepository<UserApplicat
       + "WHERE a.jobPost.id = :jobId AND a.user.id = :userId")
   boolean existsByJobIdAndUserId(@Param("jobId") String jobId, @Param("userId") String userId);
 
+  @Query("SELECT COUNT(a) FROM UserApplicationJobEntity a WHERE a.jobPost.id = :jobId")
+  long countByJobId(@Param("jobId") String jobId);
+
   @Query(value = "SELECT new com.lynq.backend.repository.projection.JobCandidateProjection("
       + "a.id, u.id, j.id, u.fullName, u.profileImageUrl, u.currentPosition, a.appliedOn, "
       + "CAST((SELECT function('group_concat', jsk.skill) FROM JobPostSkillEntity jsk "

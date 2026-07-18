@@ -2,11 +2,14 @@ package com.lynq.backend.controller;
 
 import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.response.ApplyJobRestResponse;
+import com.lynq.backend.controller.response.CloseJobRestResponse;
 import com.lynq.backend.controller.response.CreateJobRestResponse;
+import com.lynq.backend.controller.response.GetJobDetailForCandidateRestResponse;
 import com.lynq.backend.controller.response.GetJobRestResponse;
 import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
+import com.lynq.backend.controller.response.RefreshJobRestResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,12 +43,40 @@ public interface JobController {
       String filterValue);
 
   @Operation(
+      summary = "Get a single job post's details",
+      description = "Returns the details of the job post identified by the given id, using the same "
+          + "response shape as the paginated listing (company, poster, skills and the LyNQ score "
+          + "for the authenticated user). Fails with 404 when no job post matches the id.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<GetJobDetailForCandidateRestResponse>> getJobDetails(
+      String jobId);
+
+  @Operation(
       summary = "Increase the seen counter of a job post",
       description = "Atomically increments the total seen counter of the job post identified by "
           + "the given id and returns the updated counter value. Fails with 404 when no job post "
           + "matches the id.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<GlobalRestResponse<Long>> increaseSeen(String jobId);
+
+  @Operation(
+      summary = "Refresh (reopen) a closed job post",
+      description = "Reopens the closed job post identified by the given id, setting its status back "
+          + "to OPEN and stamping its creation date with the current date so it resurfaces at the "
+          + "top of the feed. Only the user who created the job post may refresh it. Fails with 404 "
+          + "when no job post matches the id, 403 when the caller is not the owner, and 400 when the "
+          + "job post is not currently closed.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<RefreshJobRestResponse>> refreshJob(String jobId);
+
+  @Operation(
+      summary = "Close an open job post",
+      description = "Closes the open job post identified by the given id, setting its status to "
+          + "CLOSE and stamping the date it was closed. Only the user who created the job post may "
+          + "close it. Fails with 404 when no job post matches the id, 403 when the caller is not "
+          + "the owner, and 400 when the job post is not currently open.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<CloseJobRestResponse>> closeJob(String jobId);
 
   @Operation(
       summary = "Apply to a job post",

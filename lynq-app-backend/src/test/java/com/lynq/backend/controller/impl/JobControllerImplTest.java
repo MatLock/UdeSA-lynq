@@ -2,12 +2,16 @@ package com.lynq.backend.controller.impl;
 
 import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.response.ApplyJobRestResponse;
+import com.lynq.backend.controller.response.CloseJobRestResponse;
 import com.lynq.backend.controller.response.CreateJobRestResponse;
+import com.lynq.backend.controller.response.GetJobDetailForCandidateRestResponse;
 import com.lynq.backend.controller.response.GetJobRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
+import com.lynq.backend.controller.response.RefreshJobRestResponse;
 import com.lynq.backend.enums.JobPostSource;
+import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
@@ -189,6 +193,41 @@ class JobControllerImplTest {
   }
 
   @Test
+  void getJobDetailsDelegatesToServiceWithJobId() {
+    when(jobService.getJobDetails(JOB_ID))
+        .thenReturn(GetJobDetailForCandidateRestResponse.builder().jobId(JOB_ID).build());
+
+    jobController.getJobDetails(JOB_ID);
+
+    verify(jobService).getJobDetails(JOB_ID);
+  }
+
+  @Test
+  void getJobDetailsRespondsWithOkStatus() {
+    when(jobService.getJobDetails(JOB_ID))
+        .thenReturn(GetJobDetailForCandidateRestResponse.builder().jobId(JOB_ID).build());
+
+    ResponseEntity<GlobalRestResponse<GetJobDetailForCandidateRestResponse>> response =
+        jobController.getJobDetails(JOB_ID);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void getJobDetailsWrapsServiceResultInSuccessfulEnvelope() {
+    when(jobService.getJobDetails(JOB_ID))
+        .thenReturn(GetJobDetailForCandidateRestResponse.builder().jobId(JOB_ID).build());
+
+    ResponseEntity<GlobalRestResponse<GetJobDetailForCandidateRestResponse>> response =
+        jobController.getJobDetails(JOB_ID);
+
+    GlobalRestResponse<GetJobDetailForCandidateRestResponse> body = response.getBody();
+    assertThat(body, is(notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData().getJobId(), is(JOB_ID));
+  }
+
+  @Test
   void increaseSeenDelegatesToServiceWithJobId() {
     when(jobService.increaseSeen(JOB_ID)).thenReturn(seenJob(SEEN_COUNT));
 
@@ -220,6 +259,92 @@ class JobControllerImplTest {
 
   private JobPostEntity seenJob(Long totalSeen) {
     return JobPostEntity.builder().id(JOB_ID).totalSeen(totalSeen).build();
+  }
+
+  @Test
+  void refreshJobDelegatesToServiceWithJobId() {
+    when(jobService.refreshJob(JOB_ID)).thenReturn(refreshedJob());
+
+    jobController.refreshJob(JOB_ID);
+
+    verify(jobService).refreshJob(JOB_ID);
+  }
+
+  @Test
+  void refreshJobRespondsWithOkStatus() {
+    when(jobService.refreshJob(JOB_ID)).thenReturn(refreshedJob());
+
+    ResponseEntity<GlobalRestResponse<RefreshJobRestResponse>> response =
+        jobController.refreshJob(JOB_ID);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void refreshJobMapsReopenedJobIntoSuccessfulResponseData() {
+    when(jobService.refreshJob(JOB_ID)).thenReturn(refreshedJob());
+
+    ResponseEntity<GlobalRestResponse<RefreshJobRestResponse>> response =
+        jobController.refreshJob(JOB_ID);
+
+    GlobalRestResponse<RefreshJobRestResponse> body = response.getBody();
+    assertThat(body, is(notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    RefreshJobRestResponse data = body.getData();
+    assertThat(data.getJobId(), is(JOB_ID));
+    assertThat(data.getJobStatus(), is(JobStatus.OPEN));
+    assertThat(data.getCreatedOn(), is(CREATED_ON));
+  }
+
+  private JobPostEntity refreshedJob() {
+    return JobPostEntity.builder()
+        .id(JOB_ID)
+        .jobStatus(JobStatus.OPEN)
+        .createdOn(CREATED_ON)
+        .build();
+  }
+
+  @Test
+  void closeJobDelegatesToServiceWithJobId() {
+    when(jobService.closeJob(JOB_ID)).thenReturn(closedJob());
+
+    jobController.closeJob(JOB_ID);
+
+    verify(jobService).closeJob(JOB_ID);
+  }
+
+  @Test
+  void closeJobRespondsWithOkStatus() {
+    when(jobService.closeJob(JOB_ID)).thenReturn(closedJob());
+
+    ResponseEntity<GlobalRestResponse<CloseJobRestResponse>> response =
+        jobController.closeJob(JOB_ID);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void closeJobMapsClosedJobIntoSuccessfulResponseData() {
+    when(jobService.closeJob(JOB_ID)).thenReturn(closedJob());
+
+    ResponseEntity<GlobalRestResponse<CloseJobRestResponse>> response =
+        jobController.closeJob(JOB_ID);
+
+    GlobalRestResponse<CloseJobRestResponse> body = response.getBody();
+    assertThat(body, is(notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    CloseJobRestResponse data = body.getData();
+    assertThat(data.getJobId(), is(JOB_ID));
+    assertThat(data.getJobStatus(), is(JobStatus.CLOSE));
+    assertThat(data.getClosedOn(), is(CREATED_ON));
+  }
+
+  private JobPostEntity closedJob() {
+    return JobPostEntity.builder()
+        .id(JOB_ID)
+        .jobStatus(JobStatus.CLOSE)
+        .closedOn(CREATED_ON)
+        .build();
   }
 
   @Test

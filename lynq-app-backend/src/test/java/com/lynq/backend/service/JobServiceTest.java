@@ -1,13 +1,16 @@
 package com.lynq.backend.service;
 
+import com.lynq.backend.controller.response.GetJobDetailForCandidateRestResponse;
 import com.lynq.backend.controller.response.GetJobRestResponse;
 import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.enums.JobPostSource;
+import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.exceptions.AlreadyAppliedToJobException;
 import com.lynq.backend.exceptions.BadRequestException;
+import com.lynq.backend.exceptions.ForbiddenException;
 import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
@@ -84,6 +87,7 @@ class JobServiceTest {
   private static final String JOB_URL = "https://lynq.ai/jobs/1";
   private static final LocalDate CREATED_ON = LocalDate.of(2026, 6, 30);
   private static final Long TOTAL_SEEN = 0L;
+  private static final Long TOTAL_CANDIDATES_APPLIED = 5L;
 
   private static final String COMPANY_ID = "company-1";
   private static final String COMPANY_NAME = "Lynq";
@@ -124,6 +128,14 @@ class JobServiceTest {
   private static final String ALREADY_APPLIED_TO_JOB = "User has already applied to this job";
   private static final String ONLY_CANDIDATE_USERS_CAN_APPLY =
       "Only users of type CANDIDATE can apply to jobs";
+  private static final String ONLY_JOB_OWNER_CAN_REFRESH =
+      "Only the owner of the job post can refresh it";
+  private static final String ONLY_CLOSED_JOBS_CAN_BE_REFRESHED =
+      "Only closed job posts can be refreshed";
+  private static final String ONLY_JOB_OWNER_CAN_CLOSE =
+      "Only the owner of the job post can close it";
+  private static final String ONLY_OPEN_JOBS_CAN_BE_CLOSED =
+      "Only open job posts can be closed";
 
   @Mock
   private JobPostRepository jobPostRepository;
@@ -405,19 +417,68 @@ class JobServiceTest {
   }
 
   @Test
-  void searchAvailableJobsDoesNotScoreLynqWhenCandidateHasNoSkills() {
+  void searchAvailableJobsScoresLynqZeroWhenCandidateHasNoSkills() {
     stubAuthenticatedUser(candidateUser(null));
     stubSingleJob(JOB_SKILLS_CONCATENATED);
 
-    assertThat(searchSingleJobLynqScore(), is(nullValue()));
+    assertThat(searchSingleJobLynqScore(), is(0));
   }
 
   @Test
-  void searchAvailableJobsDoesNotScoreLynqWhenJobHasNoSkills() {
+  void searchAvailableJobsScoresLynqZeroWhenJobHasNoSkills() {
     stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA)));
     stubSingleJob(null);
 
-    assertThat(searchSingleJobLynqScore(), is(nullValue()));
+    assertThat(searchSingleJobLynqScore(), is(0));
+  }
+
+  @Test
+  void getJobDetailsMapsProjectionFieldsIncludingCompanyPosterAndLynqScore() {
+    stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA, SKILL_SPRING)));
+    JobWithDetailsProjection projection = new JobWithDetailsProjection(
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_IMAGE_PATH,
+        POSTER_ID, POSTER_FULL_NAME, POSTER_IMAGE_PATH, POSTER_CURRENT_POSITION,
+        JOB_SKILLS_CONCATENATED);
+    when(jobPostRepository.findJobDetailsById(JOB_ID)).thenReturn(Optional.of(projection));
+    when(userApplicationJobRepository.countByJobId(JOB_ID)).thenReturn(TOTAL_CANDIDATES_APPLIED);
+    when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
+        .thenReturn(COMPANY_IMAGE_URL);
+    when(storageService.obtainProfilePreSignedUrl(POSTER_IMAGE_PATH))
+        .thenReturn(POSTER_IMAGE_URL);
+
+    GetJobDetailForCandidateRestResponse job = jobService.getJobDetails(JOB_ID);
+
+    assertThat(job.getJobId(), is(JOB_ID));
+    assertThat(job.getTitle(), is(TITLE));
+    assertThat(job.getDescription(), is(DESCRIPTION));
+    assertThat(job.getWorkType(), is(WORK_TYPE));
+    assertThat(job.getSalaryRangeDown(), is(SALARY_RANGE_DOWN));
+    assertThat(job.getSalaryRangeTop(), is(SALARY_RANGE_TOP));
+    assertThat(job.getJobUrl(), is(JOB_URL));
+    assertThat(job.getJobPostSource(), is(JOB_POST_TYPE));
+    assertThat(job.getCreatedOn(), is(CREATED_ON));
+    assertThat(job.getCompany().getId(), is(COMPANY_ID));
+    assertThat(job.getCompany().getName(), is(COMPANY_NAME));
+    assertThat(job.getCompany().getProfileImageUrl(), is(COMPANY_IMAGE_URL));
+    assertThat(job.getPostedBy().getId(), is(POSTER_ID));
+    assertThat(job.getPostedBy().getFullName(), is(POSTER_FULL_NAME));
+    assertThat(job.getPostedBy().getProfileImageUrl(), is(POSTER_IMAGE_URL));
+    assertThat(job.getSkills(), contains(SKILL_JAVA, SKILL_SPRING));
+    assertThat(job.getLynqScore(), is(100));
+    assertThat(job.getTotalSeen(), is(TOTAL_SEEN));
+    assertThat(job.getTotalCandidatesApplied(), is(TOTAL_CANDIDATES_APPLIED));
+  }
+
+  @Test
+  void getJobDetailsThrowsNotFoundWhenJobDoesNotExist() {
+    stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA)));
+    when(jobPostRepository.findJobDetailsById(JOB_ID)).thenReturn(Optional.empty());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> jobService.getJobDetails(JOB_ID));
+    assertThat(exception.getMessage(), is(JOB_POST_NOT_FOUND));
   }
 
   @Test
@@ -514,6 +575,139 @@ class JobServiceTest {
   }
 
   @Test
+  void refreshJobReopensClosedJobStampsCreatedOnWithTodayAndClearsClosedOn() {
+    UserEntity owner = candidateUser(null);
+    JobPostEntity job = JobPostEntity.builder()
+        .id(JOB_ID)
+        .jobStatus(JobStatus.CLOSE)
+        .createdByUser(owner)
+        .createdOn(LocalDate.of(2026, 1, 1))
+        .closedOn(LocalDate.of(2026, 5, 1))
+        .build();
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    JobPostEntity result = jobService.refreshJob(JOB_ID);
+
+    assertThat(result.getJobStatus(), is(JobStatus.OPEN));
+    assertThat(result.getCreatedOn(), is(LocalDate.now()));
+    assertThat(result.getClosedOn(), is(nullValue()));
+    verify(jobPostRepository).save(job);
+  }
+
+  @Test
+  void refreshJobThrowsNotFoundWhenJobDoesNotExist() {
+    stubAuthenticatedUser(candidateUser(null));
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.empty());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> jobService.refreshJob(JOB_ID));
+    assertThat(exception.getMessage(), is(JOB_POST_NOT_FOUND));
+    verify(jobPostRepository, never()).save(any());
+  }
+
+  @Test
+  void refreshJobThrowsForbiddenWhenCallerIsNotTheOwner() {
+    UserEntity anotherOwner = UserEntity.builder().id("another-user").build();
+    JobPostEntity job = JobPostEntity.builder()
+        .id(JOB_ID)
+        .jobStatus(JobStatus.CLOSE)
+        .createdByUser(anotherOwner)
+        .build();
+    stubAuthenticatedUser(candidateUser(null));
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+
+    ForbiddenException exception = assertThrows(ForbiddenException.class,
+        () -> jobService.refreshJob(JOB_ID));
+    assertThat(exception.getMessage(), is(ONLY_JOB_OWNER_CAN_REFRESH));
+    verify(jobPostRepository, never()).save(any());
+  }
+
+  @Test
+  void refreshJobThrowsBadRequestWhenJobIsNotClosed() {
+    UserEntity owner = candidateUser(null);
+    JobPostEntity job = JobPostEntity.builder()
+        .id(JOB_ID)
+        .jobStatus(JobStatus.OPEN)
+        .createdByUser(owner)
+        .build();
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> jobService.refreshJob(JOB_ID));
+    assertThat(exception.getMessage(), is(ONLY_CLOSED_JOBS_CAN_BE_REFRESHED));
+    verify(jobPostRepository, never()).save(any());
+  }
+
+  @Test
+  void closeJobClosesOpenJobAndStampsClosedOnWithToday() {
+    UserEntity owner = candidateUser(null);
+    JobPostEntity job = JobPostEntity.builder()
+        .id(JOB_ID)
+        .jobStatus(JobStatus.OPEN)
+        .createdByUser(owner)
+        .build();
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    JobPostEntity result = jobService.closeJob(JOB_ID);
+
+    assertThat(result.getJobStatus(), is(JobStatus.CLOSE));
+    assertThat(result.getClosedOn(), is(LocalDate.now()));
+    verify(jobPostRepository).save(job);
+  }
+
+  @Test
+  void closeJobThrowsNotFoundWhenJobDoesNotExist() {
+    stubAuthenticatedUser(candidateUser(null));
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.empty());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> jobService.closeJob(JOB_ID));
+    assertThat(exception.getMessage(), is(JOB_POST_NOT_FOUND));
+    verify(jobPostRepository, never()).save(any());
+  }
+
+  @Test
+  void closeJobThrowsForbiddenWhenCallerIsNotTheOwner() {
+    UserEntity anotherOwner = UserEntity.builder().id("another-user").build();
+    JobPostEntity job = JobPostEntity.builder()
+        .id(JOB_ID)
+        .jobStatus(JobStatus.OPEN)
+        .createdByUser(anotherOwner)
+        .build();
+    stubAuthenticatedUser(candidateUser(null));
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+
+    ForbiddenException exception = assertThrows(ForbiddenException.class,
+        () -> jobService.closeJob(JOB_ID));
+    assertThat(exception.getMessage(), is(ONLY_JOB_OWNER_CAN_CLOSE));
+    verify(jobPostRepository, never()).save(any());
+  }
+
+  @Test
+  void closeJobThrowsBadRequestWhenJobIsNotOpen() {
+    UserEntity owner = candidateUser(null);
+    JobPostEntity job = JobPostEntity.builder()
+        .id(JOB_ID)
+        .jobStatus(JobStatus.CLOSE)
+        .createdByUser(owner)
+        .build();
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> jobService.closeJob(JOB_ID));
+    assertThat(exception.getMessage(), is(ONLY_OPEN_JOBS_CAN_BE_CLOSED));
+    verify(jobPostRepository, never()).save(any());
+  }
+
+  @Test
   void getJobCandidatesMapsProjectionFieldsAndGeneratesPresignedImageUrl() {
     when(storageService.obtainProfilePreSignedUrl(CANDIDATE_IMAGE_PATH))
         .thenReturn(CANDIDATE_IMAGE_URL);
@@ -551,7 +745,7 @@ class JobServiceTest {
   }
 
   @Test
-  void getJobCandidatesLeavesLynqScoreNullWhenCandidateHasNoSkills() {
+  void getJobCandidatesScoresLynqZeroWhenCandidateHasNoSkills() {
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
         JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_IMAGE_PATH, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
         CANDIDATE_JOB_SKILLS, null);
@@ -561,11 +755,11 @@ class JobServiceTest {
     JobCandidateResponse candidate =
         jobService.getJobCandidates(JOB_ID, DEFAULT_PAGEABLE).getContent().get(0);
 
-    assertThat(candidate.getLynqScore(), is(nullValue()));
+    assertThat(candidate.getLynqScore(), is(0));
   }
 
   @Test
-  void getJobCandidatesLeavesLynqScoreNullWhenJobHasNoSkills() {
+  void getJobCandidatesScoresLynqZeroWhenJobHasNoSkills() {
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
         JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_IMAGE_PATH, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
         null, CANDIDATE_MATCHING_SKILLS);
@@ -575,7 +769,7 @@ class JobServiceTest {
     JobCandidateResponse candidate =
         jobService.getJobCandidates(JOB_ID, DEFAULT_PAGEABLE).getContent().get(0);
 
-    assertThat(candidate.getLynqScore(), is(nullValue()));
+    assertThat(candidate.getLynqScore(), is(0));
   }
 
   @Test
