@@ -137,10 +137,7 @@ services:
       retries: 5
 
   localstack:
-    # Pinned to the last community (free) release. The `latest` tag now points at
-    # the Pro image, which exits with code 55 unless a LOCALSTACK_AUTH_TOKEN is
-    # provided. S3 is a free community service, so this needs no token/license.
-    image: localstack/localstack:4.5.0
+    image: gresau/localstack-persist:4.5
     ports:
       - "4566:4566"
     environment:
@@ -148,9 +145,8 @@ services:
       - AWS_DEFAULT_REGION=${AWS_REGION:-us-east-1}
       - AWS_BUCKET_NAME=${AWS_BUCKET_NAME:-lynq-bucket}
     volumes:
-      # Init hook: creates the bucket + CORS once S3 is ready.
       - ./localstack-init:/etc/localstack/init/ready.d:ro
-      - localstack_data:/var/lib/localstack
+      - localstack_data:/persisted-data
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health | grep -q '\"s3\": \"\\(running\\|available\\)\"'"]
       interval: 10s

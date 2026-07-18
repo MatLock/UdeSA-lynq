@@ -1,0 +1,12 @@
+date,prompt
+"18-07-2026","create endpoint GET ""/job/${""job_id""}/details"" that given a job id it returns the job response exactly as the paginated endpoint but for only one job"
+"18-07-2026","yes"
+"18-07-2026","for the getJobDetails create a subclass of the GetJobRestResponse called GetJobDetailForCandidateRestResponse. in this response add the fields totalSeen, totalCandidatesApplied (this has to be calculated seeing intermediate table)"
+"18-07-2026","I changed the lynq-score. fix the tests"
+"18-07-2026","I changed the lynq-score. fix the tests"
+"18-07-2026","refactor StorageService.createUserProfilePreSignedUrl and StorageService.createCompanyProfilePreSignedUrl I'm getting a warning of duplicated code"
+"18-07-2026","create endpoint in CompanyController GET ""/company/${company_id}"" it should return all company information the same as the user detail endpoint + all the job positions that are open or closed"
+"18-07-2026","create endpoint PATCH  /job/${job_id}/refresh that will REOPEN a CLOSED position. it will also update its created_on date. The user performing this actions has to be the owner of the job post only"
+"18-07-2026","check if I need to add the job status in any test"
+"18-07-2026","create endpoint /job/${job_id}/close and endpoint that changes the status of a job from OPEN to CLOSE. add a new column to table job_post that denotes the date when the job was closed. this action can only be performed by the owner of the job. Also update the refresh endpoint to set this date to null when a job is refreshed"
+"18-07-2026","make small commits for all the work done here. add the preffix [lynq-app-backend] use small descriptions and do not mention claude on any of them"
