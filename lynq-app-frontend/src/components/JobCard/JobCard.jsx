@@ -107,6 +107,7 @@ const JobCard = ({ job, onApply, showScore = true }) => {
               label={`${t.lynqScore}: ${job.lynqScore}`}
               size="small"
               variant="outlined"
+              className="job-card-score-chip"
               sx={{
                 ...CHIP_SX,
                 fontWeight: 700,
@@ -194,7 +195,7 @@ const JobCard = ({ job, onApply, showScore = true }) => {
                     later) — not the signed-in user's own /profile. Falls back to
                     plain text when the post has no identified poster. */}
                 {poster?.id ? (
-                  <Link to={`/users/${poster.id}`} className="job-card-poster-value">
+                  <Link to={`/user/${poster.id}`} className="job-card-poster-value">
                     {poster.fullName ?? t.unknownPoster}
                   </Link>
                 ) : (
@@ -218,18 +219,22 @@ const JobCard = ({ job, onApply, showScore = true }) => {
         </div>
       </div>
 
-      <div className="job-card-actions">
-        <button
-          type="button"
-          className="job-card-apply"
-          onClick={() => onApply?.(job)}
-        >
-          {t.apply}
-        </button>
+      {/* "See details" navigates to the job's detail page, handing the already
+          loaded job object along via router state so the detail page can render
+          instantly without a redundant fetch. onApply, when provided, still fires
+          for callers that want to observe the click. */}
+      <Link
+        to={`/job/${job.jobId}/details`}
+        state={{ job }}
+        className="job-card-actions"
+        aria-label={`${t.apply} — ${job.title}`}
+        onClick={() => onApply?.(job)}
+      >
+        <span className="job-card-apply">{t.apply}</span>
         <span className="job-card-chevron" aria-hidden="true">
           ›
         </span>
-      </div>
+      </Link>
     </article>
   )
 }

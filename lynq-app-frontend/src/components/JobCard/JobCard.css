@@ -68,6 +68,12 @@
   gap: 6px;
 }
 
+/* Pin the LYNQ-score chip to the far right of the tags row, opposite the
+   work-type chip on the left. */
+.job-card-score-chip {
+  margin-left: auto;
+}
+
 .job-card-title {
   margin: 0;
   font-size: 17px;
@@ -181,15 +187,19 @@ a.job-card-poster-value:focus-visible {
   margin: 2px 0 0;
 }
 
-/* Far right: Apply action and the row chevron. */
+/* Far right: "See details" link (styled as a pill) and the row chevron. The
+   whole cluster is a single <Link> to the job's detail page. */
 .job-card-actions {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+  text-decoration: none;
 }
 
 .job-card-apply {
+  display: inline-flex;
+  align-items: center;
   padding: 8px 18px;
   font: inherit;
   font-size: 13px;
@@ -202,7 +212,7 @@ a.job-card-poster-value:focus-visible {
   transition: opacity 0.15s ease;
 }
 
-.job-card-apply:hover {
+.job-card-actions:hover .job-card-apply {
   opacity: 0.92;
 }
 
