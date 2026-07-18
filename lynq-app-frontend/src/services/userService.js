@@ -34,6 +34,35 @@ const get_user = async (authFetch) => {
 };
 
 /**
+ * Fetch another user's public profile by id.
+ *
+ * Calls GET /user/{userId} (UserController.getUserProfile). Used by the public
+ * user profile page reached from a job's poster/recruiter link. For COMPANY
+ * users the payload also carries their `company` and the `jobs` they have posted;
+ * for candidates those are omitted.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
+ * @param {string} userId
+ * @returns {Promise<{
+ *   fullName: string,
+ *   profileImageUrl: string,
+ *   currentPosition: string,
+ *   about: string,
+ *   githubUrl: string,
+ *   linkedinUrl: string,
+ *   company: { name: string, profileImageUrl: string } | null,
+ *   jobs: Array<{ id: string, title: string, description: string }> | null,
+ * }>} The unwrapped GetUserProfileRestResponse.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const get_user_profile = async (authFetch, userId) => {
+  const payload = await authFetch(`/user/${userId}`, { method: 'GET' });
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
+  return payload?.data;
+};
+
+/**
  * Update the authenticated user's profile.
  *
  * Calls PATCH /user (UserController.updateUserProfile). Partial: only the fields
@@ -119,6 +148,7 @@ const upload_profile_image = async (preSignedUrl, file) => {
 
 export default {
   get_user,
+  get_user_profile,
   update_user_profile,
   generate_profile_image_upload_url,
   upload_profile_image,

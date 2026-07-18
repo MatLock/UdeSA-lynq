@@ -1,0 +1,470 @@
+/* UserProfilePage — public profile for another user. Reuses the card language
+   (white surfaces, soft shadow, brand tokens) shared with JobDetailPage.
+   Tokens come from index.css. */
+
+.user-profile-page {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 32px 24px;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.user-profile-container {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.user-profile-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 18px;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand-purple-dark);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.user-profile-back:hover {
+  text-decoration: underline;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+.user-profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 28px 30px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 12px 34px rgba(80, 60, 150, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+/* A soft brand wash along the top edge to lift the hero above plain cards. */
+.user-profile-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--brand-gradient);
+  z-index: 1;
+}
+
+/* Company-owner variant: a compact identity row (smaller avatar, name, position,
+   company logo) at the top-left, with the About text spanning the full card
+   width below it. */
+.user-profile-hero--split {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+}
+
+/* Shrink the identity block when it sits above the full-width About. */
+.user-profile-hero--split .user-profile-avatar {
+  width: 64px;
+  height: 64px;
+}
+
+.user-profile-hero--split .user-profile-avatar svg {
+  width: 32px;
+  height: 32px;
+}
+
+.user-profile-hero--split .user-profile-name {
+  font-size: 20px;
+}
+
+/* About occupies the whole width of the card, under the identity, set off by a
+   hairline divider along the top. */
+.user-profile-hero--split .user-profile-hero-about {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.user-profile-hero-about .user-profile-about {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Groups the avatar and the identity column as a single top-left row. */
+.user-profile-hero-left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.user-profile-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 92px;
+  height: 92px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  color: var(--brand-purple);
+  border: 2px solid #fff;
+  box-shadow: 0 6px 18px rgba(80, 60, 150, 0.12);
+}
+
+.user-profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-profile-avatar svg {
+  width: 46px;
+  height: 46px;
+}
+
+.user-profile-hero-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.user-profile-name {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.4px;
+  color: var(--text-h);
+}
+
+.user-profile-position {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--brand-purple-dark);
+}
+
+/* Company affiliation, shown as a tinted pill with the company's logo. */
+.user-profile-company-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 4px 12px 4px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand-blue-dark);
+  background: var(--accent-blue-bg);
+  border: 1px solid var(--accent-blue-border);
+  border-radius: 999px;
+}
+
+.user-profile-company-badge-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--brand-purple);
+}
+
+.user-profile-company-badge-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-profile-company-badge-logo svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Social links row (GitHub / LinkedIn). */
+.user-profile-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.user-profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.user-profile-link:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(80, 60, 150, 0.12);
+}
+
+/* ── Body grid ────────────────────────────────────────────────────────── */
+.user-profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.user-profile-grid--single {
+  grid-template-columns: 1fr;
+}
+
+.user-profile-card {
+  padding: 22px 24px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(80, 60, 150, 0.06);
+}
+
+.user-profile-card-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text-h);
+}
+
+.user-profile-jobs-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-blue-dark);
+}
+
+.user-profile-about {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.user-profile-muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* Posted-jobs carousel: squared cards scrolling horizontally, with a dotted
+   position indicator standing in for the (hidden) native scrollbar. */
+.user-profile-jobs-carousel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.user-profile-jobs-track {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 2px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none; /* Firefox — the dots replace the scrollbar */
+  -ms-overflow-style: none;
+}
+
+.user-profile-jobs-track::-webkit-scrollbar {
+  display: none;
+}
+
+/* Squared card: title + a clamped slice of the description + a CTA. */
+.user-profile-job-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 190px;
+  height: 190px;
+  padding: 16px;
+  scroll-snap-align: start;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 14px;
+  text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.user-profile-job-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(80, 60, 150, 0.12);
+}
+
+/* Closed posts: muted surface + dashed border, with a red "Closed" badge so
+   they read as inactive at a glance while staying clickable. */
+.user-profile-job-card.is-closed {
+  background: color-mix(in srgb, var(--accent-bg) 45%, #fff);
+  border-style: dashed;
+}
+
+.user-profile-job-card.is-closed .user-profile-job-card-title {
+  color: var(--text);
+  padding-right: 62px; /* keep the first line clear of the badge */
+}
+
+.user-profile-job-card.is-closed .user-profile-job-card-cta {
+  color: var(--text);
+}
+
+.user-profile-job-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 3px 9px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--score-red);
+  border-radius: 999px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+}
+
+.user-profile-job-card-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--brand-purple-dark);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.user-profile-job-card-desc {
+  display: -webkit-box;
+  flex: 1;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.user-profile-job-card-cta {
+  margin-top: auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand-blue-dark);
+}
+
+/* Dotted scroll indicator. The active card's dot stretches into a brand pill. */
+.user-profile-jobs-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.user-profile-jobs-dot {
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  background: var(--accent-border);
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    width 0.15s ease,
+    background 0.15s ease;
+}
+
+.user-profile-jobs-dot:hover {
+  background: var(--brand-purple);
+}
+
+.user-profile-jobs-dot.is-active {
+  width: 20px;
+  background: var(--brand-gradient);
+}
+
+/* ── Loading / empty state ────────────────────────────────────────────── */
+.user-profile-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 64px 24px;
+  text-align: center;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 12px 34px rgba(80, 60, 150, 0.08);
+}
+
+.user-profile-empty-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.user-profile-empty-body {
+  margin: 0;
+  max-width: 420px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+@media (max-width: 860px) {
+  .user-profile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .user-profile-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .user-profile-hero-left {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
