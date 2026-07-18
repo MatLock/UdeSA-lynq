@@ -4,6 +4,7 @@ import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
+import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
@@ -425,5 +426,15 @@ public interface UserController {
       security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<GlobalRestResponse<List<GetUserResumeRestResponse>>> getUserResumes(
       @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
+      summary = "Get a user's public profile",
+      description = "Returns the public profile of the user identified by the given id: full name, "
+          + "profile image, current position, about, and GitHub/LinkedIn links. When the user is a "
+          + "company owner, the response also includes the company's name and profile image plus "
+          + "the list of every job the user has created, regardless of the job's status. Fails "
+          + "with 404 when no user matches the id.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<GetUserProfileRestResponse>> getUserProfile(String userId);
 
 }

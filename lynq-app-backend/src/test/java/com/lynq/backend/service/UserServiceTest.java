@@ -3,12 +3,18 @@ package com.lynq.backend.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
+import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.Language;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.NotFoundException;
+import com.lynq.backend.model.CompanyEntity;
+import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.model.UserResumeEntity;
+import com.lynq.backend.controller.response.GetUserProfileRestResponse;
+import com.lynq.backend.repository.CompanyRepository;
+import com.lynq.backend.repository.JobPostRepository;
 import com.lynq.backend.repository.UserRepository;
 import com.lynq.backend.repository.UserResumeRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,6 +71,14 @@ class UserServiceTest {
   private static final String RESUME_STORAGE_PATH = "lynq/users/" + USER_ID + "/resume/cv.pdf";
   private static final String RESUME_PDF_URL = "https://presigned/cv.pdf";
 
+  private static final String COMPANY_ID = "company-1";
+  private static final String COMPANY_NAME = "Lynq";
+  private static final String COMPANY_IMAGE_PATH = "lynq/companies/" + COMPANY_ID + "/profile/logo.png";
+  private static final String COMPANY_IMAGE_URL = "https://presigned/company-logo.png";
+  private static final String JOB_ID = "job-1";
+  private static final String JOB_TITLE = "Senior Backend Engineer";
+  private static final String JOB_DESCRIPTION = "Build and scale the Lynq hiring platform.";
+
   private static final String USER_NOT_FOUND = "User '" + USER_ID + "' not found";
   private static final String ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES =
       "Only users of type CANDIDATE can access resumes";
@@ -74,6 +88,12 @@ class UserServiceTest {
 
   @Mock
   private UserResumeRepository userResumeRepository;
+
+  @Mock
+  private CompanyRepository companyRepository;
+
+  @Mock
+  private JobPostRepository jobPostRepository;
 
   @Mock
   private UpdateUserProfileRequest updateRequest;
@@ -87,8 +107,8 @@ class UserServiceTest {
 
   @BeforeEach
   void setUp() {
-    userService = new UserService(userRepository, userResumeRepository, storageService,
-        objectMapper);
+    userService = new UserService(userRepository, userResumeRepository, companyRepository,
+        jobPostRepository, storageService, objectMapper);
   }
 
   @Test
@@ -371,8 +391,90 @@ class UserServiceTest {
     verify(userResumeRepository, never()).findByUserId(any());
   }
 
+  @Test
+  void getUserProfileMapsProfileFieldsAndPresignedImageForCandidate() {
+    UserEntity existing = existingUser();
+    existing.setProfileImageUrl(S3_PATH);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+    when(storageService.obtainUserProfilePreSignedUrl(existing)).thenReturn(PRE_SIGNED_URL);
+
+    GetUserProfileRestResponse profile = userService.getUserProfile(USER_ID);
+
+    assertThat(profile.getFullName(), is(FULL_NAME));
+    assertThat(profile.getProfileImageUrl(), is(PRE_SIGNED_URL));
+    assertThat(profile.getCurrentPosition(), is(CURRENT_POSITION));
+    assertThat(profile.getAbout(), is(ABOUT));
+    assertThat(profile.getGithubUrl(), is(GITHUB_URL));
+    assertThat(profile.getLinkedinUrl(), is(LINKEDIN_URL));
+    assertThat(profile.getCompany(), is(nullValue()));
+    assertThat(profile.getJobs(), is(nullValue()));
+    verify(companyRepository, never()).findByOwner(any());
+    verify(jobPostRepository, never()).findByCreatedByUserId(any());
+  }
+
+  @Test
+  void getUserProfileIncludesCompanyAndCreatedJobsWhenUserIsCompanyOwner() {
+    UserEntity owner = companyOwner();
+    CompanyEntity company = CompanyEntity.builder()
+        .id(COMPANY_ID)
+        .name(COMPANY_NAME)
+        .profileImageUrl(COMPANY_IMAGE_PATH)
+        .owner(owner)
+        .build();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(owner));
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
+    when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
+        .thenReturn(COMPANY_IMAGE_URL);
+    when(jobPostRepository.findByCreatedByUserId(USER_ID)).thenReturn(List.of(job()));
+
+    GetUserProfileRestResponse profile = userService.getUserProfile(USER_ID);
+
+    assertThat(profile.getCompany().getName(), is(COMPANY_NAME));
+    assertThat(profile.getCompany().getProfileImageUrl(), is(COMPANY_IMAGE_URL));
+    assertThat(profile.getJobs(), hasSize(1));
+    assertThat(profile.getJobs().get(0).getId(), is(JOB_ID));
+    assertThat(profile.getJobs().get(0).getTitle(), is(JOB_TITLE));
+    assertThat(profile.getJobs().get(0).getDescription(), is(JOB_DESCRIPTION));
+    assertThat(profile.getJobs().get(0).getJobStatus(), is(JobStatus.CLOSE));
+  }
+
+  @Test
+  void getUserProfileReturnsEmptyJobsWhenCompanyOwnerHasNotCreatedJobs() {
+    UserEntity owner = companyOwner();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(owner));
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.empty());
+    when(jobPostRepository.findByCreatedByUserId(USER_ID)).thenReturn(List.of());
+
+    GetUserProfileRestResponse profile = userService.getUserProfile(USER_ID);
+
+    assertThat(profile.getCompany(), is(nullValue()));
+    assertThat(profile.getJobs(), is(empty()));
+  }
+
+  @Test
+  void getUserProfileThrowsNotFoundWhenUserDoesNotExist() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> userService.getUserProfile(USER_ID));
+    assertThat(exception.getMessage(), is(USER_NOT_FOUND));
+  }
+
   private UserEntity candidate() {
     return UserEntity.builder().id(USER_ID).type(UserType.CANDIDATE).build();
+  }
+
+  private UserEntity companyOwner() {
+    return UserEntity.builder().id(USER_ID).type(UserType.COMPANY).fullName(FULL_NAME).build();
+  }
+
+  private JobPostEntity job() {
+    return JobPostEntity.builder()
+        .id(JOB_ID)
+        .title(JOB_TITLE)
+        .description(JOB_DESCRIPTION)
+        .jobStatus(JobStatus.CLOSE)
+        .build();
   }
 
   private UserResumeEntity resume(String resumeJson, String storagePath) {

@@ -4,6 +4,7 @@ import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
+import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
@@ -25,6 +26,7 @@ import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -64,7 +66,7 @@ class UserControllerImplTest {
   @BeforeEach
   void setUp() {
     userController = new UserControllerImpl(userService);
-    when(principal.getId()).thenReturn(USER_ID);
+    lenient().when(principal.getId()).thenReturn(USER_ID);
   }
 
   private void stubCreateRequestFields() {
@@ -283,6 +285,43 @@ class UserControllerImplTest {
     assertThat(body.isSuccess(), is(true));
     assertThat(body.getData(), is(org.hamcrest.Matchers.hasSize(1)));
     assertThat(body.getData().get(0).getId(), is(RESUME_ID));
+  }
+
+  @Test
+  void getUserProfileDelegatesToServiceWithPathUserId() {
+    when(userService.getUserProfile(USER_ID))
+        .thenReturn(GetUserProfileRestResponse.builder().build());
+
+    userController.getUserProfile(USER_ID);
+
+    verify(userService).getUserProfile(USER_ID);
+  }
+
+  @Test
+  void getUserProfileRespondsWithOkStatus() {
+    when(userService.getUserProfile(USER_ID))
+        .thenReturn(GetUserProfileRestResponse.builder().build());
+
+    ResponseEntity<GlobalRestResponse<GetUserProfileRestResponse>> response =
+        userController.getUserProfile(USER_ID);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void getUserProfileWrapsServiceResultInSuccessfulEnvelope() {
+    GetUserProfileRestResponse profile = GetUserProfileRestResponse.builder()
+        .fullName(FULL_NAME)
+        .build();
+    when(userService.getUserProfile(USER_ID)).thenReturn(profile);
+
+    ResponseEntity<GlobalRestResponse<GetUserProfileRestResponse>> response =
+        userController.getUserProfile(USER_ID);
+
+    GlobalRestResponse<GetUserProfileRestResponse> body = response.getBody();
+    assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData().getFullName(), is(FULL_NAME));
   }
 
   private UserEntity savedUser() {
