@@ -35,25 +35,17 @@ public class StorageService {
 
   @AuditLog
   public PreSignedUploadUrl createUserProfilePreSignedUrl(UserEntity userEntity, String fileName) {
-
-    String s3Path = String.format(USER_PROFILE_PATH_FORMAT, userEntity.getId(), fileName);
-    PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-        .bucket(bucketName)
-        .key(s3Path)
-        .build();
-    PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
-        .signatureDuration(PRE_SIGNED_URL_EXPIRATION)
-        .putObjectRequest(putObjectRequest)
-        .build();
-    PresignedPutObjectRequest presignedRequest = s3Presigner.presignPutObject(presignRequest);
-
-    return new PreSignedUploadUrl(s3Path, presignedRequest.url().toString());
+    return createProfilePreSignedUrl(
+        String.format(USER_PROFILE_PATH_FORMAT, userEntity.getId(), fileName));
   }
 
   @AuditLog
   public PreSignedUploadUrl createCompanyProfilePreSignedUrl(CompanyEntity companyEntity, String fileName) {
+    return createProfilePreSignedUrl(
+        String.format(COMPANY_PROFILE_PATH_FORMAT, companyEntity.getId(), fileName));
+  }
 
-    String s3Path = String.format(COMPANY_PROFILE_PATH_FORMAT, companyEntity.getId(), fileName);
+  private PreSignedUploadUrl createProfilePreSignedUrl(String s3Path) {
     PutObjectRequest putObjectRequest = PutObjectRequest.builder()
         .bucket(bucketName)
         .key(s3Path)
