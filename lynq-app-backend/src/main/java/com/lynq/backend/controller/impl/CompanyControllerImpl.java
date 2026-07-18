@@ -4,6 +4,7 @@ import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
 import com.lynq.backend.controller.response.CreateUserWithCompanyRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
+import com.lynq.backend.controller.response.GetCompanyDetailRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.security.LynqUserPrincipal;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -65,6 +67,18 @@ public class CompanyControllerImpl implements com.lynq.backend.controller.Compan
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, response));
+  }
+
+  @Override
+  @GetMapping("/{companyId}")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<GetCompanyDetailRestResponse>> getCompanyDetail(
+      @PathVariable String companyId) {
+    GetCompanyDetailRestResponse company = companyService.getCompanyDetail(companyId);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, company));
   }
 
 }

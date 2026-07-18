@@ -3,6 +3,7 @@ package com.lynq.backend.controller.impl;
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
 import com.lynq.backend.controller.response.CreateUserWithCompanyRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
+import com.lynq.backend.controller.response.GetCompanyDetailRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.UserEntity;
@@ -53,7 +54,7 @@ class CompanyControllerImplTest {
   @BeforeEach
   void setUp() {
     companyController = new CompanyControllerImpl(companyService);
-    when(principal.getId()).thenReturn(USER_ID);
+    lenient().when(principal.getId()).thenReturn(USER_ID);
     // Used by the create tests only; lenient so the logo-upload tests don't trip
     // strict stubbing.
     lenient().when(companyService.createUserWithCompany(USER_ID, request))
@@ -121,6 +122,45 @@ class CompanyControllerImplTest {
     assertThat(body, is(notNullValue()));
     assertThat(body.isSuccess(), is(true));
     assertThat(body.getData().getPreSignedUrl(), is(PRE_SIGNED_URL));
+  }
+
+  @Test
+  void getCompanyDetailDelegatesToServiceWithPathCompanyId() {
+    when(companyService.getCompanyDetail(COMPANY_ID))
+        .thenReturn(GetCompanyDetailRestResponse.builder().id(COMPANY_ID).build());
+
+    companyController.getCompanyDetail(COMPANY_ID);
+
+    verify(companyService).getCompanyDetail(COMPANY_ID);
+  }
+
+  @Test
+  void getCompanyDetailRespondsWithOkStatus() {
+    when(companyService.getCompanyDetail(COMPANY_ID))
+        .thenReturn(GetCompanyDetailRestResponse.builder().id(COMPANY_ID).build());
+
+    ResponseEntity<GlobalRestResponse<GetCompanyDetailRestResponse>> response =
+        companyController.getCompanyDetail(COMPANY_ID);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void getCompanyDetailWrapsServiceResultInSuccessfulEnvelope() {
+    GetCompanyDetailRestResponse detail = GetCompanyDetailRestResponse.builder()
+        .id(COMPANY_ID)
+        .name(COMPANY_NAME)
+        .build();
+    when(companyService.getCompanyDetail(COMPANY_ID)).thenReturn(detail);
+
+    ResponseEntity<GlobalRestResponse<GetCompanyDetailRestResponse>> response =
+        companyController.getCompanyDetail(COMPANY_ID);
+
+    GlobalRestResponse<GetCompanyDetailRestResponse> body = response.getBody();
+    assertThat(body, is(notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData().getId(), is(COMPANY_ID));
+    assertThat(body.getData().getName(), is(COMPANY_NAME));
   }
 
   private CompanyEntity savedCompany() {

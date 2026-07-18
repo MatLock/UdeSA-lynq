@@ -3,6 +3,7 @@ package com.lynq.backend.controller;
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
 import com.lynq.backend.controller.response.CreateUserWithCompanyRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
+import com.lynq.backend.controller.response.GetCompanyDetailRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.security.LynqUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -209,5 +210,14 @@ public interface CompanyController {
   ResponseEntity<GlobalRestResponse<GenerateUploadImageRestResponse>> generateCompanyImageUploadUrl(
       String fileName,
       @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
+      summary = "Get a company's details",
+      description = "Returns the full profile of the company identified by the given id (name, "
+          + "about, size, profile image and creation date) together with every job position the "
+          + "company has posted, regardless of the job's status (open or closed). Fails with 404 "
+          + "when no company matches the id.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<GetCompanyDetailRestResponse>> getCompanyDetail(String companyId);
 
 }
