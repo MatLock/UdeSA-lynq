@@ -28,6 +28,35 @@ const APP_BASE_URL =
  * @returns {Promise<string>} The pre-signed upload URL (data.preSignedUrl).
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
+/**
+ * Fetch a company's public detail by id.
+ *
+ * Calls GET /company/{companyId} (CompanyController.getCompanyDetail) through the
+ * caller's `authFetch` (see useApi), which injects the bearer token and refreshes
+ * an expired one. Used by the company detail page reached from a job's "View
+ * company" link. The payload carries the company's profile plus the jobs it has
+ * posted.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   authenticated fetcher from useApi.
+ * @param {string} companyId
+ * @returns {Promise<{
+ *   id: string,
+ *   name: string,
+ *   about: string,
+ *   size: number,
+ *   profileImageUrl: string,
+ *   createdOn: string,
+ *   jobs: Array<{ id: string, title: string, description: string }>,
+ * }>} The unwrapped GetCompanyDetailRestResponse.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const get_company_detail = async (authFetch, companyId) => {
+  const payload = await authFetch(`/company/${companyId}`, { method: 'GET' });
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
+  return payload?.data;
+};
+
 const generate_company_image_upload_url = async (
   fileName,
   accessToken,
@@ -89,6 +118,7 @@ const upload_company_image = async (preSignedUrl, file) => {
 };
 
 export default {
+  get_company_detail,
   generate_company_image_upload_url,
   upload_company_image,
 };
