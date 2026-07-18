@@ -107,6 +107,64 @@ const generate_skills = async (authFetch, { title, description, workType } = {})
   return payload?.data?.skills ?? [];
 };
 
+/**
+ * Fetch a single job post's full details for the detail page.
+ *
+ * Calls GET /job/{jobId}/details (JobController.getJobDetails) through
+ * `authFetch`. Returns the same job shape as the feed (get_jobs) — including the
+ * LYNQ score computed for the authenticated candidate — enriched with two
+ * counters: `totalSeen` and `totalCandidatesApplied`. Read-only: it does not
+ * count the view (use increase_seen for that).
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch
+ * @param {string} jobId
+ * @returns {Promise<object>} The unwrapped GetJobDetailForCandidateRestResponse.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const get_job_details = async (authFetch, jobId) => {
+  const payload = await authFetch(`/job/${jobId}/details`, { method: 'GET' });
+  return payload?.data;
+};
+
+/**
+ * Increment a job post's "seen" counter.
+ *
+ * Calls PATCH /job/{jobId}/increase-seen (JobController.increaseSeen) through
+ * `authFetch`. Best-effort telemetry fired when a job's detail page is opened —
+ * callers should not block the UI on it. Returns the updated counter value.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch
+ * @param {string} jobId
+ * @returns {Promise<number>} The updated seen counter.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const increase_seen = async (authFetch, jobId) => {
+  const payload = await authFetch(`/job/${jobId}/increase-seen`, {
+    method: 'PATCH',
+  });
+  return payload?.data;
+};
+
+/**
+ * Apply the authenticated user to a job post.
+ *
+ * Calls POST /job/{jobId}/apply (JobController.applyToJob) through `authFetch`.
+ * The applicant is resolved from the bearer token. The backend replies 400 when
+ * the user has already applied to the same job, so callers should treat that
+ * status as an "already applied" outcome rather than a hard failure.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch
+ * @param {string} jobId
+ * @returns {Promise<object>} The unwrapped ApplyJobRestResponse.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const apply_to_job = async (authFetch, jobId) => {
+  const payload = await authFetch(`/job/${jobId}/apply`, {
+    method: 'POST',
+  });
+  return payload?.data;
+};
+
 const create_job = async (
   authFetch,
   { title, description, workType, salaryRangeDown, salaryRangeTop, skills } = {},
@@ -136,6 +194,9 @@ const create_job = async (
 
 export default {
   get_jobs,
+  get_job_details,
   generate_skills,
+  increase_seen,
+  apply_to_job,
   create_job,
 };

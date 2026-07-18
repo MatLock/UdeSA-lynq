@@ -1,0 +1,414 @@
+/* JobDetailPage — full view for a single job post. Reuses the card language
+   (white surfaces, soft shadow, brand tokens) shared with JobCard and the auth
+   pages. Tokens come from index.css. */
+
+.job-detail-page {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 32px 24px;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.job-detail-container {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+/* Back-to-feed link. */
+.job-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand-purple-dark);
+  text-decoration: none;
+}
+
+.job-detail-back:hover {
+  text-decoration: underline;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────── */
+.job-detail-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 26px 28px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 12px 34px rgba(80, 60, 150, 0.08);
+}
+
+.job-detail-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--accent-bg);
+  color: var(--brand-purple);
+}
+
+.job-detail-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.job-detail-logo svg {
+  width: 36px;
+  height: 36px;
+}
+
+.job-detail-hero-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.job-detail-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.job-detail-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.4px;
+  color: var(--text-h);
+}
+
+.job-detail-hero-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.job-detail-company-name {
+  font-weight: 700;
+  color: var(--brand-purple-dark);
+}
+
+.job-detail-sep {
+  color: var(--border);
+}
+
+.job-detail-hero-salary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.job-detail-hero-salary-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text);
+}
+
+/* Right rail of the hero: LYNQ-score chip pinned to the top-right corner, with
+   the apply action vertically centered below it. Stretches to the hero's full
+   height so the apply group can center against it. */
+.job-detail-hero-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  align-self: stretch;
+  flex-shrink: 0;
+}
+
+/* Apply action, vertically centered on the hero's right edge (flex:1 lets it
+   consume the space left under the score chip). */
+.job-detail-hero-actions {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+}
+
+.job-detail-apply {
+  padding: 11px 26px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-gradient);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.job-detail-apply:hover {
+  opacity: 0.92;
+}
+
+.job-detail-apply:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.job-detail-apply-status {
+  margin: 0;
+  max-width: 200px;
+  font-size: 12px;
+  text-align: right;
+}
+
+.job-detail-apply-status.is-success {
+  color: var(--score-green);
+}
+
+.job-detail-apply-status.is-info {
+  color: var(--brand-blue-dark);
+}
+
+.job-detail-apply-status.is-error {
+  color: #ef4444;
+}
+
+/* ── Body grid: long-form content + side facts ────────────────────────── */
+.job-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.job-detail-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.job-detail-card {
+  padding: 22px 24px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(80, 60, 150, 0.06);
+}
+
+.job-detail-card-title {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text-h);
+}
+
+.job-detail-description {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.job-detail-muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.job-detail-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Overview: label/value fact rows. */
+.job-detail-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+
+.job-detail-fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.job-detail-fact dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.job-detail-fact dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  color: var(--text-h);
+}
+
+/* Company / recruiter identity block. */
+.job-detail-entity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.job-detail-entity-logo,
+.job-detail-entity-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--accent-bg);
+  color: var(--brand-purple);
+}
+
+.job-detail-entity-logo {
+  border-radius: 12px;
+}
+
+.job-detail-entity-avatar {
+  border-radius: 50%;
+}
+
+.job-detail-entity-logo img,
+.job-detail-entity-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.job-detail-entity-logo svg,
+.job-detail-entity-avatar svg {
+  width: 22px;
+  height: 22px;
+}
+
+.job-detail-entity-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.job-detail-entity-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.job-detail-entity-sub {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.job-detail-about {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.job-detail-external-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--brand-blue-dark);
+  text-decoration: none;
+}
+
+.job-detail-external-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Empty / unavailable state ────────────────────────────────────────── */
+.job-detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 64px 24px;
+  text-align: center;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 12px 34px rgba(80, 60, 150, 0.08);
+}
+
+.job-detail-empty-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.job-detail-empty-body {
+  margin: 0;
+  max-width: 420px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+@media (max-width: 860px) {
+  .job-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .job-detail-hero {
+    flex-direction: column;
+  }
+
+  .job-detail-hero-side {
+    width: 100%;
+  }
+
+  .job-detail-hero-actions {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .job-detail-apply {
+    width: 100%;
+  }
+
+  .job-detail-apply-status {
+    max-width: none;
+    text-align: left;
+  }
+}
