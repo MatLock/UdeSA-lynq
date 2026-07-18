@@ -1,7 +1,4 @@
 date,prompt
-"24-06-2026","rename every occurence of lyqn-iam to lyqn-app-backend"
-"24-06-2026","yes, rename that"
-"24-06-2026","why intelliJ names this project as [iam]. I want this project to be named app-backend"
 "24-06-2026","add new sql file to changelog. sql language: SQL 8+, file name: ""01-create-users-table.sql"", columns: id [string], username [string] 15 char maximum, email [string], profile_image_url [string], current_position [string], about_me [string], github_url [string], linkedin_url [string], birth_date [date. format yyyy-mm-dd], created_on [date. format yyyy-mm-dd].
 constraints:
 username unique
@@ -133,10 +130,20 @@ parameters:
 "12-07-2026","create Junit test cases and integration tests"
 "12-07-2026","include lynq score calculation for each of the jobPost returned in ""searchAvailableJobs"". and add this field in the response as well"
 "12-07-2026","fill README.md with all the details about this project. follow lynq-iam/README.md examples"
-"17-07-2026","add a new endoint in JobController. url PATCH ""/job/${job_id}/increase-seen"" that increases the total seen counter for the job post"
+"17-07-2026","add a new endpoint in JobController. url PATCH ""/job/${job_id}/increase-seen"" that increases the total seen counter for the job post"
 "17-07-2026","create new endpoint POST ""/job/${job_id}/apply"" that performs an application by an user to the job. it should grab the userId from auth context. and create a record in intermediate table user_application_job. Even though there is a constraint about an user_id and a job_id. perform a validation that a user cannot apply to the same job twice. create new exception ""AlreadyAppliedToJobException"", add it to the exception handler and return badrequest http header"
 "17-07-2026","add validation to apply endpoint. only users of type candidate can apply to jobs"
 "17-07-2026","create new endpoint GET ""/job/{job_id}/candidates"" that returns all candidates that applied for that job. endpoint should be paginated with a size default of 10. Pagination parameters should come as request parameters with name page and pageSize. create new response class JobCandidateResponse whose fields are id, userId, jobId, userFullName, userProfileImage, userCurrentPosition, userAppliedOn."
 "17-07-2026","refactor this ""existsByJobPost_IdAndUser_Id"" always follow java pattern and use HQL or MySQL native query if not possible to do with DQM"
 "17-07-2026","for the endpoint that retrieves the total candidates for a jobpost include lynq score calculation as well"
 "17-07-2026","create endpoint GET /user-resume that takes the userid from auth context and return all of the resume. Both formats, json format and s3 public link of the pdf. This is only possible for users whose type is CANDIDATE add validation for that"
+"18-07-2026","modify lynq-score calculation. if the user has no skill or the list of skills is empty. lynq-score calculation should be 0"
+"18-07-2026","create endpoint GET /job/${job_id}/details that given a job id it returns the job response exactly as the paginated endpoint but for only one job"
+"18-07-2026","yes (add tests for the GET /job/{id}/details endpoint: success and 404 cases)"
+"18-07-2026","for the getJobDetails create a subclass of the GetJobRestResponse called GetJobDetailForCandidateRestResponse. in this response add the fields totalSeen, totalCandidatesApplied (this has to be calculated seeing intermediate table)"
+"18-07-2026","create endpoint in userController GET /user/${user_id}. that returns userProfile Information. it should include FullName, ProfileImageUrl, currentPosition, About, githubUrl, linkedInUrl. if the requested user is a Company Owner it should return also the name of the company and the profileImageUrl. it has also return a list of all the jobs that it created, regardless of the position status. for the job information it should return id, title and description"
+"18-07-2026","refactor StorageService.createUserProfilePreSignedUrl and StorageService.createCompanyProfilePreSignedUrl. There are duplicated code"
+"18-07-2026","create endpoint in CompanyController GET /company/${company_id} it should return all company information the same as the user detail endpoint + all the job positions that are open or closed"
+"18-07-2026","create endpoint PATCH /job/${job_id}/refresh that will REOPEN a CLOSED position. it will also update its created_on date. The user performing this actions has to be the owner of the job post only"
+"18-07-2026","check if I need to add the job status in any test"
+"18-07-2026","create endpoint PATCH /job/${job_id}/close and endpoint that changes the status of a job from OPEN to CLOSE. add a new column to table job_post that denotes the date when the job was closed. this action can only be performed by the owner of the job. Also update the refresh endpoint to set this date to null when a job is refreshed"
