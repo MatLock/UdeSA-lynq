@@ -57,6 +57,73 @@ const get_jobs = async (authFetch, { page = 0, size = 20, filterValue } = {}) =>
 };
 
 /**
+ * Fetch a page of the job posts created by the authenticated user, newest first.
+ *
+ * Calls GET /job/mine (JobController.getMyJobs) through `authFetch`. The backend
+ * resolves the owner from the bearer token and returns every job they created —
+ * both OPEN and CLOSE — so this powers the owner's "my job posts" management
+ * list (unlike get_jobs, which only lists OPEN posts across all companies and
+ * hides the caller's own drafts behind the public feed's filters). Same job
+ * shape as the feed (GetJobRestResponse), including `jobStatus`.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch
+ * @param {object} [params]
+ * @param {number} [params.page=0] - Zero-based page index.
+ * @param {number} [params.size=20] - Page size.
+ * @returns {Promise<object>} The unwrapped PagedRestResponse.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const get_my_jobs = async (authFetch, { page = 0, size = 20 } = {}) => {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  const payload = await authFetch(`/job/mine?${query}`, { method: 'GET' });
+  return payload?.data;
+};
+
+/**
+ * Update the editable fields of a job post owned by the authenticated user.
+ *
+ * Calls PATCH /job/{jobId} (JobController.updateJob) through `authFetch`. Owner-
+ * only: the backend resolves the caller from the bearer token and rejects users
+ * who did not create the post. The provided skills fully replace the existing
+ * ones. `status` (OPEN | CLOSE) is required by the backend, so callers must send
+ * the intended status even when it is unchanged. Empty/omitted salary bounds are
+ * dropped so they don't fail the backend's @Positive validation.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch
+ * @param {string} jobId
+ * @param {object} job
+ * @param {string} job.title
+ * @param {string} job.description
+ * @param {'REMOTE' | 'IN_OFFICE'} job.workType
+ * @param {'OPEN' | 'CLOSE'} job.status
+ * @param {number} [job.salaryRangeDown]
+ * @param {number} [job.salaryRangeTop]
+ * @param {string[]} [job.skills]
+ * @returns {Promise<object>} The unwrapped UpdateJobRestResponse.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const update_job = async (
+  authFetch,
+  jobId,
+  { title, description, workType, status, salaryRangeDown, salaryRangeTop, skills } = {},
+) => {
+  const body = { title, description, workType, status };
+  if (salaryRangeDown != null && salaryRangeDown !== '') {
+    body.salaryRangeDown = Number(salaryRangeDown);
+  }
+  if (salaryRangeTop != null && salaryRangeTop !== '') {
+    body.salaryRangeTop = Number(salaryRangeTop);
+  }
+  body.skills = skills ?? [];
+
+  const payload = await authFetch(`/job/${jobId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+  return payload?.data;
+};
+
+/**
  * Create a job post for the authenticated user's company.
  *
  * Calls POST /job (JobController.createJob) through `authFetch`. The backend
@@ -165,6 +232,48 @@ const apply_to_job = async (authFetch, jobId) => {
   return payload?.data;
 };
 
+/**
+ * Close a job post so it stops seeking candidates.
+ *
+ * Calls PATCH /job/{jobId}/close (JobController.closeJob) through `authFetch`.
+ * Owner-only: the backend resolves the caller from the bearer token and replies
+ * 403 when the authenticated user is not the job's poster, and 400 when the job
+ * is not currently OPEN. On success the job transitions OPEN → CLOSE and no
+ * longer surfaces in the feed or the details endpoint.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch
+ * @param {string} jobId
+ * @returns {Promise<object>} The unwrapped CloseJobRestResponse.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const close_job = async (authFetch, jobId) => {
+  const payload = await authFetch(`/job/${jobId}/close`, {
+    method: 'PATCH',
+  });
+  return payload?.data;
+};
+
+/**
+ * Re-open a closed job post so it seeks candidates again.
+ *
+ * Calls PATCH /job/{jobId}/refresh (JobController.refreshJob) through `authFetch`.
+ * Owner-only: the backend resolves the caller from the bearer token and replies
+ * 403 when the authenticated user is not the job's poster, and 400 when the job
+ * is not currently CLOSE. On success the job transitions CLOSE → OPEN, its
+ * created date is reset and it surfaces in the feed again.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch
+ * @param {string} jobId
+ * @returns {Promise<object>} The unwrapped RefreshJobRestResponse.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const refresh_job = async (authFetch, jobId) => {
+  const payload = await authFetch(`/job/${jobId}/refresh`, {
+    method: 'PATCH',
+  });
+  return payload?.data;
+};
+
 const create_job = async (
   authFetch,
   { title, description, workType, salaryRangeDown, salaryRangeTop, skills } = {},
@@ -194,9 +303,13 @@ const create_job = async (
 
 export default {
   get_jobs,
+  get_my_jobs,
+  update_job,
   get_job_details,
   generate_skills,
   increase_seen,
   apply_to_job,
+  close_job,
+  refresh_job,
   create_job,
 };
