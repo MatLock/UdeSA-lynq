@@ -147,3 +147,6 @@ parameters:
 "18-07-2026","create endpoint PATCH /job/${job_id}/refresh that will REOPEN a CLOSED position. it will also update its created_on date. The user performing this actions has to be the owner of the job post only"
 "18-07-2026","check if I need to add the job status in any test"
 "18-07-2026","create endpoint PATCH /job/${job_id}/close and endpoint that changes the status of a job from OPEN to CLOSE. add a new column to table job_post that denotes the date when the job was closed. this action can only be performed by the owner of the job. Also update the refresh endpoint to set this date to null when a job is refreshed"
+"18-07-2026","create new endpoint in JobController PATCH ""/job/${job_id}"" that allows update of a jobpost if the user is the publisher of such job post. Updatable fields are title, description, type, salary (both lower and top) and the skills."
+"18-07-2026","to the new endpoint created. add another updatable field ""status"""
+"18-07-2026","create new backend endpoint for JobController GET ""/job/mine"" and endpoint paginated that returns a list of GetJobRestResponse that the user owns. Can be executed only for users that are of type owner"
