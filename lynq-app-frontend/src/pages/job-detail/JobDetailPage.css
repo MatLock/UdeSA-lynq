@@ -173,6 +173,72 @@
   cursor: default;
 }
 
+/* Owner "stop seeking candidates" action — an outlined counterpart to the
+   filled Apply button so a destructive-ish close reads distinctly on-brand. */
+.job-detail-stop {
+  padding: 7px 16px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--danger-dark);
+  background: #fff;
+  border: 1.5px solid var(--danger);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.job-detail-stop:hover {
+  color: #fff;
+  background: var(--danger);
+}
+
+.job-detail-stop:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.job-detail-stop:disabled:hover {
+  color: var(--danger-dark);
+  background: #fff;
+}
+
+/* Owner "re-open" action, shown when the post is closed — green counterpart to
+   the red stop button, matching the same small outlined shape. */
+.job-detail-reopen {
+  padding: 7px 16px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--score-green);
+  background: #fff;
+  border: 1.5px solid var(--score-green);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.job-detail-reopen:hover {
+  color: #fff;
+  background: var(--score-green);
+}
+
+.job-detail-reopen:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.job-detail-reopen:disabled:hover {
+  color: var(--score-green);
+  background: #fff;
+}
+
 .job-detail-apply-status {
   margin: 0;
   max-width: 200px;

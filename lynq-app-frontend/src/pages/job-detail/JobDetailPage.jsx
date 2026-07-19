@@ -72,6 +72,10 @@ const JobDetailPage = () => {
   // the feed but silently vanish here.
   const isCompany = user?.userType === 'COMPANY'
   const [applyState, setApplyState] = useState('idle') // idle|applying|applied|already|error
+  // Owner-only close/re-open action. The button shown (and which endpoint it
+  // hits) is derived from the job's live status; this only tracks the in-flight
+  // request so the button can disable and surface an error.
+  const [ownerAction, setOwnerAction] = useState('idle') // idle|working|error
   // The two counters returned by the details endpoint, seeded from the router
   // placeholder (if any) so they render immediately, then refreshed from the
   // fetch below.
@@ -134,6 +138,26 @@ const JobDetailPage = () => {
     }
   }
 
+  // Close the post (stop seeking) or re-open it, then flip the local job status
+  // so the button swaps to its counterpart without a refetch.
+  const handleOwnerAction = async (close) => {
+    if (ownerAction === 'working') return
+    setOwnerAction('working')
+    try {
+      if (close) {
+        await jobService.close_job(authFetch, jobId)
+      } else {
+        await jobService.refresh_job(authFetch, jobId)
+      }
+      setJob((prev) =>
+        prev ? { ...prev, jobStatus: close ? 'CLOSE' : 'OPEN' } : prev,
+      )
+      setOwnerAction('idle')
+    } catch {
+      setOwnerAction('error')
+    }
+  }
+
   // Details still loading with nothing to show yet (direct navigation / reload):
   // render a spinner rather than flashing the "unavailable" state.
   if (loading && !job) {
@@ -178,6 +202,13 @@ const JobDetailPage = () => {
   const company = job.company ?? null
   const companyLogo = isExternal ? null : company?.profileImageUrl
   const recruiter = job.postedBy ?? null
+  // The post belongs to the logged-in user when they are the one who created it.
+  // Only LYNQ posts carry a poster, so external jobs never match.
+  const isOwner =
+    user?.id != null && recruiter?.id != null && user.id === recruiter.id
+  // The details endpoint returns jobs of any status, so an owned post can be
+  // closed — in which case the owner gets a re-open action instead of close.
+  const isClosed = job.jobStatus === 'CLOSE'
 
   return (
     <div className="job-detail-page">
@@ -242,7 +273,43 @@ const JobDetailPage = () => {
             )}
           </div>
 
-          {!isCompany && (
+          {isOwner ? (
+            <div className="job-detail-hero-side">
+              {/* Owner action: close the post to stop seeking candidates, or
+                  re-open it (green) once it has been closed. */}
+              <div className="job-detail-hero-actions">
+                {isClosed ? (
+                  <button
+                    type="button"
+                    className="job-detail-reopen"
+                    onClick={() => handleOwnerAction(false)}
+                    disabled={ownerAction === 'working'}
+                  >
+                    {ownerAction === 'working' ? t.reopening : t.reopen}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="job-detail-stop"
+                    onClick={() => handleOwnerAction(true)}
+                    disabled={ownerAction === 'working'}
+                  >
+                    {ownerAction === 'working' ? t.stopping : t.stopSeeking}
+                  </button>
+                )}
+                {isClosed && ownerAction !== 'error' && (
+                  <p className="job-detail-apply-status is-info">
+                    {t.closedNotice}
+                  </p>
+                )}
+                {ownerAction === 'error' && (
+                  <p className="job-detail-apply-status is-error">
+                    {isClosed ? t.reopenError : t.stopError}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : !isCompany ? (
             <div className="job-detail-hero-side">
               {/* LYNQ score pinned to the hero's top-right corner. */}
               {hasScore && (
@@ -288,7 +355,7 @@ const JobDetailPage = () => {
                 )}
               </div>
             </div>
-          )}
+          ) : null}
         </section>
 
         <div className="job-detail-grid">
