@@ -20,12 +20,15 @@ import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.model.UserSkillsEntity;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
+import com.lynq.backend.repository.JobPostSkillRepository;
 import com.lynq.backend.repository.UserApplicationJobRepository;
 import com.lynq.backend.repository.UserRepository;
 import com.lynq.backend.repository.projection.JobCandidateProjection;
 import com.lynq.backend.repository.projection.JobWithDetailsProjection;
 import com.lynq.backend.security.LynqUserPrincipal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -123,6 +126,8 @@ class JobServiceTest {
   private static final String AUTHENTICATED_USER_NOT_FOUND = "Authenticated user not found";
   private static final String ONLY_COMPANY_USERS_CAN_CREATE_JOBS =
       "Only users of type COMPANY can create jobs";
+  private static final String ONLY_COMPANY_USERS_CAN_VIEW_OWNED_JOBS =
+      "Only users of type COMPANY can view their own jobs";
   private static final String USER_NOT_LINKED_TO_COMPANY = "User is not linked to any company";
   private static final String JOB_POST_NOT_FOUND = "Job post not found";
   private static final String ALREADY_APPLIED_TO_JOB = "User has already applied to this job";
@@ -136,6 +141,15 @@ class JobServiceTest {
       "Only the owner of the job post can close it";
   private static final String ONLY_OPEN_JOBS_CAN_BE_CLOSED =
       "Only open job posts can be closed";
+  private static final String ONLY_JOB_OWNER_CAN_UPDATE =
+      "Only the owner of the job post can update it";
+
+  private static final String UPDATED_TITLE = "Staff Backend Engineer";
+  private static final String UPDATED_DESCRIPTION = "Lead the Lynq platform architecture.";
+  private static final WorkType UPDATED_WORK_TYPE = WorkType.IN_OFFICE;
+  private static final JobStatus UPDATED_STATUS = JobStatus.OPEN;
+  private static final Integer UPDATED_SALARY_RANGE_DOWN = 100000;
+  private static final Integer UPDATED_SALARY_RANGE_TOP = 150000;
 
   @Mock
   private JobPostRepository jobPostRepository;
@@ -148,6 +162,9 @@ class JobServiceTest {
 
   @Mock
   private UserApplicationJobRepository userApplicationJobRepository;
+
+  @Mock
+  private JobPostSkillRepository jobPostSkillRepository;
 
   @Mock
   private StorageService storageService;
@@ -163,7 +180,7 @@ class JobServiceTest {
   @BeforeEach
   void setUp() {
     jobService = new JobService(jobPostRepository, companyRepository, userRepository,
-        userApplicationJobRepository, storageService);
+        userApplicationJobRepository, jobPostSkillRepository, storageService);
     SecurityContextHolder.setContext(securityContext);
   }
 
@@ -306,7 +323,7 @@ class JobServiceTest {
     stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA, SKILL_SPRING)));
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
-        JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN,
+        JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_IMAGE_PATH,
         POSTER_ID, POSTER_FULL_NAME, POSTER_IMAGE_PATH, POSTER_CURRENT_POSITION,
         JOB_SKILLS_CONCATENATED);
@@ -433,11 +450,68 @@ class JobServiceTest {
   }
 
   @Test
+  void searchOwnedJobsReturnsOwnersJobsIncludingClosedOnesMappedToResponse() {
+    UserEntity owner = companyUser();
+    stubAuthenticatedUser(owner);
+    JobWithDetailsProjection projection = new JobWithDetailsProjection(
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.CLOSE,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_IMAGE_PATH,
+        POSTER_ID, POSTER_FULL_NAME, POSTER_IMAGE_PATH, POSTER_CURRENT_POSITION,
+        JOB_SKILLS_CONCATENATED);
+    when(jobPostRepository.searchJobsOwnedByUser(USER_ID, DEFAULT_PAGEABLE))
+        .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
+    when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
+        .thenReturn(COMPANY_IMAGE_URL);
+    when(storageService.obtainProfilePreSignedUrl(POSTER_IMAGE_PATH))
+        .thenReturn(POSTER_IMAGE_URL);
+
+    PagedRestResponse<GetJobRestResponse> result = jobService.searchOwnedJobs(DEFAULT_PAGEABLE);
+
+    assertThat(result.getContent(), hasSize(1));
+    GetJobRestResponse job = result.getContent().get(0);
+    assertThat(job.getJobId(), is(JOB_ID));
+    assertThat(job.getJobStatus(), is(JobStatus.CLOSE));
+    assertThat(job.getCompany().getId(), is(COMPANY_ID));
+    assertThat(job.getPostedBy().getId(), is(POSTER_ID));
+    assertThat(job.getSkills(), contains(SKILL_JAVA, SKILL_SPRING));
+    assertThat(job.getLynqScore(), is(nullValue()));
+    verify(jobPostRepository).searchJobsOwnedByUser(USER_ID, DEFAULT_PAGEABLE);
+  }
+
+  @Test
+  void searchOwnedJobsForwardsPaginationMetadata() {
+    UserEntity owner = companyUser();
+    stubAuthenticatedUser(owner);
+    Pageable pageable = PageRequest.of(1, 2);
+    Page<JobWithDetailsProjection> page = new PageImpl<>(
+        List.of(projectionWithId(JOB_ID_NEWEST), projectionWithId(JOB_ID_OLDEST)), pageable, 6);
+    when(jobPostRepository.searchJobsOwnedByUser(USER_ID, pageable)).thenReturn(page);
+
+    PagedRestResponse<GetJobRestResponse> result = jobService.searchOwnedJobs(pageable);
+
+    assertThat(result.getPage(), is(1));
+    assertThat(result.getTotalElements(), is(6L));
+    assertThat(result.getContent().stream().map(GetJobRestResponse::getJobId).toList(),
+        contains(JOB_ID_NEWEST, JOB_ID_OLDEST));
+  }
+
+  @Test
+  void searchOwnedJobsThrowsBadRequestWhenUserIsNotCompany() {
+    stubAuthenticatedUser(candidateUser(null));
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> jobService.searchOwnedJobs(DEFAULT_PAGEABLE));
+    assertThat(exception.getMessage(), is(ONLY_COMPANY_USERS_CAN_VIEW_OWNED_JOBS));
+    verify(jobPostRepository, never()).searchJobsOwnedByUser(any(), any());
+  }
+
+  @Test
   void getJobDetailsMapsProjectionFieldsIncludingCompanyPosterAndLynqScore() {
     stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA, SKILL_SPRING)));
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
-        JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN,
+        JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_IMAGE_PATH,
         POSTER_ID, POSTER_FULL_NAME, POSTER_IMAGE_PATH, POSTER_CURRENT_POSITION,
         JOB_SKILLS_CONCATENATED);
@@ -468,6 +542,7 @@ class JobServiceTest {
     assertThat(job.getSkills(), contains(SKILL_JAVA, SKILL_SPRING));
     assertThat(job.getLynqScore(), is(100));
     assertThat(job.getTotalSeen(), is(TOTAL_SEEN));
+    assertThat(job.getJobStatus(), is(JobStatus.OPEN));
     assertThat(job.getTotalCandidatesApplied(), is(TOTAL_CANDIDATES_APPLIED));
   }
 
@@ -708,6 +783,164 @@ class JobServiceTest {
   }
 
   @Test
+  void updateJobUpdatesEditableFieldsForOwnerAndReturnsSavedEntity() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA, SKILL_SPRING));
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
+        UPDATED_WORK_TYPE, UPDATED_STATUS, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
+        SKILLS);
+
+    assertThat(result, is(sameInstance(job)));
+    assertThat(result.getTitle(), is(UPDATED_TITLE));
+    assertThat(result.getDescription(), is(UPDATED_DESCRIPTION));
+    assertThat(result.getWorkType(), is(UPDATED_WORK_TYPE));
+    assertThat(result.getSalaryRangeDown(), is(UPDATED_SALARY_RANGE_DOWN));
+    assertThat(result.getSalaryRangeTop(), is(UPDATED_SALARY_RANGE_TOP));
+    verify(jobPostRepository).save(job);
+  }
+
+  @Test
+  void updateJobClosingOpenJobStampsClosedOnWithToday() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
+        UPDATED_WORK_TYPE, JobStatus.CLOSE, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
+        SKILLS);
+
+    assertThat(result.getJobStatus(), is(JobStatus.CLOSE));
+    assertThat(result.getClosedOn(), is(LocalDate.now()));
+  }
+
+  @Test
+  void updateJobReopeningClosedJobClearsClosedOn() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
+    job.setJobStatus(JobStatus.CLOSE);
+    job.setClosedOn(LocalDate.of(2026, 5, 1));
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
+        UPDATED_WORK_TYPE, JobStatus.OPEN, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
+        SKILLS);
+
+    assertThat(result.getJobStatus(), is(JobStatus.OPEN));
+    assertThat(result.getClosedOn(), is(nullValue()));
+  }
+
+  @Test
+  void updateJobLeavesClosedOnUntouchedWhenStatusUnchanged() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
+    job.setJobStatus(JobStatus.CLOSE);
+    LocalDate closedOn = LocalDate.of(2026, 5, 1);
+    job.setClosedOn(closedOn);
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
+        UPDATED_WORK_TYPE, JobStatus.CLOSE, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
+        SKILLS);
+
+    assertThat(result.getJobStatus(), is(JobStatus.CLOSE));
+    assertThat(result.getClosedOn(), is(closedOn));
+  }
+
+  @Test
+  void updateJobReplacesSkillsRemovingStaleOnesAndAddingNewOnes() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA, SKILL_SPRING));
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    ArgumentCaptor<List<JobPostSkillEntity>> removedCaptor = ArgumentCaptor.forClass(List.class);
+
+    jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
+        UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
+        List.of(SKILL_JAVA, SKILL_POSTGRES));
+
+    verify(jobPostSkillRepository).deleteAll(removedCaptor.capture());
+    assertThat(removedCaptor.getValue().stream().map(JobPostSkillEntity::getSkill).toList(),
+        contains(SKILL_SPRING));
+    assertThat(job.getSkills().stream().map(JobPostSkillEntity::getSkill).toList(),
+        contains(SKILL_JAVA, SKILL_POSTGRES));
+  }
+
+  @Test
+  void updateJobTrimsDeduplicatesAndIgnoresBlankSkills() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of());
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
+        UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
+        Arrays.asList("  Java  ", "Java", "  ", SKILL_SPRING));
+
+    assertThat(job.getSkills().stream().map(JobPostSkillEntity::getSkill).toList(),
+        contains(SKILL_JAVA, SKILL_SPRING));
+  }
+
+  @Test
+  void updateJobClearsSkillsWhenNoneProvided() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA, SKILL_SPRING));
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
+        UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, NO_SKILLS);
+
+    assertThat(job.getSkills(), is(empty()));
+  }
+
+  @Test
+  void updateJobThrowsNotFoundWhenJobDoesNotExist() {
+    stubAuthenticatedUser(companyUser());
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.empty());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
+            UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS));
+    assertThat(exception.getMessage(), is(JOB_POST_NOT_FOUND));
+    verify(jobPostRepository, never()).save(any());
+  }
+
+  @Test
+  void updateJobThrowsForbiddenWhenCallerIsNotTheOwner() {
+    UserEntity anotherOwner = UserEntity.builder().id("another-user").build();
+    JobPostEntity job = ownedJob(anotherOwner, List.of(SKILL_JAVA));
+    stubAuthenticatedUser(companyUser());
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+
+    ForbiddenException exception = assertThrows(ForbiddenException.class,
+        () -> jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
+            UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS));
+    assertThat(exception.getMessage(), is(ONLY_JOB_OWNER_CAN_UPDATE));
+    verify(jobPostRepository, never()).save(any());
+    verify(jobPostSkillRepository, never()).deleteAll(any());
+  }
+
+  @Test
   void getJobCandidatesMapsProjectionFieldsAndGeneratesPresignedImageUrl() {
     when(storageService.obtainProfilePreSignedUrl(CANDIDATE_IMAGE_PATH))
         .thenReturn(CANDIDATE_IMAGE_URL);
@@ -828,13 +1061,32 @@ class JobServiceTest {
   private JobWithDetailsProjection projectionWithId(String jobId) {
     return new JobWithDetailsProjection(
         jobId, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
-        null, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN,
+        null, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_IMAGE_PATH,
         POSTER_ID, POSTER_FULL_NAME, POSTER_IMAGE_PATH, POSTER_CURRENT_POSITION, null);
   }
 
   private UserEntity companyUser() {
     return UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
+  }
+
+  private JobPostEntity ownedJob(UserEntity owner, List<String> skillNames) {
+    JobPostEntity job = JobPostEntity.builder()
+        .id(JOB_ID)
+        .title(TITLE)
+        .description(DESCRIPTION)
+        .workType(WORK_TYPE)
+        .salaryRangeDown(SALARY_RANGE_DOWN)
+        .salaryRangeTop(SALARY_RANGE_TOP)
+        .createdByUser(owner)
+        .skills(new ArrayList<>())
+        .build();
+    skillNames.forEach(name -> job.getSkills().add(JobPostSkillEntity.builder()
+        .id(UUID.randomUUID().toString())
+        .jobPost(job)
+        .skill(name)
+        .build()));
+    return job;
   }
 
   private UserEntity candidateUser(List<String> skillNames) {
@@ -855,7 +1107,7 @@ class JobServiceTest {
   private void stubSingleJob(String concatenatedSkills) {
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
-        JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN,
+        JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, null,
         POSTER_ID, POSTER_FULL_NAME, null, POSTER_CURRENT_POSITION, concatenatedSkills);
     when(jobPostRepository.searchAvailableJobs(null, DEFAULT_PAGEABLE))

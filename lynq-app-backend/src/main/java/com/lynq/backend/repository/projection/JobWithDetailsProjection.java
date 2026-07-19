@@ -1,6 +1,7 @@
 package com.lynq.backend.repository.projection;
 
 import com.lynq.backend.enums.JobPostSource;
+import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.WorkType;
 import java.time.LocalDate;
 
@@ -22,6 +23,7 @@ public record JobWithDetailsProjection(
     JobPostSource jobPostSource,
     LocalDate createdOn,
     Long totalSeen,
+    JobStatus jobStatus,
     String companyId,
     String companyName,
     String companyAbout,

@@ -3,6 +3,7 @@ package com.lynq.backend.controller.impl;
 import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.controller.JobController;
 import com.lynq.backend.controller.request.CreateJobRequest;
+import com.lynq.backend.controller.request.UpdateJobRequest;
 import com.lynq.backend.controller.response.ApplyJobRestResponse;
 import com.lynq.backend.controller.response.CloseJobRestResponse;
 import com.lynq.backend.controller.response.CreateJobRestResponse;
@@ -12,6 +13,7 @@ import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.controller.response.RefreshJobRestResponse;
+import com.lynq.backend.controller.response.UpdateJobRestResponse;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSkillEntity;
 import com.lynq.backend.model.UserApplicationJobEntity;
@@ -68,6 +70,44 @@ public class JobControllerImpl implements JobController {
   }
 
   @Override
+  @PatchMapping("/{jobId}")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<UpdateJobRestResponse>> updateJob(
+      @PathVariable String jobId,
+      @RequestBody UpdateJobRequest request) {
+    JobPostEntity job = jobService.updateJob(
+        jobId,
+        request.getTitle(),
+        request.getDescription(),
+        request.getWorkType(),
+        request.getStatus(),
+        request.getSalaryRangeDown(),
+        request.getSalaryRangeTop(),
+        request.getSkills());
+
+    UpdateJobRestResponse response = UpdateJobRestResponse.builder()
+        .jobId(job.getId())
+        .title(job.getTitle())
+        .description(job.getDescription())
+        .workType(job.getWorkType())
+        .salaryRangeDown(job.getSalaryRangeDown())
+        .salaryRangeTop(job.getSalaryRangeTop())
+        .jobPostSource(job.getJobPostSource())
+        .jobStatus(job.getJobStatus())
+        .createdOn(job.getCreatedOn())
+        .closedOn(job.getClosedOn())
+        .totalSeen(job.getTotalSeen())
+        .companyId(job.getCompany().getId())
+        .createdByUserId(job.getCreatedByUser().getId())
+        .skills(job.getSkills().stream().map(JobPostSkillEntity::getSkill).toList())
+        .build();
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, response));
+  }
+
+  @Override
   @GetMapping
   @AuditLog
   public ResponseEntity<GlobalRestResponse<PagedRestResponse<GetJobRestResponse>>> getJobs(
@@ -77,6 +117,20 @@ public class JobControllerImpl implements JobController {
     JobFilter filter = new JobFilter(filterValue);
     PagedRestResponse<GetJobRestResponse> jobs =
         jobService.searchAvailableJobs(filter, PageRequest.of(page, size));
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, jobs));
+  }
+
+  @Override
+  @GetMapping("/mine")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<PagedRestResponse<GetJobRestResponse>>> getMyJobs(
+      @RequestParam(defaultValue = "0") Integer page,
+      @RequestParam(defaultValue = "20") Integer size) {
+    PagedRestResponse<GetJobRestResponse> jobs =
+        jobService.searchOwnedJobs(PageRequest.of(page, size));
 
     return ResponseEntity
         .status(HttpStatus.OK)

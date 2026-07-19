@@ -26,6 +26,7 @@ public class GetJobDetailForCandidateRestResponse extends GetJobRestResponse {
         .jobPostSource(source.getJobPostSource())
         .createdOn(source.getCreatedOn())
         .totalSeen(source.getTotalSeen())
+        .jobStatus(source.getJobStatus())
         .company(source.getCompany())
         .postedBy(source.getPostedBy())
         .skills(source.getSkills())

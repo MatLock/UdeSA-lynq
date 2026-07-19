@@ -1,6 +1,7 @@
 package com.lynq.backend.controller.impl;
 
 import com.lynq.backend.controller.request.CreateJobRequest;
+import com.lynq.backend.controller.request.UpdateJobRequest;
 import com.lynq.backend.controller.response.ApplyJobRestResponse;
 import com.lynq.backend.controller.response.CloseJobRestResponse;
 import com.lynq.backend.controller.response.CreateJobRestResponse;
@@ -10,6 +11,7 @@ import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.controller.response.RefreshJobRestResponse;
+import com.lynq.backend.controller.response.UpdateJobRestResponse;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.WorkType;
@@ -53,6 +55,7 @@ class JobControllerImplTest {
   private static final String TITLE = "Senior Backend Engineer";
   private static final String DESCRIPTION = "Build and scale the Lynq hiring platform.";
   private static final WorkType WORK_TYPE = WorkType.REMOTE;
+  private static final JobStatus STATUS = JobStatus.OPEN;
   private static final Integer SALARY_RANGE_DOWN = 80000;
   private static final Integer SALARY_RANGE_TOP = 120000;
   private static final JobPostSource JOB_POST_TYPE = JobPostSource.LYNQ;
@@ -76,6 +79,9 @@ class JobControllerImplTest {
   @Mock
   private CreateJobRequest request;
 
+  @Mock
+  private UpdateJobRequest updateRequest;
+
   private JobControllerImpl jobController;
 
   @BeforeEach
@@ -90,6 +96,54 @@ class JobControllerImplTest {
     lenient().when(request.getSkills()).thenReturn(SKILLS);
     lenient().when(jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
         SALARY_RANGE_TOP, JOB_POST_TYPE, SKILLS)).thenReturn(savedJob());
+    lenient().when(updateRequest.getTitle()).thenReturn(TITLE);
+    lenient().when(updateRequest.getDescription()).thenReturn(DESCRIPTION);
+    lenient().when(updateRequest.getWorkType()).thenReturn(WORK_TYPE);
+    lenient().when(updateRequest.getStatus()).thenReturn(STATUS);
+    lenient().when(updateRequest.getSalaryRangeDown()).thenReturn(SALARY_RANGE_DOWN);
+    lenient().when(updateRequest.getSalaryRangeTop()).thenReturn(SALARY_RANGE_TOP);
+    lenient().when(updateRequest.getSkills()).thenReturn(SKILLS);
+    lenient().when(jobService.updateJob(JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, STATUS,
+        SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SKILLS)).thenReturn(savedJob());
+  }
+
+  @Test
+  void updateJobDelegatesToServiceWithRequestFields() {
+    jobController.updateJob(JOB_ID, updateRequest);
+
+    verify(jobService).updateJob(JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, STATUS, SALARY_RANGE_DOWN,
+        SALARY_RANGE_TOP, SKILLS);
+  }
+
+  @Test
+  void updateJobRespondsWithOkStatus() {
+    ResponseEntity<GlobalRestResponse<UpdateJobRestResponse>> response =
+        jobController.updateJob(JOB_ID, updateRequest);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void updateJobMapsSavedJobIntoSuccessfulResponseData() {
+    ResponseEntity<GlobalRestResponse<UpdateJobRestResponse>> response =
+        jobController.updateJob(JOB_ID, updateRequest);
+
+    GlobalRestResponse<UpdateJobRestResponse> body = response.getBody();
+    assertThat(body, is(notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    UpdateJobRestResponse data = body.getData();
+    assertThat(data.getJobId(), is(JOB_ID));
+    assertThat(data.getTitle(), is(TITLE));
+    assertThat(data.getDescription(), is(DESCRIPTION));
+    assertThat(data.getWorkType(), is(WORK_TYPE));
+    assertThat(data.getSalaryRangeDown(), is(SALARY_RANGE_DOWN));
+    assertThat(data.getSalaryRangeTop(), is(SALARY_RANGE_TOP));
+    assertThat(data.getJobPostSource(), is(JOB_POST_TYPE));
+    assertThat(data.getCreatedOn(), is(CREATED_ON));
+    assertThat(data.getCompanyId(), is(COMPANY_ID));
+    assertThat(data.getCreatedByUserId(), is(USER_ID));
+    assertThat(data.getSkills(), contains(SKILL_JAVA, SKILL_SPRING));
+    assertThat(data.getJobStatus(), is(STATUS));
   }
 
   @Test
@@ -184,6 +238,47 @@ class JobControllerImplTest {
 
     ResponseEntity<GlobalRestResponse<PagedRestResponse<GetJobRestResponse>>> response =
         jobController.getJobs(DEFAULT_PAGE, DEFAULT_SIZE, null);
+
+    GlobalRestResponse<PagedRestResponse<GetJobRestResponse>> body = response.getBody();
+    assertThat(body, is(notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData().getContent(), hasSize(1));
+    assertThat(body.getData().getContent().get(0).getJobId(), is(JOB_ID));
+  }
+
+  @Test
+  void getMyJobsDelegatesToServiceWithPageable() {
+    when(jobService.searchOwnedJobs(any(Pageable.class))).thenReturn(emptyPaged());
+
+    jobController.getMyJobs(REQUESTED_PAGE, REQUESTED_SIZE);
+
+    ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+    verify(jobService).searchOwnedJobs(pageableCaptor.capture());
+    Pageable pageable = pageableCaptor.getValue();
+    assertThat(pageable.getPageNumber(), is(REQUESTED_PAGE));
+    assertThat(pageable.getPageSize(), is(REQUESTED_SIZE));
+  }
+
+  @Test
+  void getMyJobsRespondsWithOkStatus() {
+    when(jobService.searchOwnedJobs(any(Pageable.class))).thenReturn(emptyPaged());
+
+    ResponseEntity<GlobalRestResponse<PagedRestResponse<GetJobRestResponse>>> response =
+        jobController.getMyJobs(DEFAULT_PAGE, DEFAULT_SIZE);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void getMyJobsWrapsServiceResultInSuccessfulEnvelope() {
+    GetJobRestResponse job = GetJobRestResponse.builder().jobId(JOB_ID).build();
+    PagedRestResponse<GetJobRestResponse> paged = PagedRestResponse.<GetJobRestResponse>builder()
+        .content(List.of(job))
+        .build();
+    when(jobService.searchOwnedJobs(any(Pageable.class))).thenReturn(paged);
+
+    ResponseEntity<GlobalRestResponse<PagedRestResponse<GetJobRestResponse>>> response =
+        jobController.getMyJobs(DEFAULT_PAGE, DEFAULT_SIZE);
 
     GlobalRestResponse<PagedRestResponse<GetJobRestResponse>> body = response.getBody();
     assertThat(body, is(notNullValue()));

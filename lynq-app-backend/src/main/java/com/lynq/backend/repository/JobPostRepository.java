@@ -21,7 +21,7 @@ public interface JobPostRepository extends JpaRepository<JobPostEntity, String> 
 
   @Query(value = "SELECT new com.lynq.backend.repository.projection.JobWithDetailsProjection("
       + "j.id, j.title, j.description, j.workType, j.salaryRangeDown, j.salaryRangeTop, j.jobUrl, "
-      + "j.jobPostSource, j.createdOn, j.totalSeen, "
+      + "j.jobPostSource, j.createdOn, j.totalSeen, j.jobStatus, "
       + "c.id, c.name, c.about, c.size, c.profileImageUrl, "
       + "u.id, u.fullName, u.profileImageUrl, u.currentPosition, "
       + "CAST((SELECT function('group_concat', sk.skill) FROM JobPostSkillEntity sk "
@@ -53,7 +53,7 @@ public interface JobPostRepository extends JpaRepository<JobPostEntity, String> 
 
   @Query("SELECT new com.lynq.backend.repository.projection.JobWithDetailsProjection("
       + "j.id, j.title, j.description, j.workType, j.salaryRangeDown, j.salaryRangeTop, j.jobUrl, "
-      + "j.jobPostSource, j.createdOn, j.totalSeen, "
+      + "j.jobPostSource, j.createdOn, j.totalSeen, j.jobStatus, "
       + "c.id, c.name, c.about, c.size, c.profileImageUrl, "
       + "u.id, u.fullName, u.profileImageUrl, u.currentPosition, "
       + "CAST((SELECT function('group_concat', sk.skill) FROM JobPostSkillEntity sk "
@@ -63,6 +63,23 @@ public interface JobPostRepository extends JpaRepository<JobPostEntity, String> 
       + "LEFT JOIN j.createdByUser u "
       + "WHERE j.id = :jobId")
   Optional<JobWithDetailsProjection> findJobDetailsById(@Param("jobId") String jobId);
+
+  @Query(value = "SELECT new com.lynq.backend.repository.projection.JobWithDetailsProjection("
+      + "j.id, j.title, j.description, j.workType, j.salaryRangeDown, j.salaryRangeTop, j.jobUrl, "
+      + "j.jobPostSource, j.createdOn, j.totalSeen, j.jobStatus, "
+      + "c.id, c.name, c.about, c.size, c.profileImageUrl, "
+      + "u.id, u.fullName, u.profileImageUrl, u.currentPosition, "
+      + "CAST((SELECT function('group_concat', sk.skill) FROM JobPostSkillEntity sk "
+      + "WHERE sk.jobPost = j) AS string)) "
+      + "FROM JobPostEntity j "
+      + "LEFT JOIN j.company c "
+      + "LEFT JOIN j.createdByUser u "
+      + "WHERE u.id = :userId "
+      + "ORDER BY j.createdOn DESC",
+      countQuery = "SELECT COUNT(j) FROM JobPostEntity j "
+      + "WHERE j.createdByUser.id = :userId")
+  Page<JobWithDetailsProjection> searchJobsOwnedByUser(@Param("userId") String userId,
+      Pageable pageable);
 
   @Query("SELECT j FROM JobPostEntity j WHERE j.createdByUser.id = :userId ORDER BY j.createdOn DESC")
   List<JobPostEntity> findByCreatedByUserId(@Param("userId") String userId);

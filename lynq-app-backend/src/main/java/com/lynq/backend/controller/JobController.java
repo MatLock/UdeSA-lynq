@@ -1,6 +1,7 @@
 package com.lynq.backend.controller;
 
 import com.lynq.backend.controller.request.CreateJobRequest;
+import com.lynq.backend.controller.request.UpdateJobRequest;
 import com.lynq.backend.controller.response.ApplyJobRestResponse;
 import com.lynq.backend.controller.response.CloseJobRestResponse;
 import com.lynq.backend.controller.response.CreateJobRestResponse;
@@ -10,6 +11,7 @@ import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.controller.response.RefreshJobRestResponse;
+import com.lynq.backend.controller.response.UpdateJobRestResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +31,18 @@ public interface JobController {
       @Valid CreateJobRequest request);
 
   @Operation(
+      summary = "Update a job post",
+      description = "Updates the editable fields (title, description, work type, status, salary "
+          + "range and skills) of the job post identified by the given id. Only the user who "
+          + "created the job post may update it; the skills provided fully replace the existing "
+          + "ones and changing the status stamps or clears the closed date accordingly. Fails with "
+          + "404 when no job post matches the id and 403 when the caller is not the owner.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<UpdateJobRestResponse>> updateJob(
+      String jobId,
+      @Valid UpdateJobRequest request);
+
+  @Operation(
       summary = "List available job posts",
       description = "Returns a page of available job posts, newest first (ordered by creation date "
           + "descending). Jobs that are no longer available are skipped. Each item includes the "
@@ -41,6 +55,18 @@ public interface JobController {
       Integer page,
       Integer size,
       String filterValue);
+
+  @Operation(
+      summary = "List the authenticated owner's job posts",
+      description = "Returns a page of the job posts created by the authenticated user, newest first "
+          + "(ordered by creation date descending), using the same response shape as the public "
+          + "listing (company, poster and skills). Unlike the public feed this includes job posts "
+          + "in any status. Only COMPANY-type users may call it; the owner identity is resolved "
+          + "from the bearer token. Fails with 400 when the caller is not a COMPANY-type user.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<PagedRestResponse<GetJobRestResponse>>> getMyJobs(
+      Integer page,
+      Integer size);
 
   @Operation(
       summary = "Get a single job post's details",

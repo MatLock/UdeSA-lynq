@@ -24,6 +24,7 @@ import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.model.UserSkillsEntity;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
+import com.lynq.backend.repository.JobPostSkillRepository;
 import com.lynq.backend.repository.UserApplicationJobRepository;
 import com.lynq.backend.repository.UserRepository;
 import com.lynq.backend.repository.projection.JobCandidateProjection;
@@ -44,6 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class JobService {
 
   private static final String ONLY_COMPANY_USERS_CAN_CREATE_JOBS = "Only users of type COMPANY can create jobs";
+  private static final String ONLY_COMPANY_USERS_CAN_VIEW_OWNED_JOBS = "Only users of type COMPANY can view their own jobs";
   private static final String ONLY_CANDIDATE_USERS_CAN_APPLY = "Only users of type CANDIDATE can apply to jobs";
   private static final String USER_NOT_LINKED_TO_COMPANY = "User is not linked to any company";
   private static final String AUTHENTICATED_USER_NOT_FOUND = "Authenticated user not found";
@@ -53,20 +55,23 @@ public class JobService {
   private static final String ONLY_CLOSED_JOBS_CAN_BE_REFRESHED = "Only closed job posts can be refreshed";
   private static final String ONLY_JOB_OWNER_CAN_CLOSE = "Only the owner of the job post can close it";
   private static final String ONLY_OPEN_JOBS_CAN_BE_CLOSED = "Only open job posts can be closed";
+  private static final String ONLY_JOB_OWNER_CAN_UPDATE = "Only the owner of the job post can update it";
 
   private final JobPostRepository jobPostRepository;
   private final CompanyRepository companyRepository;
   private final UserRepository userRepository;
   private final UserApplicationJobRepository userApplicationJobRepository;
+  private final JobPostSkillRepository jobPostSkillRepository;
   private final StorageService storageService;
 
   public JobService(JobPostRepository jobPostRepository, CompanyRepository companyRepository,
       UserRepository userRepository, UserApplicationJobRepository userApplicationJobRepository,
-      StorageService storageService) {
+      JobPostSkillRepository jobPostSkillRepository, StorageService storageService) {
     this.jobPostRepository = jobPostRepository;
     this.companyRepository = companyRepository;
     this.userRepository = userRepository;
     this.userApplicationJobRepository = userApplicationJobRepository;
+    this.jobPostSkillRepository = jobPostSkillRepository;
     this.storageService = storageService;
   }
 
@@ -145,6 +150,62 @@ public class JobService {
     return jobPostRepository.save(job);
   }
 
+  @AuditLog
+  @Transactional
+  public JobPostEntity updateJob(String jobId, String title, String description, WorkType workType,
+      JobStatus status, Integer salaryRangeDown, Integer salaryRangeTop, List<String> skills) {
+    UserEntity user = getAuthenticatedUser();
+    JobPostEntity job = getOwnedJob(jobId, user, ONLY_JOB_OWNER_CAN_UPDATE);
+
+    job.setTitle(title);
+    job.setDescription(description);
+    job.setWorkType(workType);
+    job.setSalaryRangeDown(salaryRangeDown);
+    job.setSalaryRangeTop(salaryRangeTop);
+    updateStatus(job, status);
+
+    updateSkills(job, skills);
+
+    return jobPostRepository.save(job);
+  }
+
+  private void updateStatus(JobPostEntity job, JobStatus status) {
+    if (job.getJobStatus() == status) {
+      return;
+    }
+
+    job.setJobStatus(status);
+    job.setClosedOn(status == JobStatus.CLOSE ? LocalDate.now() : null);
+  }
+
+  private void updateSkills(JobPostEntity job, List<String> skills) {
+    List<String> desired = skills == null ? List.of() : skills.stream()
+        .filter(Objects::nonNull)
+        .map(String::trim)
+        .filter(skill -> !skill.isEmpty())
+        .distinct()
+        .toList();
+
+    List<JobPostSkillEntity> toRemove = job.getSkills().stream()
+        .filter(existing -> !desired.contains(existing.getSkill()))
+        .toList();
+    job.getSkills().removeAll(toRemove);
+    jobPostSkillRepository.deleteAll(toRemove);
+
+    Set<String> existingSkills = job.getSkills().stream()
+        .map(JobPostSkillEntity::getSkill)
+        .collect(Collectors.toSet());
+
+    desired.stream()
+        .filter(skill -> !existingSkills.contains(skill))
+        .map(skill -> JobPostSkillEntity.builder()
+            .id(Generators.timeBasedEpochGenerator().generate().toString())
+            .jobPost(job)
+            .skill(skill)
+            .build())
+        .forEach(job.getSkills()::add);
+  }
+
   private JobPostEntity getOwnedJob(String jobId, UserEntity user, String forbiddenMessage) {
     JobPostEntity job = jobPostRepository.findById(jobId)
         .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
@@ -204,6 +265,19 @@ public class JobService {
 
   @AuditLog
   @Transactional(readOnly = true)
+  public PagedRestResponse<GetJobRestResponse> searchOwnedJobs(Pageable pageable) {
+    UserEntity user = getAuthenticatedUser();
+
+    if (user.getType() != UserType.COMPANY) {
+      throw new BadRequestException(ONLY_COMPANY_USERS_CAN_VIEW_OWNED_JOBS);
+    }
+
+    return PagedRestResponse.from(jobPostRepository.searchJobsOwnedByUser(user.getId(), pageable)
+        .map(projection -> toResponse(projection, user)));
+  }
+
+  @AuditLog
+  @Transactional(readOnly = true)
   public GetJobDetailForCandidateRestResponse getJobDetails(String jobId) {
     UserEntity user = getAuthenticatedUser();
     JobWithDetailsProjection projection = jobPostRepository.findJobDetailsById(jobId)
@@ -243,6 +317,7 @@ public class JobService {
         .jobPostSource(projection.jobPostSource())
         .createdOn(projection.createdOn())
         .totalSeen(projection.totalSeen())
+        .jobStatus(projection.jobStatus())
         .company(JobCompanyRestResponse.builder()
             .id(projection.companyId())
             .name(projection.companyName())
