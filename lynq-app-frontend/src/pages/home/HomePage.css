@@ -6,7 +6,10 @@
   flex: 1;
   flex-direction: column;
   min-width: 0;
-  min-height: 100vh;
+  /* Lock the page to the viewport height so the sidebar and the hero/search
+     stay fixed; only the results list (below) scrolls. */
+  height: 100vh;
+  overflow: hidden;
   box-sizing: border-box;
   padding: 32px;
   gap: 28px;
@@ -138,9 +141,13 @@
   }
 }
 
-/* Results area grows to push the pagination to the bottom. */
+/* Results area grows to fill the space between the hero and the pagination, and
+   is the sole scrollable region — min-height:0 lets it shrink below its content
+   so the overflow scrolls here instead of pushing the page past the viewport. */
 .home-results {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .home-jobs {
