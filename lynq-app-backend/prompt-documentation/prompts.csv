@@ -150,4 +150,3 @@ parameters:
 "18-07-2026","create new endpoint in JobController PATCH ""/job/${job_id}"" that allows update of a jobpost if the user is the publisher of such job post. Updatable fields are title, description, type, salary (both lower and top) and the skills."
 "18-07-2026","to the new endpoint created. add another updatable field ""status"""
 "18-07-2026","create new backend endpoint for JobController GET ""/job/mine"" and endpoint paginated that returns a list of GetJobRestResponse that the user owns. Can be executed only for users that are of type owner"
-"18-07-2026","commit all the work done, start with preffix [lynq-app-backend]. do not mention claude and don't record this prompt in prompt recorder"
