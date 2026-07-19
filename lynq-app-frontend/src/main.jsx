@@ -15,6 +15,7 @@ import MyResumePage from './pages/my-resume/MyResumePage.jsx'
 import ApplicationsPage from './pages/applications/ApplicationsPage.jsx'
 import MyCompanyPage from './pages/my-company/MyCompanyPage.jsx'
 import MyJobPostsPage from './pages/my-job-posts/MyJobPostsPage.jsx'
+import EditJobPage from './pages/edit-job/EditJobPage.jsx'
 import AuthProvider from './context/AuthContext.jsx'
 import AppLayout from './components/AppLayout/AppLayout.jsx'
 import RequireAuth from './components/RequireAuth/RequireAuth.jsx'
@@ -45,7 +46,9 @@ createRoot(document.getElementById('root')).render(
             }
           >
             <Route path="/home" element={<HomePage />} />
+            <Route path="/job/mine" element={<MyJobPostsPage />} />
             <Route path="/job/:jobId/details" element={<JobDetailPage />} />
+            <Route path="/job/:jobId/edit" element={<EditJobPage />} />
             <Route path="/user/:userId" element={<UserProfilePage />} />
             <Route path="/company/:companyId" element={<CompanyDetailPage />} />
             <Route path="/create-job" element={<CreateJobPage />} />
@@ -55,7 +58,6 @@ createRoot(document.getElementById('root')).render(
             <Route path="/applications" element={<ApplicationsPage />} />
             {/* Company sections */}
             <Route path="/my-company" element={<MyCompanyPage />} />
-            <Route path="/my-job-posts" element={<MyJobPostsPage />} />
           </Route>
           {/* The register flow is an in-place carousel: a single /register route
               wraps the wizard, which slides between steps without changing URL. */}
