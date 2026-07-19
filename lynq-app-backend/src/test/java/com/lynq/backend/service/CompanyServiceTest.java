@@ -1,10 +1,13 @@
 package com.lynq.backend.service;
 
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
+import com.lynq.backend.controller.request.UpdateCompanyRequest;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.controller.response.GetCompanyDetailRestResponse;
+import com.lynq.backend.controller.response.UpdateCompanyRestResponse;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.exceptions.BadRequestException;
+import com.lynq.backend.exceptions.ForbiddenException;
 import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
@@ -59,6 +62,10 @@ class CompanyServiceTest {
   private static final String JOB_TITLE = "Senior Backend Engineer";
   private static final String JOB_DESCRIPTION = "Build and scale the Lynq hiring platform.";
   private static final String COMPANY_NOT_FOUND = "Company '" + COMPANY_ID + "' not found";
+  private static final String NEW_COMPANY_NAME = "Lynq Labs";
+  private static final String NEW_COMPANY_ABOUT = "Now hiring across the globe.";
+  private static final Integer NEW_COMPANY_SIZE = 500;
+  private static final String NO_COMPANY_OWNED = "No company owned by user '" + USER_ID + "'";
 
   @Mock
   private UserService userService;
@@ -71,6 +78,9 @@ class CompanyServiceTest {
 
   @Mock
   private CreateUserWithCompanyRequest request;
+
+  @Mock
+  private UpdateCompanyRequest updateRequest;
 
   @Mock
   private StorageService storageService;
@@ -244,13 +254,14 @@ class CompanyServiceTest {
         .size(COMPANY_SIZE)
         .profileImageUrl(COMPANY_IMAGE_PATH)
         .createdOn(COMPANY_CREATED_ON)
+        .owner(UserEntity.builder().id(USER_ID).build())
         .build();
     when(companyRepository.findById(COMPANY_ID)).thenReturn(Optional.of(company));
     when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
         .thenReturn(COMPANY_IMAGE_URL);
     when(jobPostRepository.findByCompanyId(COMPANY_ID)).thenReturn(java.util.List.of(job()));
 
-    GetCompanyDetailRestResponse detail = companyService.getCompanyDetail(COMPANY_ID);
+    GetCompanyDetailRestResponse detail = companyService.getCompanyDetail(COMPANY_ID, USER_ID);
 
     assertThat(detail.getId(), is(COMPANY_ID));
     assertThat(detail.getName(), is(COMPANY_NAME));
@@ -271,11 +282,12 @@ class CompanyServiceTest {
         .id(COMPANY_ID)
         .name(COMPANY_NAME)
         .profileImageUrl(null)
+        .owner(UserEntity.builder().id(USER_ID).build())
         .build();
     when(companyRepository.findById(COMPANY_ID)).thenReturn(Optional.of(company));
     when(jobPostRepository.findByCompanyId(COMPANY_ID)).thenReturn(java.util.List.of());
 
-    GetCompanyDetailRestResponse detail = companyService.getCompanyDetail(COMPANY_ID);
+    GetCompanyDetailRestResponse detail = companyService.getCompanyDetail(COMPANY_ID, USER_ID);
 
     assertThat(detail.getProfileImageUrl(), is(org.hamcrest.Matchers.nullValue()));
     assertThat(detail.getJobs(), is(org.hamcrest.Matchers.empty()));
@@ -287,9 +299,121 @@ class CompanyServiceTest {
     when(companyRepository.findById(COMPANY_ID)).thenReturn(Optional.empty());
 
     NotFoundException exception = assertThrows(NotFoundException.class,
-        () -> companyService.getCompanyDetail(COMPANY_ID));
+        () -> companyService.getCompanyDetail(COMPANY_ID, USER_ID));
     assertThat(exception.getMessage(), is(COMPANY_NOT_FOUND));
     verify(jobPostRepository, never()).findByCompanyId(any());
+  }
+
+  @Test
+  void getCompanyDetailThrowsForbiddenWhenRequesterDoesNotOwnCompany() {
+    CompanyEntity company = CompanyEntity.builder()
+        .id(COMPANY_ID)
+        .name(COMPANY_NAME)
+        .owner(UserEntity.builder().id("another-user-id").build())
+        .build();
+    when(companyRepository.findById(COMPANY_ID)).thenReturn(Optional.of(company));
+
+    assertThrows(ForbiddenException.class,
+        () -> companyService.getCompanyDetail(COMPANY_ID, USER_ID));
+    verify(jobPostRepository, never()).findByCompanyId(any());
+  }
+
+  @Test
+  void updateCompanyAppliesNonNullFieldsPersistsAndReturnsMappedResponse() {
+    UserEntity owner = UserEntity.builder().id(USER_ID).build();
+    CompanyEntity company = companyOwnedBy(owner);
+    when(userService.getUser(USER_ID)).thenReturn(owner);
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
+    when(updateRequest.getName()).thenReturn(NEW_COMPANY_NAME);
+    when(updateRequest.getAbout()).thenReturn(NEW_COMPANY_ABOUT);
+    when(updateRequest.getSize()).thenReturn(NEW_COMPANY_SIZE);
+    when(companyRepository.existsByName(NEW_COMPANY_NAME)).thenReturn(false);
+    when(companyRepository.save(company)).thenReturn(company);
+
+    UpdateCompanyRestResponse response = companyService.updateCompany(USER_ID, updateRequest);
+
+    assertThat(company.getName(), is(NEW_COMPANY_NAME));
+    assertThat(company.getAbout(), is(NEW_COMPANY_ABOUT));
+    assertThat(company.getSize(), is(NEW_COMPANY_SIZE));
+    assertThat(response.getId(), is(COMPANY_ID));
+    assertThat(response.getName(), is(NEW_COMPANY_NAME));
+    assertThat(response.getAbout(), is(NEW_COMPANY_ABOUT));
+    assertThat(response.getSize(), is(NEW_COMPANY_SIZE));
+  }
+
+  @Test
+  void updateCompanyLeavesFieldsUntouchedWhenRequestFieldsAreNull() {
+    UserEntity owner = UserEntity.builder().id(USER_ID).build();
+    CompanyEntity company = companyOwnedBy(owner);
+    when(userService.getUser(USER_ID)).thenReturn(owner);
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
+    when(updateRequest.getName()).thenReturn(null);
+    when(updateRequest.getAbout()).thenReturn(null);
+    when(updateRequest.getSize()).thenReturn(null);
+    when(companyRepository.save(company)).thenReturn(company);
+
+    UpdateCompanyRestResponse response = companyService.updateCompany(USER_ID, updateRequest);
+
+    assertThat(response.getName(), is(COMPANY_NAME));
+    assertThat(response.getAbout(), is(COMPANY_ABOUT));
+    assertThat(response.getSize(), is(COMPANY_SIZE));
+    verify(companyRepository, never()).existsByName(any());
+  }
+
+  @Test
+  void updateCompanyDoesNotValidateUniquenessWhenNameIsUnchanged() {
+    UserEntity owner = UserEntity.builder().id(USER_ID).build();
+    CompanyEntity company = companyOwnedBy(owner);
+    when(userService.getUser(USER_ID)).thenReturn(owner);
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
+    when(updateRequest.getName()).thenReturn(COMPANY_NAME);
+    when(companyRepository.save(company)).thenReturn(company);
+
+    companyService.updateCompany(USER_ID, updateRequest);
+
+    verify(companyRepository, never()).existsByName(any());
+  }
+
+  @Test
+  void updateCompanyThrowsBadRequestWhenNewNameIsAlreadyTaken() {
+    UserEntity owner = UserEntity.builder().id(USER_ID).build();
+    CompanyEntity company = companyOwnedBy(owner);
+    when(userService.getUser(USER_ID)).thenReturn(owner);
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
+    when(updateRequest.getName()).thenReturn(NEW_COMPANY_NAME);
+    when(companyRepository.existsByName(NEW_COMPANY_NAME)).thenReturn(true);
+
+    assertThrows(BadRequestException.class,
+        () -> companyService.updateCompany(USER_ID, updateRequest));
+    verify(companyRepository, never()).save(any());
+  }
+
+  @Test
+  void updateCompanyThrowsNotFoundWhenUserOwnsNoCompany() {
+    UserEntity owner = UserEntity.builder().id(USER_ID).build();
+    when(userService.getUser(USER_ID)).thenReturn(owner);
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.empty());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> companyService.updateCompany(USER_ID, updateRequest));
+    assertThat(exception.getMessage(), is(NO_COMPANY_OWNED));
+    verify(companyRepository, never()).save(any());
+  }
+
+  @Test
+  void updateCompanyMapsStoredLogoReferenceAsPreSignedDownloadUrl() {
+    UserEntity owner = UserEntity.builder().id(USER_ID).build();
+    CompanyEntity company = companyOwnedBy(owner);
+    company.setProfileImageUrl(COMPANY_IMAGE_PATH);
+    when(userService.getUser(USER_ID)).thenReturn(owner);
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
+    when(companyRepository.save(company)).thenReturn(company);
+    when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
+        .thenReturn(COMPANY_IMAGE_URL);
+
+    UpdateCompanyRestResponse response = companyService.updateCompany(USER_ID, updateRequest);
+
+    assertThat(response.getProfileImageUrl(), is(COMPANY_IMAGE_URL));
   }
 
   private JobPostEntity job() {

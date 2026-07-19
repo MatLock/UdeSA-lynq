@@ -33,5 +33,6 @@ public class GetJobRestResponse {
   private JobPostedByRestResponse postedBy;
   private List<String> skills;
   private Integer lynqScore;
+  private Long totalCandidatesApplied;
 
 }

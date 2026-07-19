@@ -1,10 +1,12 @@
 package com.lynq.backend.controller.impl;
 
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
+import com.lynq.backend.controller.request.UpdateCompanyRequest;
 import com.lynq.backend.controller.response.CreateUserWithCompanyRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
 import com.lynq.backend.controller.response.GetCompanyDetailRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
+import com.lynq.backend.controller.response.UpdateCompanyRestResponse;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.security.LynqUserPrincipal;
@@ -45,6 +47,9 @@ class CompanyControllerImplTest {
 
   @Mock
   private CreateUserWithCompanyRequest request;
+
+  @Mock
+  private UpdateCompanyRequest updateRequest;
 
   @Mock
   private LynqUserPrincipal principal;
@@ -125,22 +130,22 @@ class CompanyControllerImplTest {
   }
 
   @Test
-  void getCompanyDetailDelegatesToServiceWithPathCompanyId() {
-    when(companyService.getCompanyDetail(COMPANY_ID))
+  void getCompanyDetailDelegatesToServiceWithPathCompanyIdAndAuthenticatedUserId() {
+    when(companyService.getCompanyDetail(COMPANY_ID, USER_ID))
         .thenReturn(GetCompanyDetailRestResponse.builder().id(COMPANY_ID).build());
 
-    companyController.getCompanyDetail(COMPANY_ID);
+    companyController.getCompanyDetail(COMPANY_ID, principal);
 
-    verify(companyService).getCompanyDetail(COMPANY_ID);
+    verify(companyService).getCompanyDetail(COMPANY_ID, USER_ID);
   }
 
   @Test
   void getCompanyDetailRespondsWithOkStatus() {
-    when(companyService.getCompanyDetail(COMPANY_ID))
+    when(companyService.getCompanyDetail(COMPANY_ID, USER_ID))
         .thenReturn(GetCompanyDetailRestResponse.builder().id(COMPANY_ID).build());
 
     ResponseEntity<GlobalRestResponse<GetCompanyDetailRestResponse>> response =
-        companyController.getCompanyDetail(COMPANY_ID);
+        companyController.getCompanyDetail(COMPANY_ID, principal);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
   }
@@ -151,16 +156,62 @@ class CompanyControllerImplTest {
         .id(COMPANY_ID)
         .name(COMPANY_NAME)
         .build();
-    when(companyService.getCompanyDetail(COMPANY_ID)).thenReturn(detail);
+    when(companyService.getCompanyDetail(COMPANY_ID, USER_ID)).thenReturn(detail);
 
     ResponseEntity<GlobalRestResponse<GetCompanyDetailRestResponse>> response =
-        companyController.getCompanyDetail(COMPANY_ID);
+        companyController.getCompanyDetail(COMPANY_ID, principal);
 
     GlobalRestResponse<GetCompanyDetailRestResponse> body = response.getBody();
     assertThat(body, is(notNullValue()));
     assertThat(body.isSuccess(), is(true));
     assertThat(body.getData().getId(), is(COMPANY_ID));
     assertThat(body.getData().getName(), is(COMPANY_NAME));
+  }
+
+  @Test
+  void updateCompanyDelegatesToServiceWithPrincipalIdAndRequest() {
+    when(companyService.updateCompany(USER_ID, updateRequest)).thenReturn(updatedCompany());
+
+    companyController.updateCompany(updateRequest, principal);
+
+    verify(companyService).updateCompany(USER_ID, updateRequest);
+  }
+
+  @Test
+  void updateCompanyRespondsWithOkStatus() {
+    when(companyService.updateCompany(USER_ID, updateRequest)).thenReturn(updatedCompany());
+
+    ResponseEntity<GlobalRestResponse<UpdateCompanyRestResponse>> response =
+        companyController.updateCompany(updateRequest, principal);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void updateCompanyWrapsServiceResultInSuccessfulEnvelope() {
+    when(companyService.updateCompany(USER_ID, updateRequest)).thenReturn(updatedCompany());
+
+    ResponseEntity<GlobalRestResponse<UpdateCompanyRestResponse>> response =
+        companyController.updateCompany(updateRequest, principal);
+
+    GlobalRestResponse<UpdateCompanyRestResponse> body = response.getBody();
+    assertThat(body, is(notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData().getId(), is(COMPANY_ID));
+    assertThat(body.getData().getName(), is(COMPANY_NAME));
+    assertThat(body.getData().getAbout(), is(COMPANY_ABOUT));
+    assertThat(body.getData().getSize(), is(COMPANY_SIZE));
+  }
+
+  private UpdateCompanyRestResponse updatedCompany() {
+    return UpdateCompanyRestResponse.builder()
+        .id(COMPANY_ID)
+        .name(COMPANY_NAME)
+        .about(COMPANY_ABOUT)
+        .size(COMPANY_SIZE)
+        .profileImageUrl(COMPANY_PROFILE_IMAGE_URL)
+        .createdOn(CREATED_ON)
+        .build();
   }
 
   private CompanyEntity savedCompany() {

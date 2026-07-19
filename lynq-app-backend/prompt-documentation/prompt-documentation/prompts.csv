@@ -10,3 +10,4 @@ date,prompt
 "18-07-2026","check if I need to add the job status in any test"
 "18-07-2026","create endpoint /job/${job_id}/close and endpoint that changes the status of a job from OPEN to CLOSE. add a new column to table job_post that denotes the date when the job was closed. this action can only be performed by the owner of the job. Also update the refresh endpoint to set this date to null when a job is refreshed"
 "18-07-2026","make small commits for all the work done here. add the preffix [lynq-app-backend] use small descriptions and do not mention claude on any of them"
+"19-07-2026","for the UserController.getUser add companyId field in the GetUserRestResponse. If the user owns a company it should return the company id as well"

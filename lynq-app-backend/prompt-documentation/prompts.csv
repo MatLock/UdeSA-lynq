@@ -84,7 +84,8 @@ parameters:
  - salaryRangeTop [Integer]
  - jobPostType [jobPostType]
  - user [UserEntity - must be taken from security context]
- - company [CompanyEntity - must be inferred from user] (only users linked to a company can create job) throw BadRequestException if the user is not of type COMPANY - add validation""26-06-2026","make exception messages to be constants instead of hardcoding the message value"
+ - company [CompanyEntity - must be inferred from user] (only users linked to a company can create job) throw BadRequestException if the user is not of type COMPANY - add validation"
+"26-06-2026","make exception messages to be constants instead of hardcoding the message value"
 "26-06-2026","add JunitTest new method `createJob`  in class JobService"
 "26-06-2026","create new method in JobControllerImpl that calls jobService.createJob(..). all the parameters that jobService requires should come from a requestObject in requestBody"
 "26-06-2026","add JunitTest for method createJob in JobControllerImpl"
@@ -92,7 +93,8 @@ parameters:
 "26-06-2026","alter method createJob -> make the request to also have an optional field of type List<String> denoting JobPostSkillEntity. if the list is present it should create the skills for the job and save it in the database"
 "27-06-2026","add Full Name to userEntity"
 "27-06-2026","add fullName as part of the request of `createUser`"
-"27-06-2026","create a new endpoint. PATCH to modify userProfile fields. fields allowed to be modified in the request. birthDate, linkedinUrl, githubUrl, about, currentPosition, userProfileImageUrl, fullName""27-06-2026","how can I generate openapi specification of all the endpoints in this service"
+"27-06-2026","create a new endpoint. PATCH to modify userProfile fields. fields allowed to be modified in the request. birthDate, linkedinUrl, githubUrl, about, currentPosition, userProfileImageUrl, fullName"
+"27-06-2026","how can I generate openapi specification of all the endpoints in this service"
 "28-06-2026","getting a 503 for http://localhost:8082/lynq-backend-app/user when creating an user"
 "28-06-2026","add `owner_user_id` to table companies like it is defined in CompanyEntity.java"
 "29-06-2026","implement new endpoint GET ""/user"". it returns all user information. userId must be taken from auth context"
@@ -150,3 +152,6 @@ parameters:
 "18-07-2026","create new endpoint in JobController PATCH ""/job/${job_id}"" that allows update of a jobpost if the user is the publisher of such job post. Updatable fields are title, description, type, salary (both lower and top) and the skills."
 "18-07-2026","to the new endpoint created. add another updatable field ""status"""
 "18-07-2026","create new backend endpoint for JobController GET ""/job/mine"" and endpoint paginated that returns a list of GetJobRestResponse that the user owns. Can be executed only for users that are of type owner"
+"19-07-2026","modify CompanyController.getCompanyDetail add validation that only the owner can call this endpoint. return a 403 if another user that do not own the company with id tries to retrieve its information"
+"19-07-2026","for the UserController.getUser add companyId field in the GetUserRestResponse. If the user owns a company it should return the company id as well"
+"19-07-2026","add unit test and integration test for new endpoint PATCH /company/${comoany_id}"

@@ -56,6 +56,8 @@ public class JobService {
   private static final String ONLY_JOB_OWNER_CAN_CLOSE = "Only the owner of the job post can close it";
   private static final String ONLY_OPEN_JOBS_CAN_BE_CLOSED = "Only open job posts can be closed";
   private static final String ONLY_JOB_OWNER_CAN_UPDATE = "Only the owner of the job post can update it";
+  private static final String ONLY_JOB_OWNER_CAN_VIEW_CANDIDATES =
+      "Only the owner of the job post can view its candidates";
 
   private final JobPostRepository jobPostRepository;
   private final CompanyRepository companyRepository;
@@ -247,6 +249,9 @@ public class JobService {
   @AuditLog
   @Transactional(readOnly = true)
   public PagedRestResponse<JobCandidateResponse> getJobCandidates(String jobId, Pageable pageable) {
+    UserEntity user = getAuthenticatedUser();
+    getOwnedJob(jobId, user, ONLY_JOB_OWNER_CAN_VIEW_CANDIDATES);
+
     return PagedRestResponse.from(userApplicationJobRepository
         .findCandidatesByJobId(jobId, pageable)
         .map(this::toCandidateResponse));
@@ -273,7 +278,12 @@ public class JobService {
     }
 
     return PagedRestResponse.from(jobPostRepository.searchJobsOwnedByUser(user.getId(), pageable)
-        .map(projection -> toResponse(projection, user)));
+        .map(projection -> {
+          GetJobRestResponse response = toResponse(projection, user);
+          response.setTotalCandidatesApplied(
+              userApplicationJobRepository.countByJobId(projection.jobId()));
+          return response;
+        }));
   }
 
   @AuditLog

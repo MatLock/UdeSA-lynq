@@ -11,7 +11,6 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 public class GetJobDetailForCandidateRestResponse extends GetJobRestResponse {
 
-  private Long totalCandidatesApplied;
 
   public static GetJobDetailForCandidateRestResponse from(GetJobRestResponse source,
       Long totalCandidatesApplied) {

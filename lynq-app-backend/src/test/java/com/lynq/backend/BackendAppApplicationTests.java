@@ -4,6 +4,7 @@ import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
 import com.lynq.backend.controller.request.SkillEnhanceRequest;
+import com.lynq.backend.controller.request.UpdateCompanyRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
@@ -94,6 +95,12 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final Integer COMPANY_SIZE = 250;
   private static final String COMPANY_PROFILE_IMAGE_URL = "https://cdn.lynq.com/logos/lynq.png";
   private static final String COMPANY_ID = "22222222-2222-2222-2222-222222222222";
+  private static final String UPDATED_COMPANY_NAME = "Lynq Labs";
+  private static final String UPDATED_COMPANY_ABOUT = "Now hiring across the globe.";
+  private static final Integer UPDATED_COMPANY_SIZE = 500;
+  private static final String OTHER_USER_ID = "33333333-3333-3333-3333-333333333333";
+  private static final String OTHER_COMPANY_ID = "44444444-4444-4444-4444-444444444444";
+  private static final String OTHER_COMPANY_NAME = "Taken Name Inc";
 
   private static final String JOB_TITLE = "Senior Backend Engineer";
   private static final String JOB_DESCRIPTION = "Build and scale the Lynq hiring platform.";
@@ -332,6 +339,84 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
     assertThat(response.statusCode(), is(401));
     assertThat(userRepository.findById(USER_ID).orElseThrow().getFullName(), is(FULL_NAME));
+  }
+
+  @Test
+  void updateCompanyAuthenticatesAppliesSuppliedFieldsPersistsAndReturnsOk() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCompanyOwnerWithCompany();
+
+    UpdateCompanyRequest updateRequest = new UpdateCompanyRequest();
+    updateRequest.setName(UPDATED_COMPANY_NAME);
+    updateRequest.setAbout(UPDATED_COMPANY_ABOUT);
+    updateRequest.setSize(UPDATED_COMPANY_SIZE);
+
+    HttpResponse<String> response = patchCompany(updateRequest);
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> body = parse(response.body());
+    assertThat(body.get("success"), is(true));
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> data = (Map<String, Object>) body.get("data");
+    assertThat(data.get("id"), is(COMPANY_ID));
+    assertThat(data.get("name"), is(UPDATED_COMPANY_NAME));
+    assertThat(data.get("about"), is(UPDATED_COMPANY_ABOUT));
+    assertThat(data.get("size"), is(UPDATED_COMPANY_SIZE));
+
+    CompanyEntity persisted = companyRepository.findById(COMPANY_ID).orElseThrow();
+    assertThat(persisted.getName(), is(UPDATED_COMPANY_NAME));
+    assertThat(persisted.getAbout(), is(UPDATED_COMPANY_ABOUT));
+    assertThat(persisted.getSize(), is(UPDATED_COMPANY_SIZE));
+  }
+
+  @Test
+  void updateCompanyReturnsNotFoundWhenUserOwnsNoCompany() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCandidateUser();
+
+    UpdateCompanyRequest updateRequest = new UpdateCompanyRequest();
+    updateRequest.setAbout(UPDATED_COMPANY_ABOUT);
+
+    HttpResponse<String> response = patchCompany(updateRequest);
+
+    assertThat(response.statusCode(), is(404));
+    assertThat(parse(response.body()).get("success"), is(false));
+  }
+
+  @Test
+  void updateCompanyReturnsBadRequestWhenNewNameIsAlreadyTaken() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCompanyOwnerWithCompany();
+    UserEntity otherOwner = seedCompanyUser(OTHER_USER_ID, FULL_NAME, CURRENT_POSITION,
+        COMPANY_PROFILE_IMAGE_URL);
+    seedCompany(OTHER_COMPANY_ID, OTHER_COMPANY_NAME, otherOwner);
+
+    UpdateCompanyRequest updateRequest = new UpdateCompanyRequest();
+    updateRequest.setName(OTHER_COMPANY_NAME);
+
+    HttpResponse<String> response = patchCompany(updateRequest);
+
+    assertThat(response.statusCode(), is(400));
+    assertThat(parse(response.body()).get("success"), is(false));
+    assertThat(companyRepository.findById(COMPANY_ID).orElseThrow().getName(), is(COMPANY_NAME));
+  }
+
+  @Test
+  void updateCompanyReturnsUnauthorizedWhenIamRejectsToken() throws Exception {
+    stubIamInvalidToken();
+    seedCompanyOwnerWithCompany();
+
+    UpdateCompanyRequest updateRequest = new UpdateCompanyRequest();
+    updateRequest.setName(UPDATED_COMPANY_NAME);
+
+    HttpResponse<String> response = patchCompany(updateRequest);
+
+    assertThat(response.statusCode(), is(401));
+    assertThat(companyRepository.findById(COMPANY_ID).orElseThrow().getName(), is(COMPANY_NAME));
   }
 
   @Test
@@ -904,6 +989,17 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
   }
 
+  private HttpResponse<String> patchCompany(UpdateCompanyRequest updateRequest) throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(createCompanyUrl()))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .method("PATCH", HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(updateRequest)))
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
   private HttpResponse<String> postCreateJob() throws Exception {
     return postCreateJob(null);
   }
@@ -1240,7 +1336,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   void getJobCandidatesReturnsAppliedCandidatesNewestFirst() throws Exception {
     stubIamValidateToken();
     stubIamUserInfo();
-    seedSingleJob(INITIAL_SEEN);
+    seedJobOwnedBy(seedCompanyOwner(USER_ID), null);
     seedCandidate(CANDIDATE_A_ID, CANDIDATE_A_NAME, CANDIDATE_A_POSITION);
     seedCandidate(CANDIDATE_B_ID, CANDIDATE_B_NAME, CANDIDATE_B_POSITION);
     seedApplication(APPLICATION_OLDEST_ID, CANDIDATE_B_ID, LocalDate.now().minusDays(3));
@@ -1271,7 +1367,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   void getJobCandidatesDefaultsPageSizeToTen() throws Exception {
     stubIamValidateToken();
     stubIamUserInfo();
-    seedSingleJob(INITIAL_SEEN);
+    seedJobOwnedBy(seedCompanyOwner(USER_ID), null);
     seedCandidate(CANDIDATE_A_ID, CANDIDATE_A_NAME, CANDIDATE_A_POSITION);
     seedApplication(APPLICATION_NEWEST_ID, CANDIDATE_A_ID, LocalDate.now());
 
@@ -1288,7 +1384,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   void getJobCandidatesReturnsEmptyContentWhenNoApplications() throws Exception {
     stubIamValidateToken();
     stubIamUserInfo();
-    seedSingleJob(INITIAL_SEEN);
+    seedJobOwnedBy(seedCompanyOwner(USER_ID), null);
 
     HttpResponse<String> response = getCandidates(JOB_ID, null, null);
 
@@ -1304,7 +1400,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   void getJobCandidatesIncludesLynqScoreFromMatchingSkills() throws Exception {
     stubIamValidateToken();
     stubIamUserInfo();
-    seedSingleJobWithSkills(List.of(SKILL_JAVA, SKILL_SPRING));
+    seedJobOwnedBy(seedCompanyOwner(USER_ID), List.of(SKILL_JAVA, SKILL_SPRING));
     seedCandidateWithSkills(CANDIDATE_A_ID, CANDIDATE_A_NAME, CANDIDATE_A_POSITION,
         List.of(SKILL_JAVA));
     seedApplication(APPLICATION_NEWEST_ID, CANDIDATE_A_ID, LocalDate.now());
@@ -1316,6 +1412,33 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     List<Map<String, Object>> content = (List<Map<String, Object>>) data.get("content");
     assertThat(content.size(), is(1));
     assertThat(((Number) content.get(0).get("lynqScore")).intValue(), is(MATCHING_LYNQ_SCORE));
+  }
+
+  @Test
+  void getJobCandidatesReturnsForbiddenWhenCallerIsNotTheJobOwner() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCompanyOwner(USER_ID);
+    seedJobOwnedBy(seedCompanyOwner(OTHER_USER_ID), null);
+    seedCandidate(CANDIDATE_A_ID, CANDIDATE_A_NAME, CANDIDATE_A_POSITION);
+    seedApplication(APPLICATION_NEWEST_ID, CANDIDATE_A_ID, LocalDate.now());
+
+    HttpResponse<String> response = getCandidates(JOB_ID, null, null);
+
+    assertThat(response.statusCode(), is(403));
+    assertThat(parse(response.body()).get("success"), is(false));
+  }
+
+  @Test
+  void getJobCandidatesReturnsNotFoundWhenJobDoesNotExist() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCompanyOwner(USER_ID);
+
+    HttpResponse<String> response = getCandidates(UNKNOWN_JOB_ID, null, null);
+
+    assertThat(response.statusCode(), is(404));
+    assertThat(parse(response.body()).get("success"), is(false));
   }
 
   // ---------------------------------------------------------------------------
@@ -1424,6 +1547,34 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .jobPost(job)
         .skill(skill)
         .build()));
+    jobPostRepository.save(job);
+  }
+
+  private UserEntity seedCompanyOwner(String id) {
+    return userRepository.save(UserEntity.builder()
+        .id(id)
+        .type(UserType.COMPANY)
+        .createdOn(LocalDate.now())
+        .build());
+  }
+
+  private void seedJobOwnedBy(UserEntity owner, List<String> skills) {
+    JobPostEntity job = JobPostEntity.builder()
+        .id(JOB_ID)
+        .title(JOB_TITLE)
+        .workType(JOB_WORK_TYPE)
+        .jobPostSource(JOB_POST_TYPE)
+        .createdOn(LocalDate.now())
+        .totalSeen(INITIAL_SEEN)
+        .createdByUser(owner)
+        .build();
+    if (skills != null) {
+      skills.forEach(skill -> job.getSkills().add(JobPostSkillEntity.builder()
+          .id("jskill-" + skill)
+          .jobPost(job)
+          .skill(skill)
+          .build()));
+    }
     jobPostRepository.save(job);
   }
 

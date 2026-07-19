@@ -31,7 +31,9 @@ public interface UserController {
   @Operation(
       summary = "Get the authenticated user",
       description = "Returns the full profile of the authenticated user. The user identity is "
-          + "resolved from the bearer token, so no path or query parameters are required.",
+          + "resolved from the bearer token, so no path or query parameters are required. When the "
+          + "user owns a company, the id of that company is included as companyId; otherwise "
+          + "companyId is null.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
       @ApiResponse(
@@ -54,7 +56,8 @@ public interface UserController {
                           "githubUrl": "https://github.com/janedoe",
                           "linkedinUrl": "https://linkedin.com/in/janedoe",
                           "birthDate": "1995-04-12",
-                          "createdOn": "2026-06-25"
+                          "createdOn": "2026-06-25",
+                          "companyId": null
                         }
                       }"""))),
       @ApiResponse(

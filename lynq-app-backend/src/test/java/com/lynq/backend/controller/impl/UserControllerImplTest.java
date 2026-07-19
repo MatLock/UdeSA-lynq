@@ -48,6 +48,7 @@ class UserControllerImplTest {
       "https://lynq-bucket.s3.amazonaws.com/lynq/users/" + USER_ID + "/profile/" + FILE_NAME + "?X-Amz-Signature=abc";
   private static final String RESUME_ID = "resume-1";
   private static final String RESUME_NAME = "Jane Doe - Backend";
+  private static final String COMPANY_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
 
   @Mock
   private UserService userService;
@@ -103,6 +104,7 @@ class UserControllerImplTest {
     UserEntity user = savedUser();
     when(userService.getUser(USER_ID)).thenReturn(user);
     when(userService.obtainProfileImagePreSignedUrl(user)).thenReturn(PRE_SIGNED_URL);
+    when(userService.obtainOwnedCompanyId(user)).thenReturn(COMPANY_ID);
 
     ResponseEntity<GlobalRestResponse<GetUserRestResponse>> response =
         userController.getUser(principal);
@@ -121,6 +123,7 @@ class UserControllerImplTest {
     assertThat(data.getLinkedinUrl(), is(LINKEDIN_URL));
     assertThat(data.getBirthDate(), is(BIRTH_DATE));
     assertThat(data.getCreatedOn(), is(CREATED_ON));
+    assertThat(data.getCompanyId(), is(COMPANY_ID));
   }
 
   @Test

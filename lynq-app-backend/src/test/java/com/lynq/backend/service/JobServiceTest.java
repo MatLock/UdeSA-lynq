@@ -143,6 +143,8 @@ class JobServiceTest {
       "Only open job posts can be closed";
   private static final String ONLY_JOB_OWNER_CAN_UPDATE =
       "Only the owner of the job post can update it";
+  private static final String ONLY_JOB_OWNER_CAN_VIEW_CANDIDATES =
+      "Only the owner of the job post can view its candidates";
 
   private static final String UPDATED_TITLE = "Staff Backend Engineer";
   private static final String UPDATED_DESCRIPTION = "Lead the Lynq platform architecture.";
@@ -461,6 +463,7 @@ class JobServiceTest {
         JOB_SKILLS_CONCATENATED);
     when(jobPostRepository.searchJobsOwnedByUser(USER_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
+    when(userApplicationJobRepository.countByJobId(JOB_ID)).thenReturn(TOTAL_CANDIDATES_APPLIED);
     when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
         .thenReturn(COMPANY_IMAGE_URL);
     when(storageService.obtainProfilePreSignedUrl(POSTER_IMAGE_PATH))
@@ -476,7 +479,21 @@ class JobServiceTest {
     assertThat(job.getPostedBy().getId(), is(POSTER_ID));
     assertThat(job.getSkills(), contains(SKILL_JAVA, SKILL_SPRING));
     assertThat(job.getLynqScore(), is(nullValue()));
+    assertThat(job.getTotalCandidatesApplied(), is(TOTAL_CANDIDATES_APPLIED));
     verify(jobPostRepository).searchJobsOwnedByUser(USER_ID, DEFAULT_PAGEABLE);
+  }
+
+  @Test
+  void searchOwnedJobsDefaultsTotalCandidatesAppliedToZeroWhenNoOneApplied() {
+    UserEntity owner = companyUser();
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.searchJobsOwnedByUser(USER_ID, DEFAULT_PAGEABLE))
+        .thenReturn(new PageImpl<>(List.of(projectionWithId(JOB_ID)), DEFAULT_PAGEABLE, 1));
+    when(userApplicationJobRepository.countByJobId(JOB_ID)).thenReturn(0L);
+
+    PagedRestResponse<GetJobRestResponse> result = jobService.searchOwnedJobs(DEFAULT_PAGEABLE);
+
+    assertThat(result.getContent().get(0).getTotalCandidatesApplied(), is(0L));
   }
 
   @Test
@@ -942,6 +959,7 @@ class JobServiceTest {
 
   @Test
   void getJobCandidatesMapsProjectionFieldsAndGeneratesPresignedImageUrl() {
+    stubJobOwnedByAuthenticatedUser();
     when(storageService.obtainProfilePreSignedUrl(CANDIDATE_IMAGE_PATH))
         .thenReturn(CANDIDATE_IMAGE_URL);
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
@@ -965,6 +983,7 @@ class JobServiceTest {
 
   @Test
   void getJobCandidatesScoresLynqAsPercentageOfMatchingJobSkills() {
+    stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
         JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_IMAGE_PATH, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
         CANDIDATE_JOB_SKILLS, CANDIDATE_JOB_SKILLS);
@@ -979,6 +998,7 @@ class JobServiceTest {
 
   @Test
   void getJobCandidatesScoresLynqZeroWhenCandidateHasNoSkills() {
+    stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
         JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_IMAGE_PATH, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
         CANDIDATE_JOB_SKILLS, null);
@@ -993,6 +1013,7 @@ class JobServiceTest {
 
   @Test
   void getJobCandidatesScoresLynqZeroWhenJobHasNoSkills() {
+    stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
         JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_IMAGE_PATH, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
         null, CANDIDATE_MATCHING_SKILLS);
@@ -1007,6 +1028,7 @@ class JobServiceTest {
 
   @Test
   void getJobCandidatesLeavesProfileImageNullWhenPathIsBlank() {
+    stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
         JOB_ID, CANDIDATE_FULL_NAME, null, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
         CANDIDATE_JOB_SKILLS, CANDIDATE_MATCHING_SKILLS);
@@ -1022,6 +1044,7 @@ class JobServiceTest {
 
   @Test
   void getJobCandidatesMapsPaginationMetadataAndPreservesOrder() {
+    stubJobOwnedByAuthenticatedUser();
     Pageable pageable = PageRequest.of(1, 2);
     Page<JobCandidateProjection> page = new PageImpl<>(
         List.of(candidateProjection(APPLICATION_ID_NEWEST),
@@ -1042,6 +1065,7 @@ class JobServiceTest {
 
   @Test
   void getJobCandidatesReturnsEmptyContentWhenNoCandidates() {
+    stubJobOwnedByAuthenticatedUser();
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(), DEFAULT_PAGEABLE, 0));
 
@@ -1050,6 +1074,30 @@ class JobServiceTest {
 
     assertThat(result.getContent(), is(empty()));
     assertThat(result.getTotalElements(), is(0L));
+  }
+
+  @Test
+  void getJobCandidatesThrowsForbiddenWhenCallerIsNotTheOwner() {
+    UserEntity anotherOwner = UserEntity.builder().id("another-user").build();
+    JobPostEntity job = ownedJob(anotherOwner, List.of(SKILL_JAVA));
+    stubAuthenticatedUser(companyUser());
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+
+    ForbiddenException exception = assertThrows(ForbiddenException.class,
+        () -> jobService.getJobCandidates(JOB_ID, DEFAULT_PAGEABLE));
+    assertThat(exception.getMessage(), is(ONLY_JOB_OWNER_CAN_VIEW_CANDIDATES));
+    verify(userApplicationJobRepository, never()).findCandidatesByJobId(any(), any());
+  }
+
+  @Test
+  void getJobCandidatesThrowsNotFoundWhenJobDoesNotExist() {
+    stubAuthenticatedUser(companyUser());
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.empty());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> jobService.getJobCandidates(JOB_ID, DEFAULT_PAGEABLE));
+    assertThat(exception.getMessage(), is(JOB_POST_NOT_FOUND));
+    verify(userApplicationJobRepository, never()).findCandidatesByJobId(any(), any());
   }
 
   private JobCandidateProjection candidateProjection(String applicationId) {
@@ -1087,6 +1135,12 @@ class JobServiceTest {
         .skill(name)
         .build()));
     return job;
+  }
+
+  private void stubJobOwnedByAuthenticatedUser() {
+    UserEntity owner = companyUser();
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(ownedJob(owner, List.of())));
   }
 
   private UserEntity candidateUser(List<String> skillNames) {

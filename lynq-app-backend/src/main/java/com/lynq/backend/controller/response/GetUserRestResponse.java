@@ -22,5 +22,6 @@ public class GetUserRestResponse {
   private String linkedinUrl;
   private LocalDate birthDate;
   private LocalDate createdOn;
+  private String companyId;
 
 }

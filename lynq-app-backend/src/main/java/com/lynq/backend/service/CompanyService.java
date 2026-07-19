@@ -3,10 +3,13 @@ package com.lynq.backend.service;
 import com.fasterxml.uuid.Generators;
 import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
+import com.lynq.backend.controller.request.UpdateCompanyRequest;
 import com.lynq.backend.controller.response.CompanyJobRestResponse;
 import com.lynq.backend.controller.response.GetCompanyDetailRestResponse;
+import com.lynq.backend.controller.response.UpdateCompanyRestResponse;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.exceptions.BadRequestException;
+import com.lynq.backend.exceptions.ForbiddenException;
 import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
@@ -63,12 +66,7 @@ public class CompanyService {
     return companyRepository.save(company);
   }
 
-  /**
-   * Build the S3 path for the company logo of the company owned by the given user, persist it as the
-   * company's profile image reference, and return a short-lived pre-signed upload URL. Mirrors
-   * {@link UserService#generateProfileImageUploadUrl}: calling it again replaces the stored
-   * reference and best-effort deletes the previous object.
-   */
+
   @AuditLog
   @Transactional
   public String generateCompanyImageUploadUrl(String userId, String fileName) {
@@ -93,9 +91,14 @@ public class CompanyService {
 
   @AuditLog
   @Transactional(readOnly = true)
-  public GetCompanyDetailRestResponse getCompanyDetail(String companyId) {
+  public GetCompanyDetailRestResponse getCompanyDetail(String companyId, String userId) {
     CompanyEntity company = companyRepository.findById(companyId)
         .orElseThrow(() -> new NotFoundException(String.format(COMPANY_NOT_FOUND, companyId)));
+
+    if (company.getOwner() == null || !company.getOwner().getId().equals(userId)) {
+      throw new ForbiddenException(
+          String.format("User '%s' is not allowed to access company '%s'", userId, companyId));
+    }
 
     return GetCompanyDetailRestResponse.builder()
         .id(company.getId())
@@ -107,6 +110,37 @@ public class CompanyService {
         .jobs(jobPostRepository.findByCompanyId(companyId).stream()
             .map(this::toJobResponse)
             .toList())
+        .build();
+  }
+
+
+  @AuditLog
+  @Transactional
+  public UpdateCompanyRestResponse updateCompany(String userId, UpdateCompanyRequest request) {
+    UserEntity owner = userService.getUser(userId);
+    CompanyEntity company = companyRepository.findByOwner(owner)
+        .orElseThrow(() -> new NotFoundException("No company owned by user '" + userId + "'"));
+
+    if (request.getName() != null && !request.getName().equals(company.getName())) {
+      validateCompanyNameIsUnique(request.getName());
+      company.setName(request.getName());
+    }
+    if (request.getAbout() != null) {
+      company.setAbout(request.getAbout());
+    }
+    if (request.getSize() != null) {
+      company.setSize(request.getSize());
+    }
+
+    CompanyEntity saved = companyRepository.save(company);
+
+    return UpdateCompanyRestResponse.builder()
+        .id(saved.getId())
+        .name(saved.getName())
+        .about(saved.getAbout())
+        .size(saved.getSize())
+        .profileImageUrl(obtainImageUrl(saved.getProfileImageUrl()))
+        .createdOn(saved.getCreatedOn())
         .build();
   }
 

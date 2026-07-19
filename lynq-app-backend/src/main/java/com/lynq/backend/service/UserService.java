@@ -78,6 +78,17 @@ public class UserService {
 
   @AuditLog
   @Transactional(readOnly = true)
+  public String obtainOwnedCompanyId(UserEntity user) {
+    if (user.getType() != UserType.COMPANY) {
+      return null;
+    }
+    return companyRepository.findByOwner(user)
+        .map(CompanyEntity::getId)
+        .orElse(null);
+  }
+
+  @AuditLog
+  @Transactional(readOnly = true)
   public GetUserProfileRestResponse getUserProfile(String userId) {
     UserEntity user = userRepository.findById(userId)
         .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));

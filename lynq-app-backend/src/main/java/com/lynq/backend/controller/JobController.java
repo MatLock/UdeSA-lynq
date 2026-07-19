@@ -118,7 +118,9 @@ public interface JobController {
       description = "Returns a page of the candidates who applied to the job post identified by the "
           + "given id, newest application first. Each item includes the applicant's public profile "
           + "fields and the date the application was submitted. Pagination is controlled with the "
-          + "'page' (zero-based) and 'pageSize' (default 10) request parameters.",
+          + "'page' (zero-based) and 'pageSize' (default 10) request parameters. Only the user who "
+          + "created the job post may list its candidates. Fails with 404 when no job post matches "
+          + "the id, and 403 when the caller is not the owner.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<GlobalRestResponse<PagedRestResponse<JobCandidateResponse>>> getJobCandidates(
       String jobId,

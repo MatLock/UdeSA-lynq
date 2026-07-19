@@ -460,6 +460,29 @@ class UserServiceTest {
     assertThat(exception.getMessage(), is(USER_NOT_FOUND));
   }
 
+  @Test
+  void obtainOwnedCompanyIdReturnsCompanyIdWhenCompanyOwnerOwnsACompany() {
+    UserEntity owner = companyOwner();
+    CompanyEntity company = CompanyEntity.builder().id(COMPANY_ID).owner(owner).build();
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
+
+    assertThat(userService.obtainOwnedCompanyId(owner), is(COMPANY_ID));
+  }
+
+  @Test
+  void obtainOwnedCompanyIdReturnsNullWhenCompanyOwnerOwnsNoCompany() {
+    UserEntity owner = companyOwner();
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.empty());
+
+    assertThat(userService.obtainOwnedCompanyId(owner), is(nullValue()));
+  }
+
+  @Test
+  void obtainOwnedCompanyIdReturnsNullForNonCompanyUserWithoutQueryingCompanies() {
+    assertThat(userService.obtainOwnedCompanyId(candidate()), is(nullValue()));
+    verify(companyRepository, never()).findByOwner(any());
+  }
+
   private UserEntity candidate() {
     return UserEntity.builder().id(USER_ID).type(UserType.CANDIDATE).build();
   }

@@ -2,10 +2,12 @@ package com.lynq.backend.controller.impl;
 
 import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
+import com.lynq.backend.controller.request.UpdateCompanyRequest;
 import com.lynq.backend.controller.response.CreateUserWithCompanyRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
 import com.lynq.backend.controller.response.GetCompanyDetailRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
+import com.lynq.backend.controller.response.UpdateCompanyRestResponse;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.security.LynqUserPrincipal;
 import com.lynq.backend.service.CompanyService;
@@ -14,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -73,12 +76,24 @@ public class CompanyControllerImpl implements com.lynq.backend.controller.Compan
   @GetMapping("/{companyId}")
   @AuditLog
   public ResponseEntity<GlobalRestResponse<GetCompanyDetailRestResponse>> getCompanyDetail(
-      @PathVariable String companyId) {
-    GetCompanyDetailRestResponse company = companyService.getCompanyDetail(companyId);
+      @PathVariable String companyId, @AuthenticationPrincipal LynqUserPrincipal principal) {
+    GetCompanyDetailRestResponse company = companyService.getCompanyDetail(companyId, principal.getId());
 
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, company));
+  }
+
+  @Override
+  @PatchMapping
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<UpdateCompanyRestResponse>> updateCompany(
+      @RequestBody UpdateCompanyRequest request, @AuthenticationPrincipal LynqUserPrincipal principal) {
+    UpdateCompanyRestResponse response = companyService.updateCompany(principal.getId(), request);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, response));
   }
 
 }
