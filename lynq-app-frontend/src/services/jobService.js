@@ -301,6 +301,32 @@ const create_job = async (
   return payload?.data;
 };
 
+/**
+ * Fetch a page of the candidates who applied to a job post, newest application
+ * first.
+ *
+ * Calls GET /job/{jobId}/candidates (JobController.getJobCandidates) through
+ * `authFetch`. Powers the owner's "see candidates" list reached from the my-job-
+ * posts cards. Each item carries the applicant's public profile plus their LYNQ
+ * match score for this job. Note the backend paging param is `pageSize` (not
+ * `size`).
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch
+ * @param {string} jobId
+ * @param {object} [params]
+ * @param {number} [params.page=0] - Zero-based page index.
+ * @param {number} [params.pageSize=10] - Page size.
+ * @returns {Promise<object>} The unwrapped PagedRestResponse of
+ *   JobCandidateResponse ({ id, userId, jobId, userFullName, userProfileImage,
+ *   userCurrentPosition, userAppliedOn, lynqScore }).
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const get_job_candidates = async (authFetch, jobId, { page = 0, pageSize = 10 } = {}) => {
+  const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  const payload = await authFetch(`/job/${jobId}/candidates?${query}`, { method: 'GET' });
+  return payload?.data;
+};
+
 export default {
   get_jobs,
   get_my_jobs,
@@ -312,4 +338,5 @@ export default {
   close_job,
   refresh_job,
   create_job,
+  get_job_candidates,
 };

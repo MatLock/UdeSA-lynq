@@ -7,6 +7,7 @@ import useRegister from '../../hooks/useRegister'
 import useRegisterSubmit from '../../hooks/useRegisterSubmit'
 import registrationService from '../../services/registrationService'
 import companyService from '../../services/companyService'
+import securedFetch from '../../utils/securedFetch'
 import Toast from '../Toast/Toast'
 import StepIndicator from '../StepIndicator/StepIndicator'
 import strings from '../../i18n'
@@ -74,8 +75,8 @@ const CompanyDetailsStep = ({ active, stepNumber, totalSteps }) => {
       if (logoFile) {
         try {
           const preSignedUrl = await companyService.generate_company_image_upload_url(
+            securedFetch.tokenFetcher(auth.accessToken),
             logoFile.name,
-            auth.accessToken,
           )
           await companyService.upload_company_image(preSignedUrl, logoFile)
         } catch {

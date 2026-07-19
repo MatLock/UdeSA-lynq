@@ -9,13 +9,14 @@ import HomePage from './pages/home/HomePage.jsx'
 import JobDetailPage from './pages/job-detail/JobDetailPage.jsx'
 import UserProfilePage from './pages/user-profile/UserProfilePage.jsx'
 import CompanyDetailPage from './pages/company-detail/CompanyDetailPage.jsx'
+import CompanyEditPage from './pages/company-edit/CompanyEditPage.jsx'
 import CreateJobPage from './pages/create-job/CreateJobPage.jsx'
 import ProfilePage from './pages/profile/ProfilePage.jsx'
 import MyResumePage from './pages/my-resume/MyResumePage.jsx'
 import ApplicationsPage from './pages/applications/ApplicationsPage.jsx'
-import MyCompanyPage from './pages/my-company/MyCompanyPage.jsx'
 import MyJobPostsPage from './pages/my-job-posts/MyJobPostsPage.jsx'
 import EditJobPage from './pages/edit-job/EditJobPage.jsx'
+import JobCandidatesPage from './pages/job-candidates/JobCandidatesPage.jsx'
 import AuthProvider from './context/AuthContext.jsx'
 import AppLayout from './components/AppLayout/AppLayout.jsx'
 import RequireAuth from './components/RequireAuth/RequireAuth.jsx'
@@ -49,15 +50,15 @@ createRoot(document.getElementById('root')).render(
             <Route path="/job/mine" element={<MyJobPostsPage />} />
             <Route path="/job/:jobId/details" element={<JobDetailPage />} />
             <Route path="/job/:jobId/edit" element={<EditJobPage />} />
+            <Route path="/job/:jobId/candidates" element={<JobCandidatesPage />} />
             <Route path="/user/:userId" element={<UserProfilePage />} />
             <Route path="/company/:companyId" element={<CompanyDetailPage />} />
+            <Route path="/company/:companyId/edit" element={<CompanyEditPage />} />
             <Route path="/create-job" element={<CreateJobPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             {/* Candidate sections */}
             <Route path="/my-resume" element={<MyResumePage />} />
             <Route path="/applications" element={<ApplicationsPage />} />
-            {/* Company sections */}
-            <Route path="/my-company" element={<MyCompanyPage />} />
           </Route>
           {/* The register flow is an in-place carousel: a single /register route
               wraps the wizard, which slides between steps without changing URL. */}

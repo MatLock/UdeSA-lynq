@@ -56,7 +56,14 @@ const scoreColorVar = (score) => {
 const truncate = (text, max) =>
   text && text.length > max ? `${text.slice(0, max).trimEnd()}…` : text ?? ''
 
-const JobCard = ({ job, onApply, showScore = true, showStatus = false, actions }) => {
+const JobCard = ({
+  job,
+  onApply,
+  showScore = true,
+  showStatus = false,
+  showCandidates = false,
+  actions,
+}) => {
   const t = strings.jobCard
   const workTypeLabel = t.workType[job.workType] ?? job.workType
   // Owner-facing lists (my job posts) surface the post's lifecycle state; the
@@ -237,6 +244,23 @@ const JobCard = ({ job, onApply, showScore = true, showStatus = false, actions }
                 {t.published} {publishedAt}
               </span>
             </>
+          )}
+          {/* Owner lists (my job posts) pin the applicant tally and a shortcut to
+              the candidates page at the right of the footer. */}
+          {showCandidates && (
+            <span className="job-card-candidates">
+              <span className="job-card-candidates-count">
+                {t.candidatesApplied.replace('{count}', job.totalCandidatesApplied ?? 0)}
+              </span>
+              <Link
+                to={`/job/${job.jobId}/candidates`}
+                state={{ job }}
+                className="job-card-candidates-link"
+              >
+                {t.seeCandidates}
+                <span aria-hidden="true"> ›</span>
+              </Link>
+            </span>
           )}
         </div>
       </div>

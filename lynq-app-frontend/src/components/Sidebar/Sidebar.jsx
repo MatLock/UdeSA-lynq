@@ -42,7 +42,7 @@ const Sidebar = () => {
     { key: 'profile', icon: '👤', label: t.profile, to: '/profile' },
     ...(isCompany
       ? [
-          { key: 'company', icon: '🏢', label: t.company, to: '/my-company' },
+          { key: 'company', icon: '🏢', label: t.company, to: `/company/${user?.companyId}/edit` },
           { key: 'jobPosts', icon: '📢', label: t.jobPosts, to: '/job/mine' },
         ]
       : [

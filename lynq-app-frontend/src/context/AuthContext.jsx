@@ -78,6 +78,9 @@ const withProfile = (user, profile) =>
         profileImageUrl:
           profileImageCache.read(user.id) ?? profile.userProfileImageUrl,
         userType: profile.userType,
+        // COMPANY owners carry the id of the company they own; the sidebar uses
+        // it to open their own company at /company/{companyId}.
+        companyId: profile.companyId,
         currentPosition: profile.currentPosition,
         about: profile.about,
         githubUrl: profile.githubUrl,

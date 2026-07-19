@@ -101,6 +101,7 @@ const MyJobPostsPage = () => {
                 job={job}
                 showScore={false}
                 showStatus
+                showCandidates
                 actions={
                   <Link
                     to={`/job/${job.jobId}/edit`}

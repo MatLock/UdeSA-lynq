@@ -100,4 +100,6 @@ date,prompt
 2026-07-18,"there is a job post list in both pages user detail and company detail. showing posts that can be close or open. add a nice way to highlight the ones that are closed."
 2026-07-18,"jobdetail page add a button to stop the seeking candidates if the job belongs to the logged user"
 2026-07-18,"in home page. disable scroll for left bar. If the user scrolls only the jobs listing must be scrollable"
-2026-07-18,"rename the route to ""job/mine"" and it should invoke backend endpoint "/job/mine""
+2026-07-18,"rename the route "my-job-post" to ""job/mine"" and it should invoke backend endpoint "/job/mine""
+2026-07-19,"replace react route ""/my-company"" with ""/company/${company_id}"", when the user clicks on it. a backend call has to be made to this url in the backend to retrieve company detail information"
+2026-07-19,"trim company information to 200 characters to avoid making the div too big. if the company descriptions is longer just displayed 197 characters and three dots. The user can see the full description and size once clicks on ""view company"" link"

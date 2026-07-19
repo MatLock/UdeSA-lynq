@@ -220,6 +220,43 @@ a.job-card-poster-value:focus-visible {
   color: var(--text);
 }
 
+/* Owner footer extra: applicant tally + "see candidates" link, pushed to the
+   far right of the meta row (margin-left:auto). */
+.job-card-candidates {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  padding-left: 8px;
+}
+
+.job-card-candidates-count {
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.job-card-candidates-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand-purple);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.job-card-candidates-link:hover {
+  color: var(--brand-purple-dark);
+  text-decoration: underline;
+}
+
 /* Skill Chips, shown below the description within the main column. */
 .job-card-skills {
   display: flex;

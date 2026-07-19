@@ -1,0 +1,251 @@
+/* CompanyEditPage — company editor for the authenticated owner (reached from the
+   sidebar). Reuses the auth card design + field styling (matches login /
+   register / profile), with tokens from index.css. */
+
+/* .login-bg is position:fixed/centered on the auth pages; inside the AppLayout
+   shell it must flow next to the sidebar and scroll when the form is tall. */
+.company-edit-page {
+  position: relative;
+  inset: auto;
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
+  align-items: flex-start;
+  padding: 32px 24px;
+}
+
+/* Fills the full width available next to the sidebar (no centered max-width),
+   so there's no blank space on the left/right. */
+.company-edit-card {
+  max-width: none;
+  margin: 0;
+  padding: 32px;
+  gap: 4px;
+}
+
+.company-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  margin-top: 18px;
+  text-align: left;
+}
+
+/* Centered loader shown in place of the form during the initial fetch. */
+.company-edit-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+
+/* Fetch failure banner, shown in place of the form. */
+.company-edit-load-error {
+  margin: 24px 0;
+  text-align: center;
+}
+
+/* Editable logo at the top of the form. A rounded-square tile with the
+   brand-gradient fallback, revealing a pencil overlay on hover so it reads as
+   clickable. */
+.company-edit-logo-field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.company-edit-logo {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--brand-gradient);
+  color: #fff;
+  cursor: pointer;
+}
+
+.company-edit-logo:focus-visible {
+  outline: 2px solid var(--brand-purple);
+  outline-offset: 2px;
+}
+
+.company-edit-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.company-edit-logo svg {
+  width: 32px;
+  height: 32px;
+}
+
+/* Pencil overlay — hidden until the logo is hovered or focused. */
+.company-edit-logo-edit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.company-edit-logo:hover .company-edit-logo-edit,
+.company-edit-logo:focus-visible .company-edit-logo-edit {
+  opacity: 1;
+}
+
+/* The real <input type=file> is triggered via the logo button, not shown. */
+.company-edit-logo-input {
+  display: none;
+}
+
+.company-edit-logo-hint {
+  margin: 0;
+  text-align: center;
+}
+
+.company-edit-logo-error {
+  margin: 0;
+  text-align: center;
+}
+
+.company-edit-logo:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* Field: label on top, then an icon + control row. --icon-col aligns the label
+   and hint with the input edge, to the right of the icon. */
+.company-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  --icon-col: 34px;
+}
+
+.company-edit-field > label {
+  color: var(--text-h);
+  font-size: 11px;
+  margin-left: var(--icon-col);
+}
+
+.company-edit-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The about textarea is multi-line, so pin the icon to the top of the row. */
+.company-edit-control--textarea {
+  align-items: flex-start;
+}
+
+.company-edit-field-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}
+
+.company-edit-field-icon.tone-blue {
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--brand-blue-dark);
+}
+
+.company-edit-field-icon.tone-purple {
+  background: rgba(168, 85, 247, 0.12);
+  color: var(--brand-purple);
+}
+
+/* The input fills the rest of the control row. */
+.company-edit-control > input,
+.company-edit-control > .company-edit-textarea {
+  flex: 1;
+  min-width: 0;
+}
+
+.company-edit-field input,
+.company-edit-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text-h);
+  outline: none;
+}
+
+.company-edit-textarea {
+  resize: vertical;
+  min-height: 96px;
+  line-height: 1.5;
+}
+
+.company-edit-field input:focus,
+.company-edit-textarea:focus {
+  border-color: var(--brand-purple);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.company-edit-error {
+  margin: 0 0 0 var(--icon-col);
+  font-size: 11px;
+  color: #ef4444;
+}
+
+.company-edit-hint {
+  margin: 0 0 0 var(--icon-col);
+  font-size: 11px;
+  color: var(--text);
+}
+
+.company-edit-save {
+  align-self: flex-end;
+  min-width: 160px;
+  margin-top: 8px;
+  padding: 9px 20px;
+  border: none;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand-gradient);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.company-edit-save:hover {
+  opacity: 0.92;
+}
+
+.company-edit-save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 560px) {
+  .company-edit-save {
+    width: 100%;
+  }
+}

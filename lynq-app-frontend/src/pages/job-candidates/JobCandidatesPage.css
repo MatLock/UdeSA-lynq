@@ -1,0 +1,180 @@
+/* JobCandidatesPage — the applicants for one of the owner's job posts. Fills the
+   AppLayout outlet next to the sidebar; mirrors the my-job-posts layout (fixed
+   header, single scrollable results region) with brand tokens from index.css. */
+
+.job-candidates-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  /* Lock to the viewport so the header stays fixed; only the list scrolls. */
+  height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 32px;
+  gap: 24px;
+  text-align: initial;
+  background:
+    radial-gradient(ellipse at top left, #efeafc 0%, transparent 45%),
+    radial-gradient(ellipse at bottom right, #e8f1fc 0%, transparent 45%),
+    #f7f6fb;
+}
+
+.job-candidates-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.job-candidates-back {
+  align-self: flex-start;
+  margin-bottom: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand-purple);
+  cursor: pointer;
+}
+
+.job-candidates-back:hover {
+  color: var(--brand-purple-dark);
+}
+
+.job-candidates-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.job-candidates-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.job-candidates-count {
+  margin-top: 6px;
+  align-self: flex-start;
+  padding: 2px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+}
+
+/* The list is the sole scrollable region — min-height:0 lets it shrink below its
+   content so the overflow scrolls here instead of pushing past the viewport. */
+.job-candidates-results {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.job-candidates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.job-candidates-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 240px;
+  color: var(--text);
+}
+
+.job-candidates-error {
+  color: #ef4444;
+}
+
+.job-candidates-pagination {
+  display: flex;
+  justify-content: center;
+}
+
+/* Candidate row: avatar, identity block, and the LYNQ score pinned right. */
+.candidate-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+
+.candidate-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  color: var(--brand-purple);
+}
+
+.candidate-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.candidate-avatar svg {
+  width: 26px;
+  height: 26px;
+}
+
+.candidate-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.candidate-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+  text-decoration: none;
+}
+
+a.candidate-name:hover {
+  color: var(--brand-purple);
+  text-decoration: underline;
+}
+
+.candidate-position {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.candidate-applied {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.candidate-score-chip {
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .job-candidates-page {
+    padding: 20px 16px;
+  }
+}

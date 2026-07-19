@@ -20,6 +20,13 @@ const SOURCE_LABELS = {
 }
 const prettySource = (source) => SOURCE_LABELS[source] ?? source
 
+// Keep the company blurb from stretching the card: preview at most 200 chars,
+// clipping to 197 + "..." when longer. The full description (and size) live on
+// the company profile a "View company" click away.
+const MAX_COMPANY_ABOUT_LENGTH = 200
+const truncateCompanyAbout = (text) =>
+  text && text.length > MAX_COMPANY_ABOUT_LENGTH ? `${text.slice(0, 197)}...` : text
+
 // The work-type chip is filled with the matching brand color; an unknown type
 // falls back to the brand blend.
 const workTypeBg = (workType) =>
@@ -471,7 +478,7 @@ const JobDetailPage = () => {
                 </div>
               </div>
               <p className="job-detail-about">
-                {company?.about || t.noCompanyAbout}
+                {company?.about ? truncateCompanyAbout(company.about) : t.noCompanyAbout}
               </p>
               {/* Links to the company's detail page at /company/{companyId}.
                   Falls back to nothing when the post carries no identified

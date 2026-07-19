@@ -16,6 +16,7 @@
  * @returns {Promise<{
  *   id: string,
  *   userType: string,
+ *   companyId: string | null,
  *   fullName: string,
  *   userProfileImageUrl: string,
  *   currentPosition: string,
