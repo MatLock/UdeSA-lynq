@@ -35,6 +35,9 @@
   --score-yellow: #eab308;
   --score-light-green: #84cc16;
   --score-green: #22c55e;
+  /* Destructive actions (e.g. closing a job post). */
+  --danger: #ef4444;
+  --danger-dark: #dc2626;
   --social-bg: rgba(244, 243, 236, 0.5);
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
