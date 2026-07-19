@@ -56,9 +56,12 @@ const scoreColorVar = (score) => {
 const truncate = (text, max) =>
   text && text.length > max ? `${text.slice(0, max).trimEnd()}…` : text ?? ''
 
-const JobCard = ({ job, onApply, showScore = true }) => {
+const JobCard = ({ job, onApply, showScore = true, showStatus = false, actions }) => {
   const t = strings.jobCard
   const workTypeLabel = t.workType[job.workType] ?? job.workType
+  // Owner-facing lists (my job posts) surface the post's lifecycle state; the
+  // public feed never does since it only ever shows OPEN posts.
+  const isClosed = job.jobStatus === 'CLOSE'
   // The backend supplies a per-job relevance score (0–100), null when it can't
   // compute one (e.g. company users, or a candidate with no matching skills).
   const hasScore = showScore && job.lynqScore != null
@@ -78,7 +81,7 @@ const JobCard = ({ job, onApply, showScore = true }) => {
   const logoUrl = isExternal ? null : job.company?.profileImageUrl
 
   return (
-    <article className="job-card">
+    <article className={`job-card${showStatus && isClosed ? ' is-closed' : ''}`}>
       <span className="job-card-logo">
         {logoUrl ? (
           <img src={logoUrl} alt={job.company?.name ?? t.companyLogoAlt} />
@@ -114,6 +117,25 @@ const JobCard = ({ job, onApply, showScore = true }) => {
                 color: `var(${scoreColorVar(job.lynqScore)})`,
                 borderColor: `var(${scoreColorVar(job.lynqScore)})`,
                 backgroundColor: `color-mix(in srgb, var(${scoreColorVar(job.lynqScore)}) 14%, transparent)`,
+              }}
+            />
+          )}
+          {/* Lifecycle badge for owner lists: green when live, muted red when
+              closed. Pinned right unless the score chip already claimed that. */}
+          {showStatus && (
+            <Chip
+              label={isClosed ? t.status.CLOSE : t.status.OPEN}
+              size="small"
+              variant="outlined"
+              className={hasScore ? undefined : 'job-card-score-chip'}
+              sx={{
+                ...CHIP_SX,
+                fontWeight: 700,
+                color: isClosed ? 'var(--score-red)' : 'var(--score-green)',
+                borderColor: isClosed ? 'var(--score-red)' : 'var(--score-green)',
+                backgroundColor: isClosed
+                  ? 'color-mix(in srgb, var(--score-red) 14%, transparent)'
+                  : 'color-mix(in srgb, var(--score-green) 14%, transparent)',
               }}
             />
           )}
@@ -219,22 +241,26 @@ const JobCard = ({ job, onApply, showScore = true }) => {
         </div>
       </div>
 
-      {/* "See details" navigates to the job's detail page, handing the already
-          loaded job object along via router state so the detail page can render
-          instantly without a redundant fetch. onApply, when provided, still fires
-          for callers that want to observe the click. */}
-      <Link
-        to={`/job/${job.jobId}/details`}
-        state={{ job }}
-        className="job-card-actions"
-        aria-label={`${t.apply} — ${job.title}`}
-        onClick={() => onApply?.(job)}
-      >
-        <span className="job-card-apply">{t.apply}</span>
-        <span className="job-card-chevron" aria-hidden="true">
-          ›
-        </span>
-      </Link>
+      {/* Callers can override the trailing action (e.g. the owner list swaps
+          "See details" for an Edit button). By default, "See details" navigates
+          to the job's detail page, handing the already loaded job object along
+          via router state so the detail page can render instantly without a
+          redundant fetch. onApply, when provided, still fires for callers that
+          want to observe the click. */}
+      {actions ?? (
+        <Link
+          to={`/job/${job.jobId}/details`}
+          state={{ job }}
+          className="job-card-actions"
+          aria-label={`${t.apply} — ${job.title}`}
+          onClick={() => onApply?.(job)}
+        >
+          <span className="job-card-apply">{t.apply}</span>
+          <span className="job-card-chevron" aria-hidden="true">
+            ›
+          </span>
+        </Link>
+      )}
     </article>
   )
 }

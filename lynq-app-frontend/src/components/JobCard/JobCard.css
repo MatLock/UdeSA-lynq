@@ -24,6 +24,47 @@
   box-shadow: 0 16px 40px rgba(80, 60, 150, 0.12);
 }
 
+/* Closed posts (owner lists) read as inactive: dimmed with a muted-red rail so
+   they stay legible but clearly de-emphasized against live posts. */
+.job-card.is-closed {
+  border-left: 3px solid var(--score-red);
+  background: color-mix(in srgb, var(--score-red) 4%, #fff);
+}
+
+.job-card.is-closed .job-card-logo,
+.job-card.is-closed .job-card-title,
+.job-card.is-closed .job-card-description {
+  opacity: 0.7;
+}
+
+/* Edit action (owner list) — an outlined pill matching the app's ghost button
+   language, sitting where "See details" does in the public feed. */
+.job-card-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.job-card-edit:hover {
+  opacity: 0.85;
+}
+
+.job-card-edit svg {
+  width: 15px;
+  height: 15px;
+}
+
 /* Left: company logo (or the default icon for external posts). */
 .job-card-logo {
   display: inline-flex;
