@@ -338,26 +338,40 @@
 
 .user-profile-job-card.is-closed .user-profile-job-card-title {
   color: var(--text);
-  padding-right: 62px; /* keep the first line clear of the badge */
+  padding-right: 78px; /* keep the first line clear of the badge */
 }
 
 .user-profile-job-card.is-closed .user-profile-job-card-cta {
   color: var(--text);
 }
 
+/* Closed badge: a soft, tinted danger chip with a leading status dot — reads as
+   clearly inactive without the harshness of a solid-red pill. */
 .user-profile-job-badge {
   position: absolute;
   top: 12px;
   right: 12px;
-  padding: 3px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 8px;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  color: #fff;
-  background: var(--score-red);
+  color: var(--danger-dark);
+  background: color-mix(in srgb, var(--danger) 14%, #fff);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
   border-radius: 999px;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--danger) 22%, transparent);
+}
+
+.user-profile-job-badge-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--danger);
 }
 
 .user-profile-job-card-title {

@@ -243,6 +243,10 @@ const UserProfilePage = () => {
                       >
                         {job.jobStatus === 'CLOSE' && (
                           <span className="user-profile-job-badge">
+                            <span
+                              className="user-profile-job-badge-dot"
+                              aria-hidden="true"
+                            />
                             {t.closedBadge}
                           </span>
                         )}
