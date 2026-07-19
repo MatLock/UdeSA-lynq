@@ -1,0 +1,111 @@
+/* MyJobPostsPage — owner job-post management list. Fills the AppLayout outlet
+   next to the sidebar; mirrors the home feed layout (fixed header, single
+   scrollable results region) with brand tokens from index.css. */
+
+.my-jobs-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  /* Lock to the viewport so the header stays fixed; only the list scrolls. */
+  height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 32px;
+  gap: 24px;
+  text-align: initial;
+  background:
+    radial-gradient(ellipse at top left, #efeafc 0%, transparent 45%),
+    radial-gradient(ellipse at bottom right, #e8f1fc 0%, transparent 45%),
+    #f7f6fb;
+}
+
+.my-jobs-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.my-jobs-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.my-jobs-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.my-jobs-count {
+  margin-top: 6px;
+  align-self: flex-start;
+  padding: 2px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+}
+
+/* The list is the sole scrollable region — min-height:0 lets it shrink below
+   its content so the overflow scrolls here instead of pushing past the viewport. */
+.my-jobs-results {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.my-jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.my-jobs-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 240px;
+  color: var(--text);
+}
+
+.my-jobs-error {
+  color: #ef4444;
+}
+
+.my-jobs-empty-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-gradient);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.my-jobs-empty-cta:hover {
+  opacity: 0.92;
+}
+
+.my-jobs-pagination {
+  display: flex;
+  justify-content: center;
+}
+
+@media (max-width: 640px) {
+  .my-jobs-page {
+    padding: 20px 16px;
+  }
+}
