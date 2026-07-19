@@ -98,3 +98,6 @@ date,prompt
 2026-07-18,"now in the job detail page. When I click to see the company details it redirects to companies/${compnay_id}. refactor to redirect to /company/${user_id}"
 2026-07-18,"connect link about company in job details page with the backend endpoint ""/company/${comopany_id}""
 2026-07-18,"there is a job post list in both pages user detail and company detail. showing posts that can be close or open. add a nice way to highlight the ones that are closed."
+2026-07-18,"jobdetail page add a button to stop the seeking candidates if the job belongs to the logged user"
+2026-07-18,"in home page. disable scroll for left bar. If the user scrolls only the jobs listing must be scrollable"
+2026-07-18,"rename the route to ""job/mine"" and it should invoke backend endpoint "/job/mine""
