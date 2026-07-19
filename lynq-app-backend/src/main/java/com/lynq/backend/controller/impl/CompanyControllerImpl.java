@@ -76,8 +76,8 @@ public class CompanyControllerImpl implements com.lynq.backend.controller.Compan
   @GetMapping("/{companyId}")
   @AuditLog
   public ResponseEntity<GlobalRestResponse<GetCompanyDetailRestResponse>> getCompanyDetail(
-      @PathVariable String companyId, @AuthenticationPrincipal LynqUserPrincipal principal) {
-    GetCompanyDetailRestResponse company = companyService.getCompanyDetail(companyId, principal.getId());
+      @PathVariable String companyId) {
+    GetCompanyDetailRestResponse company = companyService.getCompanyDetail(companyId);
 
     return ResponseEntity
         .status(HttpStatus.OK)

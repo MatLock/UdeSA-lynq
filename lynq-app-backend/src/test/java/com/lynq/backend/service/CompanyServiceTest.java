@@ -7,7 +7,6 @@ import com.lynq.backend.controller.response.GetCompanyDetailRestResponse;
 import com.lynq.backend.controller.response.UpdateCompanyRestResponse;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.exceptions.BadRequestException;
-import com.lynq.backend.exceptions.ForbiddenException;
 import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
@@ -261,7 +260,7 @@ class CompanyServiceTest {
         .thenReturn(COMPANY_IMAGE_URL);
     when(jobPostRepository.findByCompanyId(COMPANY_ID)).thenReturn(java.util.List.of(job()));
 
-    GetCompanyDetailRestResponse detail = companyService.getCompanyDetail(COMPANY_ID, USER_ID);
+    GetCompanyDetailRestResponse detail = companyService.getCompanyDetail(COMPANY_ID);
 
     assertThat(detail.getId(), is(COMPANY_ID));
     assertThat(detail.getName(), is(COMPANY_NAME));
@@ -287,7 +286,7 @@ class CompanyServiceTest {
     when(companyRepository.findById(COMPANY_ID)).thenReturn(Optional.of(company));
     when(jobPostRepository.findByCompanyId(COMPANY_ID)).thenReturn(java.util.List.of());
 
-    GetCompanyDetailRestResponse detail = companyService.getCompanyDetail(COMPANY_ID, USER_ID);
+    GetCompanyDetailRestResponse detail = companyService.getCompanyDetail(COMPANY_ID);
 
     assertThat(detail.getProfileImageUrl(), is(org.hamcrest.Matchers.nullValue()));
     assertThat(detail.getJobs(), is(org.hamcrest.Matchers.empty()));
@@ -299,23 +298,25 @@ class CompanyServiceTest {
     when(companyRepository.findById(COMPANY_ID)).thenReturn(Optional.empty());
 
     NotFoundException exception = assertThrows(NotFoundException.class,
-        () -> companyService.getCompanyDetail(COMPANY_ID, USER_ID));
+        () -> companyService.getCompanyDetail(COMPANY_ID));
     assertThat(exception.getMessage(), is(COMPANY_NOT_FOUND));
     verify(jobPostRepository, never()).findByCompanyId(any());
   }
 
   @Test
-  void getCompanyDetailThrowsForbiddenWhenRequesterDoesNotOwnCompany() {
+  void getCompanyDetailIsReturnedToUsersWhoDoNotOwnTheCompany() {
     CompanyEntity company = CompanyEntity.builder()
         .id(COMPANY_ID)
         .name(COMPANY_NAME)
         .owner(UserEntity.builder().id("another-user-id").build())
         .build();
     when(companyRepository.findById(COMPANY_ID)).thenReturn(Optional.of(company));
+    when(jobPostRepository.findByCompanyId(COMPANY_ID)).thenReturn(java.util.List.of());
 
-    assertThrows(ForbiddenException.class,
-        () -> companyService.getCompanyDetail(COMPANY_ID, USER_ID));
-    verify(jobPostRepository, never()).findByCompanyId(any());
+    GetCompanyDetailRestResponse detail = companyService.getCompanyDetail(COMPANY_ID);
+
+    assertThat(detail.getId(), is(COMPANY_ID));
+    assertThat(detail.getName(), is(COMPANY_NAME));
   }
 
   @Test

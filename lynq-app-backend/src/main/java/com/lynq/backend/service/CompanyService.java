@@ -9,7 +9,6 @@ import com.lynq.backend.controller.response.GetCompanyDetailRestResponse;
 import com.lynq.backend.controller.response.UpdateCompanyRestResponse;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.exceptions.BadRequestException;
-import com.lynq.backend.exceptions.ForbiddenException;
 import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
@@ -91,14 +90,9 @@ public class CompanyService {
 
   @AuditLog
   @Transactional(readOnly = true)
-  public GetCompanyDetailRestResponse getCompanyDetail(String companyId, String userId) {
+  public GetCompanyDetailRestResponse getCompanyDetail(String companyId) {
     CompanyEntity company = companyRepository.findById(companyId)
         .orElseThrow(() -> new NotFoundException(String.format(COMPANY_NOT_FOUND, companyId)));
-
-    if (company.getOwner() == null || !company.getOwner().getId().equals(userId)) {
-      throw new ForbiddenException(
-          String.format("User '%s' is not allowed to access company '%s'", userId, companyId));
-    }
 
     return GetCompanyDetailRestResponse.builder()
         .id(company.getId())

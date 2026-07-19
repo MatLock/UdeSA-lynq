@@ -130,22 +130,22 @@ class CompanyControllerImplTest {
   }
 
   @Test
-  void getCompanyDetailDelegatesToServiceWithPathCompanyIdAndAuthenticatedUserId() {
-    when(companyService.getCompanyDetail(COMPANY_ID, USER_ID))
+  void getCompanyDetailDelegatesToServiceWithPathCompanyId() {
+    when(companyService.getCompanyDetail(COMPANY_ID))
         .thenReturn(GetCompanyDetailRestResponse.builder().id(COMPANY_ID).build());
 
-    companyController.getCompanyDetail(COMPANY_ID, principal);
+    companyController.getCompanyDetail(COMPANY_ID);
 
-    verify(companyService).getCompanyDetail(COMPANY_ID, USER_ID);
+    verify(companyService).getCompanyDetail(COMPANY_ID);
   }
 
   @Test
   void getCompanyDetailRespondsWithOkStatus() {
-    when(companyService.getCompanyDetail(COMPANY_ID, USER_ID))
+    when(companyService.getCompanyDetail(COMPANY_ID))
         .thenReturn(GetCompanyDetailRestResponse.builder().id(COMPANY_ID).build());
 
     ResponseEntity<GlobalRestResponse<GetCompanyDetailRestResponse>> response =
-        companyController.getCompanyDetail(COMPANY_ID, principal);
+        companyController.getCompanyDetail(COMPANY_ID);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
   }
@@ -156,10 +156,10 @@ class CompanyControllerImplTest {
         .id(COMPANY_ID)
         .name(COMPANY_NAME)
         .build();
-    when(companyService.getCompanyDetail(COMPANY_ID, USER_ID)).thenReturn(detail);
+    when(companyService.getCompanyDetail(COMPANY_ID)).thenReturn(detail);
 
     ResponseEntity<GlobalRestResponse<GetCompanyDetailRestResponse>> response =
-        companyController.getCompanyDetail(COMPANY_ID, principal);
+        companyController.getCompanyDetail(COMPANY_ID);
 
     GlobalRestResponse<GetCompanyDetailRestResponse> body = response.getBody();
     assertThat(body, is(notNullValue()));

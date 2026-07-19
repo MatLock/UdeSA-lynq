@@ -155,3 +155,4 @@ parameters:
 "19-07-2026","modify CompanyController.getCompanyDetail add validation that only the owner can call this endpoint. return a 403 if another user that do not own the company with id tries to retrieve its information"
 "19-07-2026","for the UserController.getUser add companyId field in the GetUserRestResponse. If the user owns a company it should return the company id as well"
 "19-07-2026","add unit test and integration test for new endpoint PATCH /company/${comoany_id}"
+"19-07-2026","remove validation in getCompanyDetail all the users can see the company details. I introduced a bug"

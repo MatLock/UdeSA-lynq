@@ -217,27 +217,11 @@ public interface CompanyController {
       summary = "Get a company's details",
       description = "Returns the full profile of the company identified by the given id (name, "
           + "about, size, profile image and creation date) together with every job position the "
-          + "company has posted, regardless of the job's status (open or closed). Only the owner of "
-          + "the company may retrieve its details: requests from any other authenticated user are "
-          + "rejected with 403. Fails with 404 when no company matches the id.",
+          + "company has posted, regardless of the job's status (open or closed). Any authenticated "
+          + "user may retrieve a company's details. Fails with 404 when no company matches the id.",
       security = @SecurityRequirement(name = "bearerAuth"))
-  @ApiResponses({
-      @ApiResponse(
-          responseCode = "403",
-          description = "The authenticated user does not own the requested company",
-          content = @Content(
-              examples = @ExampleObject(
-                  name = "Forbidden",
-                  value = """
-                      {
-                        "success": false,
-                        "data": null,
-                        "reason": "User '550e8400-e29b-41d4-a716-446655440000' is not allowed to access company '018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60'"
-                      }""")))
-  })
   ResponseEntity<GlobalRestResponse<GetCompanyDetailRestResponse>> getCompanyDetail(
-      String companyId,
-      @Parameter(hidden = true) LynqUserPrincipal principal);
+      String companyId);
 
   @Operation(
       summary = "Update the authenticated owner's company",
