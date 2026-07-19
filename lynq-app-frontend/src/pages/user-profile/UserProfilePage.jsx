@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Chip } from '@mui/material'
 import GitHubIcon from '@mui/icons-material/GitHub'
 import LinkedInIcon from '@mui/icons-material/LinkedIn'
 import strings from '../../i18n'
@@ -26,11 +27,25 @@ const MAX_JOB_DESCRIPTION_LENGTH = 90
 const truncate = (text, max) =>
   text && text.length > max ? `${text.slice(0, max).trimEnd()}…` : text ?? ''
 
+// Map a 0–100 LYNQ score to its band color token (see index.css --score-*),
+// matching the JobCard / candidates-list scoring bands.
+const scoreColorVar = (score) => {
+  if (score <= 20) return '--score-red'
+  if (score <= 40) return '--score-orange'
+  if (score <= 60) return '--score-yellow'
+  if (score <= 80) return '--score-light-green'
+  return '--score-green'
+}
+
 const UserProfilePage = () => {
   const t = strings.userProfile
   const { userId } = useParams()
   const navigate = useNavigate()
   const { authFetch } = useApi()
+  // Reached from a job's candidates list, the applicant's job-specific LYNQ
+  // match score rides along via router state so it can sit next to the name.
+  const { state } = useLocation()
+  const lynqScore = state?.lynqScore ?? null
 
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -160,7 +175,28 @@ const UserProfilePage = () => {
             </span>
 
             <div className="user-profile-hero-main">
-              <h1 className="user-profile-name">{profile.fullName}</h1>
+              {/* Name and — when arriving from a job's candidates list — the
+                  applicant's LYNQ match score share the top line. */}
+              <div className="user-profile-name-row">
+                <h1 className="user-profile-name">{profile.fullName}</h1>
+                {lynqScore != null && (
+                  <Chip
+                    label={`${t.lynqScore}: ${lynqScore}`}
+                    size="small"
+                    variant="outlined"
+                    className="user-profile-score-chip"
+                    sx={{
+                      height: 24,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      '& .MuiChip-label': { px: 1.2 },
+                      color: `var(${scoreColorVar(lynqScore)})`,
+                      borderColor: `var(${scoreColorVar(lynqScore)})`,
+                      backgroundColor: `color-mix(in srgb, var(${scoreColorVar(lynqScore)}) 14%, transparent)`,
+                    }}
+                  />
+                )}
+              </div>
               <p className="user-profile-position">
                 {profile.currentPosition || t.noPosition}
               </p>

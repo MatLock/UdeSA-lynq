@@ -142,6 +142,14 @@
   gap: 6px;
 }
 
+/* Name + LYNQ-score chip share the top line of the identity block. */
+.user-profile-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .user-profile-name {
   margin: 0;
   font-size: 26px;
@@ -149,6 +157,10 @@
   line-height: 1.2;
   letter-spacing: -0.4px;
   color: var(--text-h);
+}
+
+.user-profile-score-chip {
+  flex-shrink: 0;
 }
 
 .user-profile-position {

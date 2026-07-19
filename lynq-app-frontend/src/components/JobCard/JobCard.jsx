@@ -11,7 +11,9 @@ import './JobCard.css'
 // feed design): a company logo on the left, the work-type tag / title /
 // description / posting meta in the middle, key skills and an Apply action on
 // the right. Presentational only — the caller owns what Apply does.
-const MAX_DESCRIPTION_LENGTH = 100
+// Roomy char cap so short/medium descriptions pass through untouched; the CSS
+// 3-line clamp (.job-card-description) is what visually bounds the height.
+const MAX_DESCRIPTION_LENGTH = 300
 const MAX_SKILLS = 3
 
 // Shared MUI Chip sizing — ~20% smaller than the card's body type. Brand colors
@@ -89,6 +91,25 @@ const JobCard = ({
 
   return (
     <article className={`job-card${showStatus && isClosed ? ' is-closed' : ''}`}>
+      {/* Lifecycle badge for owner lists: green when live, muted red when
+          closed. Pinned to the card's top-right corner. */}
+      {showStatus && (
+        <Chip
+          label={isClosed ? t.status.CLOSE : t.status.OPEN}
+          size="small"
+          variant="outlined"
+          className="job-card-status-chip"
+          sx={{
+            ...CHIP_SX,
+            fontWeight: 700,
+            color: isClosed ? 'var(--score-red)' : 'var(--score-green)',
+            borderColor: isClosed ? 'var(--score-red)' : 'var(--score-green)',
+            backgroundColor: isClosed
+              ? 'color-mix(in srgb, var(--score-red) 14%, transparent)'
+              : 'color-mix(in srgb, var(--score-green) 14%, transparent)',
+          }}
+        />
+      )}
       <span className="job-card-logo">
         {logoUrl ? (
           <img src={logoUrl} alt={job.company?.name ?? t.companyLogoAlt} />
@@ -124,25 +145,6 @@ const JobCard = ({
                 color: `var(${scoreColorVar(job.lynqScore)})`,
                 borderColor: `var(${scoreColorVar(job.lynqScore)})`,
                 backgroundColor: `color-mix(in srgb, var(${scoreColorVar(job.lynqScore)}) 14%, transparent)`,
-              }}
-            />
-          )}
-          {/* Lifecycle badge for owner lists: green when live, muted red when
-              closed. Pinned right unless the score chip already claimed that. */}
-          {showStatus && (
-            <Chip
-              label={isClosed ? t.status.CLOSE : t.status.OPEN}
-              size="small"
-              variant="outlined"
-              className={hasScore ? undefined : 'job-card-score-chip'}
-              sx={{
-                ...CHIP_SX,
-                fontWeight: 700,
-                color: isClosed ? 'var(--score-red)' : 'var(--score-green)',
-                borderColor: isClosed ? 'var(--score-red)' : 'var(--score-green)',
-                backgroundColor: isClosed
-                  ? 'color-mix(in srgb, var(--score-red) 14%, transparent)'
-                  : 'color-mix(in srgb, var(--score-green) 14%, transparent)',
               }}
             />
           )}
@@ -245,46 +247,51 @@ const JobCard = ({
               </span>
             </>
           )}
-          {/* Owner lists (my job posts) pin the applicant tally and a shortcut to
-              the candidates page at the right of the footer. */}
-          {showCandidates && (
-            <span className="job-card-candidates">
-              <span className="job-card-candidates-count">
-                {t.candidatesApplied.replace('{count}', job.totalCandidatesApplied ?? 0)}
-              </span>
-              <Link
-                to={`/job/${job.jobId}/candidates`}
-                state={{ job }}
-                className="job-card-candidates-link"
-              >
-                {t.seeCandidates}
-                <span aria-hidden="true"> ›</span>
-              </Link>
-            </span>
-          )}
         </div>
       </div>
 
-      {/* Callers can override the trailing action (e.g. the owner list swaps
-          "See details" for an Edit button). By default, "See details" navigates
-          to the job's detail page, handing the already loaded job object along
-          via router state so the detail page can render instantly without a
-          redundant fetch. onApply, when provided, still fires for callers that
-          want to observe the click. */}
-      {actions ?? (
-        <Link
-          to={`/job/${job.jobId}/details`}
-          state={{ job }}
-          className="job-card-actions"
-          aria-label={`${t.apply} — ${job.title}`}
-          onClick={() => onApply?.(job)}
-        >
-          <span className="job-card-apply">{t.apply}</span>
-          <span className="job-card-chevron" aria-hidden="true">
-            ›
+      {/* Trailing column on the far right: the action (Edit / See details) on
+          top, with the owner-only applicant tally + candidates shortcut stacked
+          directly below it — the chip and link keep their side-by-side layout. */}
+      <div className={`job-card-side${showCandidates ? ' has-candidates' : ''}`}>
+        {/* Callers can override the trailing action (e.g. the owner list swaps
+            "See details" for an Edit button). By default, "See details"
+            navigates to the job's detail page, handing the already loaded job
+            object along via router state so the detail page can render instantly
+            without a redundant fetch. onApply, when provided, still fires for
+            callers that want to observe the click. */}
+        {actions ?? (
+          <Link
+            to={`/job/${job.jobId}/details`}
+            state={{ job }}
+            className="job-card-actions"
+            aria-label={`${t.apply} — ${job.title}`}
+            onClick={() => onApply?.(job)}
+          >
+            <span className="job-card-apply">{t.apply}</span>
+            <span className="job-card-chevron" aria-hidden="true">
+              ›
+            </span>
+          </Link>
+        )}
+        {/* Owner lists (my job posts) pin the applicant tally and a shortcut to
+            the candidates page below the action. */}
+        {showCandidates && (
+          <span className="job-card-candidates">
+            <span className="job-card-candidates-count">
+              {t.candidatesApplied.replace('{count}', job.totalCandidatesApplied ?? 0)}
+            </span>
+            <Link
+              to={`/job/${job.jobId}/candidates`}
+              state={{ job }}
+              className="job-card-candidates-link"
+            >
+              {t.seeCandidates}
+              <span aria-hidden="true"> ›</span>
+            </Link>
           </span>
-        </Link>
-      )}
+        )}
+      </div>
     </article>
   )
 }

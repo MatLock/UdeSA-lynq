@@ -202,6 +202,7 @@ const en = {
     noJobs: 'No job posts published yet.',
     viewJob: 'View job',
     closedBadge: 'Closed',
+    lynqScore: 'LYNQ-SCORE',
   },
   companyProfile: {
     back: 'Back',
@@ -323,6 +324,7 @@ const en = {
       noPosition: 'No position listed',
       lynqScore: 'LYNQ-SCORE',
       unknownCandidate: 'Unknown',
+      reviewApplication: 'Review application',
     },
     editJob: {
       title: 'Edit job post',

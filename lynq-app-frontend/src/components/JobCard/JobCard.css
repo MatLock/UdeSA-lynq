@@ -3,6 +3,7 @@
    language. */
 
 .job-card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 20px;
@@ -115,6 +116,14 @@
   margin-left: auto;
 }
 
+/* Owner lists: the OPEN/CLOSE lifecycle chip sits in the card's top-right
+   corner, out of the tags row's flow. */
+.job-card-status-chip {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+}
+
 .job-card-title {
   margin: 0;
   font-size: 17px;
@@ -129,17 +138,22 @@
   font-size: 13px;
   line-height: 1.5;
   color: var(--text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Clamp to at most 3 lines, appending an ellipsis when it overflows. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
-/* Posting meta row: small avatar, poster name, and relative publish date. */
+/* Posting meta row: small avatar, poster name, and relative publish date. The
+   owner-only candidates chip + link ride the same row, pinned bottom-right and
+   vertically aligned with the avatar/name/date. Footer labels sit ~10% smaller
+   than the card's body type. */
 .job-card-meta {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-top: 2px;
-  font-size: 12px;
+  font-size: 10.8px;
   color: var(--text);
 }
 
@@ -198,7 +212,7 @@ a.job-card-poster-value:focus-visible {
   align-items: center;
   gap: 5px;
   padding: 2px 9px 2px 7px;
-  font-size: 11px;
+  font-size: 9.9px;
   font-weight: 700;
   color: var(--brand-blue-dark);
   background: var(--accent-blue-bg);
@@ -220,19 +234,42 @@ a.job-card-poster-value:focus-visible {
   color: var(--text);
 }
 
-/* Owner footer extra: applicant tally + "see candidates" link, pushed to the
-   far right of the meta row (margin-left:auto). */
+/* Trailing right-hand column: the action (Edit / See details) on top, with the
+   owner-only candidates block stacked directly below it, both right-aligned. */
+.job-card-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Owner lists: stretch the column to the card's full height and vertically
+   center the Edit button (level with the job description), while the candidates
+   block is pinned to the bottom-right corner so it lines up with the
+   creation-date row. */
+.job-card-side.has-candidates {
+  align-self: stretch;
+  justify-content: center;
+}
+
+.job-card-side.has-candidates .job-card-candidates {
+  position: absolute;
+  right: 22px;
+  bottom: 18px;
+}
+
+/* Owner extra: applicant tally chip + "see candidates" link, kept side by side
+   and sitting below the Edit button in the trailing column. */
 .job-card-candidates {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-left: auto;
-  padding-left: 8px;
 }
 
 .job-card-candidates-count {
   padding: 2px 10px;
-  font-size: 11px;
+  font-size: 9.9px;
   font-weight: 700;
   color: var(--brand-purple-dark);
   background: var(--accent-bg);
@@ -245,7 +282,7 @@ a.job-card-poster-value:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  font-size: 12px;
+  font-size: 10.8px;
   font-weight: 700;
   color: var(--brand-purple);
   text-decoration: none;

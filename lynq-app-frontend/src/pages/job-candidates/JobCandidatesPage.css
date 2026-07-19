@@ -145,6 +145,14 @@
   flex: 1;
 }
 
+/* Name + LYNQ-score chip share the top line of the identity block. */
+.candidate-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .candidate-name {
   font-size: 15px;
   font-weight: 700;
@@ -171,6 +179,29 @@ a.candidate-name:hover {
 
 .candidate-score-chip {
   flex-shrink: 0;
+}
+
+/* Trailing "Review application" action: a filled brand pill pinned to the right
+   of the row, mirroring the primary-button language used across the app. */
+.candidate-review {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-gradient);
+  border: none;
+  border-radius: 8px;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.candidate-review:hover {
+  opacity: 0.92;
 }
 
 @media (max-width: 640px) {

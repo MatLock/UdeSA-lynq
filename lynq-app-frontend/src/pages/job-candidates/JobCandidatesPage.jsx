@@ -127,15 +127,40 @@ const JobCandidatesPage = () => {
                   </span>
 
                   <div className="candidate-main">
-                    {candidate.userId ? (
-                      <Link to={`/user/${candidate.userId}`} className="candidate-name">
-                        {candidate.userFullName ?? t.unknownCandidate}
-                      </Link>
-                    ) : (
-                      <span className="candidate-name">
-                        {candidate.userFullName ?? t.unknownCandidate}
-                      </span>
-                    )}
+                    {/* Name and LYNQ score share the top line: the score chip
+                        sits right next to the applicant's name. */}
+                    <div className="candidate-name-row">
+                      {candidate.userId ? (
+                        <Link
+                          to={`/user/${candidate.userId}`}
+                          state={{ lynqScore: candidate.lynqScore }}
+                          className="candidate-name"
+                        >
+                          {candidate.userFullName ?? t.unknownCandidate}
+                        </Link>
+                      ) : (
+                        <span className="candidate-name">
+                          {candidate.userFullName ?? t.unknownCandidate}
+                        </span>
+                      )}
+                      {candidate.lynqScore != null && (
+                        <Chip
+                          label={`${t.lynqScore}: ${candidate.lynqScore}`}
+                          size="small"
+                          variant="outlined"
+                          className="candidate-score-chip"
+                          sx={{
+                            height: 22,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            '& .MuiChip-label': { px: 1.2 },
+                            color: `var(${scoreColorVar(candidate.lynqScore)})`,
+                            borderColor: `var(${scoreColorVar(candidate.lynqScore)})`,
+                            backgroundColor: `color-mix(in srgb, var(${scoreColorVar(candidate.lynqScore)}) 14%, transparent)`,
+                          }}
+                        />
+                      )}
+                    </div>
                     <p className="candidate-position">
                       {candidate.userCurrentPosition || t.noPosition}
                     </p>
@@ -146,22 +171,16 @@ const JobCandidatesPage = () => {
                     )}
                   </div>
 
-                  {candidate.lynqScore != null && (
-                    <Chip
-                      label={`${t.lynqScore}: ${candidate.lynqScore}`}
-                      size="small"
-                      variant="outlined"
-                      className="candidate-score-chip"
-                      sx={{
-                        height: 22,
-                        fontSize: 10,
-                        fontWeight: 700,
-                        '& .MuiChip-label': { px: 1.2 },
-                        color: `var(${scoreColorVar(candidate.lynqScore)})`,
-                        borderColor: `var(${scoreColorVar(candidate.lynqScore)})`,
-                        backgroundColor: `color-mix(in srgb, var(${scoreColorVar(candidate.lynqScore)}) 14%, transparent)`,
-                      }}
-                    />
+                  {/* Trailing action: review the applicant on their profile. */}
+                  {candidate.userId && (
+                    <Link
+                      to={`/user/${candidate.userId}`}
+                      state={{ lynqScore: candidate.lynqScore }}
+                      className="candidate-review"
+                      aria-label={`${t.reviewApplication} — ${candidate.userFullName ?? t.unknownCandidate}`}
+                    >
+                      {t.reviewApplication}
+                    </Link>
                   )}
                 </article>
               )
