@@ -68,7 +68,7 @@ class JobControllerImplTest {
   private static final int REQUESTED_PAGE = 2;
   private static final int REQUESTED_SIZE = 15;
   private static final int DEFAULT_PAGE = 0;
-  private static final int DEFAULT_SIZE = 20;
+  private static final int DEFAULT_SIZE = 10;
   private static final Long SEEN_COUNT = 7L;
   private static final String APPLICATION_ID = "018f9c3a-2b1d-7c4e-9a6f-bbbbbbbbbbbb";
   private static final LocalDate APPLIED_ON = LocalDate.of(2026, 7, 17);

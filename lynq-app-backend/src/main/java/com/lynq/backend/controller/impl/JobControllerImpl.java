@@ -112,7 +112,7 @@ public class JobControllerImpl implements JobController {
   @AuditLog
   public ResponseEntity<GlobalRestResponse<PagedRestResponse<GetJobRestResponse>>> getJobs(
       @RequestParam(defaultValue = "0") Integer page,
-      @RequestParam(defaultValue = "20") Integer size,
+      @RequestParam(defaultValue = "10") Integer size,
       @RequestParam(required = false) String filterValue) {
     JobFilter filter = new JobFilter(filterValue);
     PagedRestResponse<GetJobRestResponse> jobs =
@@ -128,7 +128,7 @@ public class JobControllerImpl implements JobController {
   @AuditLog
   public ResponseEntity<GlobalRestResponse<PagedRestResponse<GetJobRestResponse>>> getMyJobs(
       @RequestParam(defaultValue = "0") Integer page,
-      @RequestParam(defaultValue = "20") Integer size) {
+      @RequestParam(defaultValue = "10") Integer size) {
     PagedRestResponse<GetJobRestResponse> jobs =
         jobService.searchOwnedJobs(PageRequest.of(page, size));
 

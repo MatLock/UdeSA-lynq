@@ -156,3 +156,4 @@ parameters:
 "19-07-2026","for the UserController.getUser add companyId field in the GetUserRestResponse. If the user owns a company it should return the company id as well"
 "19-07-2026","add unit test and integration test for new endpoint PATCH /company/${comoany_id}"
 "19-07-2026","remove validation in getCompanyDetail all the users can see the company details. I introduced a bug"
+"19-07-2026","make default pagination to 10 on all paginated endpoints"
