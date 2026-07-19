@@ -1,0 +1,24 @@
+/* EditJobPage — job-post edit form. Reuses the create-job form design wholesale
+   (fields, controls, actions) so the two forms stay visually identical; only a
+   few edit-specific states are added below. */
+@import '../create-job/CreateJobPage.css';
+
+/* Centered loading state while the job is recovered on a direct hit. */
+.edit-job-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  width: 100%;
+}
+
+/* Not-found card: stack the message and the "back" action with breathing room. */
+.edit-job-notfound {
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.edit-job-notfound .create-job-cancel {
+  margin-top: 8px;
+}
