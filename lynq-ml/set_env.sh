@@ -37,4 +37,15 @@ if [ "$LLM_PROVIDER" = "openai" ] && [ -z "$OPENAI_API_KEY" ]; then
   echo "WARNING: LLM_PROVIDER=openai but OPENAI_API_KEY is empty." >&2
 fi
 
+# ----------------------------------------------------------------------------
+# Course lookup for POST /upskilling_suggestion.
+#
+# No API key is needed: a keyless web-search provider returns real Udemy course
+# links (with a search-link fallback), capped per topic. The Udemy Affiliate
+# API is deprecated and is not used.
+# ----------------------------------------------------------------------------
+export UDEMY_MAX_COURSES="${UDEMY_MAX_COURSES:-2}"
+export UDEMY_BASE_URL="${UDEMY_BASE_URL:-https://www.udemy.com}"
+export COURSE_SEARCH_TIMEOUT="${COURSE_SEARCH_TIMEOUT:-15}"
+
 echo "lynq-ml env set: LLM_PROVIDER=$LLM_PROVIDER"

@@ -6,61 +6,20 @@ from llm_client import LLMProvider, get_llm_client
 from middleware.request_uuid import require_request_uuid
 from response import ErrorRestResponse
 from skill_enhance.router import router as skill_enhance_router
+from upskilling_suggestion.router import router as upskilling_suggestion_router
 
-import logging
 import logging.config
 import os
 import uvicorn
+import json
+
+
+_LOG_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "log_config.json")
 
 
 def _build_logging_config() -> dict:
-  """Colour logs per level (INFO cyan, WARNING yellow, ERROR red).
-
-  Reuses uvicorn's colourising formatters so the service's own loggers and
-  uvicorn's match, and streams to stdout (stderr is coloured red wholesale by
-  many consoles/IDEs). ``LOG_COLORS=false`` disables colour for file/CI output.
-  """
-  level = os.getenv("LOG_LEVEL", "INFO").upper()
-  use_colors = os.getenv("LOG_COLORS", "true").lower() not in ("0", "false", "no")
-  return {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "filters": {
-      "request_uuid": {"()": "logging_context.RequestUuidFilter"},
-    },
-    "formatters": {
-      "default": {
-        "()": "uvicorn.logging.DefaultFormatter",
-        "fmt": "%(asctime)s %(levelprefix)s [%(lynq_request_uuid)s] %(name)s - %(message)s",
-        "use_colors": use_colors,
-      },
-      "access": {
-        "()": "uvicorn.logging.AccessFormatter",
-        "fmt": '%(asctime)s %(levelprefix)s [%(lynq_request_uuid)s] %(client_addr)s - "%(request_line)s" %(status_code)s',
-        "use_colors": use_colors,
-      },
-    },
-    "handlers": {
-      "default": {
-        "class": "logging.StreamHandler",
-        "formatter": "default",
-        "filters": ["request_uuid"],
-        "stream": "ext://sys.stdout",
-      },
-      "access": {
-        "class": "logging.StreamHandler",
-        "formatter": "access",
-        "filters": ["request_uuid"],
-        "stream": "ext://sys.stdout",
-      },
-    },
-    "loggers": {
-      "uvicorn": {"handlers": ["default"], "level": level, "propagate": False},
-      "uvicorn.error": {"level": level},
-      "uvicorn.access": {"handlers": ["access"], "level": level, "propagate": False},
-    },
-    "root": {"handlers": ["default"], "level": level},
-  }
+  with open(_LOG_CONFIG_PATH, "r", encoding="utf-8") as f:
+    return json.load(f)
 
 
 # Configure logging before the app starts so the service's own loggers (e.g.
@@ -128,6 +87,7 @@ async def health():
 
 
 router.include_router(skill_enhance_router)
+router.include_router(upskilling_suggestion_router)
 app.include_router(router)
 
 

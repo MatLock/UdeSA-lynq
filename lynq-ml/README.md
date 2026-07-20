@@ -147,10 +147,11 @@ sequenceDiagram
 
 Base path: `/lynq-ml`. All routes require the `lynq-request-uuid` header **except** `/lynq-ml/health`.
 
-| Method | Path                   | Extra headers required          | Description                                            |
-| ------ | ---------------------- | ------------------------------- | ------------------------------------------------------ |
-| POST   | `/skill-enhance`       | `user-id`, `company-id`         | Extract 5–15 key technical skills from a job posting.  |
-| GET    | `/health`              | —                               | Liveness/readiness probe; reports service + LLM status.|
+| Method | Path                       | Extra headers required          | Description                                            |
+| ------ | -------------------------- | ------------------------------- | ------------------------------------------------------ |
+| POST   | `/skill-enhance`           | `user-id`, `company-id`         | Extract 5–15 key technical skills from a job posting.  |
+| POST   | `/upskilling_suggestion`   | `user-id`, `company-id`         | Assess a candidate vs. a job; return a verdict + Udemy courses for each gap. |
+| GET    | `/health`                  | —                               | Liveness/readiness probe; reports service + LLM status.|
 
 **`POST /skill-enhance`** request body:
 
@@ -167,6 +168,44 @@ Base path: `/lynq-ml`. All routes require the `lynq-request-uuid` header **excep
 ```json
 { "success": true, "data": { "skills": ["Java", "Spring", "AWS", "REST", "Docker"] } }
 ```
+
+**`POST /upskilling_suggestion`** request body (the same `{ job, candidate }` structure the prompt consumes):
+
+```json
+{
+  "job": {
+    "description": "Backend role needing Kubernetes and GraphQL.",
+    "skills": ["Java", "AWS", "Kubernetes", "GraphQL"]
+  },
+  "candidate": {
+    "description": "Junior backend developer.",
+    "skills": ["Java", "AWS"]
+  }
+}
+```
+
+The LLM returns a verdict plus 0–5 search queries (one per missing competency); each query is resolved to Udemy courses. The response is wrapped in `GlobalRestResponse<UpskillingResponse>`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "outcome": "Solid backend base; close the infra and API gaps below.",
+    "suggestions": [
+      {
+        "query": "Kubernetes orchestration",
+        "courses": [
+          { "title": "Kubernetes for Developers", "url": "https://www.udemy.com/course/k8s-for-devs/" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+A perfect match yields `outcome: "You are perfect for this role."` and an empty `suggestions` array (no course lookup is made).
+
+**Course lookup requires no API key.** Each search query is resolved by a keyless provider that finds real Udemy course links via a public web search and, when that is rate-limited or unavailable, falls back to a deterministic Udemy search deep-link for the topic — so the endpoint always returns useful links. Results are capped at `UDEMY_MAX_COURSES` (default **2**) per topic. (The Udemy Affiliate API is deprecated and is not used.)
 
 **`GET /health`** returns `200` when the configured LLM is reachable, `503` otherwise (this route is *not* wrapped in `GlobalRestResponse`):
 
@@ -192,6 +231,26 @@ curl -X POST http://localhost:8084/lynq-ml/skill-enhance \
     "title": "Senior Backend Java Developer",
     "description": "Building scalable services with Java, Spring and AWS.",
     "work_type": "REMOTE"
+  }'
+```
+
+**Upskilling suggestion**
+
+```bash
+curl -X POST http://localhost:8084/lynq-ml/upskilling_suggestion \
+  -H "Content-Type: application/json" \
+  -H "lynq-request-uuid: $UUID" \
+  -H "user-id: user-1" \
+  -H "company-id: company-1" \
+  -d '{
+    "job": {
+      "description": "Backend role needing Kubernetes and GraphQL.",
+      "skills": ["Java", "AWS", "Kubernetes", "GraphQL"]
+    },
+    "candidate": {
+      "description": "Junior backend developer.",
+      "skills": ["Java", "AWS"]
+    }
   }'
 ```
 
@@ -272,6 +331,9 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 | `OPENAI_API_KEY`  | — (required)                | `LLM_PROVIDER=openai`| OpenAI API key.                                      |
 | `OPENAI_MODEL`    | `gpt-4o-mini`               | `LLM_PROVIDER=openai`| OpenAI model name.                                   |
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | `LLM_PROVIDER=openai`| OpenAI-compatible API base URL.                      |
+| `UDEMY_MAX_COURSES` | `2`                       | `/upskilling_suggestion` | Max courses returned per topic.                   |
+| `UDEMY_BASE_URL`  | `https://www.udemy.com`     | `/upskilling_suggestion` | Udemy base URL (course + search links).          |
+| `COURSE_SEARCH_TIMEOUT` | `15`                  | `/upskilling_suggestion` | Web-search request timeout, in seconds.          |
 | `HOST`            | `0.0.0.0`                   | always               | Bind host (`python main.py`).                        |
 | `PORT`            | `8084`                      | always               | Bind port.                                           |
 | `LOG_LEVEL`       | `INFO`                      | always               | Root log level.                                      |
