@@ -24,5 +24,6 @@ USER appuser
 
 EXPOSE 8084
 
-# main.py reads HOST/PORT from the environment (defaults 0.0.0.0:8084).
-CMD ["python", "main.py"]
+# src/main.py reads HOST/PORT from the environment (defaults 0.0.0.0:8084).
+# Running the script adds src/ to sys.path, so the top-level imports resolve.
+CMD ["python", "src/main.py"]

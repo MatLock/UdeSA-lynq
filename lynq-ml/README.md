@@ -76,11 +76,12 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
 
 **Layers**
 
-- **Entrypoint** (`main.py`) — builds the FastAPI app, registers the request-UUID middleware, wires the standard exception handlers (`HTTPException`, `RequestValidationError`, catch-all), mounts the `/lynq-ml` router, and configures logging.
+- **Entrypoint** (`main.py`) — builds the FastAPI app, registers the request-UUID middleware, wires the standard exception handlers (from `exception_handlers.py`), mounts the `/lynq-ml` router (health + feature routers), and configures logging.
+- **Exception handlers** (`exception_handlers.py`) — the `HTTPException`, `RequestValidationError`, and catch-all handlers that render the standard error envelope; `register_exception_handlers(app)` attaches them.
 - **Middleware** (`middleware/`) — `require_request_uuid` enforces the `lynq-request-uuid` header on every non-exempt route and binds it to the logging context.
 - **Feature router** (`skill_enhance/`) — the `POST /skill-enhance` endpoint plus its request/response models and the Jinja prompt renderer.
 - **LLM clients** (`llm_client/`) — a common `LLMClient` interface with `OllamaClient` and `OpenAIClient` implementations, selected by the `get_llm_client()` factory from environment configuration.
-- **Prompts** (`prompts/`) — provider-specific Jinja templates (`skill_extractor/ollama.jinja`, `skill_extractor/openai.jinja`).
+- **Prompts** (`resources/prompts/`) — provider-specific Jinja templates (`skill_extractor/ollama.jinja`, `skill_extractor/openai.jinja`).
 - **Response envelopes** (`response/`) — `GlobalRestResponse` / `ErrorRestResponse`, mirroring the Java services.
 - **Logging context** (`logging_context.py`) — the MDC-style request-UUID contextvar and logging filter.
 - **Document helpers** (`file_downloader/`, `file_reader/`) — download a resume from a presigned S3 URL and extract text from PDF/DOCX. Building blocks not yet exposed via an endpoint.
@@ -285,7 +286,7 @@ docker compose -f ../docker-compose.yaml up -d ollama ollama-pull
 source ./set_env.sh
 
 # 4. Run the service
-python main.py
+python src/main.py
 ```
 
 Service URL: `http://localhost:8084/lynq-ml` (health at `/lynq-ml/health`).
@@ -294,7 +295,7 @@ To use OpenAI instead of a local model:
 
 ```bash
 LLM_PROVIDER=openai OPENAI_API_KEY=sk-... source ./set_env.sh
-python main.py
+python src/main.py
 ```
 
 ---
@@ -334,7 +335,7 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 | `UDEMY_MAX_COURSES` | `2`                       | `/upskilling_suggestion` | Max courses returned per topic.                   |
 | `UDEMY_BASE_URL`  | `https://www.udemy.com`     | `/upskilling_suggestion` | Udemy base URL (course + search links).          |
 | `COURSE_SEARCH_TIMEOUT` | `15`                  | `/upskilling_suggestion` | Web-search request timeout, in seconds.          |
-| `HOST`            | `0.0.0.0`                   | always               | Bind host (`python main.py`).                        |
+| `HOST`            | `0.0.0.0`                   | always               | Bind host (`python src/main.py`).                    |
 | `PORT`            | `8084`                      | always               | Bind port.                                           |
 | `LOG_LEVEL`       | `INFO`                      | always               | Root log level.                                      |
 | `LOG_COLORS`      | `true`                      | always               | Colourised per-level logs; set `false` for files/CI. |
@@ -350,10 +351,14 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 
 ## Testing
 
-Tests use the standard-library `unittest` framework with FastAPI's `TestClient`; LLM and HTTP collaborators are mocked, so no network or model is required. Run from the module root:
+Tests use the standard-library `unittest` framework with FastAPI's `TestClient`; LLM and HTTP collaborators are mocked, so no network or model is required. Application code lives under `src/`, which must be on the import path. Run from the module root:
 
 ```bash
+# The tests package puts src/ on the path, so the bare command works:
 python -m unittest discover
+
+# Invocation-independent equivalent (e.g. for CI):
+PYTHONPATH=src python -m unittest discover -s tests
 ```
 
 Coverage includes the `skill-enhance` and `health` endpoints, the request-UUID middleware and logging context, the prompt renderer, the `get_llm_client` factory, and the Ollama/OpenAI client HTTP behaviour.
@@ -364,26 +369,41 @@ Coverage includes the `skill-enhance` and `health` endpoints, the request-UUID m
 
 ```
 lynq-ml/
-├── main.py                     # FastAPI app, middleware, exception handlers, logging
-├── logging_context.py          # Request-UUID contextvar + logging filter (MDC)
-├── middleware/
-│   └── request_uuid.py         # require_request_uuid middleware
-├── skill_enhance/
-│   ├── router.py               # POST /skill-enhance
-│   ├── models.py               # SkillEnhanceRequest/Response, WorkType enum
-│   └── prompts.py              # render_key_extractor_prompt (Jinja)
-├── llm_client/
-│   ├── base.py                 # LLMClient interface, LLMProvider enum
-│   ├── ollama_client.py        # Ollama implementation
-│   ├── openai_client.py        # OpenAI implementation
-│   └── __init__.py             # get_llm_client() factory
-├── prompts/
-│   └── skill_extractor/        # ollama.jinja, openai.jinja
-├── response/
-│   └── models.py               # GlobalRestResponse, ErrorRestResponse
-├── file_downloader/            # presigned-URL download helper
-├── file_reader/                # resume text extraction (PDF/DOCX)
-├── tests/                      # unittest suite
+├── src/                        # application sources root (on the import path)
+│   ├── main.py                 # FastAPI app wiring, router mounting, logging setup
+│   ├── exception_handlers.py   # standard error-envelope handlers + registrar
+│   ├── logging_context.py      # Request-UUID contextvar + logging filter (MDC)
+│   ├── middleware/
+│   │   └── request_uuid.py     # require_request_uuid middleware
+│   ├── health/
+│   │   └── router.py           # GET /health probe
+│   ├── skill_enhance/
+│   │   ├── router.py           # POST /skill-enhance
+│   │   ├── models.py           # SkillEnhanceRequest/Response, WorkType enum
+│   │   └── prompts.py          # render_key_extractor_prompt (Jinja)
+│   ├── upskilling_suggestion/
+│   │   ├── router.py           # POST /upskilling_suggestion
+│   │   ├── models.py           # UpskillingRequest/Response, QuerySuggestion
+│   │   └── prompts.py          # render_upskilling_prompt (Jinja)
+│   ├── llm_client/
+│   │   ├── base.py             # LLMClient interface, LLMProvider enum
+│   │   ├── ollama_client.py    # Ollama implementation
+│   │   ├── openai_client.py    # OpenAI implementation
+│   │   └── __init__.py         # get_llm_client() factory
+│   ├── udemy_client/
+│   │   ├── search_client.py    # keyless Udemy course search (+ fallback)
+│   │   ├── models.py           # Course value object
+│   │   └── __init__.py         # get_course_provider() factory
+│   ├── response/
+│   │   └── models.py           # GlobalRestResponse, ErrorRestResponse
+│   ├── file_downloader/        # presigned-URL download helper
+│   └── file_reader/            # resume text extraction (PDF/DOCX)
+├── resources/                  # service config + assets (loaded at runtime)
+│   ├── log_config.json         # logging dictConfig
+│   └── prompts/
+│       ├── skill_extractor/       # ollama.jinja, openai.jinja
+│       └── upskilling_suggestion/ # ollama.jinja, openai.jinja
+├── tests/                      # unittest suite (puts src/ on the path)
 ├── set_env.sh                  # environment defaults
 ├── Dockerfile
 └── requirements.txt

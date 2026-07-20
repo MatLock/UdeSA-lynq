@@ -24,7 +24,7 @@ class HealthEndpointTests(unittest.TestCase):
         fake.provider = LLMProvider.OLLAMA
         fake.health_check = AsyncMock(return_value=True)
 
-        with patch("main.get_llm_client", return_value=fake):
+        with patch("health.router.get_llm_client", return_value=fake):
             response = self.client.get(_ENDPOINT)
 
         self.assertEqual(response.status_code, 200)
@@ -37,7 +37,7 @@ class HealthEndpointTests(unittest.TestCase):
         fake.provider = LLMProvider.OPENAI
         fake.health_check = AsyncMock(return_value=False)
 
-        with patch("main.get_llm_client", return_value=fake):
+        with patch("health.router.get_llm_client", return_value=fake):
             response = self.client.get(_ENDPOINT)
 
         self.assertEqual(response.status_code, 503)
@@ -46,7 +46,7 @@ class HealthEndpointTests(unittest.TestCase):
         self.assertEqual(body["llm"], {"provider": "openai", "status": "DOWN"})
 
     def test_returns_503_when_client_misconfigured(self) -> None:
-        with patch("main.get_llm_client", side_effect=ValueError("bad config")):
+        with patch("health.router.get_llm_client", side_effect=ValueError("bad config")):
             response = self.client.get(_ENDPOINT)
 
         self.assertEqual(response.status_code, 503)
@@ -60,7 +60,7 @@ class HealthEndpointTests(unittest.TestCase):
         fake.health_check = AsyncMock(return_value=True)
 
         # No lynq-request-uuid header supplied; middleware must let it through.
-        with patch("main.get_llm_client", return_value=fake):
+        with patch("health.router.get_llm_client", return_value=fake):
             response = self.client.get(_ENDPOINT)
 
         self.assertEqual(response.status_code, 200)
