@@ -1,7 +1,10 @@
 package com.lynq.backend.client;
 
+import com.lynq.backend.client.request.CandidateEvaluationRequest;
 import com.lynq.backend.client.request.SkillEnhanceRequest;
+import com.lynq.backend.client.response.CandidateExplanationResponse;
 import com.lynq.backend.client.response.SkillEnhanceResponse;
+import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +26,20 @@ public interface LynqMLClient {
   @PostMapping("/skill-enhance")
   GlobalRestResponse<SkillEnhanceResponse> enhanceSkills(
       @RequestBody SkillEnhanceRequest request,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(USER_ID_HEADER) String userId,
+      @RequestHeader(COMPANY_ID_HEADER) String companyId);
+
+  @PostMapping("/upskilling_suggestion")
+  GlobalRestResponse<UpskillingSuggestionResponse> upskillingSuggestion(
+      @RequestBody CandidateEvaluationRequest request,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(USER_ID_HEADER) String userId,
+      @RequestHeader(COMPANY_ID_HEADER) String companyId);
+
+  @PostMapping("/candidate-explanation")
+  GlobalRestResponse<CandidateExplanationResponse> candidateExplanation(
+      @RequestBody CandidateEvaluationRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
       @RequestHeader(USER_ID_HEADER) String userId,
       @RequestHeader(COMPANY_ID_HEADER) String companyId);

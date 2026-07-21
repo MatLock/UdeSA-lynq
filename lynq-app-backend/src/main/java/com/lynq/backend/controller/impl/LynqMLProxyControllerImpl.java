@@ -1,8 +1,11 @@
 package com.lynq.backend.controller.impl;
 
 import com.lynq.backend.aspect.AuditLog;
+import com.lynq.backend.client.response.CandidateExplanationResponse;
 import com.lynq.backend.client.response.SkillEnhanceResponse;
+import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.controller.LynqMLProxyController;
+import com.lynq.backend.controller.request.CandidateEvaluationRequest;
 import com.lynq.backend.controller.request.SkillEnhanceRequest;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.service.LynqMLProxyService;
@@ -39,6 +42,34 @@ public class LynqMLProxyControllerImpl implements LynqMLProxyController {
         request.getDescription(),
         request.getWorkType(),
         requestUuid);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, response));
+  }
+
+  @Override
+  @PostMapping("/upskilling-suggestion")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> suggestUpskilling(
+      @RequestBody CandidateEvaluationRequest request,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid) {
+    UpskillingSuggestionResponse response =
+        lynqMLProxyService.suggestUpskilling(request, requestUuid);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, response));
+  }
+
+  @Override
+  @PostMapping("/candidate-explanation")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<CandidateExplanationResponse>> explainCandidate(
+      @RequestBody CandidateEvaluationRequest request,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid) {
+    CandidateExplanationResponse response =
+        lynqMLProxyService.explainCandidate(request, requestUuid);
 
     return ResponseEntity
         .status(HttpStatus.OK)

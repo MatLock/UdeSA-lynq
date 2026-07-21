@@ -1,8 +1,11 @@
 package com.lynq.backend;
 
+import com.lynq.backend.controller.request.CandidateEvaluationRequest;
+import com.lynq.backend.controller.request.CandidateSpecRequest;
 import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
+import com.lynq.backend.controller.request.JobSpecRequest;
 import com.lynq.backend.controller.request.SkillEnhanceRequest;
 import com.lynq.backend.controller.request.UpdateCompanyRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
@@ -63,6 +66,10 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String RESUME_PATH = "/user/resume";
   private static final String SKILL_ENHANCE_PROXY_PATH = "/ml/skill-enhance";
   private static final String ML_SKILL_ENHANCE_PATH = "/skill-enhance";
+  private static final String UPSKILLING_PROXY_PATH = "/ml/upskilling-suggestion";
+  private static final String ML_UPSKILLING_PATH = "/upskilling_suggestion";
+  private static final String CANDIDATE_EXPLANATION_PROXY_PATH = "/ml/candidate-explanation";
+  private static final String ML_CANDIDATE_EXPLANATION_PATH = "/candidate-explanation";
   private static final String VALIDATE_PATH = "/auth/validate";
   private static final String USERINFO_PATH = "/auth/user-info";
 
@@ -156,6 +163,19 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String RESUME_JSON =
       "{\"summary\":\"" + RESUME_SUMMARY + "\",\"years\":" + RESUME_YEARS + "}";
   private static final String RESUME_STORAGE_PATH = "lynq/users/" + USER_ID + "/resume/cv.pdf";
+
+  private static final String CANDIDATE_DESCRIPTION = "Backend engineer with 5 years of experience.";
+  private static final List<String> CANDIDATE_SKILLS = List.of(SKILL_JAVA, SKILL_SPRING);
+  private static final String UPSKILLING_OUTCOME =
+      "The candidate should strengthen container orchestration.";
+  private static final String UPSKILLING_QUERY = "Kubernetes orchestration";
+  private static final String UPSKILLING_COURSE_TITLE = "Kubernetes for Developers";
+  private static final String UPSKILLING_COURSE_URL = "https://udemy.com/kubernetes";
+  private static final String CANDIDATE_RECOMMENDATION = "maybe";
+  private static final String CANDIDATE_EXPLANATION_TEXT =
+      "Strong core stack but missing infrastructure depth.";
+  private static final String CANDIDATE_STRENGTH = "Solid Java and Spring experience";
+  private static final String CANDIDATE_CONCERN = "No Kubernetes exposure";
 
   @LocalServerPort
   private int port;
@@ -1204,6 +1224,139 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   // ---------------------------------------------------------------------------
+  // ML upskilling-suggestion proxy
+  // ---------------------------------------------------------------------------
+
+  @Test
+  void upskillingSuggestionAuthenticatesProxiesToMlWithHeadersAndReturnsSuggestions()
+      throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCompanyOwnerWithCompany();
+    stubMlUpskillingSuggestion();
+
+    HttpResponse<String> response = postCandidateEvaluation(upskillingSuggestionUrl());
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> body = parse(response.body());
+    assertThat(body.get("success"), is(true));
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> data = (Map<String, Object>) body.get("data");
+    assertThat(data.get("outcome"), is(UPSKILLING_OUTCOME));
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> suggestions = (List<Map<String, Object>>) data.get("suggestions");
+    assertThat(suggestions.get(0).get("query"), is(UPSKILLING_QUERY));
+
+    lynqMlMock.verify(request()
+        .withMethod("POST")
+        .withPath(ML_UPSKILLING_PATH)
+        .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .withHeader(USER_ID_HEADER, USER_ID)
+        .withHeader(COMPANY_ID_HEADER, COMPANY_ID)
+        .withBody(subString("\"candidate\"")));
+  }
+
+  @Test
+  void upskillingSuggestionReturnsUnauthorizedWhenIamRejectsTokenAndDoesNotCallMl()
+      throws Exception {
+    stubIamInvalidToken();
+    seedCompanyOwnerWithCompany();
+    stubMlUpskillingSuggestion();
+
+    HttpResponse<String> response = postCandidateEvaluation(upskillingSuggestionUrl());
+
+    assertThat(response.statusCode(), is(401));
+    lynqMlMock.verify(request().withPath(ML_UPSKILLING_PATH), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void upskillingSuggestionReturnsBadRequestWhenUserIsNotCompanyType() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedUser(UserType.CANDIDATE);
+    stubMlUpskillingSuggestion();
+
+    HttpResponse<String> response = postCandidateEvaluation(upskillingSuggestionUrl());
+
+    assertThat(response.statusCode(), is(400));
+    assertThat(parse(response.body()).get("success"), is(false));
+    lynqMlMock.verify(request().withPath(ML_UPSKILLING_PATH), VerificationTimes.exactly(0));
+  }
+
+  // ---------------------------------------------------------------------------
+  // ML candidate-explanation proxy
+  // ---------------------------------------------------------------------------
+
+  @Test
+  void candidateExplanationAuthenticatesProxiesToMlWithHeadersAndReturnsRecommendation()
+      throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCompanyOwnerWithCompany();
+    stubMlCandidateExplanation();
+
+    HttpResponse<String> response = postCandidateEvaluation(candidateExplanationUrl());
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> body = parse(response.body());
+    assertThat(body.get("success"), is(true));
+
+    @SuppressWarnings("unchecked")
+    Map<String, Object> data = (Map<String, Object>) body.get("data");
+    assertThat(data.get("recommendation"), is(CANDIDATE_RECOMMENDATION));
+    assertThat(data.get("explanation"), is(CANDIDATE_EXPLANATION_TEXT));
+    @SuppressWarnings("unchecked")
+    List<String> strengths = (List<String>) data.get("strengths");
+    @SuppressWarnings("unchecked")
+    List<String> concerns = (List<String>) data.get("concerns");
+    assertThat(strengths, contains(CANDIDATE_STRENGTH));
+    assertThat(concerns, contains(CANDIDATE_CONCERN));
+
+    lynqMlMock.verify(request()
+        .withMethod("POST")
+        .withPath(ML_CANDIDATE_EXPLANATION_PATH)
+        .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .withHeader(USER_ID_HEADER, USER_ID)
+        .withHeader(COMPANY_ID_HEADER, COMPANY_ID)
+        .withBody(subString("\"candidate\"")));
+  }
+
+  @Test
+  void candidateExplanationReturnsForbiddenWhenRequestUuidHeaderMissing() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCompanyOwnerWithCompany();
+    stubMlCandidateExplanation();
+
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(candidateExplanationUrl()))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .POST(HttpRequest.BodyPublishers.ofString(candidateEvaluationRequestBody()))
+        .build();
+    HttpResponse<String> response =
+        httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(response.statusCode(), is(403));
+    lynqMlMock.verify(request().withPath(ML_CANDIDATE_EXPLANATION_PATH), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void candidateExplanationReturnsBadRequestWhenCompanyOwnerHasNoCompany() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedUser(UserType.COMPANY);
+    stubMlCandidateExplanation();
+
+    HttpResponse<String> response = postCandidateEvaluation(candidateExplanationUrl());
+
+    assertThat(response.statusCode(), is(400));
+    assertThat(parse(response.body()).get("success"), is(false));
+    lynqMlMock.verify(request().withPath(ML_CANDIDATE_EXPLANATION_PATH), VerificationTimes.exactly(0));
+  }
+
+  // ---------------------------------------------------------------------------
   // Job increase-seen
   // ---------------------------------------------------------------------------
 
@@ -1713,6 +1866,77 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   private String skillEnhanceUrl() {
     return "http://localhost:" + port + CONTEXT_PATH + SKILL_ENHANCE_PROXY_PATH;
+  }
+
+  private HttpResponse<String> postCandidateEvaluation(String url) throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(url))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .POST(HttpRequest.BodyPublishers.ofString(candidateEvaluationRequestBody()))
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private String candidateEvaluationRequestBody() {
+    JobSpecRequest job = new JobSpecRequest();
+    job.setDescription(JOB_DESCRIPTION);
+    job.setSkills(JOB_SKILLS);
+    CandidateSpecRequest candidate = new CandidateSpecRequest();
+    candidate.setDescription(CANDIDATE_DESCRIPTION);
+    candidate.setSkills(CANDIDATE_SKILLS);
+    CandidateEvaluationRequest request = new CandidateEvaluationRequest();
+    request.setJob(job);
+    request.setCandidate(candidate);
+    return objectMapper.writeValueAsString(request);
+  }
+
+  private void stubMlUpskillingSuggestion() {
+    lynqMlMock.when(request().withMethod("POST").withPath(ML_UPSKILLING_PATH))
+        .respond(response()
+            .withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody("""
+                {
+                  "success": true,
+                  "data": {
+                    "outcome": "%s",
+                    "suggestions": [
+                      {
+                        "query": "%s",
+                        "courses": [{"title": "%s", "url": "%s"}]
+                      }
+                    ]
+                  }
+                }""".formatted(UPSKILLING_OUTCOME, UPSKILLING_QUERY, UPSKILLING_COURSE_TITLE,
+                UPSKILLING_COURSE_URL)));
+  }
+
+  private void stubMlCandidateExplanation() {
+    lynqMlMock.when(request().withMethod("POST").withPath(ML_CANDIDATE_EXPLANATION_PATH))
+        .respond(response()
+            .withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody("""
+                {
+                  "success": true,
+                  "data": {
+                    "recommendation": "%s",
+                    "explanation": "%s",
+                    "strengths": ["%s"],
+                    "concerns": ["%s"]
+                  }
+                }""".formatted(CANDIDATE_RECOMMENDATION, CANDIDATE_EXPLANATION_TEXT,
+                CANDIDATE_STRENGTH, CANDIDATE_CONCERN)));
+  }
+
+  private String upskillingSuggestionUrl() {
+    return "http://localhost:" + port + CONTEXT_PATH + UPSKILLING_PROXY_PATH;
+  }
+
+  private String candidateExplanationUrl() {
+    return "http://localhost:" + port + CONTEXT_PATH + CANDIDATE_EXPLANATION_PROXY_PATH;
   }
 
   private String jobSubResourceUrl(String jobId, String subResource) {
