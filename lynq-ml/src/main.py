@@ -1,5 +1,6 @@
 from fastapi import APIRouter, FastAPI
 
+from candidate_explanation.router import router as candidate_explanation_router
 from exception_handlers import register_exception_handlers
 from health.router import router as health_router
 from middleware.request_uuid import require_request_uuid
@@ -34,6 +35,7 @@ router = APIRouter(prefix="/lynq-ml")
 router.include_router(health_router)
 router.include_router(skill_enhance_router)
 router.include_router(upskilling_suggestion_router)
+router.include_router(candidate_explanation_router)
 app.include_router(router)
 
 
