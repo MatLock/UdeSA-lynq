@@ -1,7 +1,13 @@
 package com.lynq.backend.service;
 
+import com.lynq.backend.client.request.CandidateEvaluationRequest;
+import com.lynq.backend.client.response.CandidateExplanationResponse;
+import com.lynq.backend.client.response.Course;
+import com.lynq.backend.client.response.QuerySuggestion;
+import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.controller.response.GetJobDetailForCandidateRestResponse;
 import com.lynq.backend.controller.response.GetJobRestResponse;
+import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.enums.JobPostSource;
@@ -58,6 +64,7 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -145,6 +152,18 @@ class JobServiceTest {
       "Only the owner of the job post can update it";
   private static final String ONLY_JOB_OWNER_CAN_VIEW_CANDIDATES =
       "Only the owner of the job post can view its candidates";
+  private static final String ONLY_JOB_OWNER_CAN_EXPLAIN_CANDIDATES =
+      "Only the owner of the job post can request an AI evaluation of its candidates";
+  private static final String CANDIDATE_APPLICATION_NOT_FOUND =
+      "The candidate has not applied to this job post";
+  private static final String ONLY_CANDIDATE_USERS_CAN_GET_UPSKILLING =
+      "Only users of type CANDIDATE can request upskilling suggestions";
+
+  private static final String REQUEST_UUID = "11111111-1111-1111-1111-111111111111";
+  private static final String CANDIDATE_ABOUT = "Backend engineer with 5 years of experience.";
+  private static final String CANDIDATE_RECOMMENDATION = "maybe";
+  private static final String CANDIDATE_EXPLANATION_TEXT =
+      "Strong core stack but missing infrastructure depth.";
 
   private static final String UPDATED_TITLE = "Staff Backend Engineer";
   private static final String UPDATED_DESCRIPTION = "Lead the Lynq platform architecture.";
@@ -172,6 +191,9 @@ class JobServiceTest {
   private StorageService storageService;
 
   @Mock
+  private com.lynq.backend.client.LynqMLClient lynqMLClient;
+
+  @Mock
   private SecurityContext securityContext;
 
   @Mock
@@ -182,7 +204,7 @@ class JobServiceTest {
   @BeforeEach
   void setUp() {
     jobService = new JobService(jobPostRepository, companyRepository, userRepository,
-        userApplicationJobRepository, jobPostSkillRepository, storageService);
+        userApplicationJobRepository, jobPostSkillRepository, storageService, lynqMLClient);
     SecurityContextHolder.setContext(securityContext);
   }
 
@@ -1112,6 +1134,238 @@ class JobServiceTest {
         null, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_IMAGE_PATH,
         POSTER_ID, POSTER_FULL_NAME, POSTER_IMAGE_PATH, POSTER_CURRENT_POSITION, null);
+  }
+
+  @Test
+  void explainCandidateBuildsRequestFromApplicationAndForwardsHeaders() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA, SKILL_SPRING, SKILL_POSTGRES));
+    UserEntity candidate = candidateForExplanation(List.of(SKILL_JAVA, SKILL_SPRING));
+    stubAuthenticatedUser(owner);
+    when(userApplicationJobRepository.findByJobIdAndUserId(JOB_ID, CANDIDATE_ID))
+        .thenReturn(Optional.of(application(job, candidate)));
+    when(companyRepository.findByOwner(owner))
+        .thenReturn(Optional.of(CompanyEntity.builder().id(COMPANY_ID).owner(owner).build()));
+    when(lynqMLClient.candidateExplanation(any(), eq(REQUEST_UUID), eq(USER_ID), eq(COMPANY_ID)))
+        .thenReturn(new GlobalRestResponse<>(true, explanationResponse()));
+    ArgumentCaptor<CandidateEvaluationRequest> requestCaptor =
+        ArgumentCaptor.forClass(CandidateEvaluationRequest.class);
+
+    jobService.explainCandidate(JOB_ID, CANDIDATE_ID, REQUEST_UUID);
+
+    verify(lynqMLClient).candidateExplanation(requestCaptor.capture(), eq(REQUEST_UUID),
+        eq(USER_ID), eq(COMPANY_ID));
+    CandidateEvaluationRequest forwarded = requestCaptor.getValue();
+    assertThat(forwarded.getJob().getSkills(), contains(SKILL_JAVA, SKILL_SPRING, SKILL_POSTGRES));
+    assertThat(forwarded.getJob().getDescription(), is(TITLE + "\n\n" + DESCRIPTION));
+    assertThat(forwarded.getCandidate().getSkills(), contains(SKILL_JAVA, SKILL_SPRING));
+    assertThat(forwarded.getCandidate().getDescription(),
+        is(CANDIDATE_CURRENT_POSITION + "\n\n" + CANDIDATE_ABOUT));
+  }
+
+  @Test
+  void explainCandidateReturnsDataFromClientResponse() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
+    UserEntity candidate = candidateForExplanation(List.of(SKILL_JAVA));
+    stubAuthenticatedUser(owner);
+    when(userApplicationJobRepository.findByJobIdAndUserId(JOB_ID, CANDIDATE_ID))
+        .thenReturn(Optional.of(application(job, candidate)));
+    when(companyRepository.findByOwner(owner))
+        .thenReturn(Optional.of(CompanyEntity.builder().id(COMPANY_ID).owner(owner).build()));
+    CandidateExplanationResponse mlResponse = explanationResponse();
+    when(lynqMLClient.candidateExplanation(any(), eq(REQUEST_UUID), eq(USER_ID), eq(COMPANY_ID)))
+        .thenReturn(new GlobalRestResponse<>(true, mlResponse));
+
+    CandidateExplanationResponse result =
+        jobService.explainCandidate(JOB_ID, CANDIDATE_ID, REQUEST_UUID);
+
+    assertThat(result, is(sameInstance(mlResponse)));
+    assertThat(result.getRecommendation(), is(CANDIDATE_RECOMMENDATION));
+    assertThat(result.getExplanation(), is(CANDIDATE_EXPLANATION_TEXT));
+  }
+
+  @Test
+  void explainCandidateThrowsNotFoundWhenCandidateHasNotApplied() {
+    stubAuthenticatedUser(companyUser());
+    when(userApplicationJobRepository.findByJobIdAndUserId(JOB_ID, CANDIDATE_ID))
+        .thenReturn(Optional.empty());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> jobService.explainCandidate(JOB_ID, CANDIDATE_ID, REQUEST_UUID));
+    assertThat(exception.getMessage(), is(CANDIDATE_APPLICATION_NOT_FOUND));
+    verify(lynqMLClient, never()).candidateExplanation(any(), any(), any(), any());
+  }
+
+  @Test
+  void explainCandidateThrowsForbiddenWhenCallerDoesNotOwnJob() {
+    UserEntity caller = companyUser();
+    UserEntity otherOwner = UserEntity.builder().id("other-owner").type(UserType.COMPANY).build();
+    JobPostEntity job = ownedJob(otherOwner, List.of(SKILL_JAVA));
+    UserEntity candidate = candidateForExplanation(List.of(SKILL_JAVA));
+    stubAuthenticatedUser(caller);
+    when(userApplicationJobRepository.findByJobIdAndUserId(JOB_ID, CANDIDATE_ID))
+        .thenReturn(Optional.of(application(job, candidate)));
+
+    ForbiddenException exception = assertThrows(ForbiddenException.class,
+        () -> jobService.explainCandidate(JOB_ID, CANDIDATE_ID, REQUEST_UUID));
+    assertThat(exception.getMessage(), is(ONLY_JOB_OWNER_CAN_EXPLAIN_CANDIDATES));
+    verify(lynqMLClient, never()).candidateExplanation(any(), any(), any(), any());
+  }
+
+  @Test
+  void explainCandidateThrowsBadRequestWhenOwnerHasNoCompany() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
+    UserEntity candidate = candidateForExplanation(List.of(SKILL_JAVA));
+    stubAuthenticatedUser(owner);
+    when(userApplicationJobRepository.findByJobIdAndUserId(JOB_ID, CANDIDATE_ID))
+        .thenReturn(Optional.of(application(job, candidate)));
+    when(companyRepository.findByOwner(owner)).thenReturn(Optional.empty());
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> jobService.explainCandidate(JOB_ID, CANDIDATE_ID, REQUEST_UUID));
+    assertThat(exception.getMessage(), is(USER_NOT_LINKED_TO_COMPANY));
+    verify(lynqMLClient, never()).candidateExplanation(any(), any(), any(), any());
+  }
+
+  @Test
+  void suggestUpskillingBuildsRequestFromAuthenticatedUserAndJobAndForwardsHeaders() {
+    stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA, SKILL_SPRING)));
+    JobPostEntity job = jobWithCompany(List.of(SKILL_JAVA, SKILL_SPRING, SKILL_POSTGRES));
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(COMPANY_ID)))
+        .thenReturn(new GlobalRestResponse<>(true, upskillingResponse()));
+    ArgumentCaptor<CandidateEvaluationRequest> requestCaptor =
+        ArgumentCaptor.forClass(CandidateEvaluationRequest.class);
+
+    jobService.suggestUpskilling(JOB_ID, REQUEST_UUID);
+
+    verify(lynqMLClient).upskillingSuggestion(requestCaptor.capture(), eq(REQUEST_UUID),
+        eq(USER_ID), eq(COMPANY_ID));
+    CandidateEvaluationRequest forwarded = requestCaptor.getValue();
+    assertThat(forwarded.getJob().getSkills(), contains(SKILL_JAVA, SKILL_SPRING, SKILL_POSTGRES));
+    assertThat(forwarded.getJob().getDescription(), is(TITLE + "\n\n" + DESCRIPTION));
+    assertThat(forwarded.getCandidate().getSkills(), contains(SKILL_JAVA, SKILL_SPRING));
+    assertThat(forwarded.getCandidate().getDescription(),
+        is(CANDIDATE_CURRENT_POSITION + "\n\n" + CANDIDATE_ABOUT));
+  }
+
+  @Test
+  void suggestUpskillingReturnsDataFromClientResponse() {
+    stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA)));
+    when(jobPostRepository.findById(JOB_ID))
+        .thenReturn(Optional.of(jobWithCompany(List.of(SKILL_JAVA, SKILL_SPRING))));
+    UpskillingSuggestionResponse mlResponse = upskillingResponse();
+    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(COMPANY_ID)))
+        .thenReturn(new GlobalRestResponse<>(true, mlResponse));
+
+    UpskillingSuggestionResponse result = jobService.suggestUpskilling(JOB_ID, REQUEST_UUID);
+
+    assertThat(result, is(sameInstance(mlResponse)));
+  }
+
+  @Test
+  void suggestUpskillingUsesEmptyCompanyIdWhenJobHasNoCompany() {
+    stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA)));
+    JobPostEntity job = ownedJob(companyUser(), List.of(SKILL_JAVA)); // no company set
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq("")))
+        .thenReturn(new GlobalRestResponse<>(true, upskillingResponse()));
+
+    jobService.suggestUpskilling(JOB_ID, REQUEST_UUID);
+
+    verify(lynqMLClient).upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(""));
+  }
+
+  @Test
+  void suggestUpskillingThrowsBadRequestWhenUserIsNotCandidate() {
+    stubAuthenticatedUser(companyUser());
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> jobService.suggestUpskilling(JOB_ID, REQUEST_UUID));
+    assertThat(exception.getMessage(), is(ONLY_CANDIDATE_USERS_CAN_GET_UPSKILLING));
+    verify(lynqMLClient, never()).upskillingSuggestion(any(), any(), any(), any());
+  }
+
+  @Test
+  void suggestUpskillingThrowsNotFoundWhenJobDoesNotExist() {
+    stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA)));
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.empty());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> jobService.suggestUpskilling(JOB_ID, REQUEST_UUID));
+    assertThat(exception.getMessage(), is(JOB_POST_NOT_FOUND));
+    verify(lynqMLClient, never()).upskillingSuggestion(any(), any(), any(), any());
+  }
+
+  private UserEntity authenticatedCandidate(List<String> skillNames) {
+    UserEntity candidate = UserEntity.builder()
+        .id(USER_ID)
+        .type(UserType.CANDIDATE)
+        .currentPosition(CANDIDATE_CURRENT_POSITION)
+        .about(CANDIDATE_ABOUT)
+        .skills(new ArrayList<>())
+        .build();
+    skillNames.forEach(name -> candidate.getSkills().add(UserSkillsEntity.builder()
+        .id(UUID.randomUUID().toString())
+        .user(candidate)
+        .skill(name)
+        .build()));
+    return candidate;
+  }
+
+  private JobPostEntity jobWithCompany(List<String> skillNames) {
+    JobPostEntity job = ownedJob(companyUser(), skillNames);
+    job.setCompany(CompanyEntity.builder().id(COMPANY_ID).build());
+    return job;
+  }
+
+  private UpskillingSuggestionResponse upskillingResponse() {
+    Course course = Course.builder().title("Kubernetes for Developers").url("https://u/k8s").build();
+    QuerySuggestion suggestion = QuerySuggestion.builder()
+        .query("Kubernetes orchestration")
+        .courses(List.of(course))
+        .build();
+    return UpskillingSuggestionResponse.builder()
+        .outcome("The candidate should strengthen container orchestration.")
+        .suggestions(List.of(suggestion))
+        .build();
+  }
+
+  private UserApplicationJobEntity application(JobPostEntity job, UserEntity candidate) {
+    return UserApplicationJobEntity.builder()
+        .id(APPLICATION_ID)
+        .jobPost(job)
+        .user(candidate)
+        .appliedOn(APPLIED_ON)
+        .build();
+  }
+
+  private UserEntity candidateForExplanation(List<String> skillNames) {
+    UserEntity candidate = UserEntity.builder()
+        .id(CANDIDATE_ID)
+        .type(UserType.CANDIDATE)
+        .fullName(CANDIDATE_FULL_NAME)
+        .currentPosition(CANDIDATE_CURRENT_POSITION)
+        .about(CANDIDATE_ABOUT)
+        .skills(new ArrayList<>())
+        .build();
+    skillNames.forEach(name -> candidate.getSkills().add(UserSkillsEntity.builder()
+        .id(UUID.randomUUID().toString())
+        .user(candidate)
+        .skill(name)
+        .build()));
+    return candidate;
+  }
+
+  private CandidateExplanationResponse explanationResponse() {
+    return CandidateExplanationResponse.builder()
+        .recommendation(CANDIDATE_RECOMMENDATION)
+        .explanation(CANDIDATE_EXPLANATION_TEXT)
+        .strengths(List.of("Solid Java and Spring experience"))
+        .concerns(List.of("No Kubernetes exposure"))
+        .build();
   }
 
   private UserEntity companyUser() {

@@ -1,6 +1,8 @@
 package com.lynq.backend.controller.impl;
 
 import com.lynq.backend.aspect.AuditLog;
+import com.lynq.backend.client.response.CandidateExplanationResponse;
+import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.controller.JobController;
 import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.request.UpdateJobRequest;
@@ -29,6 +31,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/job")
 @Validated
 public class JobControllerImpl implements JobController {
+
+  private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
 
   private final JobService jobService;
 
@@ -228,6 +232,35 @@ public class JobControllerImpl implements JobController {
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, candidates));
+  }
+
+  @Override
+  @GetMapping("/{jobId}/candidate/{candidateId}/candidate-explanation")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<CandidateExplanationResponse>> explainCandidate(
+      @PathVariable String jobId,
+      @PathVariable String candidateId,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid) {
+    CandidateExplanationResponse response =
+        jobService.explainCandidate(jobId, candidateId, requestUuid);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, response));
+  }
+
+  @Override
+  @GetMapping("/{jobId}/upskilling-suggestion")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> suggestUpskilling(
+      @PathVariable String jobId,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid) {
+    UpskillingSuggestionResponse response =
+        jobService.suggestUpskilling(jobId, requestUuid);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, response));
   }
 
 }

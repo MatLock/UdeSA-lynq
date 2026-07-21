@@ -2,6 +2,7 @@ package com.lynq.backend.repository;
 
 import com.lynq.backend.model.UserApplicationJobEntity;
 import com.lynq.backend.repository.projection.JobCandidateProjection;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +16,11 @@ public interface UserApplicationJobRepository extends JpaRepository<UserApplicat
   @Query("SELECT COUNT(a) > 0 FROM UserApplicationJobEntity a "
       + "WHERE a.jobPost.id = :jobId AND a.user.id = :userId")
   boolean existsByJobIdAndUserId(@Param("jobId") String jobId, @Param("userId") String userId);
+
+  @Query("SELECT a FROM UserApplicationJobEntity a "
+      + "WHERE a.jobPost.id = :jobId AND a.user.id = :userId")
+  Optional<UserApplicationJobEntity> findByJobIdAndUserId(@Param("jobId") String jobId,
+      @Param("userId") String userId);
 
   @Query("SELECT COUNT(a) FROM UserApplicationJobEntity a WHERE a.jobPost.id = :jobId")
   long countByJobId(@Param("jobId") String jobId);

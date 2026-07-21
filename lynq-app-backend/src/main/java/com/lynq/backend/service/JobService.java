@@ -2,8 +2,15 @@ package com.lynq.backend.service;
 
 import com.fasterxml.uuid.Generators;
 import com.lynq.backend.aspect.AuditLog;
+import com.lynq.backend.client.LynqMLClient;
+import com.lynq.backend.client.request.CandidateEvaluationRequest;
+import com.lynq.backend.client.request.CandidateSpec;
+import com.lynq.backend.client.request.JobSpec;
+import com.lynq.backend.client.response.CandidateExplanationResponse;
+import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.controller.response.GetJobDetailForCandidateRestResponse;
 import com.lynq.backend.controller.response.GetJobRestResponse;
+import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.JobCompanyRestResponse;
 import com.lynq.backend.controller.response.JobPostedByRestResponse;
@@ -36,6 +43,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -58,6 +66,12 @@ public class JobService {
   private static final String ONLY_JOB_OWNER_CAN_UPDATE = "Only the owner of the job post can update it";
   private static final String ONLY_JOB_OWNER_CAN_VIEW_CANDIDATES =
       "Only the owner of the job post can view its candidates";
+  private static final String ONLY_JOB_OWNER_CAN_EXPLAIN_CANDIDATES =
+      "Only the owner of the job post can request an AI evaluation of its candidates";
+  private static final String CANDIDATE_APPLICATION_NOT_FOUND =
+      "The candidate has not applied to this job post";
+  private static final String ONLY_CANDIDATE_USERS_CAN_GET_UPSKILLING =
+      "Only users of type CANDIDATE can request upskilling suggestions";
 
   private final JobPostRepository jobPostRepository;
   private final CompanyRepository companyRepository;
@@ -65,16 +79,19 @@ public class JobService {
   private final UserApplicationJobRepository userApplicationJobRepository;
   private final JobPostSkillRepository jobPostSkillRepository;
   private final StorageService storageService;
+  private final LynqMLClient lynqMLClient;
 
   public JobService(JobPostRepository jobPostRepository, CompanyRepository companyRepository,
       UserRepository userRepository, UserApplicationJobRepository userApplicationJobRepository,
-      JobPostSkillRepository jobPostSkillRepository, StorageService storageService) {
+      JobPostSkillRepository jobPostSkillRepository, StorageService storageService,
+      LynqMLClient lynqMLClient) {
     this.jobPostRepository = jobPostRepository;
     this.companyRepository = companyRepository;
     this.userRepository = userRepository;
     this.userApplicationJobRepository = userApplicationJobRepository;
     this.jobPostSkillRepository = jobPostSkillRepository;
     this.storageService = storageService;
+    this.lynqMLClient = lynqMLClient;
   }
 
   @AuditLog
@@ -255,6 +272,82 @@ public class JobService {
     return PagedRestResponse.from(userApplicationJobRepository
         .findCandidatesByJobId(jobId, pageable)
         .map(this::toCandidateResponse));
+  }
+
+  @AuditLog
+  @Transactional(readOnly = true)
+  public CandidateExplanationResponse explainCandidate(String jobId, String candidateId,
+      String requestUuid) {
+    UserEntity owner = getAuthenticatedUser();
+
+    // The candidate must actually have applied to the job: that relationship
+    // lives in the application (intermediate) table, which is the source of both
+    // the job post and the candidate we evaluate.
+    UserApplicationJobEntity application = userApplicationJobRepository
+        .findByJobIdAndUserId(jobId, candidateId)
+        .orElseThrow(() -> new NotFoundException(CANDIDATE_APPLICATION_NOT_FOUND));
+
+    JobPostEntity job = application.getJobPost();
+    UserEntity candidate = application.getUser();
+
+    // Only the owner of the job post may request the evaluation of its candidates.
+    if (job.getCreatedByUser() == null
+        || !job.getCreatedByUser().getId().equals(owner.getId())) {
+      throw new ForbiddenException(ONLY_JOB_OWNER_CAN_EXPLAIN_CANDIDATES);
+    }
+
+    CompanyEntity company = companyRepository.findByOwner(owner)
+        .orElseThrow(() -> new BadRequestException(USER_NOT_LINKED_TO_COMPANY));
+
+    GlobalRestResponse<CandidateExplanationResponse> response = lynqMLClient.candidateExplanation(
+        toEvaluationRequest(job, candidate), requestUuid, owner.getId(), company.getId());
+
+    return response.getData();
+  }
+
+  @AuditLog
+  @Transactional(readOnly = true)
+  public UpskillingSuggestionResponse suggestUpskilling(String jobId, String requestUuid) {
+    // The upskilling suggestion is for the authenticated candidate against the
+    // job. No job-post ownership check — any CANDIDATE may ask how they would
+    // need to upskill for a job. Both are read straight from the DB.
+    UserEntity user = getAuthenticatedUser();
+
+    if (user.getType() != UserType.CANDIDATE) {
+      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_GET_UPSKILLING);
+    }
+
+    JobPostEntity job = jobPostRepository.findById(jobId)
+        .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
+
+    // company-id is contextual for lynq-ml; scraped jobs may have no company, so
+    // fall back to an empty value rather than omitting the required header.
+    String companyId = job.getCompany() != null ? job.getCompany().getId() : "";
+
+    GlobalRestResponse<UpskillingSuggestionResponse> response = lynqMLClient.upskillingSuggestion(
+        toEvaluationRequest(job, user), requestUuid, user.getId(), companyId);
+
+    return response.getData();
+  }
+
+  private static CandidateEvaluationRequest toEvaluationRequest(JobPostEntity job,
+      UserEntity candidate) {
+    return CandidateEvaluationRequest.builder()
+        .job(JobSpec.builder()
+            .description(describe(job.getTitle(), job.getDescription()))
+            .skills(job.getSkills().stream().map(JobPostSkillEntity::getSkill).toList())
+            .build())
+        .candidate(CandidateSpec.builder()
+            .description(describe(candidate.getCurrentPosition(), candidate.getAbout()))
+            .skills(candidate.getSkills().stream().map(UserSkillsEntity::getSkill).toList())
+            .build())
+        .build();
+  }
+
+  private static String describe(String... parts) {
+    return Stream.of(parts)
+        .filter(value -> value != null && !value.isBlank())
+        .collect(Collectors.joining("\n\n"));
   }
 
   @AuditLog

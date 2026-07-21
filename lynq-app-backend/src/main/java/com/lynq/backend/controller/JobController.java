@@ -1,5 +1,7 @@
 package com.lynq.backend.controller;
 
+import com.lynq.backend.client.response.CandidateExplanationResponse;
+import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.request.UpdateJobRequest;
 import com.lynq.backend.controller.response.ApplyJobRestResponse;
@@ -126,5 +128,32 @@ public interface JobController {
       String jobId,
       Integer page,
       Integer pageSize);
+
+  @Operation(
+      summary = "Explain whether a candidate should be hired for a job post",
+      description = "Returns an AI hiring recommendation (with the reasons for and against hiring) "
+          + "for the candidate identified by 'candidateId' against the job post identified by "
+          + "'jobId'. The job and candidate information is read from the database and forwarded to "
+          + "the lynq-ml service. Only the COMPANY-type owner of both the company and the job post "
+          + "may request it. Fails with 404 when the job post or candidate does not exist, and 403 "
+          + "when the caller is not the owner of the job post.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<CandidateExplanationResponse>> explainCandidate(
+      String jobId,
+      String candidateId,
+      String requestUuid);
+
+  @Operation(
+      summary = "Suggest upskilling courses for the authenticated candidate against a job post",
+      description = "Returns an AI upskilling recommendation (a verdict plus course suggestions) "
+          + "for the authenticated user against the job post identified by 'jobId'. The user and "
+          + "job information is read from the database and forwarded to the lynq-ml service. Only "
+          + "CANDIDATE-type users may call it; the caller identity is resolved from the bearer "
+          + "token. Fails with 400 when the caller is not a CANDIDATE and 404 when the job post "
+          + "does not exist.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> suggestUpskilling(
+      String jobId,
+      String requestUuid);
 
 }
