@@ -325,6 +325,18 @@ const en = {
       lynqScore: 'LYNQ-SCORE',
       unknownCandidate: 'Unknown',
       reviewApplication: 'Review application',
+      aiEvaluation: 'AI Evaluation',
+      aiEvaluating: 'Evaluating…',
+      aiError: 'We could not generate the AI evaluation. Please try again.',
+      aiRecommendationLabel: 'Recommendation',
+      aiStrengths: 'Strengths',
+      aiConcerns: 'Concerns',
+      aiClose: 'Close',
+      aiRecommendation: {
+        hire: 'Recommended to hire',
+        no_hire: 'Not recommended',
+        maybe: 'Consider with caution',
+      },
     },
     editJob: {
       title: 'Edit job post',

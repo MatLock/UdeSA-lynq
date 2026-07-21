@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Chip } from '@mui/material'
+import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined'
 import strings from '../../i18n'
 import useApi from '../../hooks/useApi'
 import useAuth from '../../hooks/useAuth'
@@ -8,6 +9,9 @@ import jobService from '../../services/jobService'
 import UserIcon from '../../components/UserIcon/UserIcon.jsx'
 import Pagination from '../../components/Pagination/Pagination.jsx'
 import Spinner from '../../components/Spinner/Spinner.jsx'
+import LoadingOverlay from '../../components/LoadingOverlay/LoadingOverlay.jsx'
+import Toast from '../../components/Toast/Toast.jsx'
+import CandidateEvaluationModal from '../../components/CandidateEvaluationModal/CandidateEvaluationModal.jsx'
 import formatRelativeDate from '../../utils/formatRelativeDate'
 import './JobCandidatesPage.css'
 
@@ -44,6 +48,13 @@ const JobCandidatesPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
+  // AI evaluation state: the userId currently being evaluated (drives the
+  // per-row button + blocking overlay), the last result to show inline, and a
+  // toast for failures — mirroring the skill-enhance flow (overlay + Toast).
+  const [evaluatingId, setEvaluatingId] = useState(null)
+  const [explanation, setExplanation] = useState(null)
+  const [toast, setToast] = useState(null)
+
   // Refetch on page change. A cancel flag drops the result of a superseded
   // request so a slow earlier fetch can't overwrite a newer one.
   useEffect(() => {
@@ -52,6 +63,8 @@ const JobCandidatesPage = () => {
     const loadCandidates = async () => {
       setLoading(true)
       setError(false)
+      // A new page invalidates any open evaluation panel.
+      setExplanation(null)
       try {
         const result = await jobService.get_job_candidates(authFetch, jobId, {
           page,
@@ -70,6 +83,26 @@ const JobCandidatesPage = () => {
       cancelled = true
     }
   }, [authFetch, jobId, page])
+
+  // Request the AI hiring evaluation for one applicant. The backend reads the job
+  // and candidate from the DB, so we only pass the ids (candidate.userId is the
+  // applicant's user id the endpoint looks up). The result opens in a modal.
+  const handleEvaluate = async (candidate) => {
+    if (evaluatingId || !candidate.userId) return
+    setEvaluatingId(candidate.userId)
+    try {
+      const result = await jobService.get_candidate_explanation(
+        authFetch,
+        jobId,
+        candidate.userId,
+      )
+      setExplanation({ candidate, result })
+    } catch (err) {
+      setToast({ type: 'error', message: err.reason ?? err.message ?? t.aiError })
+    } finally {
+      setEvaluatingId(null)
+    }
+  }
 
   // Company-only page: send everyone else back to the feed.
   if (user && user.userType !== 'COMPANY') {
@@ -116,6 +149,7 @@ const JobCandidatesPage = () => {
           <div className="job-candidates-list">
             {candidates.map((candidate) => {
               const appliedOn = formatRelativeDate(candidate.userAppliedOn)
+              const isEvaluating = evaluatingId === candidate.userId
               return (
                 <article className="candidate-card" key={candidate.id}>
                   <span className="candidate-avatar">
@@ -171,16 +205,29 @@ const JobCandidatesPage = () => {
                     )}
                   </div>
 
-                  {/* Trailing action: review the applicant on their profile. */}
+                  {/* Trailing actions: AI evaluation + review on their profile. */}
                   {candidate.userId && (
-                    <Link
-                      to={`/user/${candidate.userId}`}
-                      state={{ lynqScore: candidate.lynqScore }}
-                      className="candidate-review"
-                      aria-label={`${t.reviewApplication} — ${candidate.userFullName ?? t.unknownCandidate}`}
-                    >
-                      {t.reviewApplication}
-                    </Link>
+                    <div className="candidate-actions">
+                      <button
+                        type="button"
+                        className="candidate-ai-button"
+                        onClick={() => handleEvaluate(candidate)}
+                        disabled={Boolean(evaluatingId)}
+                        aria-haspopup="dialog"
+                        aria-label={`${t.aiEvaluation} — ${candidate.userFullName ?? t.unknownCandidate}`}
+                      >
+                        <AutoAwesomeOutlinedIcon sx={{ fontSize: 16 }} />
+                        {isEvaluating ? t.aiEvaluating : t.aiEvaluation}
+                      </button>
+                      <Link
+                        to={`/user/${candidate.userId}`}
+                        state={{ lynqScore: candidate.lynqScore }}
+                        className="candidate-review"
+                        aria-label={`${t.reviewApplication} — ${candidate.userFullName ?? t.unknownCandidate}`}
+                      >
+                        {t.reviewApplication}
+                      </Link>
+                    </div>
                   )}
                 </article>
               )
@@ -200,6 +247,22 @@ const JobCandidatesPage = () => {
           />
         </footer>
       )}
+
+      {evaluatingId && <LoadingOverlay label={t.aiEvaluating} />}
+
+      {explanation && (
+        <CandidateEvaluationModal
+          candidateName={explanation.candidate?.userFullName ?? t.unknownCandidate}
+          result={explanation.result}
+          onClose={() => setExplanation(null)}
+        />
+      )}
+
+      <Toast
+        message={toast?.message}
+        type={toast?.type}
+        onClose={() => setToast(null)}
+      />
     </div>
   )
 }

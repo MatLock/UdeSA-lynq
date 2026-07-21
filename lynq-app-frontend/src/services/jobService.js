@@ -327,6 +327,36 @@ const get_job_candidates = async (authFetch, jobId, { page = 0, pageSize = 10 } 
   return payload?.data;
 };
 
+/**
+ * Ask the backend for an AI hiring recommendation for one candidate on a job.
+ *
+ * Calls GET /job/{jobId}/candidate/{candidateId}/candidate-explanation
+ * (JobController.explainCandidate) through `authFetch`. Owner-only: the backend
+ * resolves the caller from the bearer token, requires them to own both the
+ * company and the job post (403 otherwise), reads the job and candidate from the
+ * database and forwards the pair to the lynq-ml service. `candidateId` is the
+ * applicant's user id (JobCandidateResponse.userId), which the backend looks up
+ * in the users table. Replies 404 when the job post or candidate does not exist.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch
+ * @param {string} jobId
+ * @param {string} candidateId - The applicant's user id (candidate.userId).
+ * @returns {Promise<{
+ *   recommendation: string,
+ *   explanation: string,
+ *   strengths: string[],
+ *   concerns: string[],
+ * }>} The unwrapped CandidateExplanationResponse.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const get_candidate_explanation = async (authFetch, jobId, candidateId) => {
+  const payload = await authFetch(
+    `/job/${jobId}/candidate/${candidateId}/candidate-explanation`,
+    { method: 'GET' },
+  );
+  return payload?.data;
+};
+
 export default {
   get_jobs,
   get_my_jobs,
@@ -339,4 +369,5 @@ export default {
   refresh_job,
   create_job,
   get_job_candidates,
+  get_candidate_explanation,
 };

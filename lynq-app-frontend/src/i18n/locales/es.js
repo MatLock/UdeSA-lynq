@@ -325,6 +325,18 @@ const es = {
       lynqScore: 'LYNQ-SCORE',
       unknownCandidate: 'Desconocido',
       reviewApplication: 'Revisar postulación',
+      aiEvaluation: 'Evaluación IA',
+      aiEvaluating: 'Evaluando…',
+      aiError: 'No pudimos generar la evaluación con IA. Intentá de nuevo.',
+      aiRecommendationLabel: 'Recomendación',
+      aiStrengths: 'Fortalezas',
+      aiConcerns: 'Puntos a considerar',
+      aiClose: 'Cerrar',
+      aiRecommendation: {
+        hire: 'Se recomienda contratar',
+        no_hire: 'No se recomienda',
+        maybe: 'Considerar con cautela',
+      },
     },
     editJob: {
       title: 'Editar publicación',

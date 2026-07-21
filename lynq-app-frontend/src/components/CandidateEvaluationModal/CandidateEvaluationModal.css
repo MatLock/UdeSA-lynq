@@ -1,0 +1,147 @@
+/* CandidateEvaluationModal — a closable overlay modal for the AI hiring
+   evaluation. Portals to <body>; brand tokens from index.css. */
+
+.candidate-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(16, 24, 40, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.candidate-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 540px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 24px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(16, 24, 40, 0.24);
+}
+
+.candidate-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.candidate-modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--brand-purple-dark);
+}
+
+.candidate-modal-close {
+  margin-left: auto;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.candidate-modal-close:hover {
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.candidate-modal-subject {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.candidate-modal-badge {
+  align-self: flex-start;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 999px;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+}
+
+.candidate-modal-badge-hire {
+  color: var(--score-green);
+  border-color: var(--score-green);
+  background: color-mix(in srgb, var(--score-green) 14%, transparent);
+}
+
+.candidate-modal-badge-no_hire {
+  color: var(--score-red);
+  border-color: var(--score-red);
+  background: color-mix(in srgb, var(--score-red) 14%, transparent);
+}
+
+.candidate-modal-badge-maybe {
+  color: var(--score-orange);
+  border-color: var(--score-orange);
+  background: color-mix(in srgb, var(--score-orange) 14%, transparent);
+}
+
+.candidate-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.candidate-modal-explanation {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-h);
+}
+
+.candidate-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.candidate-modal-section-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.candidate-modal-strengths {
+  color: var(--score-green);
+}
+
+.candidate-modal-concerns {
+  color: var(--score-orange);
+}
+
+.candidate-modal-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-h);
+}
