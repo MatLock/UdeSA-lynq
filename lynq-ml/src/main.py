@@ -16,6 +16,7 @@ import json
 # src/main.py -> repo root is one level up; service config lives in resources/.
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LOG_CONFIG_PATH = os.path.join(_REPO_ROOT, "resources", "log_config.json")
+_VERSION_PATH = os.path.join(_REPO_ROOT, "VERSION")
 
 
 def _build_logging_config() -> dict:
@@ -23,10 +24,20 @@ def _build_logging_config() -> dict:
     return json.load(f)
 
 
+def _read_version() -> str:
+  # The release workflow writes the GitHub tag into VERSION; fall back to a
+  # sentinel when the file is missing (e.g. local checkouts before a release).
+  try:
+    with open(_VERSION_PATH, "r", encoding="utf-8") as f:
+      return f.read().strip() or "0.0.0"
+  except FileNotFoundError:
+    return "0.0.0"
+
+
 LOGGING_CONFIG = _build_logging_config()
 logging.config.dictConfig(LOGGING_CONFIG)
 
-app = FastAPI()
+app = FastAPI(version=_read_version())
 
 app.middleware("http")(require_request_uuid)
 register_exception_handlers(app)

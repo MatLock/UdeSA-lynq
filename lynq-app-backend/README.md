@@ -1,7 +1,8 @@
 # lynq-app-backend
 
-[![CI](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lynq-app-backend-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lynq-app-backend-test-workflow.yaml)
-[![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lyqn/main/.github/badges/jacoco-app-backend.svg)](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lynq-app-backend-test-workflow.yaml)
+[![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-app-backend-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-app-backend-test-workflow.yaml)
+[![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/jacoco-app-backend.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-app-backend-test-workflow.yaml)
+[![Version](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/version.svg)](https://github.com/MatLock/UdeSA-lynq/releases)
 
 Core application service for the Lynq platform. It owns the product domain — **user profiles**, **companies**, and **job posts** — and exposes the **job feed** that mixes Lynq-native postings with externally scraped ones, ranked per candidate with a **LyNQ match score**. It also brokers **profile/company image uploads** through S3 pre-signed URLs and **proxies skill-enhancement requests** to the `lynq-ml` service.
 

@@ -1,7 +1,7 @@
 # lynq-iam
 
-[![CI](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lynq-iam-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lynq-iam-test-workflow.yaml)
-[![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lyqn/main/.github/badges/jacoco.svg)](https://github.com/MatLock/UdeSA-lyqn/actions/workflows/lynq-iam-test-workflow.yaml)
+[![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-iam-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-iam-test-workflow.yaml)
+[![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/jacoco.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-iam-test-workflow.yaml)
 
 Identity and Access Management service for the Lynq platform. Issues short-lived JWT access tokens and opaque, Redis-backed refresh tokens, and exposes endpoints for registration, login (by username or email), token refresh, token validation, password update, and pre-registration availability checks for usernames and emails.
 
