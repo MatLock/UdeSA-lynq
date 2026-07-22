@@ -315,7 +315,7 @@ jobs:
           existing=$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json body -q .body)
           {
             printf '%s\n\n' "$existing"
-            printf '---\n\n'
+            printf '%s\n\n' '---'
             printf '## Test coverage (lynq-iam)\n\n'
             printf '| Metric | Coverage |\n'
             printf '| --- | --- |\n'
