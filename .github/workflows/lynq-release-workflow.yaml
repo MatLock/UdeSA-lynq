@@ -56,6 +56,13 @@ jobs:
       - name: Bump lynq-ml (python) version
         run: echo "${{ steps.resolve.outputs.version }}" > lynq-ml/VERSION
 
+      - name: Bump Helm chart appVersion
+        run: |
+          # Mirror the released tag into the Helm chart's appVersion, matching
+          # how the poms are stamped. appVersion is quoted so values like
+          # "1.0.5-SNAPSHOT" stay valid YAML.
+          sed -i -E "s/^appVersion:.*/appVersion: \"${{ steps.resolve.outputs.version }}\"/" infrastructure/helm/Chart.yaml
+
       - name: Generate version badge
         run: |
           mkdir -p .github/badges
@@ -74,7 +81,7 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: set release version ${{ steps.resolve.outputs.version }} [skip ci]"
-          file_pattern: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-ml/VERSION .github/badges/version.svg
+          file_pattern: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml .github/badges/version.svg
 
   # ===========================================================================
   # Stage 2 — Build & test each service in parallel. Artifacts (jars + JaCoCo
@@ -354,3 +361,73 @@ jobs:
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-iam.zip --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-app-backend.zip --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/coverage-lynq-ml.xml --clobber
+
+  # ===========================================================================
+  # Stage 5 — Once the release is fully published, open the next development
+  # cycle by bumping every project's version one step higher and committing it
+  # back to main. A released SNAPSHOT bumps the patch (1.0.5-SNAPSHOT ->
+  # 1.0.6-SNAPSHOT); a released final version bumps the minor and resets the
+  # patch (1.0.5 -> 1.1.0-SNAPSHOT).
+  # ===========================================================================
+  bump-next-version:
+    name: "5 · Bump to next development version"
+    runs-on: ubuntu-latest
+    needs: [set-version, publish-coverage]
+    permissions:
+      contents: write
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Setup Java Environment
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: temurin
+          architecture: x64
+          cache: maven
+
+      - name: Compute next development version
+        id: next
+        env:
+          VERSION: ${{ needs.set-version.outputs.version }}
+        run: |
+          # Split the released version into its base (MAJOR.MINOR.PATCH) and the
+          # optional -SNAPSHOT suffix.
+          BASE="${VERSION%-SNAPSHOT}"
+          IFS='.' read -r MAJOR MINOR PATCH <<<"$BASE"
+          if [ "$BASE" != "$VERSION" ]; then
+            # Released a SNAPSHOT (e.g. 1.0.5-SNAPSHOT) -> bump patch -> 1.0.6-SNAPSHOT
+            PATCH=$((PATCH + 1))
+          else
+            # Released a final version (e.g. 1.0.5) -> bump minor, reset patch -> 1.1.0-SNAPSHOT
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          fi
+          NEXT="${MAJOR}.${MINOR}.${PATCH}-SNAPSHOT"
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "Next development version: $NEXT"
+
+      - name: Bump lynq-iam pom version
+        working-directory: lynq-iam
+        run: mvn -B versions:set -DnewVersion="${{ steps.next.outputs.version }}" -DgenerateBackupPoms=false
+
+      - name: Bump lynq-app-backend pom version
+        working-directory: lynq-app-backend
+        run: mvn -B versions:set -DnewVersion="${{ steps.next.outputs.version }}" -DgenerateBackupPoms=false
+
+      - name: Bump lynq-ml (python) version
+        run: echo "${{ steps.next.outputs.version }}" > lynq-ml/VERSION
+
+      - name: Bump Helm chart appVersion
+        run: |
+          sed -i -E "s/^appVersion:.*/appVersion: \"${{ steps.next.outputs.version }}\"/" infrastructure/helm/Chart.yaml
+
+      - name: Commit next development version to main
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: prepare next development version ${{ steps.next.outputs.version }} [skip ci]"
+          file_pattern: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml
