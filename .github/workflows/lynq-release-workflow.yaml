@@ -5,13 +5,17 @@ on:
     types: [published]
 
 env:
+  # Single Docker Hub repository shared by all services; each service is
+  # distinguished by a tag prefix, e.g. matlock0o/lynq:lynq-ml-<version>.
   DOCKER_NAMESPACE: matlock0o/lynq
-  # Version derived from the release tag, e.g. tag "v1.2.3" -> "1.2.3".
-  VERSION: ${{ github.event.release.tag_name }}
 
 jobs:
+  # ===========================================================================
+  # Stage 1 — Stamp the release tag into every project's version metadata and
+  # commit it back to main so the built artifacts and images carry the version.
+  # ===========================================================================
   set-version:
-    name: Set release version from tag
+    name: "1 · Set release version"
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -65,8 +69,12 @@ jobs:
           commit_message: "chore: set release version ${{ steps.resolve.outputs.version }} [skip ci]"
           file_pattern: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-ml/VERSION .github/badges/version.svg
 
+  # ===========================================================================
+  # Stage 2 — Build & test each service in parallel. Artifacts (jars + JaCoCo
+  # reports) are handed off to the later stages instead of rebuilding.
+  # ===========================================================================
   build-lynq-iam:
-    name: "lynq-iam: build, test & push image"
+    name: "2 · Build & test: lynq-iam"
     runs-on: ubuntu-latest
     needs: set-version
     steps:
@@ -88,22 +96,20 @@ jobs:
         working-directory: lynq-iam
         run: mvn -B clean verify
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          name: lynq-iam-jar
+          path: lynq-iam/target/lynq-iam.jar
 
-      - name: Build and push image
-        uses: docker/build-push-action@v6
+      - name: Upload JaCoCo report
+        uses: actions/upload-artifact@v4
         with:
-          context: lynq-iam
-          file: lynq-iam/Dockerfile
-          push: true
-          tags: ${{ env.DOCKER_NAMESPACE }}:lynq-iam-${{ needs.set-version.outputs.version }}
+          name: jacoco-lynq-iam
+          path: lynq-iam/target/site/jacoco/
 
   build-lynq-app-backend:
-    name: "lynq-app-backend: build, test & push image"
+    name: "2 · Build & test: lynq-app-backend"
     runs-on: ubuntu-latest
     needs: set-version
     steps:
@@ -125,22 +131,20 @@ jobs:
         working-directory: lynq-app-backend
         run: mvn -B clean verify
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          name: lynq-app-backend-jar
+          path: lynq-app-backend/target/lynq-app-backend.jar
 
-      - name: Build and push image
-        uses: docker/build-push-action@v6
+      - name: Upload JaCoCo report
+        uses: actions/upload-artifact@v4
         with:
-          context: lynq-app-backend
-          file: lynq-app-backend/Dockerfile
-          push: true
-          tags: ${{ env.DOCKER_NAMESPACE }}:lynq-app-backend-${{ needs.set-version.outputs.version }}
+          name: jacoco-lynq-app-backend
+          path: lynq-app-backend/target/site/jacoco/
 
   build-lynq-ml:
-    name: "lynq-ml: build, test & push image"
+    name: "2 · Build & test: lynq-ml"
     runs-on: ubuntu-latest
     needs: set-version
     steps:
@@ -168,6 +172,40 @@ jobs:
         run: |
           coverage run -m unittest discover -s tests -t .
           coverage report -m
+          coverage xml -o coverage.xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lynq-ml
+          path: lynq-ml/coverage.xml
+
+  # ===========================================================================
+  # Stage 3 — Build the Docker images from the tested artifacts and push them
+  # to Docker Hub. Runs once every service has built and tested successfully.
+  # ===========================================================================
+  push-images:
+    name: "3 · Push Docker images"
+    runs-on: ubuntu-latest
+    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-ml]
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Download lynq-iam jar
+        uses: actions/download-artifact@v4
+        with:
+          name: lynq-iam-jar
+          path: lynq-iam/target
+
+      - name: Download lynq-app-backend jar
+        uses: actions/download-artifact@v4
+        with:
+          name: lynq-app-backend-jar
+          path: lynq-app-backend/target
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
@@ -175,7 +213,23 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push image
+      - name: Build and push lynq-iam image
+        uses: docker/build-push-action@v6
+        with:
+          context: lynq-iam
+          file: lynq-iam/Dockerfile
+          push: true
+          tags: ${{ env.DOCKER_NAMESPACE }}:lynq-iam-${{ needs.set-version.outputs.version }}
+
+      - name: Build and push lynq-app-backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: lynq-app-backend
+          file: lynq-app-backend/Dockerfile
+          push: true
+          tags: ${{ env.DOCKER_NAMESPACE }}:lynq-app-backend-${{ needs.set-version.outputs.version }}
+
+      - name: Build and push lynq-ml image
         uses: docker/build-push-action@v6
         with:
           context: lynq-ml
@@ -183,60 +237,80 @@ jobs:
           push: true
           tags: ${{ env.DOCKER_NAMESPACE }}:lynq-ml-${{ needs.set-version.outputs.version }}
 
-  # ---------------------------------------------------------------------------
-  # Coverage reporting into the release notes (unchanged from before).
-  # ---------------------------------------------------------------------------
+  # ===========================================================================
+  # Stage 4 — Publish the JaCoCo coverage produced in stage 2 into the release
+  # notes and attach the HTML reports. Runs after the images are published.
+  # ===========================================================================
   publish-coverage:
-    name: Publish coverage to release notes
+    name: "4 · Publish coverage to release notes"
     runs-on: ubuntu-latest
+    needs: push-images
     permissions:
       contents: write
     steps:
-      - name: Code Checkout
-        uses: actions/checkout@v5
+      - name: Download lynq-iam coverage
+        uses: actions/download-artifact@v4
         with:
-          fetch-depth: 0
+          name: jacoco-lynq-iam
+          path: coverage/lynq-iam
 
-      - name: Setup Java Environment
-        uses: actions/setup-java@v5
+      - name: Download lynq-app-backend coverage
+        uses: actions/download-artifact@v4
         with:
-          java-version: 21
-          distribution: temurin
-          architecture: x64
-          cache: maven
+          name: jacoco-lynq-app-backend
+          path: coverage/lynq-app-backend
 
-      - name: Run tests with coverage
-        working-directory: lynq-iam
-        run: mvn -B clean verify
+      - name: Download lynq-ml coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-lynq-ml
+          path: coverage/lynq-ml
 
       - name: Extract coverage percentages
         id: coverage
-        working-directory: lynq-iam
         run: |
-          CSV=target/site/jacoco/jacoco.csv
-          read INSTR LINE BRANCH <<<"$(awk -F',' '
-            NR>1 {
-              im+=$4; ic+=$5;
-              bm+=$6; bc+=$7;
-              lm+=$8; lc+=$9;
-            }
-            END {
-              printf "%.2f %.2f %.2f",
-                (ic/(im+ic))*100,
-                (lc/(lm+lc))*100,
-                (bm+bc>0 ? (bc/(bm+bc))*100 : 0);
-            }' "$CSV")"
-          echo "instruction=$INSTR" >> "$GITHUB_OUTPUT"
-          echo "line=$LINE" >> "$GITHUB_OUTPUT"
-          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          # JaCoCo (Java): sum missed/covered counters from the CSV report.
+          extract_jacoco() {
+            awk -F',' '
+              NR>1 { im+=$4; ic+=$5; bm+=$6; bc+=$7; lm+=$8; lc+=$9; }
+              END {
+                printf "%.2f %.2f %.2f",
+                  (ic/(im+ic))*100,
+                  (lc/(lm+lc))*100,
+                  (bm+bc>0 ? (bc/(bm+bc))*100 : 0);
+              }' "$1"
+          }
+          # coverage.py (Python): read line-rate/branch-rate from the Cobertura XML.
+          rate() {
+            python3 -c "import xml.etree.ElementTree as ET; print(f\"{float(ET.parse('$1').getroot().get('$2'))*100:.2f}\")"
+          }
+          read IAM_INSTR IAM_LINE IAM_BRANCH <<<"$(extract_jacoco coverage/lynq-iam/jacoco.csv)"
+          read APP_INSTR APP_LINE APP_BRANCH <<<"$(extract_jacoco coverage/lynq-app-backend/jacoco.csv)"
+          ML_LINE="$(rate coverage/lynq-ml/coverage.xml line-rate)"
+          ML_BRANCH="$(rate coverage/lynq-ml/coverage.xml branch-rate)"
+          {
+            echo "iam_instruction=$IAM_INSTR"
+            echo "iam_line=$IAM_LINE"
+            echo "iam_branch=$IAM_BRANCH"
+            echo "app_instruction=$APP_INSTR"
+            echo "app_line=$APP_LINE"
+            echo "app_branch=$APP_BRANCH"
+            echo "ml_line=$ML_LINE"
+            echo "ml_branch=$ML_BRANCH"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Append coverage summary to release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.release.tag_name }}
-          INSTR: ${{ steps.coverage.outputs.instruction }}
-          LINE: ${{ steps.coverage.outputs.line }}
-          BRANCH: ${{ steps.coverage.outputs.branch }}
+          IAM_INSTR: ${{ steps.coverage.outputs.iam_instruction }}
+          IAM_LINE: ${{ steps.coverage.outputs.iam_line }}
+          IAM_BRANCH: ${{ steps.coverage.outputs.iam_branch }}
+          APP_INSTR: ${{ steps.coverage.outputs.app_instruction }}
+          APP_LINE: ${{ steps.coverage.outputs.app_line }}
+          APP_BRANCH: ${{ steps.coverage.outputs.app_branch }}
+          ML_LINE: ${{ steps.coverage.outputs.ml_line }}
+          ML_BRANCH: ${{ steps.coverage.outputs.ml_branch }}
         run: |
           existing=$(gh release view "$TAG" --json body -q .body)
           {
@@ -245,92 +319,31 @@ jobs:
             printf '## Test coverage (lynq-iam)\n\n'
             printf '| Metric | Coverage |\n'
             printf '| --- | --- |\n'
-            printf '| Instructions | %s%% |\n' "$INSTR"
-            printf '| Lines | %s%% |\n' "$LINE"
-            printf '| Branches | %s%% |\n' "$BRANCH"
-          } > /tmp/notes.md
-          gh release edit "$TAG" --notes-file /tmp/notes.md
-
-      - name: Attach JaCoCo HTML report to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.release.tag_name }}
-        working-directory: lynq-iam
-        run: |
-          (cd target/site && zip -qr /tmp/jacoco-report.zip jacoco)
-          gh release upload "$TAG" /tmp/jacoco-report.zip --clobber
-
-  publish-coverage-app-backend:
-    name: Publish coverage to release notes (lynq-app-backend)
-    runs-on: ubuntu-latest
-    needs: publish-coverage
-    permissions:
-      contents: write
-    steps:
-      - name: Code Checkout
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Setup Java Environment
-        uses: actions/setup-java@v5
-        with:
-          java-version: 21
-          distribution: temurin
-          architecture: x64
-          cache: maven
-
-      - name: Run tests with coverage
-        working-directory: lynq-app-backend
-        run: mvn -B clean verify
-
-      - name: Extract coverage percentages
-        id: coverage
-        working-directory: lynq-app-backend
-        run: |
-          CSV=target/site/jacoco/jacoco.csv
-          read INSTR LINE BRANCH <<<"$(awk -F',' '
-            NR>1 {
-              im+=$4; ic+=$5;
-              bm+=$6; bc+=$7;
-              lm+=$8; lc+=$9;
-            }
-            END {
-              printf "%.2f %.2f %.2f",
-                (ic/(im+ic))*100,
-                (lc/(lm+lc))*100,
-                (bm+bc>0 ? (bc/(bm+bc))*100 : 0);
-            }' "$CSV")"
-          echo "instruction=$INSTR" >> "$GITHUB_OUTPUT"
-          echo "line=$LINE" >> "$GITHUB_OUTPUT"
-          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
-
-      - name: Append coverage summary to release notes
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ github.event.release.tag_name }}
-          INSTR: ${{ steps.coverage.outputs.instruction }}
-          LINE: ${{ steps.coverage.outputs.line }}
-          BRANCH: ${{ steps.coverage.outputs.branch }}
-        run: |
-          existing=$(gh release view "$TAG" --json body -q .body)
-          {
-            printf '%s\n\n' "$existing"
-            printf '---\n\n'
+            printf '| Instructions | %s%% |\n' "$IAM_INSTR"
+            printf '| Lines | %s%% |\n' "$IAM_LINE"
+            printf '| Branches | %s%% |\n\n' "$IAM_BRANCH"
             printf '## Test coverage (lynq-app-backend)\n\n'
             printf '| Metric | Coverage |\n'
             printf '| --- | --- |\n'
-            printf '| Instructions | %s%% |\n' "$INSTR"
-            printf '| Lines | %s%% |\n' "$LINE"
-            printf '| Branches | %s%% |\n' "$BRANCH"
-          } > /tmp/notes-app-backend.md
-          gh release edit "$TAG" --notes-file /tmp/notes-app-backend.md
+            printf '| Instructions | %s%% |\n' "$APP_INSTR"
+            printf '| Lines | %s%% |\n' "$APP_LINE"
+            printf '| Branches | %s%% |\n\n' "$APP_BRANCH"
+            printf '## Test coverage (lynq-ml)\n\n'
+            printf '| Metric | Coverage |\n'
+            printf '| --- | --- |\n'
+            printf '| Lines | %s%% |\n' "$ML_LINE"
+            printf '| Branches | %s%% |\n' "$ML_BRANCH"
+          } > /tmp/notes.md
+          gh release edit "$TAG" --notes-file /tmp/notes.md
 
-      - name: Attach JaCoCo HTML report to release
+      - name: Attach JaCoCo HTML reports to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.release.tag_name }}
-        working-directory: lynq-app-backend
         run: |
-          (cd target/site && zip -qr /tmp/jacoco-report-app-backend.zip jacoco)
+          (cd coverage/lynq-iam && zip -qr /tmp/jacoco-report-iam.zip .)
+          (cd coverage/lynq-app-backend && zip -qr /tmp/jacoco-report-app-backend.zip .)
+          cp coverage/lynq-ml/coverage.xml /tmp/coverage-lynq-ml.xml
+          gh release upload "$TAG" /tmp/jacoco-report-iam.zip --clobber
           gh release upload "$TAG" /tmp/jacoco-report-app-backend.zip --clobber
+          gh release upload "$TAG" /tmp/coverage-lynq-ml.xml --clobber
