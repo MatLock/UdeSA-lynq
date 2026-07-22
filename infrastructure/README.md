@@ -196,12 +196,11 @@ export TF_VAR_redis_password=<REDIS_PASSWORD>
 export TF_VAR_jwt_secret=<jwt-signing-secret>
 export TF_VAR_dockerhub_token=<dockerhub-access-token>
 export TF_VAR_cloudflare_api_token=<cloudflare-dns-token>
-# Backend AWS access — prefer IRSA; otherwise:
-export TF_VAR_aws_access_key_id=<...>
-export TF_VAR_aws_secret_access_key=<...>
 # Only if lynq-ml uses OpenAI:
 export TF_VAR_openai_api_key=<...>
 ```
+
+The backend's AWS S3 credentials are **not** set here: Terraform creates a least-privilege IAM user scoped to the bucket, generates its access key, and writes it straight into `lynq-app-backend-secret`.
 
 ### 4. Deploy everything else
 

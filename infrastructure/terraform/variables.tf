@@ -176,20 +176,6 @@ variable "jwt_secret" {
   default     = ""
 }
 
-variable "aws_access_key_id" {
-  description = "AWS access key for the backend. Leave empty when using IRSA."
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
-variable "aws_secret_access_key" {
-  description = "AWS secret key for the backend. Leave empty when using IRSA."
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
 variable "openai_api_key" {
   description = "OpenAI API key for lynq-ml (only if LLM_PROVIDER=openai)."
   type        = string

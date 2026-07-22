@@ -45,5 +45,10 @@ output "redis_db_private_dns" {
 
 output "redis_db_security_group_ids" {
   description = "Security group ids attached to the MySQL + Redis EC2."
-  value       = [aws_security_group.mysql.id, aws_security_group.redis.id]
+  value       = [aws_security_group.mysql.id, aws_security_group.redis.id, aws_security_group.ssh.id]
+}
+
+output "backend_s3_access_key_id" {
+  description = "Access key id of the backend's S3-only IAM user (secret is only in state / the k8s Secret)."
+  value       = aws_iam_access_key.backend_s3.id
 }

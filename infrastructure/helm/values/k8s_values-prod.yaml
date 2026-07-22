@@ -61,7 +61,7 @@ ingress:
 # ---------------------------------------------------------------------------
 
 lynq_ml:
-  replicas: 2
+  replicas: 1
   image: matlock0o/lynq:lynq-ml-1.0.5-SNAPSHOT
   config:
     PORT: "8084"
@@ -77,7 +77,7 @@ lynq_ml:
     COURSE_SEARCH_TIMEOUT: "15"
 
 lynq_app_backend:
-  replicas: 2
+  replicas: 1
   image: matlock0o/lynq:lynq-app-backend-1.0.5-SNAPSHOT
   path: /lynq-backend-app
   config:
@@ -91,7 +91,7 @@ lynq_app_backend:
     AWS_ENDPOINT: ""
 
 lynq_iam:
-  replicas: 2
+  replicas: 1
   image: matlock0o/lynq:lynq-iam-1.0.5-SNAPSHOT
   path: /lynq-iam
   config:

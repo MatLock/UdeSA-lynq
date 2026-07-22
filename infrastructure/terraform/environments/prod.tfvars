@@ -44,7 +44,9 @@ ollama_base_url = "REPLACE_OLLAMA_BASE_URL"
 #   TF_VAR_jwt_secret
 #   TF_VAR_redis_username        (only if Redis requires auth)
 #   TF_VAR_redis_password        (only if Redis requires auth)
-#   TF_VAR_aws_access_key_id     (omit if using IRSA)
-#   TF_VAR_aws_secret_access_key (omit if using IRSA)
 #   TF_VAR_openai_api_key        (only if LLM_PROVIDER=openai)
+#
+# The backend's AWS S3 access key is created by Terraform (least-privilege IAM
+# user scoped to the bucket) and wired into its Secret automatically — you do
+# NOT set AWS keys by hand.
 # -------------------------------------------------------------------------
