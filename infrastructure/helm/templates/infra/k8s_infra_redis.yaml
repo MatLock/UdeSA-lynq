@@ -1,0 +1,70 @@
+{{- if .Values.localInfra }}
+# Local-only Redis (in prod this is an external managed cache, e.g. ElastiCache).
+# Configured with the same user/password the apps expect (single source of truth).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args:
+            - "redis-server"
+            - "--user"
+            - "default"
+            - "off"
+            - "--user"
+            - {{ .Values.credentials.redis.username | quote }}
+            - "on"
+            - ">{{ .Values.credentials.redis.password }}"
+            - "~*"
+            - "&*"
+            - "+@all"
+          ports:
+            - name: redis
+              containerPort: 6379
+          livenessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: redis
+spec:
+  selector:
+    app: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+{{- end }}

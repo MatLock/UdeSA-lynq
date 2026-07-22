@@ -1,0 +1,78 @@
+{{- if .Values.localInfra }}
+# Local-only MySQL (in prod this is an external managed DB, e.g. RDS).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: mysql
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS lynq_iam_db;
+    CREATE DATABASE IF NOT EXISTS lynq_backend_db;
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:9.0
+          env:
+            # Root password from the central credentials block (single source of truth).
+            - name: MYSQL_ROOT_PASSWORD
+              value: {{ .Values.credentials.db.password | quote }}
+          ports:
+            - name: mysql
+              containerPort: 3306
+          volumeMounts:
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+            - name: data
+              mountPath: /var/lib/mysql
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: init
+          configMap:
+            name: mysql-init
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: mysql
+spec:
+  selector:
+    app: mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql
+{{- end }}

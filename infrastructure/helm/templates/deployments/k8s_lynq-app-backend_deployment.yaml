@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lynq-app-backend-deployment
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-app-backend
+spec:
+  replicas: {{ .Values.lynq_app_backend.replicas }}
+  selector:
+    matchLabels:
+      app: lynq-app-backend
+  template:
+    metadata:
+      labels:
+        app: lynq-app-backend
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-secret
+      {{- if .Values.localInfra }}
+      # Local only: wait for the in-cluster dependencies before starting.
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -w 2 mysql 3306 </dev/null; do echo "waiting for mysql:3306"; sleep 2; done']
+        - name: wait-for-localstack
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -w 2 localstack 4566 </dev/null; do echo "waiting for localstack:4566"; sleep 2; done']
+        - name: wait-for-iam
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -w 2 lynq-iam-service 8080 </dev/null; do echo "waiting for lynq-iam-service:8080"; sleep 2; done']
+      {{- end }}
+      containers:
+        - name: lynq-app-backend
+          image: {{ .Values.lynq_app_backend.image }}
+          envFrom:
+            - configMapRef:
+                name: lynq-app-backend-config
+            - secretRef:
+                name: lynq-app-backend-secret
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3

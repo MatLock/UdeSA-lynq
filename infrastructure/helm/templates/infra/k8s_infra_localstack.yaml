@@ -1,0 +1,105 @@
+{{- if .Values.localInfra }}
+# Local-only LocalStack S3 (in prod the app uses real S3 with AWS_ENDPOINT="").
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: localstack-init
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: localstack
+data:
+  01-init-s3.sh: |
+    #!/bin/bash
+    # LocalStack init hook (runs from /etc/localstack/init/ready.d once S3 is ready).
+    # Creates the profile-image bucket and enables CORS so the browser can PUT/GET
+    # directly against the pre-signed URLs the backend hands out.
+    set -euo pipefail
+
+    BUCKET="${AWS_BUCKET_NAME:-lynq-bucket}"
+
+    awslocal s3 mb "s3://${BUCKET}" || true
+
+    awslocal s3api put-bucket-cors --bucket "${BUCKET}" --cors-configuration '{
+      "CORSRules": [
+        {
+          "AllowedOrigins": ["*"],
+          "AllowedMethods": ["GET", "PUT", "HEAD"],
+          "AllowedHeaders": ["*"],
+          "ExposeHeaders": ["ETag"],
+          "MaxAgeSeconds": 3000
+        }
+      ]
+    }'
+
+    echo "LocalStack S3 ready: bucket '${BUCKET}' created with CORS enabled."
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localstack
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: localstack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: localstack
+  template:
+    metadata:
+      labels:
+        app: localstack
+    spec:
+      containers:
+        - name: localstack
+          image: gresau/localstack-persist:4.5
+          env:
+            - name: SERVICES
+              value: s3
+            - name: AWS_DEFAULT_REGION
+              value: {{ .Values.lynq_app_backend.config.AWS_REGION | quote }}
+            - name: AWS_BUCKET_NAME
+              value: {{ .Values.lynq_app_backend.config.AWS_BUCKET_NAME | quote }}
+          ports:
+            - name: edge
+              containerPort: 4566
+          volumeMounts:
+            - name: init
+              mountPath: /etc/localstack/init/ready.d
+            - name: data
+              mountPath: /persisted-data
+          livenessProbe:
+            httpGet:
+              path: /_localstack/health
+              port: edge
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /_localstack/health
+              port: edge
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: init
+          configMap:
+            name: localstack-init
+            defaultMode: 0755
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localstack
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: localstack
+spec:
+  selector:
+    app: localstack
+  ports:
+    - name: edge
+      port: 4566
+      targetPort: edge
+{{- end }}

@@ -1,0 +1,89 @@
+{{- if and .Values.localInfra .Values.ollamaInCluster }}
+# Optional in-cluster Ollama (only when ollamaInCluster=true). By default local
+# uses the Ollama already running on the host machine, so this is not rendered.
+# In prod lynq-ml points at an external OLLAMA_BASE_URL.
+# The container starts `ollama serve`, waits until it is responsive, pulls the
+# configured model, then keeps serving. The model is persisted on a PVC so it is
+# not re-downloaded on every restart.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-data
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: ollama
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: ollama
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      containers:
+        - name: ollama
+          image: ollama/ollama:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              /bin/ollama serve &
+              pid=$!
+              echo "waiting for ollama to become responsive..."
+              until /bin/ollama list >/dev/null 2>&1; do sleep 1; done
+              echo "pulling model {{ .Values.lynq_ml.config.OLLAMA_MODEL }}..."
+              /bin/ollama pull {{ .Values.lynq_ml.config.OLLAMA_MODEL }} || true
+              wait $pid
+          ports:
+            - name: http
+              containerPort: 11434
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          volumeMounts:
+            - name: data
+              mountPath: /root/.ollama
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ollama-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: ollama
+spec:
+  selector:
+    app: ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: http
+{{- end }}

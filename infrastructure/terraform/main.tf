@@ -1,0 +1,131 @@
+locals {
+  # MySQL + Redis both live on the EC2 host; use its private DNS (reachable from
+  # EKS over the internal network). Interpolating the instance here makes the
+  # release implicitly depend on it, so the VM is created first.
+  db_host = aws_instance.redis_db.private_dns
+
+  db_url_iam     = "jdbc:mysql://${local.db_host}:3306/lynq_iam_db"
+  db_url_backend = "jdbc:mysql://${local.db_host}:3306/lynq_backend_db"
+
+  # Chart value overrides that fill the REPLACE_* placeholders in k8s_values-prod.yaml.
+  chart_overrides = {
+    "ingress.host"                            = var.ingress_host
+    "ingress.certificateArn"                  = aws_acm_certificate_validation.lynq.certificate_arn
+    "lynq_iam.config.DB_URL"                  = local.db_url_iam
+    "lynq_iam.config.REDIS_ADDRESS"           = local.db_host
+    "lynq_app_backend.config.DB_URL"          = local.db_url_backend
+    "lynq_app_backend.config.AWS_BUCKET_NAME" = var.s3_bucket_name
+    "lynq_ml.config.OLLAMA_BASE_URL"          = var.ollama_base_url
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Namespace — created by Terraform so the external Secrets can be placed in it
+# before the release. The chart's createNamespace is false in prod.
+# ---------------------------------------------------------------------------
+resource "kubernetes_namespace" "lynq" {
+  metadata {
+    name = var.namespace
+  }
+}
+
+# ---------------------------------------------------------------------------
+# External Secrets — created outside the chart (the chart's manageSecrets is
+# false in prod). Names/keys match what the deployments reference.
+# ---------------------------------------------------------------------------
+resource "kubernetes_secret" "dockerhub" {
+  metadata {
+    name      = "dockerhub-secret"
+    namespace = var.namespace
+  }
+  type = "kubernetes.io/dockerconfigjson"
+  data = {
+    ".dockerconfigjson" = jsonencode({
+      auths = {
+        (var.dockerhub_server) = {
+          username = var.dockerhub_username
+          password = var.dockerhub_token
+          email    = var.dockerhub_email
+          auth     = base64encode("${var.dockerhub_username}:${var.dockerhub_token}")
+        }
+      }
+    })
+  }
+  depends_on = [kubernetes_namespace.lynq]
+}
+
+resource "kubernetes_secret" "iam" {
+  metadata {
+    name      = "lynq-iam-secret"
+    namespace = var.namespace
+  }
+  type = "Opaque"
+  data = {
+    DB_USERNAME    = var.db_username
+    DB_PASSWORD    = var.db_password
+    REDIS_USERNAME = var.redis_username
+    REDIS_PASSWORD = var.redis_password
+    JWT_SECRET     = var.jwt_secret
+  }
+  depends_on = [kubernetes_namespace.lynq]
+}
+
+resource "kubernetes_secret" "backend" {
+  metadata {
+    name      = "lynq-app-backend-secret"
+    namespace = var.namespace
+  }
+  type = "Opaque"
+  data = {
+    DB_USERNAME           = var.db_username
+    DB_PASSWORD           = var.db_password
+    AWS_ACCESS_KEY_ID     = var.aws_access_key_id
+    AWS_SECRET_ACCESS_KEY = var.aws_secret_access_key
+  }
+  depends_on = [kubernetes_namespace.lynq]
+}
+
+resource "kubernetes_secret" "ml" {
+  metadata {
+    name      = "lynq-ml-secret"
+    namespace = var.namespace
+  }
+  type = "Opaque"
+  data = {
+    OPENAI_API_KEY = var.openai_api_key
+  }
+  depends_on = [kubernetes_namespace.lynq]
+}
+
+# ---------------------------------------------------------------------------
+# The Lynq chart, using the prod values and overriding the REPLACE_*
+# placeholders. Depends on the namespace, secrets, and bucket so ordering is
+# correct (they exist before the pods that use them).
+# ---------------------------------------------------------------------------
+resource "helm_release" "lynq" {
+  name      = var.release_name
+  namespace = var.namespace
+  # Namespace is created by Terraform above, not by Helm.
+  create_namespace = false
+
+  chart  = "${path.module}/../helm"
+  values = [file("${path.module}/../helm/values/k8s_values-prod.yaml")]
+
+  dynamic "set" {
+    for_each = local.chart_overrides
+    content {
+      name  = set.key
+      value = set.value
+    }
+  }
+
+  depends_on = [
+    kubernetes_namespace.lynq,
+    kubernetes_secret.dockerhub,
+    kubernetes_secret.iam,
+    kubernetes_secret.backend,
+    kubernetes_secret.ml,
+    aws_s3_bucket.lynq,
+    aws_instance.redis_db,
+  ]
+}

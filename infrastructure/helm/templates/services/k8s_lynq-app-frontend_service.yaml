@@ -1,0 +1,17 @@
+{{- if .Values.localFrontend }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: lynq-app-frontend-service
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-app-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: lynq-app-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+{{- end }}

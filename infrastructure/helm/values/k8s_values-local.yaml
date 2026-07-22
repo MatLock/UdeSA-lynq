@@ -1,0 +1,114 @@
+k8s_namespace: local
+
+
+manageSecrets: true
+
+# Whether the chart creates the namespace. Local: true (Helm owns it). In prod
+# Terraform creates the namespace first (so it can place the external Secrets in
+# it before the release), so this is false there.
+createNamespace: true
+
+# Whether Helm installs the local infra (mysql, redis, localstack) as in-cluster
+# workloads. Local only. In prod this is false: those come from managed services
+# (RDS, ElastiCache, S3) and the apps point at them via config.
+localInfra: true
+
+# By default lynq-ml uses the Ollama running on your host machine (see
+# OLLAMA_BASE_URL below) instead of a heavy in-cluster Ollama. Set this to true
+# to deploy Ollama inside the cluster (pulls the model on first start).
+ollamaInCluster: false
+
+# The frontend is deployed in-cluster ONLY in local. In prod it lives on
+# Cloudflare (Wrangler), so this is false there.
+localFrontend: true
+
+# ---------------------------------------------------------------------------
+# Central credentials — SINGLE SOURCE OF TRUTH. Both the apps' Secrets and the
+# local infra (mysql root password, redis user/pass) reference these, so they
+# can never drift. LOCAL ONLY: in prod there are no credentials here (secrets
+# are created outside the chart by Terraform / External Secrets).
+# ---------------------------------------------------------------------------
+credentials:
+  db:
+    username: root
+    password: testpassword123
+  redis:
+    username: root
+    password: testpassword123
+  jwt:
+    secret: 8d2b6d2a9c5e8f4f8f9d1c7a4e3b5f6d8c9a1e2f3a4b5c6d7e8f9a1b2c3d4e5
+  aws:
+    accessKeyId: test
+    secretAccessKey: test
+  openai:
+    apiKey: ""
+
+
+docker:
+  server: https://index.docker.io/v1/
+  username: matlock0o
+  token: ""
+  email: ""
+
+
+ingress:
+  className: nginx
+  groupName: lynq
+  scheme: internet-facing
+  host: lynq.local
+  certificateArn: ""
+
+# Local frontend. No published image: it must be built with the local ingress
+# URLs baked in (Vite bakes them at build time) and loaded into the cluster:
+#   docker build -t lynq-app-frontend:local \
+#     --build-arg LYNQ_IAM_BASE_URL=http://lynq.local/lynq-iam \
+#     --build-arg LYNQ_BACKEND_BASE_URL=http://lynq.local/lynq-backend-app \
+#     ./lynq-app-frontend
+#   minikube image load lynq-app-frontend:local
+lynq_app_frontend:
+  replicas: 1
+  image: lynq-app-frontend:local
+
+lynq_ml:
+  replicas: 1
+  image: matlock0o/lynq:lynq-ml-1.0.5-SNAPSHOT
+  config:
+    PORT: "8084"
+    HOST: "0.0.0.0"
+    LLM_PROVIDER: ollama
+    LLM_TIMEOUT: "60"
+    # Points at the Ollama running on your host machine (minikube). For Docker
+    # Desktop's Kubernetes use http://host.docker.internal:11434 instead.
+    # If you set ollamaInCluster=true, change this to http://ollama:11434.
+    OLLAMA_BASE_URL: http://host.minikube.internal:11434
+    OLLAMA_MODEL: llama3.1
+    OPENAI_MODEL: gpt-4o-mini
+    OPENAI_BASE_URL: https://api.openai.com/v1
+    UDEMY_MAX_COURSES: "2"
+    UDEMY_BASE_URL: https://www.udemy.com
+    COURSE_SEARCH_TIMEOUT: "15"
+
+lynq_app_backend:
+  replicas: 1
+  image: matlock0o/lynq:lynq-app-backend-1.0.5-SNAPSHOT
+  path: /lynq-backend-app
+  config:
+    SPRING_PROFILES_ACTIVE: production
+    DB_URL: jdbc:mysql://mysql:3306/lynq_backend_db
+    LYNQ_IAM_URL: http://lynq-iam-service:8080/lynq-iam
+    LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
+    AWS_REGION: us-east-1
+    AWS_BUCKET_NAME: lynq-bucket
+    AWS_ENDPOINT: http://localstack:4566
+
+lynq_iam:
+  replicas: 1
+  image: matlock0o/lynq:lynq-iam-1.0.5-SNAPSHOT
+  path: /lynq-iam
+  config:
+    SPRING_PROFILES_ACTIVE: production
+    DB_URL: jdbc:mysql://mysql:3306/lynq_iam_db
+    REDIS_ADDRESS: redis
+    REDIS_PORT: "6379"
+    JWT_ACCESS_TOKEN_EXPIRATION_MINUTES: "15"
+    JWT_REFRESH_TOKEN_EXPIRATION_DAYS: "30"

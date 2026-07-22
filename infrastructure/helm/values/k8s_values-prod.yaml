@@ -1,0 +1,103 @@
+k8s_namespace: prod
+
+# Secrets are NOT managed by Helm in prod. They are created OUTSIDE the chart
+# (Terraform / External Secrets from AWS Secrets Manager) so no secret material
+# lives in git. Helm only renders the ConfigMaps; the deployments consume the
+# externally-created Secrets by name via secretRef.
+#
+# The following Secrets must exist in the lynq-prod-namespace before/at deploy,
+# with these exact names and keys:
+#
+#   dockerhub-secret            (type kubernetes.io/dockerconfigjson)
+#     .dockerconfigjson         -> Docker Hub auth for matlock0o (public repo, still authenticated)
+#
+#   lynq-iam-secret             (Opaque)
+#     DB_USERNAME, DB_PASSWORD, JWT_SECRET
+#     REDIS_USERNAME, REDIS_PASSWORD   (only if the managed Redis requires auth)
+#
+#   lynq-app-backend-secret     (Opaque)
+#     DB_USERNAME, DB_PASSWORD
+#     AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   (omit if using IRSA)
+#
+#   lynq-ml-secret              (Opaque)
+#     OPENAI_API_KEY             (only if LLM_PROVIDER=openai)
+manageSecrets: false
+
+# Terraform creates the namespace (so the external Secrets can be placed in it
+# before the release), so the chart must not create it here.
+createNamespace: false
+
+# No in-cluster infra in prod: MySQL/Redis come from managed services (RDS,
+# ElastiCache), S3 is real S3 (AWS_ENDPOINT=""), and Ollama is an external
+# OLLAMA_BASE_URL. The apps reach them via the config below.
+localInfra: false
+ollamaInCluster: false
+# Frontend is not in the cluster in prod — it is served from Cloudflare (Wrangler).
+localFrontend: false
+
+# Docker registry reference for the image pull secret. username/server are public
+# (they match the image path); the actual credentials live in the external
+# dockerhub-secret created by Terraform, not here.
+docker:
+  server: https://index.docker.io/v1/
+  username: matlock0o
+
+# Internet-facing ingress backed by a single shared AWS ALB (Option A: ACM + ALB).
+# Both services share one domain and one load balancer via the same group.name;
+# routing is path-based on each service's context-path.
+ingress:
+  className: alb
+  groupName: lynq
+  scheme: internet-facing
+  # Shared domain for both services.
+  host: "REPLACE_HOST"
+  # ACM certificate ARN (same region as the EKS cluster).
+  certificateArn: "REPLACE_CERTIFICATE_ARN"
+
+# ---------------------------------------------------------------------------
+# Per-service ConfigMap env vars (non-sensitive). Environment-specific values
+# are parameterized (REPLACE_*) and injected by Terraform at deploy.
+# Secrets are intentionally absent here (see manageSecrets note above).
+# ---------------------------------------------------------------------------
+
+lynq_ml:
+  replicas: 2
+  image: matlock0o/lynq:lynq-ml-1.0.5-SNAPSHOT
+  config:
+    PORT: "8084"
+    HOST: "0.0.0.0"
+    LLM_PROVIDER: ollama
+    LLM_TIMEOUT: "60"
+    OLLAMA_BASE_URL: "REPLACE_OLLAMA_BASE_URL"
+    OLLAMA_MODEL: llama3.1
+    OPENAI_MODEL: gpt-4o-mini
+    OPENAI_BASE_URL: https://api.openai.com/v1
+    UDEMY_MAX_COURSES: "2"
+    UDEMY_BASE_URL: https://www.udemy.com
+    COURSE_SEARCH_TIMEOUT: "15"
+
+lynq_app_backend:
+  replicas: 2
+  image: matlock0o/lynq:lynq-app-backend-1.0.5-SNAPSHOT
+  path: /lynq-backend-app
+  config:
+    SPRING_PROFILES_ACTIVE: production
+    DB_URL: "jdbc:mysql://REPLACE_DB_HOST:3306/lynq_backend_db"
+    LYNQ_IAM_URL: http://lynq-iam-service:8080/lynq-iam
+    LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
+    AWS_REGION: us-east-1
+    AWS_BUCKET_NAME: "REPLACE_BUCKET_NAME"
+    # Empty = real AWS endpoints.
+    AWS_ENDPOINT: ""
+
+lynq_iam:
+  replicas: 2
+  image: matlock0o/lynq:lynq-iam-1.0.5-SNAPSHOT
+  path: /lynq-iam
+  config:
+    SPRING_PROFILES_ACTIVE: production
+    DB_URL: "jdbc:mysql://REPLACE_DB_HOST:3306/lynq_iam_db"
+    REDIS_ADDRESS: "REPLACE_REDIS_HOST"
+    REDIS_PORT: "6379"
+    JWT_ACCESS_TOKEN_EXPIRATION_MINUTES: "15"
+    JWT_REFRESH_TOKEN_EXPIRATION_DAYS: "30"

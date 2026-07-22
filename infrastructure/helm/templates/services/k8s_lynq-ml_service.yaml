@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lynq-ml-service
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-ml
+spec:
+  type: ClusterIP
+  selector:
+    app: lynq-ml
+  ports:
+    - name: http
+      port: 8084
+      targetPort: http

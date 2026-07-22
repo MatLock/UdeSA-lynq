@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lynq-ml-deployment
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-ml
+spec:
+  replicas: {{ .Values.lynq_ml.replicas }}
+  selector:
+    matchLabels:
+      app: lynq-ml
+  template:
+    metadata:
+      labels:
+        app: lynq-ml
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-secret
+      {{- if and .Values.localInfra .Values.ollamaInCluster }}
+      # Only when Ollama runs in-cluster; with the host Ollama there is nothing to wait for.
+      initContainers:
+        - name: wait-for-ollama
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -w 2 ollama 11434 </dev/null; do echo "waiting for ollama:11434"; sleep 2; done']
+      {{- end }}
+      containers:
+        - name: lynq-ml
+          image: {{ .Values.lynq_ml.image }}
+          envFrom:
+            - configMapRef:
+                name: lynq-ml-config
+            - secretRef:
+                name: lynq-ml-secret
+          ports:
+            - name: http
+              containerPort: 8084
+          livenessProbe:
+            httpGet:
+              path: /lynq-ml/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /lynq-ml/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
