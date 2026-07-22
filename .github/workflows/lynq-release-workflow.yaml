@@ -59,8 +59,15 @@ jobs:
       - name: Generate version badge
         run: |
           mkdir -p .github/badges
-          curl -sSL --fail \
-            "https://img.shields.io/badge/version-${{ steps.resolve.outputs.version }}-blue" \
+          # Use the static/v1 endpoint with URL-encoded params so versions that
+          # contain characters special to the "label-message-color" path syntax
+          # (e.g. the hyphen in "1.0.4-SNAPSHOT") don't produce a "404: badge not
+          # found" placeholder.
+          curl -sSL --fail -G \
+            --data-urlencode "label=lynq-latest-version" \
+            --data-urlencode "message=${{ steps.resolve.outputs.version }}" \
+            --data-urlencode "color=blue" \
+            "https://img.shields.io/static/v1" \
             -o .github/badges/version.svg
 
       - name: Commit version bump back to main
