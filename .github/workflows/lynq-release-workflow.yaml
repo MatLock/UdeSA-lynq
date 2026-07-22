@@ -170,7 +170,7 @@ jobs:
       - name: Run tests
         working-directory: lynq-ml
         run: |
-          coverage run -m unittest discover -s tests -t .
+          coverage run --branch -m unittest discover -s tests -t .
           coverage report -m
           coverage xml -o coverage.xml
 
@@ -312,7 +312,7 @@ jobs:
           ML_LINE: ${{ steps.coverage.outputs.ml_line }}
           ML_BRANCH: ${{ steps.coverage.outputs.ml_branch }}
         run: |
-          existing=$(gh release view "$TAG" --json body -q .body)
+          existing=$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json body -q .body)
           {
             printf '%s\n\n' "$existing"
             printf '---\n\n'
@@ -334,7 +334,7 @@ jobs:
             printf '| Lines | %s%% |\n' "$ML_LINE"
             printf '| Branches | %s%% |\n' "$ML_BRANCH"
           } > /tmp/notes.md
-          gh release edit "$TAG" --notes-file /tmp/notes.md
+          gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file /tmp/notes.md
 
       - name: Attach JaCoCo HTML reports to release
         env:
@@ -344,6 +344,6 @@ jobs:
           (cd coverage/lynq-iam && zip -qr /tmp/jacoco-report-iam.zip .)
           (cd coverage/lynq-app-backend && zip -qr /tmp/jacoco-report-app-backend.zip .)
           cp coverage/lynq-ml/coverage.xml /tmp/coverage-lynq-ml.xml
-          gh release upload "$TAG" /tmp/jacoco-report-iam.zip --clobber
-          gh release upload "$TAG" /tmp/jacoco-report-app-backend.zip --clobber
-          gh release upload "$TAG" /tmp/coverage-lynq-ml.xml --clobber
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-iam.zip --clobber
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-app-backend.zip --clobber
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/coverage-lynq-ml.xml --clobber
