@@ -1,0 +1,39 @@
+{{- if .Values.localFrontend }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lynq-app-frontend
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-app-frontend
+spec:
+  replicas: {{ .Values.lynq_app_frontend.replicas }}
+  selector:
+    matchLabels:
+      app: lynq-app-frontend
+  template:
+    metadata:
+      labels:
+        app: lynq-app-frontend
+    spec:
+      containers:
+        - name: lynq-app-frontend
+          image: {{ .Values.lynq_app_frontend.image }}
+          # Locally-built image loaded into the cluster; never pull from a registry.
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+{{- end }}

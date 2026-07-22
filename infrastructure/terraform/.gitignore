@@ -1,0 +1,16 @@
+# Terraform state and local artifacts
+.terraform/
+# NOTE: .terraform.lock.hcl is intentionally committed (pins provider versions).
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Local override / secret var files (never commit real secrets)
+*.auto.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc

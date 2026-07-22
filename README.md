@@ -36,6 +36,10 @@ The public landing page for Lynq — a static site served from Cloudflare Worker
 
 Tooling to seed Lynq with realistic job-listing data for development. Bundles three feeders that normalize to a shared listing schema: a LinkedIn dataset loader (bulk seed data from Hugging Face) and polite live scrapers for Computrabajo Argentina and Bumeran Argentina.
 
+### infrastructure
+
+The deployment setup for Lynq. A Helm chart runs the platform on a self-contained local cluster (minikube) and on production (AWS EKS), while Terraform provisions and applies production — the EC2 MySQL/Redis host, the S3 bucket, the ACM certificate and Cloudflare DNS, the Kubernetes secrets, and the Helm release. See [infrastructure/README.md](infrastructure/README.md) for the layout, the per-environment flags, and step-by-step instructions.
+
 
 ## Running the stack
 

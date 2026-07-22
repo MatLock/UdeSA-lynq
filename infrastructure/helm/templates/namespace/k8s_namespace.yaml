@@ -1,0 +1,6 @@
+{{- if .Values.createNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lynq-{{ .Values.k8s_namespace }}-namespace
+{{- end }}

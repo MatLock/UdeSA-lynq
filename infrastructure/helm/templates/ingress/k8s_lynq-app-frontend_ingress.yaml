@@ -1,0 +1,25 @@
+{{- if .Values.localFrontend }}
+# Local-only frontend route. Serves the SPA at the root of the shared host;
+# the more specific /lynq-iam and /lynq-backend-app paths (their own Ingresses)
+# take precedence via longest-prefix matching.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lynq-app-frontend-ingress
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-app-frontend
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lynq-app-frontend-service
+                port:
+                  name: http
+{{- end }}
