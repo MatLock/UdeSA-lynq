@@ -1,0 +1,219 @@
+/* Modern resume template — dark sidebar + main column. Tuned for WeasyPrint. */
+
+:root {
+  --sidebar-w: 66mm;
+  --ink: #1f2933;
+  --muted: #7b8794;
+  --accent: #2bb6a3;
+  --sidebar-bg: #1f2933;
+  --sidebar-fg: #e4e7eb;
+  --sidebar-muted: #9aa5b1;
+}
+
+@page {
+  size: A4;
+  margin: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 10pt;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+/* Fixed sidebar repeats on every page and bleeds to the edges. */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-w);
+  height: 100%;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-fg);
+}
+
+.sidebar-inner {
+  padding: 16mm 9mm;
+}
+
+.avatar {
+  display: block;
+  width: 34mm;
+  height: 34mm;
+  margin: 0 auto 6mm;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2pt solid var(--accent);
+}
+
+.name {
+  margin: 0 0 2mm;
+  font-size: 20pt;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.2px;
+}
+
+.headline {
+  margin: 0 0 8mm;
+  color: var(--accent);
+  font-size: 10.5pt;
+  font-weight: 600;
+}
+
+.side-section {
+  margin-bottom: 7mm;
+}
+
+.side-section h2 {
+  margin: 0 0 3mm;
+  font-size: 8.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: #fff;
+  padding-bottom: 1.5mm;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.contact,
+.dots {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contact li {
+  margin-bottom: 1.6mm;
+  font-size: 8.8pt;
+  color: var(--sidebar-fg);
+  word-break: break-word;
+}
+
+.dots li {
+  position: relative;
+  margin-bottom: 1.6mm;
+  padding-left: 4mm;
+  font-size: 9pt;
+}
+
+.dots li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 1.6mm;
+  width: 1.6mm;
+  height: 1.6mm;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.6mm;
+}
+
+.chip {
+  display: inline-block;
+  padding: 0.9mm 2.4mm;
+  margin: 0 1.6mm 1.6mm 0;
+  border-radius: 2mm;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--sidebar-fg);
+  font-size: 8.3pt;
+  white-space: nowrap;
+}
+
+/* Main column sits to the right of the fixed sidebar. */
+.main {
+  margin-left: var(--sidebar-w);
+  padding: 16mm 14mm 16mm 12mm;
+}
+
+.block {
+  margin-bottom: 7mm;
+}
+
+.section-title {
+  margin: 0 0 4mm;
+  font-size: 12pt;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 2px solid #e4e7eb;
+  padding-bottom: 1.5mm;
+}
+
+.summary {
+  margin: 0;
+  text-align: justify;
+}
+
+.entry {
+  margin-bottom: 5mm;
+  page-break-inside: avoid;
+}
+
+.entry-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6mm;
+}
+
+.role {
+  margin: 0;
+  font-size: 10.5pt;
+  font-weight: 700;
+}
+
+.org {
+  margin: 0.4mm 0 0;
+  font-size: 9.5pt;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.dates {
+  flex: none;
+  font-size: 8.6pt;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.desc {
+  margin: 1.6mm 0 0;
+  text-align: justify;
+}
+
+.bullets {
+  margin: 1.6mm 0 0;
+  padding-left: 4.5mm;
+}
+
+.bullets li {
+  margin-bottom: 1mm;
+}
+
+.tech {
+  margin: 2mm 0 0;
+}
+
+.chip.small {
+  background: #eef2f2;
+  color: #35524b;
+  border: 1px solid #d7e3e0;
+  font-size: 7.8pt;
+}
+
+.muted {
+  color: var(--muted);
+}
