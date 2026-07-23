@@ -3,3 +3,4 @@ date,prompt
 "11-07-2026","in docker-compose add image container with llama3.1 and set the default env vars to use docker llama as default"
 "11-07-2026","add lynq-ml into docker-compose"
 "12-07-2026","create test package with unittest"
+"23-07-2026","create a POST /resume-template-creation endpoint that, given a body with {resume_content: <json>, profile_url: <string>, put_resume_url: <string>}, renders the resume template into a PDF, uploads it to the given presigned URL and responds with 201"

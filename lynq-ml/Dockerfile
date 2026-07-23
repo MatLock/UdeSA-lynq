@@ -10,6 +10,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Native libraries required by WeasyPrint (Pango/Cairo/GDK-PixBuf) plus base
+# fonts so PDFs render text (including accents) correctly.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libpango-1.0-0 \
+      libpangocairo-1.0-0 \
+      libgdk-pixbuf-2.0-0 \
+      libcairo2 \
+      libffi8 \
+      fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies first so the layer is cached across code changes.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

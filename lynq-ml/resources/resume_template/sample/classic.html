@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+/* Classic resume template — refined editorial single column. WeasyPrint-ready. */
+
+:root {
+  --ink: #201d1a;
+  --muted: #6b6660;
+  --rule: #ddd5c9;
+  --accent: #7c2530;
+  --accent-soft: #efe6e2;
+}
+
+@page {
+  size: A4;
+  margin: 16mm 18mm;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", "Liberation Serif", serif;
+  font-size: 10.5pt;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* ---------- Header / masthead ---------- */
+.head {
+  text-align: center;
+  padding-bottom: 5mm;
+  margin-bottom: 6mm;
+  border-bottom: 2.5pt double var(--accent);
+}
+
+.avatar {
+  display: block;
+  width: 30mm;
+  height: 30mm;
+  margin: 0 auto 4mm;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5pt solid var(--accent);
+  padding: 1mm;
+  background: #fff;
+}
+
+/* Name flanked by two thin rules, editorial masthead style. */
+.name {
+  display: table;
+  margin: 0 auto;
+  font-size: 25pt;
+  font-weight: 700;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.name::before,
+.name::after {
+  content: "";
+  display: table-cell;
+  width: 50%;
+  border-top: 0.75pt solid var(--rule);
+  transform: translateY(-3px);
+}
+
+.name::before {
+  padding-right: 6mm;
+}
+
+.name::after {
+  padding-left: 6mm;
+}
+
+.headline {
+  margin: 2.5mm 0 0;
+  font-size: 10.5pt;
+  font-style: italic;
+  letter-spacing: 1.5px;
+  text-transform: lowercase;
+  font-variant: small-caps;
+  color: var(--muted);
+}
+
+.head .contact {
+  margin: 3mm 0 0;
+  font-size: 8.6pt;
+  color: var(--muted);
+  letter-spacing: 0.4px;
+}
+
+/* ---------- Sections ---------- */
+.block {
+  margin-bottom: 6mm;
+}
+
+.section-title {
+  position: relative;
+  margin: 0 0 3.5mm;
+  padding-bottom: 1.4mm;
+  font-size: 10.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: var(--accent);
+  border-bottom: 0.5pt solid var(--rule);
+}
+
+/* Thicker accent segment overlaying the left of the section rule. */
+.section-title::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -1pt;
+  width: 16mm;
+  height: 1.6pt;
+  background: var(--accent);
+}
+
+.summary {
+  margin: 0;
+  text-align: justify;
+}
+
+/* ---------- Entries ---------- */
+.entry {
+  margin-bottom: 4.5mm;
+  padding-left: 4mm;
+  border-left: 1.6pt solid var(--accent-soft);
+  page-break-inside: avoid;
+}
+
+.entry-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6mm;
+}
+
+.role {
+  font-weight: 700;
+  font-size: 11pt;
+}
+
+.org {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.loc {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.dates {
+  flex: none;
+  font-size: 8.2pt;
+  font-style: normal;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.desc {
+  margin: 1.2mm 0 0;
+  text-align: justify;
+}
+
+.bullets {
+  margin: 1.6mm 0 0;
+  padding-left: 5mm;
+  list-style: none;
+}
+
+.bullets li {
+  position: relative;
+  margin-bottom: 1mm;
+  padding-left: 4mm;
+}
+
+.bullets li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 1.7mm;
+  width: 1.6mm;
+  height: 1.6mm;
+  background: var(--accent);
+  transform: rotate(45deg);
+}
+
+.tech {
+  margin: 1.6mm 0 0;
+  font-size: 9.3pt;
+  color: var(--muted);
+}
+
+.tech em {
+  color: var(--accent);
+  font-style: italic;
+}
+
+/* ---------- Skills ---------- */
+.skills {
+  margin: 0;
+}
+
+.skills dt {
+  float: left;
+  clear: left;
+  width: 28mm;
+  font-size: 8.4pt;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding-top: 0.6mm;
+}
+
+.skills dd {
+  margin: 0 0 1.6mm 28mm;
+}
+
+.languages {
+  margin: 0;
+}
+
+</style>
+</head>
+<body>
+  
+
+  <header class="head">
+    <img class="avatar" src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%27200%27%20height%3D%27200%27%3E%3Crect%20width%3D%27200%27%20height%3D%27200%27%20fill%3D%27%237c2530%27/%3E%3Ccircle%20cx%3D%27100%27%20cy%3D%2778%27%20r%3D%2738%27%20fill%3D%27%23ffffff%27/%3E%3Cpath%20d%3D%27M40%20190%20a60%2060%200%200%201%20120%200%20z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E" alt="">
+    <h1 class="name">Juan Pérez</h1>
+    <p class="headline">Senior Backend Engineer</p>
+    <p class="contact">
+      
+      
+      
+      
+      
+      
+      
+      
+      juan.perez@example.com  •  +54 11 5555-5555  •  Buenos Aires, Argentina  •  linkedin.com/in/juanperez  •  github.com/juanperez  •  juanperez.dev
+    </p>
+  </header>
+
+  
+  <section class="block">
+    <h2 class="section-title">Summary</h2>
+    <p class="summary">Backend engineer with 6+ years designing scalable, event-driven microservices. Passionate about clean architecture, observability and mentoring teams toward reliable delivery.</p>
+  </section>
+  
+
+  
+  <section class="block">
+    <h2 class="section-title">Experience</h2>
+    
+    <article class="entry">
+      <div class="entry-head">
+        <span class="left">
+          <span class="role">Senior Backend Engineer</span>
+          <span class="org">, Mendel</span>
+          <span class="loc"> — Remote</span>
+        </span>
+        <span class="dates">
+          2021-03 – Present
+        </span>
+      </div>
+      <p class="desc">Own the purchase and approval-workflow services powering corporate spend.</p>
+      
+      <ul class="bullets">
+        <li>Reduced API p99 latency by 40% via caching and query tuning.</li><li>Led a team of 4 through a Spring Boot 3 migration with zero downtime.</li><li>Introduced event-driven feature toggles, cutting cross-service calls by 60%.</li>
+      </ul>
+      
+      
+      <p class="tech"><em>Technologies:</em> Java, Spring Boot, AWS, Kafka, MySQL</p>
+      
+    </article>
+    
+    <article class="entry">
+      <div class="entry-head">
+        <span class="left">
+          <span class="role">Backend Engineer</span>
+          <span class="org">, Globant</span>
+          <span class="loc"> — Buenos Aires</span>
+        </span>
+        <span class="dates">
+          2018-06 – 2021-02
+        </span>
+      </div>
+      <p class="desc">Built REST APIs and integrations for fintech clients.</p>
+      
+      <ul class="bullets">
+        <li>Delivered a payments reconciliation service processing 2M+ tx/day.</li>
+      </ul>
+      
+      
+      <p class="tech"><em>Technologies:</em> Java, PostgreSQL, Docker</p>
+      
+    </article>
+    
+  </section>
+  
+
+  
+  <section class="block">
+    <h2 class="section-title">Projects</h2>
+    
+    <article class="entry">
+      <div class="entry-head">
+        <span class="left"><span class="role">Lynq ATS</span></span>
+        <span class="dates">github.com/lynq/ats</span>
+      </div>
+      <p class="desc">AI-assisted applicant tracking platform.</p>
+      
+      <p class="tech"><em>Technologies:</em> FastAPI, React, LLMs</p>
+      
+    </article>
+    
+  </section>
+  
+
+  
+  <section class="block">
+    <h2 class="section-title">Education</h2>
+    
+    <article class="entry">
+      <div class="entry-head">
+        <span class="left">
+          <span class="role">B.Sc. in Computer Science</span>
+          <span class="org">, Universidad de San Andrés</span>
+        </span>
+        <span class="dates">
+          2013 – 2018
+        </span>
+      </div>
+      <p class="desc">Graduated with honors. Focus on distributed systems.</p>
+    </article>
+    
+  </section>
+  
+
+  
+  <section class="block">
+    <h2 class="section-title">Skills</h2>
+    <dl class="skills">
+      <dt>Technical</dt><dd>Java, Python, Spring Boot, SQL, REST, Kafka</dd>
+      <dt>Tools</dt><dd>Docker, Kubernetes, Git, Grafana</dd>
+      <dt>Strengths</dt><dd>Leadership, Mentoring, Communication</dd>
+    </dl>
+  </section>
+  
+
+  
+  <section class="block">
+    <h2 class="section-title">Certifications</h2>
+    
+    <article class="entry">
+      <div class="entry-head">
+        <span class="left">
+          <span class="role">AWS Solutions Architect – Associate</span>
+          <span class="org">, Amazon Web Services</span>
+        </span>
+        <span class="dates">2022-05</span>
+      </div>
+      <p class="desc">Credential ID: AWS-SAA-12345</p>
+    </article>
+    
+  </section>
+  
+
+  
+  <section class="block">
+    <h2 class="section-title">Languages</h2>
+    <p class="languages">
+      Spanish (Native)  •  English (Advanced (C1))  •  Portuguese (Intermediate)
+    </p>
+  </section>
+  
+</body>
+</html>

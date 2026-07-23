@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+/* Modern resume template — dark sidebar + main column. Tuned for WeasyPrint. */
+
+:root {
+  --sidebar-w: 66mm;
+  --ink: #1f2933;
+  --muted: #7b8794;
+  --accent: #2bb6a3;
+  --sidebar-bg: #1f2933;
+  --sidebar-fg: #e4e7eb;
+  --sidebar-muted: #9aa5b1;
+}
+
+@page {
+  size: A4;
+  margin: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 10pt;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+/* Fixed sidebar repeats on every page and bleeds to the edges. */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--sidebar-w);
+  height: 100%;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-fg);
+}
+
+.sidebar-inner {
+  padding: 16mm 9mm;
+}
+
+.avatar {
+  display: block;
+  width: 34mm;
+  height: 34mm;
+  margin: 0 auto 6mm;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2pt solid var(--accent);
+}
+
+.name {
+  margin: 0 0 2mm;
+  font-size: 20pt;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.2px;
+}
+
+.headline {
+  margin: 0 0 8mm;
+  color: var(--accent);
+  font-size: 10.5pt;
+  font-weight: 600;
+}
+
+.side-section {
+  margin-bottom: 7mm;
+}
+
+.side-section h2 {
+  margin: 0 0 3mm;
+  font-size: 8.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: #fff;
+  padding-bottom: 1.5mm;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.contact,
+.dots {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contact li {
+  margin-bottom: 1.6mm;
+  font-size: 8.8pt;
+  color: var(--sidebar-fg);
+  word-break: break-word;
+}
+
+.dots li {
+  position: relative;
+  margin-bottom: 1.6mm;
+  padding-left: 4mm;
+  font-size: 9pt;
+}
+
+.dots li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 1.6mm;
+  width: 1.6mm;
+  height: 1.6mm;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.6mm;
+}
+
+.chip {
+  display: inline-block;
+  padding: 0.9mm 2.4mm;
+  margin: 0 1.6mm 1.6mm 0;
+  border-radius: 2mm;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--sidebar-fg);
+  font-size: 8.3pt;
+  white-space: nowrap;
+}
+
+/* Main column sits to the right of the fixed sidebar. */
+.main {
+  margin-left: var(--sidebar-w);
+  padding: 16mm 14mm 16mm 12mm;
+}
+
+.block {
+  margin-bottom: 7mm;
+}
+
+.section-title {
+  margin: 0 0 4mm;
+  font-size: 12pt;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 2px solid #e4e7eb;
+  padding-bottom: 1.5mm;
+}
+
+.summary {
+  margin: 0;
+  text-align: justify;
+}
+
+.entry {
+  margin-bottom: 5mm;
+  page-break-inside: avoid;
+}
+
+.entry-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6mm;
+}
+
+.role {
+  margin: 0;
+  font-size: 10.5pt;
+  font-weight: 700;
+}
+
+.org {
+  margin: 0.4mm 0 0;
+  font-size: 9.5pt;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.dates {
+  flex: none;
+  font-size: 8.6pt;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.desc {
+  margin: 1.6mm 0 0;
+  text-align: justify;
+}
+
+.bullets {
+  margin: 1.6mm 0 0;
+  padding-left: 4.5mm;
+}
+
+.bullets li {
+  margin-bottom: 1mm;
+}
+
+.tech {
+  margin: 2mm 0 0;
+}
+
+.chip.small {
+  background: #eef2f2;
+  color: #35524b;
+  border: 1px solid #d7e3e0;
+  font-size: 7.8pt;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+</style>
+</head>
+<body>
+  
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+      <img class="avatar" src="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%27200%27%20height%3D%27200%27%3E%3Crect%20width%3D%27200%27%20height%3D%27200%27%20fill%3D%27%237c2530%27/%3E%3Ccircle%20cx%3D%27100%27%20cy%3D%2778%27%20r%3D%2738%27%20fill%3D%27%23ffffff%27/%3E%3Cpath%20d%3D%27M40%20190%20a60%2060%200%200%201%20120%200%20z%27%20fill%3D%27%23ffffff%27/%3E%3C/svg%3E" alt="">
+      <h1 class="name">Juan Pérez</h1>
+      <p class="headline">Senior Backend Engineer</p>
+
+      <section class="side-section">
+        <h2>Contact</h2>
+        <ul class="contact">
+          <li>juan.perez@example.com</li>
+          <li>+54 11 5555-5555</li>
+          <li>Buenos Aires, Argentina</li>
+          <li>linkedin.com/in/juanperez</li>
+          <li>github.com/juanperez</li>
+          <li>juanperez.dev</li>
+          
+        </ul>
+      </section>
+
+      
+      <section class="side-section">
+        <h2>Skills</h2>
+        <div class="chips">
+          <span class="chip">Java</span><span class="chip">Python</span><span class="chip">Spring Boot</span><span class="chip">SQL</span><span class="chip">REST</span><span class="chip">Kafka</span>
+          <span class="chip">Docker</span><span class="chip">Kubernetes</span><span class="chip">Git</span><span class="chip">Grafana</span>
+        </div>
+      </section>
+      
+
+      
+      <section class="side-section">
+        <h2>Strengths</h2>
+        <ul class="dots">
+          <li>Leadership</li><li>Mentoring</li><li>Communication</li>
+        </ul>
+      </section>
+      
+
+      
+      <section class="side-section">
+        <h2>Languages</h2>
+        <ul class="dots">
+          
+          <li>Spanish <span class="muted">— Native</span></li>
+          
+          <li>English <span class="muted">— Advanced (C1)</span></li>
+          
+          <li>Portuguese <span class="muted">— Intermediate</span></li>
+          
+        </ul>
+      </section>
+      
+    </div>
+  </aside>
+
+  <main class="main">
+    
+    <section class="block">
+      <h2 class="section-title">Profile</h2>
+      <p class="summary">Backend engineer with 6+ years designing scalable, event-driven microservices. Passionate about clean architecture, observability and mentoring teams toward reliable delivery.</p>
+    </section>
+    
+
+    
+    <section class="block">
+      <h2 class="section-title">Experience</h2>
+      
+      <article class="entry">
+        <div class="entry-head">
+          <div>
+            <h3 class="role">Senior Backend Engineer</h3>
+            <p class="org">
+              Mendel · Remote
+            </p>
+          </div>
+          <span class="dates">
+            2021-03 – Present
+          </span>
+        </div>
+        <p class="desc">Own the purchase and approval-workflow services powering corporate spend.</p>
+        
+        <ul class="bullets">
+          <li>Reduced API p99 latency by 40% via caching and query tuning.</li><li>Led a team of 4 through a Spring Boot 3 migration with zero downtime.</li><li>Introduced event-driven feature toggles, cutting cross-service calls by 60%.</li>
+        </ul>
+        
+        
+        <p class="tech"><span class="chip small">Java</span><span class="chip small">Spring Boot</span><span class="chip small">AWS</span><span class="chip small">Kafka</span><span class="chip small">MySQL</span></p>
+        
+      </article>
+      
+      <article class="entry">
+        <div class="entry-head">
+          <div>
+            <h3 class="role">Backend Engineer</h3>
+            <p class="org">
+              Globant · Buenos Aires
+            </p>
+          </div>
+          <span class="dates">
+            2018-06 – 2021-02
+          </span>
+        </div>
+        <p class="desc">Built REST APIs and integrations for fintech clients.</p>
+        
+        <ul class="bullets">
+          <li>Delivered a payments reconciliation service processing 2M+ tx/day.</li>
+        </ul>
+        
+        
+        <p class="tech"><span class="chip small">Java</span><span class="chip small">PostgreSQL</span><span class="chip small">Docker</span></p>
+        
+      </article>
+      
+    </section>
+    
+
+    
+    <section class="block">
+      <h2 class="section-title">Projects</h2>
+      
+      <article class="entry">
+        <div class="entry-head">
+          <h3 class="role">Lynq ATS</h3>
+          <span class="dates">github.com/lynq/ats</span>
+        </div>
+        <p class="desc">AI-assisted applicant tracking platform.</p>
+        
+        <p class="tech"><span class="chip small">FastAPI</span><span class="chip small">React</span><span class="chip small">LLMs</span></p>
+        
+      </article>
+      
+    </section>
+    
+
+    
+    <section class="block">
+      <h2 class="section-title">Education</h2>
+      
+      <article class="entry">
+        <div class="entry-head">
+          <div>
+            <h3 class="role">B.Sc. · Computer Science</h3>
+            <p class="org">Universidad de San Andrés</p>
+          </div>
+          <span class="dates">
+            2013 – 2018
+          </span>
+        </div>
+        <p class="desc">Graduated with honors. Focus on distributed systems.</p>
+      </article>
+      
+    </section>
+    
+
+    
+    <section class="block">
+      <h2 class="section-title">Certifications</h2>
+      
+      <article class="entry">
+        <div class="entry-head">
+          <div>
+            <h3 class="role">AWS Solutions Architect – Associate</h3>
+            <p class="org">Amazon Web Services</p>
+          </div>
+          <span class="dates">2022-05</span>
+        </div>
+        <p class="desc muted">ID: AWS-SAA-12345</p>
+      </article>
+      
+    </section>
+    
+  </main>
+</body>
+</html>

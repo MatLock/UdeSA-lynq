@@ -11,8 +11,11 @@ from fastapi import APIRouter, Header, HTTPException
 from llm_client import get_llm_client
 from response import GlobalRestResponse
 
-from .models import CandidateExplanationRequest, CandidateExplanationResponse
-from .prompts import render_candidate_explanation_prompt
+from model.candidate_explanation import (
+    CandidateExplanationRequest,
+    CandidateExplanationResponse,
+)
+from prompt.candidate_explanation import render_candidate_explanation_prompt
 
 log = logging.getLogger(__name__)
 

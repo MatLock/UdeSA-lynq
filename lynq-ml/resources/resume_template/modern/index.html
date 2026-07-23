@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  {% set pi = resume.personal_info %}
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+      {% if photo_url %}<img class="avatar" src="{{ photo_url }}" alt="">{% endif %}
+      {% if pi.full_name %}<h1 class="name">{{ pi.full_name }}</h1>{% endif %}
+      {% if pi.headline %}<p class="headline">{{ pi.headline }}</p>{% endif %}
+
+      <section class="side-section">
+        <h2>Contact</h2>
+        <ul class="contact">
+          {% if pi.email %}<li>{{ pi.email }}</li>{% endif %}
+          {% if pi.phone %}<li>{{ pi.phone }}</li>{% endif %}
+          {% if pi.location %}<li>{{ pi.location }}</li>{% endif %}
+          {% if pi.links.linkedin %}<li>{{ pi.links.linkedin }}</li>{% endif %}
+          {% if pi.links.github %}<li>{{ pi.links.github }}</li>{% endif %}
+          {% if pi.links.portfolio %}<li>{{ pi.links.portfolio }}</li>{% endif %}
+          {% if pi.links.website %}<li>{{ pi.links.website }}</li>{% endif %}
+        </ul>
+      </section>
+
+      {% if resume.skills.technical or resume.skills.tools %}
+      <section class="side-section">
+        <h2>Skills</h2>
+        <div class="chips">
+          {% for s in resume.skills.technical %}<span class="chip">{{ s }}</span>{% endfor %}
+          {% for s in resume.skills.tools %}<span class="chip">{{ s }}</span>{% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if resume.skills.soft %}
+      <section class="side-section">
+        <h2>Strengths</h2>
+        <ul class="dots">
+          {% for s in resume.skills.soft %}<li>{{ s }}</li>{% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+
+      {% if resume.languages %}
+      <section class="side-section">
+        <h2>Languages</h2>
+        <ul class="dots">
+          {% for l in resume.languages %}
+          <li>{{ l.language }}{% if l.proficiency %} <span class="muted">— {{ l.proficiency }}</span>{% endif %}</li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+    </div>
+  </aside>
+
+  <main class="main">
+    {% if resume.summary %}
+    <section class="block">
+      <h2 class="section-title">Profile</h2>
+      <p class="summary">{{ resume.summary }}</p>
+    </section>
+    {% endif %}
+
+    {% if resume.work_experience %}
+    <section class="block">
+      <h2 class="section-title">Experience</h2>
+      {% for exp in resume.work_experience %}
+      <article class="entry">
+        <div class="entry-head">
+          <div>
+            {% if exp.position %}<h3 class="role">{{ exp.position }}</h3>{% endif %}
+            <p class="org">
+              {{ exp.company }}{% if exp.location %} · {{ exp.location }}{% endif %}
+            </p>
+          </div>
+          <span class="dates">
+            {{ exp.start_date }}{% if exp.end_date %} – {{ exp.end_date }}{% elif exp.is_current %} – Present{% endif %}
+          </span>
+        </div>
+        {% if exp.description %}<p class="desc">{{ exp.description }}</p>{% endif %}
+        {% if exp.achievements %}
+        <ul class="bullets">
+          {% for a in exp.achievements %}<li>{{ a }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        {% if exp.technologies %}
+        <p class="tech">{% for t in exp.technologies %}<span class="chip small">{{ t }}</span>{% endfor %}</p>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if resume.projects %}
+    <section class="block">
+      <h2 class="section-title">Projects</h2>
+      {% for p in resume.projects %}
+      <article class="entry">
+        <div class="entry-head">
+          <h3 class="role">{{ p.name }}</h3>
+          {% if p.url %}<span class="dates">{{ p.url }}</span>{% endif %}
+        </div>
+        {% if p.description %}<p class="desc">{{ p.description }}</p>{% endif %}
+        {% if p.technologies %}
+        <p class="tech">{% for t in p.technologies %}<span class="chip small">{{ t }}</span>{% endfor %}</p>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if resume.education %}
+    <section class="block">
+      <h2 class="section-title">Education</h2>
+      {% for ed in resume.education %}
+      <article class="entry">
+        <div class="entry-head">
+          <div>
+            <h3 class="role">{{ ed.degree }}{% if ed.field_of_study %} · {{ ed.field_of_study }}{% endif %}</h3>
+            <p class="org">{{ ed.institution }}</p>
+          </div>
+          <span class="dates">
+            {{ ed.start_date }}{% if ed.end_date %} – {{ ed.end_date }}{% elif ed.is_current %} – Present{% endif %}
+          </span>
+        </div>
+        {% if ed.description %}<p class="desc">{{ ed.description }}</p>{% endif %}
+      </article>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if resume.certifications %}
+    <section class="block">
+      <h2 class="section-title">Certifications</h2>
+      {% for c in resume.certifications %}
+      <article class="entry">
+        <div class="entry-head">
+          <div>
+            <h3 class="role">{{ c.name }}</h3>
+            {% if c.issuer %}<p class="org">{{ c.issuer }}</p>{% endif %}
+          </div>
+          {% if c.issue_date %}<span class="dates">{{ c.issue_date }}</span>{% endif %}
+        </div>
+        {% if c.credential_id %}<p class="desc muted">ID: {{ c.credential_id }}</p>{% endif %}
+      </article>
+      {% endfor %}
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>

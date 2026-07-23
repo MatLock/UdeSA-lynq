@@ -2,7 +2,14 @@
 
 [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/coverage-ml.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml)
 
-Machine-learning service for the Lynq platform. A FastAPI app that augments the platform with LLM-backed features, served behind the standard `lynq-request-uuid` correlation header and the platform's `GlobalRestResponse` envelope. It currently exposes a **skill-enhancement** endpoint that extracts key technical skills from a job posting, backed by a pluggable LLM client (a local **Ollama** model by default, or **OpenAI**).
+Machine-learning service for the Lynq platform. A FastAPI app that augments the platform with LLM-backed features, served behind the standard `lynq-request-uuid` correlation header and the platform's `GlobalRestResponse` envelope. All features are backed by a pluggable LLM client (a local **Ollama** model by default, or **OpenAI**). It exposes:
+
+- **Skill enhancement** — extract key technical skills from a job posting.
+- **Upskilling suggestion** — assess a candidate against a job and return the skill gaps with real Udemy courses.
+- **Candidate explanation** — turn the same candidate/job assessment into a recruiter hiring verdict with strengths and concerns.
+- **Resume parsing** — download a resume (PDF/DOCX) and structure it into rich JSON.
+- **Resume translation** — translate a structured resume into another language.
+- **Resume template** — render a structured resume into a styled PDF and upload it to S3.
 
 ---
 
@@ -152,6 +159,10 @@ Base path: `/lynq-ml`. All routes require the `lynq-request-uuid` header **excep
 | ------ | -------------------------- | ------------------------------- | ------------------------------------------------------ |
 | POST   | `/skill-enhance`           | `user-id`, `company-id`         | Extract 5–15 key technical skills from a job posting.  |
 | POST   | `/upskilling_suggestion`   | `user-id`, `company-id`         | Assess a candidate vs. a job; return a verdict + Udemy courses for each gap. |
+| POST   | `/candidate-explanation`   | `user-id`, `company-id`         | Assess a candidate vs. a job; return a hiring verdict with strengths and concerns. |
+| POST   | `/parse-resume`            | `user-id`                       | Download a resume (PDF/DOCX) from a presigned URL and structure it into JSON. |
+| POST   | `/translate`               | `user-id`                       | Translate every value of a structured resume into a target language. |
+| POST   | `/resume-template-creation`| `user-id`                       | Render a structured resume into a styled PDF and upload it to a presigned URL. |
 | GET    | `/health`                  | —                               | Liveness/readiness probe; reports service + LLM status.|
 
 **`POST /skill-enhance`** request body:
@@ -208,6 +219,93 @@ A perfect match yields `outcome: "You are perfect for this role."` and an empty 
 
 **Course lookup requires no API key.** Each search query is resolved by a keyless provider that finds real Udemy course links via a public web search and, when that is rate-limited or unavailable, falls back to a deterministic Udemy search deep-link for the topic — so the endpoint always returns useful links. Results are capped at `UDEMY_MAX_COURSES` (default **2**) per topic. (The Udemy Affiliate API is deprecated and is not used.)
 
+**`POST /candidate-explanation`** takes the **same** `{ job, candidate }` payload as `/upskilling_suggestion`, but returns a recruiter-oriented hiring recommendation instead of course links. The response is wrapped in `GlobalRestResponse<CandidateExplanationResponse>`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "recommendation": "hire",
+    "explanation": "Strong backend fundamentals that match the core of the role; the infra gap is coachable.",
+    "strengths": ["Solid Java and AWS experience", "Relevant backend background"],
+    "concerns": ["No hands-on Kubernetes", "No GraphQL experience"]
+  }
+}
+```
+
+`recommendation` is a short verdict label (e.g. `hire`, `no_hire`, `maybe`); `strengths` and `concerns` break the reasoning into points for and against hiring.
+
+**`POST /parse-resume`** downloads a resume document (PDF/DOCX) from a presigned URL, extracts its text, and structures it into JSON via the LLM. Request body (the client sends camelCase; `pre_signed_url` is also accepted):
+
+```json
+{ "preSignedUrl": "https://s3.amazonaws.com/bucket/cv.pdf?X-Amz-Signature=..." }
+```
+
+The response is wrapped in `GlobalRestResponse<Resume>`. `Resume` is a rich, fully-defaulted schema — a partial completion still validates — with these top-level fields: `personal_info` (name, headline, email, phone, location, `links`), `summary`, `work_experience[]`, `education[]`, `skills` (`technical` / `tools` / `soft`), `languages[]`, `certifications[]`, `projects[]`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "personal_info": {
+      "full_name": "Ada Lovelace",
+      "headline": "Backend Engineer",
+      "email": "ada@example.com",
+      "location": "Buenos Aires, AR",
+      "links": { "linkedin": "https://linkedin.com/in/ada", "github": "https://github.com/ada" }
+    },
+    "summary": "Backend engineer with 5 years building Java services.",
+    "work_experience": [
+      {
+        "company": "Acme",
+        "position": "Backend Engineer",
+        "start_date": "2021-01",
+        "end_date": null,
+        "is_current": true,
+        "achievements": ["Cut latency 40%"],
+        "technologies": ["Java", "Spring", "AWS"]
+      }
+    ],
+    "education": [],
+    "skills": { "technical": ["Java", "Spring"], "tools": ["Docker"], "soft": ["Communication"] },
+    "languages": [{ "language": "English", "proficiency": "C1" }],
+    "certifications": [],
+    "projects": []
+  }
+}
+```
+
+Unsupported document types return `400`; download/parse failures and malformed LLM output return `502`.
+
+**`POST /translate`** translates every value of a structured resume into a target language. It reuses the `Resume` model from `/parse-resume`, so it is the natural next step in the pipeline. Request body:
+
+```json
+{
+  "resume": { "personal_info": { "full_name": "Ada Lovelace" }, "summary": "Backend engineer..." },
+  "language": "ES"
+}
+```
+
+`language` is validated against the `Language` enum — `EN`, `ES`, `FR`, `PR` (mirrors `com.lynq.backend.enums.Language`); any other value fails validation. The response is the translated resume wrapped in `GlobalRestResponse<Resume>`.
+
+**`POST /resume-template-creation`** renders a structured resume into a styled PDF (Jinja + WeasyPrint) and uploads it to a caller-provided presigned S3 PUT URL — the service never holds AWS credentials. Request body:
+
+```json
+{
+  "resume_content": { "personal_info": { "full_name": "Ada Lovelace" }, "summary": "Backend engineer..." },
+  "profile_url": "https://s3.amazonaws.com/bucket/photo.jpg?X-Amz-Signature=...",
+  "put_resume_url": "https://s3.amazonaws.com/bucket/cv.pdf?X-Amz-Signature=...",
+  "template": "MODERN"
+}
+```
+
+- `resume_content`: the structured resume to render (the `Resume` schema above).
+- `profile_url` *(optional)*: presigned URL to the profile photo; omit it to render without an avatar.
+- `put_resume_url`: presigned S3 PUT URL the rendered PDF is streamed to.
+- `template`: visual template — `MODERN` (default) or `CLASSIC`, each backed by `resources/resume_template/<name lowercased>/`.
+
+Returns `201 Created` with an empty `GlobalRestResponse` once the PDF has been generated and stored. Render failures return `500`; upload failures return `502`.
+
 **`GET /health`** returns `200` when the configured LLM is reachable, `503` otherwise (this route is *not* wrapped in `GlobalRestResponse`):
 
 ```json
@@ -252,6 +350,63 @@ curl -X POST http://localhost:8084/lynq-ml/upskilling_suggestion \
       "description": "Junior backend developer.",
       "skills": ["Java", "AWS"]
     }
+  }'
+```
+
+**Candidate explanation**
+
+```bash
+curl -X POST http://localhost:8084/lynq-ml/candidate-explanation \
+  -H "Content-Type: application/json" \
+  -H "lynq-request-uuid: $UUID" \
+  -H "user-id: user-1" \
+  -H "company-id: company-1" \
+  -d '{
+    "job": {
+      "description": "Backend role needing Kubernetes and GraphQL.",
+      "skills": ["Java", "AWS", "Kubernetes", "GraphQL"]
+    },
+    "candidate": {
+      "description": "Junior backend developer.",
+      "skills": ["Java", "AWS"]
+    }
+  }'
+```
+
+**Parse resume**
+
+```bash
+curl -X POST http://localhost:8084/lynq-ml/parse-resume \
+  -H "Content-Type: application/json" \
+  -H "lynq-request-uuid: $UUID" \
+  -H "user-id: user-1" \
+  -d '{ "preSignedUrl": "https://s3.amazonaws.com/bucket/cv.pdf?X-Amz-Signature=..." }'
+```
+
+**Translate resume**
+
+```bash
+curl -X POST http://localhost:8084/lynq-ml/translate \
+  -H "Content-Type: application/json" \
+  -H "lynq-request-uuid: $UUID" \
+  -H "user-id: user-1" \
+  -d '{
+    "resume": { "personal_info": { "full_name": "Ada Lovelace" }, "summary": "Backend engineer..." },
+    "language": "ES"
+  }'
+```
+
+**Create resume template (PDF)**
+
+```bash
+curl -X POST http://localhost:8084/lynq-ml/resume-template-creation \
+  -H "Content-Type: application/json" \
+  -H "lynq-request-uuid: $UUID" \
+  -H "user-id: user-1" \
+  -d '{
+    "resume_content": { "personal_info": { "full_name": "Ada Lovelace" }, "summary": "Backend engineer..." },
+    "put_resume_url": "https://s3.amazonaws.com/bucket/cv.pdf?X-Amz-Signature=...",
+    "template": "MODERN"
   }'
 ```
 
@@ -375,16 +530,29 @@ lynq-ml/
 │   ├── logging_context.py      # Request-UUID contextvar + logging filter (MDC)
 │   ├── middleware/
 │   │   └── request_uuid.py     # require_request_uuid middleware
-│   ├── health/
-│   │   └── router.py           # GET /health probe
-│   ├── skill_enhance/
-│   │   ├── router.py           # POST /skill-enhance
-│   │   ├── models.py           # SkillEnhanceRequest/Response, WorkType enum
-│   │   └── prompts.py          # render_key_extractor_prompt (Jinja)
-│   ├── upskilling_suggestion/
-│   │   ├── router.py           # POST /upskilling_suggestion
-│   │   ├── models.py           # UpskillingRequest/Response, QuerySuggestion
-│   │   └── prompts.py          # render_upskilling_prompt (Jinja)
+│   ├── router/                 # HTTP routers, one module per feature
+│   │   ├── health.py           # GET /health probe
+│   │   ├── skill_enhance.py    # POST /skill-enhance
+│   │   ├── upskilling_suggestion.py # POST /upskilling_suggestion
+│   │   ├── candidate_explanation.py # POST /candidate-explanation
+│   │   ├── resume_extractor.py # POST /parse-resume
+│   │   ├── translation.py      # POST /translate
+│   │   └── resume_template.py  # POST /resume-template-creation
+│   ├── model/                  # Pydantic models, one module per feature
+│   │   ├── skill_enhance.py    # SkillEnhanceRequest/Response, WorkType enum
+│   │   ├── upskilling_suggestion.py # UpskillingRequest/Response, QuerySuggestion
+│   │   ├── candidate_explanation.py
+│   │   ├── resume_extractor.py # Resume and nested schemas
+│   │   ├── translation.py      # TranslateRequest, Language enum
+│   │   └── resume_template.py  # ResumeTemplateCreationRequest, Template enum
+│   ├── prompt/                 # LLM prompt renderers, one module per feature
+│   │   ├── skill_enhance.py    # render_key_extractor_prompt (Jinja)
+│   │   ├── upskilling_suggestion.py # render_upskilling_prompt (Jinja)
+│   │   ├── candidate_explanation.py # render_candidate_explanation_prompt
+│   │   ├── resume_extractor.py # render_resume_extractor_prompt
+│   │   └── translation.py      # render_translation_prompt
+│   ├── renderer/
+│   │   └── resume_template.py  # render_resume_pdf (Jinja + WeasyPrint)
 │   ├── llm_client/
 │   │   ├── base.py             # LLMClient interface, LLMProvider enum
 │   │   ├── ollama_client.py    # Ollama implementation

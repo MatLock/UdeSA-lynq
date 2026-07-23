@@ -26,7 +26,7 @@ The candidate-facing web app for Lynq, built with React 19 and Vite. It delivers
 
 ### lynq-ml &nbsp; [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/coverage-ml.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml)
 
-The machine-learning service for Lynq, a FastAPI app that augments the platform with LLM-backed features. It currently exposes a skill-enhancement endpoint and pluggable LLM clients (OpenAI or a local Ollama model), returning results in the platform's standard response envelope.
+The machine-learning service for Lynq, a FastAPI app that augments the platform with LLM-backed features: skill extraction from job postings, upskilling suggestions with real Udemy courses, candidate hiring assessments, and resume parsing, translation, and styled-PDF rendering. It runs on pluggable LLM clients (OpenAI or a local Ollama model) and returns results in the platform's standard response envelope.
 
 ### lynq-home
 

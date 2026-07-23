@@ -8,8 +8,8 @@ import unittest
 from jinja2 import UndefinedError
 
 from llm_client import LLMProvider
-from upskilling_suggestion import prompts as prompts_module
-from upskilling_suggestion.prompts import render_upskilling_prompt
+from prompt import upskilling_suggestion as prompts_module
+from prompt.upskilling_suggestion import render_upskilling_prompt
 
 _INPUT_JSON = json.dumps(
     {
