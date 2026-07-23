@@ -1,0 +1,1 @@
+"""Resume-extractor feature: parse a CV document into structured JSON."""
