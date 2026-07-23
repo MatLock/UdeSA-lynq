@@ -59,7 +59,7 @@ class TranslateRouterTests(unittest.TestCase):
     def test_returns_translated_resume_on_valid_output(self) -> None:
         fake = _fake_client(generate_return=json.dumps(_TRANSLATED))
 
-        with patch("translation.router.get_llm_client", return_value=fake):
+        with patch("router.translation.get_llm_client", return_value=fake):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 200)
@@ -73,7 +73,7 @@ class TranslateRouterTests(unittest.TestCase):
     def test_prompt_includes_resume_and_target_language(self) -> None:
         fake = _fake_client(generate_return=json.dumps(_TRANSLATED))
 
-        with patch("translation.router.get_llm_client", return_value=fake):
+        with patch("router.translation.get_llm_client", return_value=fake):
             self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         prompt = fake.generate.await_args.args[0]
@@ -95,7 +95,7 @@ class TranslateRouterTests(unittest.TestCase):
         fake = _fake_client(generate_return=json.dumps(_TRANSLATED))
 
         for language in ("EN", "ES", "FR", "PR"):
-            with patch("translation.router.get_llm_client", return_value=fake):
+            with patch("router.translation.get_llm_client", return_value=fake):
                 response = self.client.post(
                     _ENDPOINT,
                     json={"resume": _RESUME, "language": language},
@@ -108,7 +108,7 @@ class TranslateRouterTests(unittest.TestCase):
             generate_side_effect=httpx.ConnectError("connection refused")
         )
 
-        with patch("translation.router.get_llm_client", return_value=fake):
+        with patch("router.translation.get_llm_client", return_value=fake):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
@@ -117,7 +117,7 @@ class TranslateRouterTests(unittest.TestCase):
     def test_returns_502_on_non_json_output(self) -> None:
         fake = _fake_client(generate_return="not json at all")
 
-        with patch("translation.router.get_llm_client", return_value=fake):
+        with patch("router.translation.get_llm_client", return_value=fake):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
@@ -126,7 +126,7 @@ class TranslateRouterTests(unittest.TestCase):
     def test_returns_502_on_schema_mismatch(self) -> None:
         fake = _fake_client(generate_return=json.dumps({"skills": "not-an-object"}))
 
-        with patch("translation.router.get_llm_client", return_value=fake):
+        with patch("router.translation.get_llm_client", return_value=fake):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
@@ -135,7 +135,7 @@ class TranslateRouterTests(unittest.TestCase):
     def test_missing_required_headers_returns_400(self) -> None:
         fake = _fake_client(generate_return=json.dumps(_TRANSLATED))
 
-        with patch("translation.router.get_llm_client", return_value=fake):
+        with patch("router.translation.get_llm_client", return_value=fake):
             response = self.client.post(
                 _ENDPOINT, json=_BODY, headers={"lynq-request-uuid": "req-123"}
             )

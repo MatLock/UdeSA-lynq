@@ -54,7 +54,7 @@ class RequestUuidMiddlewareTests(unittest.TestCase):
         fake.provider = LLMProvider.OLLAMA
         fake.generate = AsyncMock(return_value=json.dumps({"skills": ["Python"]}))
 
-        with patch("skill_enhance.router.get_llm_client", return_value=fake):
+        with patch("router.skill_enhance.get_llm_client", return_value=fake):
             response = self.client.post(
                 _SKILL_ENHANCE,
                 json=_BODY,

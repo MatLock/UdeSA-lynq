@@ -13,8 +13,12 @@ from llm_client import get_llm_client
 from response import GlobalRestResponse
 from udemy_client import get_course_provider
 
-from .models import QuerySuggestion, UpskillingRequest, UpskillingResponse
-from .prompts import render_upskilling_prompt
+from model.upskilling_suggestion import (
+    QuerySuggestion,
+    UpskillingRequest,
+    UpskillingResponse,
+)
+from prompt.upskilling_suggestion import render_upskilling_prompt
 
 log = logging.getLogger(__name__)
 

@@ -11,8 +11,8 @@ from fastapi import APIRouter, Header, HTTPException
 from llm_client import get_llm_client
 from response import GlobalRestResponse
 
-from .models import SkillEnhanceRequest, SkillEnhanceResponse
-from .prompts import render_key_extractor_prompt
+from model.skill_enhance import SkillEnhanceRequest, SkillEnhanceResponse
+from prompt.skill_enhance import render_key_extractor_prompt
 
 log = logging.getLogger(__name__)
 

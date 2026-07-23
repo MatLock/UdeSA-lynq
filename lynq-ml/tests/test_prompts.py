@@ -7,8 +7,8 @@ import unittest
 from jinja2 import UndefinedError
 
 from llm_client import LLMProvider
-from skill_enhance import prompts as prompts_module
-from skill_enhance.prompts import render_key_extractor_prompt
+from prompt import skill_enhance as prompts_module
+from prompt.skill_enhance import render_key_extractor_prompt
 
 
 class RenderKeyExtractorPromptTests(unittest.TestCase):

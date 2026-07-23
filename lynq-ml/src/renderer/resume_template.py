@@ -7,11 +7,10 @@ from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from resume_extractor.models import Resume
+from model.resume_extractor import Resume
+from model.resume_template import Template
 
-from .models import Template
-
-# src/resume_template/renderer.py -> parents[2] is the repo root; the HTML/CSS
+# src/renderer/resume_template.py -> parents[2] is the repo root; the HTML/CSS
 # templates live under resources/resume_template/<variant>/.
 _TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "resources" / "resume_template"
 

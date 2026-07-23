@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 # Reuse the exact request payload of the upskilling-suggestion endpoint so both
 # endpoints accept an identical ``{"job": ..., "candidate": ...}`` structure.
-from upskilling_suggestion.models import (  # noqa: F401  (re-exported for callers)
+from model.upskilling_suggestion import (  # noqa: F401  (re-exported for callers)
     CandidateSpec,
     JobSpec,
     UpskillingRequest as CandidateExplanationRequest,

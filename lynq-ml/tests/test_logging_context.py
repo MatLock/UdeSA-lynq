@@ -56,7 +56,7 @@ class RequestUuidContextIntegrationTests(unittest.TestCase):
 
         handler = _Capture()
         handler.addFilter(RequestUuidFilter())
-        router_log = logging.getLogger("skill_enhance.router")
+        router_log = logging.getLogger("router.skill_enhance")
         router_log.addHandler(handler)
         previous_disable = logging.root.manager.disable
         logging.disable(logging.NOTSET)  # tests/__init__ disables logging globally
@@ -66,7 +66,7 @@ class RequestUuidContextIntegrationTests(unittest.TestCase):
         fake.generate = AsyncMock(return_value=json.dumps({"skills": ["Java"]}))
 
         try:
-            with patch("skill_enhance.router.get_llm_client", return_value=fake):
+            with patch("router.skill_enhance.get_llm_client", return_value=fake):
                 response = self.client.post(
                     "/lynq-ml/skill-enhance",
                     json={"title": "t", "description": "d", "work_type": "REMOTE"},

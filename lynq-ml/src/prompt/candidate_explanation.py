@@ -8,7 +8,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from llm_client import LLMProvider
 
-# src/candidate_explanation/prompts.py -> parents[2] is the repo root;
+# src/prompt/candidate_explanation.py -> parents[2] is the repo root;
 # templates live under resources/prompts/.
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "resources" / "prompts"
 

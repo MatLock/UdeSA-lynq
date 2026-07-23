@@ -71,8 +71,8 @@ class UpskillingRouterTests(unittest.TestCase):
             courses=[Course(title="K8s course", url="https://www.udemy.com/course/k8s/")]
         )
 
-        with patch("upskilling_suggestion.router.get_llm_client", return_value=llm), patch(
-            "upskilling_suggestion.router.get_course_provider", return_value=udemy
+        with patch("router.upskilling_suggestion.get_llm_client", return_value=llm), patch(
+            "router.upskilling_suggestion.get_course_provider", return_value=udemy
         ):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
@@ -92,8 +92,8 @@ class UpskillingRouterTests(unittest.TestCase):
     def test_prompt_is_built_from_request_body(self) -> None:
         llm = _fake_llm(generate_return=_llm_output("You are perfect for this role.", []))
 
-        with patch("upskilling_suggestion.router.get_llm_client", return_value=llm), patch(
-            "upskilling_suggestion.router.get_course_provider"
+        with patch("router.upskilling_suggestion.get_llm_client", return_value=llm), patch(
+            "router.upskilling_suggestion.get_course_provider"
         ):
             self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
@@ -105,8 +105,8 @@ class UpskillingRouterTests(unittest.TestCase):
     def test_perfect_match_returns_no_suggestions_and_skips_udemy(self) -> None:
         llm = _fake_llm(generate_return=_llm_output("You are perfect for this role.", []))
 
-        with patch("upskilling_suggestion.router.get_llm_client", return_value=llm), patch(
-            "upskilling_suggestion.router.get_course_provider"
+        with patch("router.upskilling_suggestion.get_llm_client", return_value=llm), patch(
+            "router.upskilling_suggestion.get_course_provider"
         ) as get_udemy:
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
@@ -120,7 +120,7 @@ class UpskillingRouterTests(unittest.TestCase):
     def test_returns_502_when_llm_request_fails(self) -> None:
         llm = _fake_llm(generate_side_effect=httpx.ConnectError("connection refused"))
 
-        with patch("upskilling_suggestion.router.get_llm_client", return_value=llm):
+        with patch("router.upskilling_suggestion.get_llm_client", return_value=llm):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
@@ -129,7 +129,7 @@ class UpskillingRouterTests(unittest.TestCase):
     def test_returns_502_on_non_json_output(self) -> None:
         llm = _fake_llm(generate_return="not json at all")
 
-        with patch("upskilling_suggestion.router.get_llm_client", return_value=llm):
+        with patch("router.upskilling_suggestion.get_llm_client", return_value=llm):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
@@ -138,7 +138,7 @@ class UpskillingRouterTests(unittest.TestCase):
     def test_returns_502_when_keys_missing(self) -> None:
         llm = _fake_llm(generate_return=json.dumps({"outcome": "x"}))  # no search_queries
 
-        with patch("upskilling_suggestion.router.get_llm_client", return_value=llm):
+        with patch("router.upskilling_suggestion.get_llm_client", return_value=llm):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
@@ -149,7 +149,7 @@ class UpskillingRouterTests(unittest.TestCase):
             generate_return=json.dumps({"outcome": "x", "search_queries": [1, 2]})
         )
 
-        with patch("upskilling_suggestion.router.get_llm_client", return_value=llm):
+        with patch("router.upskilling_suggestion.get_llm_client", return_value=llm):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
@@ -159,8 +159,8 @@ class UpskillingRouterTests(unittest.TestCase):
         llm = _fake_llm(generate_return=_llm_output("Improve infra.", _QUERIES))
         udemy = _fake_udemy(search_side_effect=httpx.ConnectError("udemy down"))
 
-        with patch("upskilling_suggestion.router.get_llm_client", return_value=llm), patch(
-            "upskilling_suggestion.router.get_course_provider", return_value=udemy
+        with patch("router.upskilling_suggestion.get_llm_client", return_value=llm), patch(
+            "router.upskilling_suggestion.get_course_provider", return_value=udemy
         ):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
@@ -170,7 +170,7 @@ class UpskillingRouterTests(unittest.TestCase):
     def test_missing_required_headers_returns_400(self) -> None:
         llm = _fake_llm(generate_return=_llm_output("You are perfect for this role.", []))
 
-        with patch("upskilling_suggestion.router.get_llm_client", return_value=llm):
+        with patch("router.upskilling_suggestion.get_llm_client", return_value=llm):
             response = self.client.post(
                 _ENDPOINT, json=_BODY, headers={"lynq-request-uuid": "req-123"}
             )

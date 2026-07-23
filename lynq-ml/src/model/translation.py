@@ -10,7 +10,7 @@ from enum import Enum
 
 from pydantic import BaseModel
 
-from resume_extractor.models import Resume
+from model.resume_extractor import Resume
 
 
 class Language(str, Enum):

@@ -47,7 +47,7 @@ class SkillEnhanceRouterTests(unittest.TestCase):
         skills = ["Java", "Spring", "AWS", "REST", "Docker"]
         fake = _fake_client(generate_return=json.dumps({"skills": skills}))
 
-        with patch("skill_enhance.router.get_llm_client", return_value=fake):
+        with patch("router.skill_enhance.get_llm_client", return_value=fake):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 200)
@@ -59,7 +59,7 @@ class SkillEnhanceRouterTests(unittest.TestCase):
     def test_prompt_is_built_from_request_body(self) -> None:
         fake = _fake_client(generate_return=json.dumps({"skills": ["Java"]}))
 
-        with patch("skill_enhance.router.get_llm_client", return_value=fake):
+        with patch("router.skill_enhance.get_llm_client", return_value=fake):
             self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         prompt = fake.generate.await_args.args[0]
@@ -72,7 +72,7 @@ class SkillEnhanceRouterTests(unittest.TestCase):
             generate_side_effect=httpx.ConnectError("connection refused")
         )
 
-        with patch("skill_enhance.router.get_llm_client", return_value=fake):
+        with patch("router.skill_enhance.get_llm_client", return_value=fake):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
@@ -83,7 +83,7 @@ class SkillEnhanceRouterTests(unittest.TestCase):
     def test_returns_502_on_non_json_output(self) -> None:
         fake = _fake_client(generate_return="not json at all")
 
-        with patch("skill_enhance.router.get_llm_client", return_value=fake):
+        with patch("router.skill_enhance.get_llm_client", return_value=fake):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
@@ -92,7 +92,7 @@ class SkillEnhanceRouterTests(unittest.TestCase):
     def test_returns_502_when_skills_key_missing(self) -> None:
         fake = _fake_client(generate_return=json.dumps({"other": []}))
 
-        with patch("skill_enhance.router.get_llm_client", return_value=fake):
+        with patch("router.skill_enhance.get_llm_client", return_value=fake):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
@@ -101,7 +101,7 @@ class SkillEnhanceRouterTests(unittest.TestCase):
     def test_returns_502_when_skills_is_not_list_of_strings(self) -> None:
         fake = _fake_client(generate_return=json.dumps({"skills": [1, 2, 3]}))
 
-        with patch("skill_enhance.router.get_llm_client", return_value=fake):
+        with patch("router.skill_enhance.get_llm_client", return_value=fake):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
@@ -110,7 +110,7 @@ class SkillEnhanceRouterTests(unittest.TestCase):
     def test_missing_required_headers_returns_400(self) -> None:
         fake = _fake_client(generate_return=json.dumps({"skills": ["Java"]}))
 
-        with patch("skill_enhance.router.get_llm_client", return_value=fake):
+        with patch("router.skill_enhance.get_llm_client", return_value=fake):
             response = self.client.post(
                 _ENDPOINT, json=_BODY, headers={"lynq-request-uuid": "req-123"}
             )

@@ -10,8 +10,8 @@ from fastapi.concurrency import run_in_threadpool
 from file_uploader.uploader import upload_to_presigned_url
 from response import GlobalRestResponse
 
-from .models import ResumeTemplateCreationRequest
-from .renderer import render_resume_pdf
+from model.resume_template import ResumeTemplateCreationRequest
+from renderer.resume_template import render_resume_pdf
 
 log = logging.getLogger(__name__)
 

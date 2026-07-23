@@ -10,11 +10,10 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import ValidationError
 
 from llm_client import get_llm_client
-from resume_extractor.models import Resume
+from model.resume_extractor import Resume
+from model.translation import TranslateRequest
+from prompt.translation import render_translation_prompt
 from response import GlobalRestResponse
-
-from .models import TranslateRequest
-from .prompts import render_translation_prompt
 
 log = logging.getLogger(__name__)
 

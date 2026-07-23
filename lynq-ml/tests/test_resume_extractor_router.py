@@ -62,8 +62,8 @@ class ParseResumeRouterTests(unittest.TestCase):
         fake = _fake_client(generate_return=json.dumps(_RESUME_JSON))
 
         with patch(
-            "resume_extractor.router.read_resume", return_value="CV text"
-        ), patch("resume_extractor.router.get_llm_client", return_value=fake):
+            "router.resume_extractor.read_resume", return_value="CV text"
+        ), patch("router.resume_extractor.get_llm_client", return_value=fake):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 200)
@@ -82,8 +82,8 @@ class ParseResumeRouterTests(unittest.TestCase):
         fake = _fake_client(generate_return=json.dumps(_RESUME_JSON))
 
         with patch(
-            "resume_extractor.router.read_resume", return_value="MY-CV-TEXT"
-        ), patch("resume_extractor.router.get_llm_client", return_value=fake):
+            "router.resume_extractor.read_resume", return_value="MY-CV-TEXT"
+        ), patch("router.resume_extractor.get_llm_client", return_value=fake):
             self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         prompt = fake.generate.await_args.args[0]
@@ -93,9 +93,9 @@ class ParseResumeRouterTests(unittest.TestCase):
         fake = _fake_client(generate_return=json.dumps(_RESUME_JSON))
 
         with patch(
-            "resume_extractor.router.read_resume", return_value="CV text"
+            "router.resume_extractor.read_resume", return_value="CV text"
         ) as read_mock, patch(
-            "resume_extractor.router.get_llm_client", return_value=fake
+            "router.resume_extractor.get_llm_client", return_value=fake
         ):
             self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
@@ -103,7 +103,7 @@ class ParseResumeRouterTests(unittest.TestCase):
 
     def test_returns_400_on_unsupported_document(self) -> None:
         with patch(
-            "resume_extractor.router.read_resume",
+            "router.resume_extractor.read_resume",
             side_effect=ValueError("Unsupported document format; expected PDF or DOCX."),
         ):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
@@ -113,7 +113,7 @@ class ParseResumeRouterTests(unittest.TestCase):
 
     def test_returns_502_when_download_fails(self) -> None:
         with patch(
-            "resume_extractor.router.read_resume",
+            "router.resume_extractor.read_resume",
             side_effect=OSError("connection refused"),
         ):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
@@ -127,8 +127,8 @@ class ParseResumeRouterTests(unittest.TestCase):
         )
 
         with patch(
-            "resume_extractor.router.read_resume", return_value="CV text"
-        ), patch("resume_extractor.router.get_llm_client", return_value=fake):
+            "router.resume_extractor.read_resume", return_value="CV text"
+        ), patch("router.resume_extractor.get_llm_client", return_value=fake):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
@@ -138,8 +138,8 @@ class ParseResumeRouterTests(unittest.TestCase):
         fake = _fake_client(generate_return="not json at all")
 
         with patch(
-            "resume_extractor.router.read_resume", return_value="CV text"
-        ), patch("resume_extractor.router.get_llm_client", return_value=fake):
+            "router.resume_extractor.read_resume", return_value="CV text"
+        ), patch("router.resume_extractor.get_llm_client", return_value=fake):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
@@ -151,15 +151,15 @@ class ParseResumeRouterTests(unittest.TestCase):
         )
 
         with patch(
-            "resume_extractor.router.read_resume", return_value="CV text"
-        ), patch("resume_extractor.router.get_llm_client", return_value=fake):
+            "router.resume_extractor.read_resume", return_value="CV text"
+        ), patch("router.resume_extractor.get_llm_client", return_value=fake):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
 
         self.assertEqual(response.status_code, 502)
         self.assertEqual(response.json()["reason"], "LLM returned malformed output")
 
     def test_missing_required_headers_returns_400(self) -> None:
-        with patch("resume_extractor.router.read_resume", return_value="CV text"):
+        with patch("router.resume_extractor.read_resume", return_value="CV text"):
             response = self.client.post(
                 _ENDPOINT, json=_BODY, headers={"lynq-request-uuid": "req-123"}
             )

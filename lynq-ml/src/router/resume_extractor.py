@@ -14,8 +14,8 @@ from file_reader.resume_reader import read_resume
 from llm_client import get_llm_client
 from response import GlobalRestResponse
 
-from .models import ParseResumeRequest, Resume
-from .prompts import render_resume_extractor_prompt
+from model.resume_extractor import ParseResumeRequest, Resume
+from prompt.resume_extractor import render_resume_extractor_prompt
 
 log = logging.getLogger(__name__)
 
