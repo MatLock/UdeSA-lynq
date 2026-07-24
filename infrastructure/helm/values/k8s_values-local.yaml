@@ -58,16 +58,20 @@ ingress:
   host: lynq.local
   certificateArn: ""
 
-# Local frontend. No published image: it must be built with the local ingress
-# URLs baked in (Vite bakes them at build time) and loaded into the cluster:
+# Local frontend. Defaults to the image published on each release, built with the
+# local ingress URLs baked in (Vite bakes them at build time) — so `helm install`
+# brings the SPA up with no manual build. To iterate on the frontend locally,
+# build and load your own image and override this value:
 #   docker build -t lynq-app-frontend:local \
 #     --build-arg LYNQ_IAM_BASE_URL=http://lynq.local/lynq-iam \
 #     --build-arg LYNQ_BACKEND_BASE_URL=http://lynq.local/lynq-backend-app \
 #     ./lynq-app-frontend
 #   minikube image load lynq-app-frontend:local
+#   helm upgrade lynq ./infrastructure/helm -f <values> \
+#     --set lynq_app_frontend.image=lynq-app-frontend:local
 lynq_app_frontend:
   replicas: 1
-  image: lynq-app-frontend:local
+  image: matlock0o/lynq:lynq-app-frontend-1.0.5-SNAPSHOT
 
 lynq_ml:
   replicas: 1

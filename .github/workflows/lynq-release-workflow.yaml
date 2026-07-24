@@ -251,6 +251,21 @@ jobs:
           push: true
           tags: ${{ env.DOCKER_NAMESPACE }}:lynq-ml-${{ needs.set-version.outputs.version }}
 
+      - name: Build and push lynq-app-frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: lynq-app-frontend
+          file: lynq-app-frontend/Dockerfile
+          push: true
+          # Local-testing image: the SPA bakes the ingress URLs at build time, so
+          # these point at the local shared host (lynq.local), letting a new user
+          # bring the frontend up with just `helm install`. In prod the frontend
+          # is served from Cloudflare, not from this image.
+          build-args: |
+            LYNQ_IAM_BASE_URL=http://lynq.local/lynq-iam
+            LYNQ_BACKEND_BASE_URL=http://lynq.local/lynq-backend-app
+          tags: ${{ env.DOCKER_NAMESPACE }}:lynq-app-frontend-${{ needs.set-version.outputs.version }}
+
   # ===========================================================================
   # Stage 4 — Publish the JaCoCo coverage produced in stage 2 into the release
   # notes and attach the HTML reports. Runs after the images are published.
@@ -363,16 +378,55 @@ jobs:
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/coverage-lynq-ml.xml --clobber
 
   # ===========================================================================
-  # Stage 5 — Once the release is fully published, open the next development
+  # Stage 5 — Point the Helm values at the images just built and pushed in
+  # stage 3. The chart's appVersion was already stamped in stage 1, but the
+  # per-service image tags in the values files are pinned literally, so they
+  # are rewritten here to the released version and committed back to main. This
+  # includes the local frontend image (published only for local testing; the
+  # prod values carry no frontend image, so nothing matches there).
+  # ===========================================================================
+  sync-helm-images:
+    name: "5 · Sync Helm image tags to release"
+    runs-on: ubuntu-latest
+    needs: [set-version, publish-coverage]
+    permissions:
+      contents: write
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Point Helm image tags at the released version
+        env:
+          VERSION: ${{ needs.set-version.outputs.version }}
+        run: |
+          # Each published service shares the DOCKER_NAMESPACE repo and is
+          # tagged <service>-<version>. Rewrite the tag suffix of every managed
+          # image in both values files to the version pushed in stage 3.
+          for f in infrastructure/helm/values/k8s_values-local.yaml \
+                   infrastructure/helm/values/k8s_values-prod.yaml; do
+            sed -i -E "s#(image: ${DOCKER_NAMESPACE}:lynq-(iam|app-backend|app-frontend|ml)-).*#\1${VERSION}#" "$f"
+          done
+
+      - name: Commit Helm image tag bump to main
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: point Helm image tags at release ${{ needs.set-version.outputs.version }} [skip ci]"
+          file_pattern: infrastructure/helm/values/k8s_values-local.yaml infrastructure/helm/values/k8s_values-prod.yaml
+
+  # ===========================================================================
+  # Stage 6 — Once the release is fully published, open the next development
   # cycle by bumping every project's version one step higher and committing it
   # back to main. A released SNAPSHOT bumps the patch (1.0.5-SNAPSHOT ->
   # 1.0.6-SNAPSHOT); a released final version bumps the minor and resets the
   # patch (1.0.5 -> 1.1.0-SNAPSHOT).
   # ===========================================================================
   bump-next-version:
-    name: "5 · Bump to next development version"
+    name: "6 · Bump to next development version"
     runs-on: ubuntu-latest
-    needs: [set-version, publish-coverage]
+    needs: [set-version, sync-helm-images]
     permissions:
       contents: write
     steps:

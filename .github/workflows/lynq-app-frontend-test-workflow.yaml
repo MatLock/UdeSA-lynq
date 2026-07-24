@@ -1,0 +1,42 @@
+name: lynq-app-frontend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lynq-app-frontend:
+    name: "lynq-app-frontend: Lint & Build"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+
+      - name: Setup Node Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: lynq-app-frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: lynq-app-frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: lynq-app-frontend
+        run: npm run lint
+
+      - name: Build
+        working-directory: lynq-app-frontend
+        # Vite bakes these at build time; CI only needs the compile to succeed,
+        # so placeholder URLs are enough (the real values are baked when the
+        # release image is built).
+        env:
+          LYNQ_IAM_BASE_URL: http://lynq.local/lynq-iam
+          LYNQ_BACKEND_BASE_URL: http://lynq.local/lynq-backend-app
+        run: npm run build
