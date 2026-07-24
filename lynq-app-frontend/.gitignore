@@ -23,4 +23,3 @@ dist-ssr
 *.sln
 *.sw?
 CLAUDE.md
-package-lock.json
