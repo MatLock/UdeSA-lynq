@@ -8,8 +8,12 @@ reasons for and against that decision.
 Rules:
 
 - Compare the job description, candidate description, and both skill lists.
-- Respond ONLY in the SAME LANGUAGE used in the input JSON.
-- Set "recommendation" to exactly one of: "hire", "no_hire", or "maybe".
+- Write "explanation", "strengths", and "concerns" ONLY in the SAME LANGUAGE used
+  in the input JSON.
+- "recommendation" is a fixed machine value, NOT prose: set it to exactly one of
+  the literal keys "hire", "no_hire", or "maybe". Always use these exact English
+  keys — never translate them and never replace them with a human-readable label,
+  even when the rest of the response is in another language.
   - Use "hire" when the candidate is a strong fit with no critical gaps.
   - Use "no_hire" when the candidate is missing critical requirements.
   - Use "maybe" when the fit is partial and depends on trade-offs.
