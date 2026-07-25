@@ -8,7 +8,9 @@ import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
+import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
+import com.lynq.backend.controller.response.UserApplicationResponse;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.security.LynqUserPrincipal;
@@ -18,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -26,6 +29,7 @@ import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.sameInstance;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -325,6 +329,37 @@ class UserControllerImplTest {
     assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
     assertThat(body.isSuccess(), is(true));
     assertThat(body.getData().getFullName(), is(FULL_NAME));
+  }
+
+  @Test
+  void getUserApplicationsDelegatesToServiceWithPrincipalIdAndPageable() {
+    when(userService.getUserApplications(USER_ID, PageRequest.of(0, 10)))
+        .thenReturn(PagedRestResponse.<UserApplicationResponse>builder().content(List.of()).build());
+
+    userController.getUserApplications(0, 10, principal);
+
+    verify(userService).getUserApplications(USER_ID, PageRequest.of(0, 10));
+  }
+
+  @Test
+  void getUserApplicationsRespondsWithOkStatusAndWrapsServiceResult() {
+    PagedRestResponse<UserApplicationResponse> page =
+        PagedRestResponse.<UserApplicationResponse>builder()
+            .content(List.of(UserApplicationResponse.builder().id("application-1").build()))
+            .page(2)
+            .size(5)
+            .totalElements(11)
+            .build();
+    when(userService.getUserApplications(USER_ID, PageRequest.of(2, 5))).thenReturn(page);
+
+    ResponseEntity<GlobalRestResponse<PagedRestResponse<UserApplicationResponse>>> response =
+        userController.getUserApplications(2, 5, principal);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+    GlobalRestResponse<PagedRestResponse<UserApplicationResponse>> body = response.getBody();
+    assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData(), is(sameInstance(page)));
   }
 
   private UserEntity savedUser() {

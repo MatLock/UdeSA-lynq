@@ -10,11 +10,14 @@ import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
+import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
+import com.lynq.backend.controller.response.UserApplicationResponse;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.security.LynqUserPrincipal;
 import com.lynq.backend.service.UserService;
 import java.util.List;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -151,6 +154,21 @@ public class UserControllerImpl implements UserController {
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, resumes));
+  }
+
+  @Override
+  @GetMapping("/application")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<PagedRestResponse<UserApplicationResponse>>> getUserApplications(
+      @RequestParam(defaultValue = "0") Integer page,
+      @RequestParam(defaultValue = "10") Integer size,
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
+    PagedRestResponse<UserApplicationResponse> applications =
+        userService.getUserApplications(principal.getId(), PageRequest.of(page, size));
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, applications));
   }
 
   @Override

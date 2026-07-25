@@ -8,7 +8,9 @@ import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
+import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
+import com.lynq.backend.controller.response.UserApplicationResponse;
 import com.lynq.backend.security.LynqUserPrincipal;
 import java.util.List;
 import io.swagger.v3.oas.annotations.Operation;
@@ -428,6 +430,109 @@ public interface UserController {
           + "CANDIDATE can access resumes; any other type is rejected with 400.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<GlobalRestResponse<List<GetUserResumeRestResponse>>> getUserResumes(
+      @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
+      summary = "Get the authenticated candidate's job applications",
+      description = "Returns a paginated list of the jobs the authenticated candidate has applied "
+          + "to, most recent first. Each entry carries the application id, the job and its owning "
+          + "company (company fields are null for scraped jobs with no company), the date the "
+          + "application was submitted, and the candidate's LyNQ score against that job. The "
+          + "candidate identity is resolved from the bearer token, so a user only ever sees their "
+          + "own applications. Only users of type CANDIDATE can access this endpoint; any other "
+          + "type is rejected with 400.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Applications retrieved successfully",
+          content = @Content(
+              schema = @Schema(implementation = PagedRestResponse.class),
+              examples = @ExampleObject(
+                  name = "Applications",
+                  value = """
+                      {
+                        "success": true,
+                        "data": {
+                          "content": [
+                            {
+                              "id": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60",
+                              "jobId": "550e8400-e29b-41d4-a716-446655440000",
+                              "jobTitle": "Senior Backend Engineer",
+                              "companyId": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a61",
+                              "companyName": "Lynq",
+                              "companyProfileImage": "https://cdn.lynq.com/companies/lynq.png",
+                              "appliedOn": "2026-07-20",
+                              "lynqScore": 80
+                            }
+                          ],
+                          "page": 0,
+                          "size": 10,
+                          "totalElements": 1,
+                          "totalPages": 1,
+                          "hasNext": false,
+                          "hasPrevious": false
+                        }
+                      }"""))),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The authenticated user is not a candidate",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Not a candidate",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Only users of type CANDIDATE can view their applications"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "404",
+          description = "No user exists for the authenticated identity",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "User not found",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "User '550e8400-e29b-41d4-a716-446655440000' not found"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "401",
+          description = "Missing or invalid bearer token",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Unauthorized",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Invalid or expired token"
+                      }""")))
+  })
+  @Parameters({
+      @Parameter(
+          name = "lynq-request-uuid",
+          in = ParameterIn.HEADER,
+          required = true,
+          description = "Unique identifier for the request, echoed back in the response and used "
+              + "for log correlation. Requests without it are rejected with 403.",
+          example = "550e8400-e29b-41d4-a716-446655440000"),
+      @Parameter(
+          name = "page",
+          in = ParameterIn.QUERY,
+          description = "Zero-based page index to retrieve.",
+          example = "0"),
+      @Parameter(
+          name = "size",
+          in = ParameterIn.QUERY,
+          description = "Number of applications per page.",
+          example = "10")
+  })
+  ResponseEntity<GlobalRestResponse<PagedRestResponse<UserApplicationResponse>>> getUserApplications(
+      Integer page,
+      Integer size,
       @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(

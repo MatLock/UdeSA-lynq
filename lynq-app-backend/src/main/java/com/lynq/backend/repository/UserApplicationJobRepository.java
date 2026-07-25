@@ -2,6 +2,7 @@ package com.lynq.backend.repository;
 
 import com.lynq.backend.model.UserApplicationJobEntity;
 import com.lynq.backend.repository.projection.JobCandidateProjection;
+import com.lynq.backend.repository.projection.UserApplicationProjection;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,4 +39,17 @@ public interface UserApplicationJobRepository extends JpaRepository<UserApplicat
       + "ORDER BY a.appliedOn DESC",
       countQuery = "SELECT COUNT(a) FROM UserApplicationJobEntity a WHERE a.jobPost.id = :jobId")
   Page<JobCandidateProjection> findCandidatesByJobId(@Param("jobId") String jobId, Pageable pageable);
+
+  @Query(value = "SELECT new com.lynq.backend.repository.projection.UserApplicationProjection("
+      + "a.id, j.id, j.title, j.description, c.id, c.name, c.profileImageUrl, a.appliedOn, "
+      + "CAST((SELECT function('group_concat', jsk.skill) FROM JobPostSkillEntity jsk "
+      + "WHERE jsk.jobPost = j) AS string)) "
+      + "FROM UserApplicationJobEntity a "
+      + "JOIN a.jobPost j "
+      + "LEFT JOIN j.company c "
+      + "WHERE a.user.id = :userId "
+      + "ORDER BY a.appliedOn DESC",
+      countQuery = "SELECT COUNT(a) FROM UserApplicationJobEntity a WHERE a.user.id = :userId")
+  Page<UserApplicationProjection> findApplicationsByUserId(@Param("userId") String userId,
+      Pageable pageable);
 }

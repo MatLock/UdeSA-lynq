@@ -484,39 +484,7 @@ public class JobService {
   }
 
   private Integer calculateLyNQScore(List<String> jobSkillNames, List<String> userSkillNames) {
-    if (userSkillNames == null || userSkillNames.isEmpty()) {
-      return 0;
-    }
-
-    if (jobSkillNames == null || jobSkillNames.isEmpty()) {
-      return 0;
-    }
-
-    Set<String> normalizedUserSkills = userSkillNames.stream()
-        .filter(Objects::nonNull)
-        .map(skill -> skill.trim().toLowerCase())
-        .filter(skill -> !skill.isEmpty())
-        .collect(Collectors.toSet());
-
-    Set<String> normalizedJobSkills = jobSkillNames.stream()
-        .filter(Objects::nonNull)
-        .map(skill -> skill.trim().toLowerCase())
-        .filter(skill -> !skill.isEmpty())
-        .collect(Collectors.toSet());
-
-    if (normalizedUserSkills.isEmpty()) {
-      return 0;
-    }
-
-    if (normalizedJobSkills.isEmpty()) {
-      return 0;
-    }
-
-    long matches = normalizedJobSkills.stream()
-        .filter(normalizedUserSkills::contains)
-        .count();
-
-    return (int) Math.round((matches * 100.0) / normalizedJobSkills.size());
+    return LyNQScoreCalculator.score(jobSkillNames, userSkillNames);
   }
 
   private UserEntity getAuthenticatedUser() {

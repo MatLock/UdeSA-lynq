@@ -157,3 +157,5 @@ parameters:
 "19-07-2026","add unit test and integration test for new endpoint PATCH /company/${comoany_id}"
 "19-07-2026","remove validation in getCompanyDetail all the users can see the company details. I introduced a bug"
 "19-07-2026","make default pagination to 10 on all paginated endpoints"
+"24-07-2026","create endpoint GET ""/user/application"" that returns a paginated result of UserApplicationJobEntity. it should return almost the same as the application view for the job owner. This endpoint must be called only by candidate user type and as a logged user I can only see my applications"
+"24-07-2026","remove the user skills, add lynq-score calculation, add the job description as well"
