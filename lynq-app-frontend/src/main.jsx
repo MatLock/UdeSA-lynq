@@ -51,6 +51,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="/job/:jobId/details" element={<JobDetailPage />} />
             <Route path="/job/:jobId/edit" element={<EditJobPage />} />
             <Route path="/job/:jobId/candidates" element={<JobCandidatesPage />} />
+            <Route path="/user/application" element={<ApplicationsPage />} />
             <Route path="/user/:userId" element={<UserProfilePage />} />
             <Route path="/company/:companyId" element={<CompanyDetailPage />} />
             <Route path="/company/:companyId/edit" element={<CompanyEditPage />} />
@@ -58,7 +59,6 @@ createRoot(document.getElementById('root')).render(
             <Route path="/profile" element={<ProfilePage />} />
             {/* Candidate sections */}
             <Route path="/my-resume" element={<MyResumePage />} />
-            <Route path="/applications" element={<ApplicationsPage />} />
           </Route>
           {/* The register flow is an in-place carousel: a single /register route
               wraps the wizard, which slides between steps without changing URL. */}

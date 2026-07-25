@@ -1,0 +1,167 @@
+/* ApplicationCard — one of the candidate's job applications, rendered as a
+   horizontal list row. Shares the JobCard visual language (white card, soft
+   shadow, brand tokens from index.css) so the "My Applications" list reads as
+   part of the same family as the home feed. */
+
+.application-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 18px 22px;
+  text-align: left;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(80, 60, 150, 0.06);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.application-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(80, 60, 150, 0.12);
+}
+
+/* Left: company logo (or the default icon for scraped jobs with no company). */
+.application-card-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--accent-bg);
+  color: var(--brand-purple);
+}
+
+.application-card-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.application-card-logo svg {
+  width: 28px;
+  height: 28px;
+}
+
+/* Middle: company + applied-date meta, job title and description, stacked. */
+.application-card-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.application-card-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10.8px;
+  color: var(--text);
+}
+
+.application-card-company {
+  font-weight: 700;
+  color: var(--brand-purple-dark);
+  text-decoration: none;
+}
+
+a.application-card-company:hover,
+a.application-card-company:focus-visible {
+  text-decoration: underline;
+}
+
+.application-card-company.is-external {
+  color: var(--text);
+}
+
+.application-card-meta-sep {
+  color: var(--border);
+}
+
+.application-card-applied {
+  color: var(--text);
+}
+
+.application-card-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-h);
+}
+
+.application-card-description {
+  margin: 0;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  /* Clamp to at most 2 lines, appending an ellipsis when it overflows. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Trailing right-hand column: LYNQ score badge on top, "See details" action
+   below, both right-aligned. */
+.application-card-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.application-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.application-card-details {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 18px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-gradient);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.application-card-actions:hover .application-card-details {
+  opacity: 0.92;
+}
+
+.application-card-chevron {
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text);
+}
+
+@media (max-width: 640px) {
+  .application-card {
+    gap: 14px;
+    padding: 14px 16px;
+  }
+
+  .application-card-chevron {
+    display: none;
+  }
+}

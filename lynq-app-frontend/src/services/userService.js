@@ -131,6 +131,50 @@ const generate_profile_image_upload_url = async (authFetch, fileName) => {
  * @returns {Promise<void>} Resolves once S3 accepts the upload.
  * @throws {Error} On a non-OK S3 response. Carries `status`.
  */
+/**
+ * Fetch a page of the authenticated candidate's job applications, most recent
+ * first.
+ *
+ * Calls GET /user/application?page&size (UserController.getUserApplications)
+ * through `authFetch`. The candidate is resolved from the bearer token; only
+ * CANDIDATE users may call it. Each entry describes the job applied to, its
+ * owning company's public fields, the date the application was submitted, and
+ * the candidate's LyNQ score against that job. `companyId`, `companyName` and
+ * `companyProfileImage` are null for scraped jobs that have no company.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
+ * @param {object} [params]
+ * @param {number} [params.page=0] - Zero-based page index.
+ * @param {number} [params.size=10] - Page size.
+ * @returns {Promise<{
+ *   content: Array<{
+ *     id: string,
+ *     jobId: string,
+ *     jobTitle: string,
+ *     jobDescription: string,
+ *     companyId: string | null,
+ *     companyName: string | null,
+ *     companyProfileImage: string | null,
+ *     appliedOn: string,
+ *     lynqScore: number | null,
+ *   }>,
+ *   page: number,
+ *   size: number,
+ *   totalElements: number,
+ *   totalPages: number,
+ *   hasNext: boolean,
+ *   hasPrevious: boolean,
+ * }>} The unwrapped PagedRestResponse of UserApplicationResponse.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const get_user_applications = async (authFetch, { page = 0, size = 10 } = {}) => {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  const payload = await authFetch(`/user/application?${query}`, { method: 'GET' });
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
+  return payload?.data;
+};
+
 const upload_profile_image = async (preSignedUrl, file) => {
   const response = await fetch(preSignedUrl, {
     method: 'PUT',
@@ -151,6 +195,7 @@ export default {
   get_user,
   get_user_profile,
   update_user_profile,
+  get_user_applications,
   generate_profile_image_upload_url,
   upload_profile_image,
 };

@@ -279,7 +279,16 @@ const en = {
     },
     applications: {
       title: 'My Applications',
-      subtitle: 'Your applications — coming soon',
+      subtitle: 'The jobs you have applied to, most recent first.',
+      loading: 'Loading your applications…',
+      error: 'We could not load your applications. Please try again.',
+      empty: 'You have not applied to any jobs yet.',
+      emptyCta: 'Browse jobs',
+      count: '{count} applications',
+      appliedOn: 'Applied',
+      lynqScore: 'LYNQ-SCORE',
+      seeDetails: 'See details',
+      externalCompany: 'External company',
     },
     company: {
       title: 'My Company',

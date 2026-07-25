@@ -279,7 +279,16 @@ const es = {
     },
     applications: {
       title: 'Mis Postulaciones',
-      subtitle: 'Tus postulaciones — próximamente',
+      subtitle: 'Los empleos a los que te postulaste, del más reciente al más antiguo.',
+      loading: 'Cargando tus postulaciones…',
+      error: 'No pudimos cargar tus postulaciones. Intentá de nuevo.',
+      empty: 'Todavía no te postulaste a ningún empleo.',
+      emptyCta: 'Explorar empleos',
+      count: '{count} postulaciones',
+      appliedOn: 'Te postulaste',
+      lynqScore: 'LYNQ-SCORE',
+      seeDetails: 'Ver detalle',
+      externalCompany: 'Empresa externa',
     },
     company: {
       title: 'Mi empresa',
