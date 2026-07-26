@@ -254,9 +254,10 @@ public class JobControllerImpl implements JobController {
   @AuditLog
   public ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> suggestUpskilling(
       @PathVariable String jobId,
-      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid) {
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestParam(defaultValue = "en") String language) {
     UpskillingSuggestionResponse response =
-        jobService.suggestUpskilling(jobId, requestUuid);
+        jobService.suggestUpskilling(jobId, requestUuid, language);
 
     return ResponseEntity
         .status(HttpStatus.OK)

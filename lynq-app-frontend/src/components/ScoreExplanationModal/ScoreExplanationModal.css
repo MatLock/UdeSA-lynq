@@ -1,0 +1,178 @@
+/* ScoreExplanationModal — a closable overlay modal for the AI LYNQ-score
+   explanation and its recommended courses. Portals to <body>; mirrors the
+   CandidateEvaluationModal visual language; brand tokens from index.css. */
+
+.score-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(16, 24, 40, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.score-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 540px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 24px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(16, 24, 40, 0.24);
+}
+
+.score-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.score-modal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--brand-purple-dark);
+}
+
+.score-modal-close {
+  margin-left: auto;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.score-modal-close:hover {
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.score-modal-subject {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.score-modal-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+.score-modal-error {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--score-red);
+  text-align: center;
+}
+
+.score-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.score-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.score-modal-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--brand-purple-dark);
+}
+
+.score-modal-explanation {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-h);
+  white-space: pre-line;
+}
+
+/* The concrete reasons the candidate isn't a perfect match, one per bullet. */
+.score-modal-reasons {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-h);
+}
+
+/* One skill gap (the ml query) and its course links. */
+.score-modal-suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+}
+
+.score-modal-query {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.score-modal-courses {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-h);
+}
+
+.score-modal-course-link {
+  color: var(--brand-blue-dark);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.score-modal-course-link:hover,
+.score-modal-course-link:focus-visible {
+  text-decoration: underline;
+  color: var(--brand-purple-dark);
+}
+
+.score-modal-empty {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}

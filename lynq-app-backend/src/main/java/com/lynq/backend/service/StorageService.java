@@ -20,6 +20,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 public class StorageService {
 
   private static final String USER_PROFILE_PATH_FORMAT = "lynq/users/%s/profile/%s";
+  private static final String USER_RESUME_PATH_FORMAT = "lynq/user/%s/resume/%s";
   private static final String COMPANY_PROFILE_PATH_FORMAT = "lynq/companies/%s/profile/%s";
   private static final Duration PRE_SIGNED_URL_EXPIRATION = Duration.ofMinutes(15);
 
@@ -35,28 +36,20 @@ public class StorageService {
 
   @AuditLog
   public PreSignedUploadUrl createUserProfilePreSignedUrl(UserEntity userEntity, String fileName) {
-    return createProfilePreSignedUrl(
+    return createPreSignedUrl(
         String.format(USER_PROFILE_PATH_FORMAT, userEntity.getId(), fileName));
   }
 
   @AuditLog
   public PreSignedUploadUrl createCompanyProfilePreSignedUrl(CompanyEntity companyEntity, String fileName) {
-    return createProfilePreSignedUrl(
+    return createPreSignedUrl(
         String.format(COMPANY_PROFILE_PATH_FORMAT, companyEntity.getId(), fileName));
   }
 
-  private PreSignedUploadUrl createProfilePreSignedUrl(String s3Path) {
-    PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-        .bucket(bucketName)
-        .key(s3Path)
-        .build();
-    PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
-        .signatureDuration(PRE_SIGNED_URL_EXPIRATION)
-        .putObjectRequest(putObjectRequest)
-        .build();
-    PresignedPutObjectRequest presignedRequest = s3Presigner.presignPutObject(presignRequest);
-
-    return new PreSignedUploadUrl(s3Path, presignedRequest.url().toString());
+  @AuditLog
+  public PreSignedUploadUrl createUserResumePreSignedUrl(UserEntity userEntity, String fileName) {
+    return createPreSignedUrl(
+        String.format(USER_RESUME_PATH_FORMAT, userEntity.getId(), fileName));
   }
 
   @AuditLog
@@ -88,6 +81,20 @@ public class StorageService {
         .build();
 
     s3Client.deleteObject(deleteObjectRequest);
+  }
+
+  private PreSignedUploadUrl createPreSignedUrl(String s3Path) {
+    PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+        .bucket(bucketName)
+        .key(s3Path)
+        .build();
+    PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+        .signatureDuration(PRE_SIGNED_URL_EXPIRATION)
+        .putObjectRequest(putObjectRequest)
+        .build();
+    PresignedPutObjectRequest presignedRequest = s3Presigner.presignPutObject(presignRequest);
+
+    return new PreSignedUploadUrl(s3Path, presignedRequest.url().toString());
   }
 
 }

@@ -157,3 +157,8 @@ parameters:
 "19-07-2026","add unit test and integration test for new endpoint PATCH /company/${comoany_id}"
 "19-07-2026","remove validation in getCompanyDetail all the users can see the company details. I introduced a bug"
 "19-07-2026","make default pagination to 10 on all paginated endpoints"
+"24-07-2026","create endpoint GET ""/user/application"" that returns a paginated result of UserApplicationJobEntity. it should return almost the same as the application view for the job owner. This endpoint must be called only by candidate user type and as a logged user I can only see my applications"
+"24-07-2026","remove the user skills, add lynq-score calculation, add the job description as well"
+"26-07-2026","create new endpoint in UserController. GET ""/user/generate-upload-resume"" that given a fileName passed as a request parameter it generates an upload pre-signed url. This can only happen to user of type CANDIDATE"
+"26-07-2026","create endpoint in UserController GET ""/user/upskilling-suggestion/${job_post_id}"" that will get the jobPost application id, the userid from the auth context and will call ML endpoint /ml/upskilling-suggestion"
+"26-07-2026","instead of showing ""You are not perfect for this role"" I would like to show reasons of why. modify backend and ml endpoint if you need it""26-07-2026","commit the work done here. commit must start with preffix [lynq-app-backend]: . do not record this promtp and do not mention claude"
