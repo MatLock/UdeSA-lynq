@@ -175,6 +175,44 @@ const get_user_applications = async (authFetch, { page = 0, size = 10 } = {}) =>
   return payload?.data;
 };
 
+/**
+ * Fetch the AI score explanation and course recommendations for one of the
+ * authenticated candidate's applications.
+ *
+ * Calls GET /user/upskilling-suggestion/{jobPostId}
+ * (UserController.suggestUpskilling) through `authFetch`. The backend asks
+ * lynq-ml to explain the candidate's LYNQ score against that job and, when the
+ * candidate isn't a perfect match, to suggest courses that close each skill gap.
+ * The correlation-id header the endpoint requires is added by authFetch, so we
+ * only pass the job id. Candidate-resolved from the bearer token.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
+ * @param {string} jobPostId - The applied-to job's id (application.jobId).
+ * @param {string} [language] - The caller's UI language code (e.g. `es`),
+ *   forwarded so lynq-ml writes the explanation and reasons in it. Defaults to
+ *   English at the backend when omitted.
+ * @returns {Promise<{
+ *   outcome: string,
+ *   reasons: string[],
+ *   suggestions: Array<{
+ *     query: string,
+ *     courses: Array<{ title: string, url: string }>,
+ *   }>,
+ * }>} The unwrapped UpskillingSuggestionResponse. `reasons` lists the concrete
+ *   gaps behind the score. Both `reasons` and `suggestions` are empty when the
+ *   candidate is a perfect match (then `outcome` carries the match message).
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const get_upskilling_suggestion = async (authFetch, jobPostId, language) => {
+  const query = language ? `?${new URLSearchParams({ language })}` : '';
+  const payload = await authFetch(`/user/upskilling-suggestion/${jobPostId}${query}`, {
+    method: 'GET',
+  });
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
+  return payload?.data;
+};
+
 const upload_profile_image = async (preSignedUrl, file) => {
   const response = await fetch(preSignedUrl, {
     method: 'PUT',
@@ -196,6 +234,7 @@ export default {
   get_user_profile,
   update_user_profile,
   get_user_applications,
+  get_upskilling_suggestion,
   generate_profile_image_upload_url,
   upload_profile_image,
 };

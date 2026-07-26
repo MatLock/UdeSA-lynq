@@ -1,4 +1,5 @@
 import { Chip } from '@mui/material'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import { Link } from 'react-router-dom'
 import strings from '../../i18n'
 import CompanyIcon from '../CompanyIcon/CompanyIcon.jsx'
@@ -37,7 +38,7 @@ const scoreColorVar = (score) => {
 const truncate = (text, max) =>
   text && text.length > max ? `${text.slice(0, max).trimEnd()}…` : text ?? ''
 
-const ApplicationCard = ({ application }) => {
+const ApplicationCard = ({ application, onExplain, explainDisabled }) => {
   const t = strings.pages.applications
   const hasScore = application.lynqScore != null
   const appliedAt = formatRelativeDate(application.appliedOn)
@@ -99,16 +100,31 @@ const ApplicationCard = ({ application }) => {
             }}
           />
         )}
-        <Link
-          to={`/job/${application.jobId}/details`}
-          className="application-card-actions"
-          aria-label={`${t.seeDetails} — ${application.jobTitle}`}
-        >
-          <span className="application-card-details">{t.seeDetails}</span>
-          <span className="application-card-chevron" aria-hidden="true">
-            ›
-          </span>
-        </Link>
+        <div className="application-card-buttons">
+          <button
+            type="button"
+            className="application-card-explain"
+            onClick={() => onExplain?.(application)}
+            disabled={explainDisabled}
+            aria-haspopup="dialog"
+            aria-label={`${t.lynqScoreExplanation} — ${application.jobTitle}`}
+          >
+            <AutoAwesomeIcon className="application-card-explain-icon" />
+            <span>{t.lynqScoreExplanation}</span>
+          </button>
+
+          <Link
+            to={`/job/${application.jobId}/details`}
+            state={{ alreadyApplied: true }}
+            className="application-card-actions"
+            aria-label={`${t.seeDetails} — ${application.jobTitle}`}
+          >
+            <span className="application-card-details">{t.seeDetails}</span>
+            <span className="application-card-chevron" aria-hidden="true">
+              ›
+            </span>
+          </Link>
+        </div>
       </div>
     </article>
   )

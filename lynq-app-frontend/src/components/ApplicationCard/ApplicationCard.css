@@ -122,12 +122,55 @@ a.application-card-company:focus-visible {
   flex-shrink: 0;
 }
 
+/* Row holding the two trailing actions: the Lynq-score explanation button and
+   the "See details" link, side by side. */
+.application-card-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .application-card-actions {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
   text-decoration: none;
+}
+
+/* Secondary action: an outlined, brand-tinted button (kept visually lighter
+   than the gradient "See details" so the primary action still leads). */
+.application-card-explain {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--brand-purple-dark);
+  background: color-mix(in srgb, var(--brand-purple) 8%, #fff);
+  border: 1px solid color-mix(in srgb, var(--brand-purple) 35%, transparent);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.application-card-explain:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand-purple) 14%, #fff);
+  border-color: var(--brand-purple);
+}
+
+.application-card-explain:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.application-card-explain-icon {
+  font-size: 16px !important;
+  color: var(--brand-blue);
 }
 
 .application-card-details {
@@ -163,5 +206,10 @@ a.application-card-company:focus-visible {
 
   .application-card-chevron {
     display: none;
+  }
+
+  .application-card-buttons {
+    flex-wrap: wrap;
+    justify-content: flex-end;
   }
 }

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import strings from '../../i18n'
+import strings, { activeLocale } from '../../i18n'
 import useApi from '../../hooks/useApi'
 import useAuth from '../../hooks/useAuth'
 import userService from '../../services/userService'
 import ApplicationCard from '../../components/ApplicationCard/ApplicationCard.jsx'
+import ScoreExplanationModal from '../../components/ScoreExplanationModal/ScoreExplanationModal.jsx'
 import Pagination from '../../components/Pagination/Pagination.jsx'
 import Spinner from '../../components/Spinner/Spinner.jsx'
 import './ApplicationsPage.css'
@@ -27,6 +28,14 @@ const ApplicationsPage = () => {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+
+  // Score-explanation modal state: the application currently being explained
+  // (drives the modal + disables the buttons while a request is in flight), the
+  // fetched suggestion result, and its own loading/error flags.
+  const [explaining, setExplaining] = useState(null)
+  const [explanationResult, setExplanationResult] = useState(null)
+  const [explanationLoading, setExplanationLoading] = useState(false)
+  const [explanationError, setExplanationError] = useState(false)
 
   // Refetch on page change. A cancel flag drops the result of a superseded
   // request so a slow earlier fetch can't overwrite a newer one.
@@ -53,6 +62,35 @@ const ApplicationsPage = () => {
       cancelled = true
     }
   }, [authFetch, page])
+
+  // Open the score-explanation modal for one application and fetch its AI
+  // explanation + recommended courses. The modal opens immediately in a loading
+  // state; the result (or error) fills in when the request settles.
+  const handleExplain = async (application) => {
+    if (explanationLoading) return
+    setExplaining(application)
+    setExplanationResult(null)
+    setExplanationError(false)
+    setExplanationLoading(true)
+    try {
+      const result = await userService.get_upskilling_suggestion(
+        authFetch,
+        application.jobId,
+        activeLocale,
+      )
+      setExplanationResult(result)
+    } catch {
+      setExplanationError(true)
+    } finally {
+      setExplanationLoading(false)
+    }
+  }
+
+  const handleCloseExplanation = () => {
+    setExplaining(null)
+    setExplanationResult(null)
+    setExplanationError(false)
+  }
 
   // Candidate-only page: send company users back to the feed.
   if (user && user.userType === 'COMPANY') {
@@ -94,7 +132,12 @@ const ApplicationsPage = () => {
         ) : (
           <div className="applications-list">
             {applications.map((application) => (
-              <ApplicationCard key={application.id} application={application} />
+              <ApplicationCard
+                key={application.id}
+                application={application}
+                onExplain={handleExplain}
+                explainDisabled={explanationLoading}
+              />
             ))}
           </div>
         )}
@@ -110,6 +153,16 @@ const ApplicationsPage = () => {
             onPageChange={setPage}
           />
         </footer>
+      )}
+
+      {explaining && (
+        <ScoreExplanationModal
+          jobTitle={explaining.jobTitle}
+          result={explanationResult}
+          loading={explanationLoading}
+          error={explanationError}
+          onClose={handleCloseExplanation}
+        />
       )}
     </div>
   )
