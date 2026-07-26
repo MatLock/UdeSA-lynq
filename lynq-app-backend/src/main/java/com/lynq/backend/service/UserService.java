@@ -39,6 +39,8 @@ public class UserService {
       "Only users of type CANDIDATE can access resumes";
   private static final String ONLY_CANDIDATE_USERS_CAN_VIEW_APPLICATIONS =
       "Only users of type CANDIDATE can view their applications";
+  private static final String ONLY_CANDIDATE_USERS_CAN_UPLOAD_RESUMES =
+      "Only users of type CANDIDATE can upload resumes";
   private static final String RESUME_NOT_VALID_JSON = "Stored resume is not valid JSON";
 
   private final UserRepository userRepository;
@@ -194,6 +196,19 @@ public class UserService {
     }
 
     return preSignedUploadUrl.url();
+  }
+
+  @AuditLog
+  @Transactional(readOnly = true)
+  public String generateResumeUploadUrl(String userId, String fileName) {
+    UserEntity user = userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
+
+    if (user.getType() != UserType.CANDIDATE) {
+      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_UPLOAD_RESUMES);
+    }
+
+    return storageService.createUserResumePreSignedUrl(user, fileName).url();
   }
 
   @AuditLog

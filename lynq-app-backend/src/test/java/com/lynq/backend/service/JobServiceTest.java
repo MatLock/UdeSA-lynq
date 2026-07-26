@@ -160,6 +160,7 @@ class JobServiceTest {
       "Only users of type CANDIDATE can request upskilling suggestions";
 
   private static final String REQUEST_UUID = "11111111-1111-1111-1111-111111111111";
+  private static final String OUTPUT_LANGUAGE = "en";
   private static final String CANDIDATE_ABOUT = "Backend engineer with 5 years of experience.";
   private static final String CANDIDATE_RECOMMENDATION = "maybe";
   private static final String CANDIDATE_EXPLANATION_TEXT =
@@ -1234,15 +1235,16 @@ class JobServiceTest {
     stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA, SKILL_SPRING)));
     JobPostEntity job = jobWithCompany(List.of(SKILL_JAVA, SKILL_SPRING, SKILL_POSTGRES));
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
-    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(COMPANY_ID)))
+    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(COMPANY_ID),
+        eq(OUTPUT_LANGUAGE)))
         .thenReturn(new GlobalRestResponse<>(true, upskillingResponse()));
     ArgumentCaptor<CandidateEvaluationRequest> requestCaptor =
         ArgumentCaptor.forClass(CandidateEvaluationRequest.class);
 
-    jobService.suggestUpskilling(JOB_ID, REQUEST_UUID);
+    jobService.suggestUpskilling(JOB_ID, REQUEST_UUID, OUTPUT_LANGUAGE);
 
     verify(lynqMLClient).upskillingSuggestion(requestCaptor.capture(), eq(REQUEST_UUID),
-        eq(USER_ID), eq(COMPANY_ID));
+        eq(USER_ID), eq(COMPANY_ID), eq(OUTPUT_LANGUAGE));
     CandidateEvaluationRequest forwarded = requestCaptor.getValue();
     assertThat(forwarded.getJob().getSkills(), contains(SKILL_JAVA, SKILL_SPRING, SKILL_POSTGRES));
     assertThat(forwarded.getJob().getDescription(), is(TITLE + "\n\n" + DESCRIPTION));
@@ -1257,10 +1259,12 @@ class JobServiceTest {
     when(jobPostRepository.findById(JOB_ID))
         .thenReturn(Optional.of(jobWithCompany(List.of(SKILL_JAVA, SKILL_SPRING))));
     UpskillingSuggestionResponse mlResponse = upskillingResponse();
-    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(COMPANY_ID)))
+    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(COMPANY_ID),
+        eq(OUTPUT_LANGUAGE)))
         .thenReturn(new GlobalRestResponse<>(true, mlResponse));
 
-    UpskillingSuggestionResponse result = jobService.suggestUpskilling(JOB_ID, REQUEST_UUID);
+    UpskillingSuggestionResponse result =
+        jobService.suggestUpskilling(JOB_ID, REQUEST_UUID, OUTPUT_LANGUAGE);
 
     assertThat(result, is(sameInstance(mlResponse)));
   }
@@ -1270,12 +1274,14 @@ class JobServiceTest {
     stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA)));
     JobPostEntity job = ownedJob(companyUser(), List.of(SKILL_JAVA)); // no company set
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
-    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq("")))
+    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(""),
+        eq(OUTPUT_LANGUAGE)))
         .thenReturn(new GlobalRestResponse<>(true, upskillingResponse()));
 
-    jobService.suggestUpskilling(JOB_ID, REQUEST_UUID);
+    jobService.suggestUpskilling(JOB_ID, REQUEST_UUID, OUTPUT_LANGUAGE);
 
-    verify(lynqMLClient).upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(""));
+    verify(lynqMLClient).upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(""),
+        eq(OUTPUT_LANGUAGE));
   }
 
   @Test
@@ -1283,9 +1289,9 @@ class JobServiceTest {
     stubAuthenticatedUser(companyUser());
 
     BadRequestException exception = assertThrows(BadRequestException.class,
-        () -> jobService.suggestUpskilling(JOB_ID, REQUEST_UUID));
+        () -> jobService.suggestUpskilling(JOB_ID, REQUEST_UUID, OUTPUT_LANGUAGE));
     assertThat(exception.getMessage(), is(ONLY_CANDIDATE_USERS_CAN_GET_UPSKILLING));
-    verify(lynqMLClient, never()).upskillingSuggestion(any(), any(), any(), any());
+    verify(lynqMLClient, never()).upskillingSuggestion(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -1294,9 +1300,9 @@ class JobServiceTest {
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.empty());
 
     NotFoundException exception = assertThrows(NotFoundException.class,
-        () -> jobService.suggestUpskilling(JOB_ID, REQUEST_UUID));
+        () -> jobService.suggestUpskilling(JOB_ID, REQUEST_UUID, OUTPUT_LANGUAGE));
     assertThat(exception.getMessage(), is(JOB_POST_NOT_FOUND));
-    verify(lynqMLClient, never()).upskillingSuggestion(any(), any(), any(), any());
+    verify(lynqMLClient, never()).upskillingSuggestion(any(), any(), any(), any(), any());
   }
 
   private UserEntity authenticatedCandidate(List<String> skillNames) {
@@ -1329,6 +1335,7 @@ class JobServiceTest {
         .build();
     return UpskillingSuggestionResponse.builder()
         .outcome("The candidate should strengthen container orchestration.")
+        .reasons(List.of("No hands-on Kubernetes experience for the required infra work."))
         .suggestions(List.of(suggestion))
         .build();
   }

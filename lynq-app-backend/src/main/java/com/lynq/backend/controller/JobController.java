@@ -154,6 +154,7 @@ public interface JobController {
       security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> suggestUpskilling(
       String jobId,
-      String requestUuid);
+      String requestUuid,
+      String language);
 
 }

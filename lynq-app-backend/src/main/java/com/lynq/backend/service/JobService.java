@@ -307,7 +307,8 @@ public class JobService {
 
   @AuditLog
   @Transactional(readOnly = true)
-  public UpskillingSuggestionResponse suggestUpskilling(String jobId, String requestUuid) {
+  public UpskillingSuggestionResponse suggestUpskilling(String jobId, String requestUuid,
+      String outputLanguage) {
     // The upskilling suggestion is for the authenticated candidate against the
     // job. No job-post ownership check — any CANDIDATE may ask how they would
     // need to upskill for a job. Both are read straight from the DB.
@@ -324,8 +325,10 @@ public class JobService {
     // fall back to an empty value rather than omitting the required header.
     String companyId = job.getCompany() != null ? job.getCompany().getId() : "";
 
+    // The candidate's UI language, forwarded so lynq-ml writes the explanation
+    // and reasons in it (defaults to English at the ML layer if blank).
     GlobalRestResponse<UpskillingSuggestionResponse> response = lynqMLClient.upskillingSuggestion(
-        toEvaluationRequest(job, user), requestUuid, user.getId(), companyId);
+        toEvaluationRequest(job, user), requestUuid, user.getId(), companyId, outputLanguage);
 
     return response.getData();
   }

@@ -4,6 +4,7 @@ import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
+import com.lynq.backend.controller.response.GenerateUploadResumeRestResponse;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
@@ -13,7 +14,9 @@ import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
 import com.lynq.backend.controller.response.UserApplicationResponse;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.model.UserEntity;
+import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.security.LynqUserPrincipal;
+import com.lynq.backend.service.JobService;
 import com.lynq.backend.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,8 +57,14 @@ class UserControllerImplTest {
   private static final String RESUME_NAME = "Jane Doe - Backend";
   private static final String COMPANY_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
 
+  private static final String JOB_POST_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a99";
+  private static final String REQUEST_UUID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
+
   @Mock
   private UserService userService;
+
+  @Mock
+  private JobService jobService;
 
   @Mock
   private CreateUserRequest request;
@@ -70,7 +79,7 @@ class UserControllerImplTest {
 
   @BeforeEach
   void setUp() {
-    userController = new UserControllerImpl(userService);
+    userController = new UserControllerImpl(userService, jobService);
     lenient().when(principal.getId()).thenReturn(USER_ID);
   }
 
@@ -252,6 +261,54 @@ class UserControllerImplTest {
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     GlobalRestResponse<GenerateUploadImageRestResponse> body = response.getBody();
+    assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData().getPreSignedUrl(), is(PRE_SIGNED_URL));
+  }
+
+  @Test
+  void suggestUpskillingDelegatesToJobServiceWithJobPostIdAndRequestUuid() {
+    when(jobService.suggestUpskilling(JOB_POST_ID, REQUEST_UUID, "es"))
+        .thenReturn(new UpskillingSuggestionResponse());
+
+    userController.suggestUpskilling(JOB_POST_ID, REQUEST_UUID, "es");
+
+    verify(jobService).suggestUpskilling(JOB_POST_ID, REQUEST_UUID, "es");
+  }
+
+  @Test
+  void suggestUpskillingRespondsWithOkStatusAndSuggestion() {
+    UpskillingSuggestionResponse suggestion = new UpskillingSuggestionResponse();
+    when(jobService.suggestUpskilling(JOB_POST_ID, REQUEST_UUID, "en")).thenReturn(suggestion);
+
+    ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> response =
+        userController.suggestUpskilling(JOB_POST_ID, REQUEST_UUID, "en");
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+    GlobalRestResponse<UpskillingSuggestionResponse> body = response.getBody();
+    assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData(), is(sameInstance(suggestion)));
+  }
+
+  @Test
+  void generateUploadResumeUrlDelegatesToServiceWithPrincipalIdAndFileName() {
+    when(userService.generateResumeUploadUrl(USER_ID, FILE_NAME)).thenReturn(PRE_SIGNED_URL);
+
+    userController.generateUploadResumeUrl(FILE_NAME, principal);
+
+    verify(userService).generateResumeUploadUrl(USER_ID, FILE_NAME);
+  }
+
+  @Test
+  void generateUploadResumeUrlRespondsWithOkStatusAndPreSignedUrl() {
+    when(userService.generateResumeUploadUrl(USER_ID, FILE_NAME)).thenReturn(PRE_SIGNED_URL);
+
+    ResponseEntity<GlobalRestResponse<GenerateUploadResumeRestResponse>> response =
+        userController.generateUploadResumeUrl(FILE_NAME, principal);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+    GlobalRestResponse<GenerateUploadResumeRestResponse> body = response.getBody();
     assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
     assertThat(body.isSuccess(), is(true));
     assertThat(body.getData().getPreSignedUrl(), is(PRE_SIGNED_URL));

@@ -1,11 +1,13 @@
 package com.lynq.backend.controller.impl;
 
 import com.lynq.backend.aspect.AuditLog;
+import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.controller.UserController;
 import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
+import com.lynq.backend.controller.response.GenerateUploadResumeRestResponse;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
@@ -15,6 +17,7 @@ import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
 import com.lynq.backend.controller.response.UserApplicationResponse;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.security.LynqUserPrincipal;
+import com.lynq.backend.service.JobService;
 import com.lynq.backend.service.UserService;
 import java.util.List;
 import org.springframework.data.domain.PageRequest;
@@ -27,6 +30,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,10 +41,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserControllerImpl implements UserController {
 
 
-  private final UserService userService;
+  private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
 
-  public UserControllerImpl(UserService userService){
+  private final UserService userService;
+  private final JobService jobService;
+
+  public UserControllerImpl(UserService userService, JobService jobService){
     this.userService = userService;
+    this.jobService = jobService;
   }
 
   @Override
@@ -145,6 +153,22 @@ public class UserControllerImpl implements UserController {
   }
 
   @Override
+  @GetMapping("/generate-upload-resume")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<GenerateUploadResumeRestResponse>> generateUploadResumeUrl(
+      @RequestParam("file-name") String fileName, @AuthenticationPrincipal LynqUserPrincipal principal) {
+    String preSignedUrl = userService.generateResumeUploadUrl(principal.getId(), fileName);
+
+    GenerateUploadResumeRestResponse response = GenerateUploadResumeRestResponse.builder()
+        .preSignedUrl(preSignedUrl)
+        .build();
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, response));
+  }
+
+  @Override
   @GetMapping("/resume")
   @AuditLog
   public ResponseEntity<GlobalRestResponse<List<GetUserResumeRestResponse>>> getUserResumes(
@@ -169,6 +193,21 @@ public class UserControllerImpl implements UserController {
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, applications));
+  }
+
+  @Override
+  @GetMapping("/upskilling-suggestion/{jobPostId}")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> suggestUpskilling(
+      @PathVariable String jobPostId,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestParam(defaultValue = "en") String language) {
+    UpskillingSuggestionResponse response =
+        jobService.suggestUpskilling(jobPostId, requestUuid, language);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, response));
   }
 
   @Override

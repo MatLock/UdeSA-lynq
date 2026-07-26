@@ -339,6 +339,39 @@ class UserServiceTest {
   }
 
   @Test
+  void generateResumeUploadUrlReturnsPreSignedUrlForCandidate() {
+    UserEntity existing = existingUser();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+    when(storageService.createUserResumePreSignedUrl(existing, FILE_NAME))
+        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+
+    String result = userService.generateResumeUploadUrl(USER_ID, FILE_NAME);
+
+    assertThat(result, is(PRE_SIGNED_URL));
+  }
+
+  @Test
+  void generateResumeUploadUrlThrowsBadRequestWhenUserIsNotCandidate() {
+    UserEntity company = UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(company));
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> userService.generateResumeUploadUrl(USER_ID, FILE_NAME));
+    assertThat(exception.getMessage(), is("Only users of type CANDIDATE can upload resumes"));
+    verify(storageService, never()).createUserResumePreSignedUrl(any(), any());
+  }
+
+  @Test
+  void generateResumeUploadUrlThrowsNotFoundWhenUserDoesNotExist() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> userService.generateResumeUploadUrl(USER_ID, FILE_NAME));
+    assertThat(exception.getMessage(), is(USER_NOT_FOUND));
+    verify(storageService, never()).createUserResumePreSignedUrl(any(), any());
+  }
+
+  @Test
   void getUserResumesMapsEntitiesWithParsedJsonAndPresignedPdfUrl() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
     when(userResumeRepository.findByUserId(USER_ID))

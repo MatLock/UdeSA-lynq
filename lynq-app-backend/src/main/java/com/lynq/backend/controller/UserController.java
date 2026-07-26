@@ -1,9 +1,11 @@
 package com.lynq.backend.controller;
 
+import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
+import com.lynq.backend.controller.response.GenerateUploadResumeRestResponse;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
@@ -423,6 +425,108 @@ public interface UserController {
       @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
+      summary = "Generate a pre-signed URL to upload the authenticated candidate's resume",
+      description = "Builds the S3 path for the given file name and returns a short-lived pre-signed "
+          + "URL. The frontend uploads the resume binary directly to S3 with an HTTP PUT against "
+          + "the returned URL. Only users of type CANDIDATE can upload resumes; any other type is "
+          + "rejected with 400.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Pre-signed upload URL generated successfully",
+          content = @Content(
+              schema = @Schema(implementation = GenerateUploadResumeRestResponse.class),
+              examples = @ExampleObject(
+                  name = "Pre-signed URL",
+                  value = """
+                      {
+                        "success": true,
+                        "data": {
+                          "preSignedUrl": "https://lynq-bucket.s3.amazonaws.com/lynq/user/550e8400-e29b-41d4-a716-446655440000/resume/resume.pdf?X-Amz-Signature=..."
+                        }
+                      }"""))),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The authenticated user is not a candidate",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Not a candidate",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Only users of type CANDIDATE can upload resumes"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "404",
+          description = "No user exists for the authenticated identity",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "User not found",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "User '550e8400-e29b-41d4-a716-446655440000' not found"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "403",
+          description = "Missing required lynq-request-uuid header",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Missing header",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Missing required header"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "401",
+          description = "Missing or invalid bearer token",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Unauthorized",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Invalid or expired token"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "500",
+          description = "Unexpected server error",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Server error",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Unexpected error"
+                      }""")))
+  })
+  @Parameters({
+      @Parameter(
+          name = "lynq-request-uuid",
+          in = ParameterIn.HEADER,
+          required = true,
+          description = "Unique identifier for the request, echoed back in the response and used "
+              + "for log correlation. Requests without it are rejected with 403.",
+          example = "550e8400-e29b-41d4-a716-446655440000"),
+      @Parameter(
+          name = "file-name",
+          in = ParameterIn.QUERY,
+          required = true,
+          description = "Name of the resume file to upload. Used to build the S3 object key.",
+          example = "resume.pdf")
+  })
+  ResponseEntity<GlobalRestResponse<GenerateUploadResumeRestResponse>> generateUploadResumeUrl(
+      String fileName,
+      @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
       summary = "Get the authenticated user's resumes",
       description = "Returns every resume of the authenticated user in both formats: the structured "
           + "JSON content and a short-lived public link to the PDF stored in S3. The user identity "
@@ -534,6 +638,92 @@ public interface UserController {
       Integer page,
       Integer size,
       @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
+      summary = "Suggest upskilling courses for the authenticated candidate against a job post",
+      description = "Returns an AI upskilling recommendation (a verdict plus course suggestions) "
+          + "for the authenticated user against the job post identified by 'jobPostId'. The user "
+          + "and job information is read from the database and forwarded to the lynq-ml service. "
+          + "Only CANDIDATE-type users may call it; the caller identity is resolved from the bearer "
+          + "token. Fails with 400 when the caller is not a CANDIDATE and 404 when the job post "
+          + "does not exist.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Upskilling suggestion generated successfully",
+          content = @Content(
+              schema = @Schema(implementation = UpskillingSuggestionResponse.class),
+              examples = @ExampleObject(
+                  name = "Suggestion",
+                  value = """
+                      {
+                        "success": true,
+                        "data": {
+                          "outcome": "The candidate is missing Kubernetes and Kafka experience.",
+                          "suggestions": [
+                            {
+                              "query": "kubernetes for backend engineers",
+                              "courses": [
+                                {
+                                  "title": "Kubernetes Fundamentals",
+                                  "url": "https://courses.lynq.com/k8s-fundamentals"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }"""))),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The authenticated user is not a candidate",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Not a candidate",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Only users of type CANDIDATE can request upskilling suggestions"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "404",
+          description = "No job post exists for the given id",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Job not found",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Job post not found"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "401",
+          description = "Missing or invalid bearer token",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Unauthorized",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Invalid or expired token"
+                      }""")))
+  })
+  @Parameters({
+      @Parameter(
+          name = "lynq-request-uuid",
+          in = ParameterIn.HEADER,
+          required = true,
+          description = "Unique identifier for the request, echoed back in the response and used "
+              + "for log correlation. Requests without it are rejected with 403.",
+          example = "550e8400-e29b-41d4-a716-446655440000")
+  })
+  ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> suggestUpskilling(
+      String jobPostId,
+      String requestUuid,
+      String language);
 
   @Operation(
       summary = "Get a user's public profile",
