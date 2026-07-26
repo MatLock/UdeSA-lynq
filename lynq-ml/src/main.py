@@ -4,6 +4,7 @@ from exception_handlers import register_exception_handlers
 from middleware.request_uuid import require_request_uuid
 from router.candidate_explanation import router as candidate_explanation_router
 from router.health import router as health_router
+from router.language_detection import router as language_detection_router
 from router.resume_extractor import router as resume_extractor_router
 from router.resume_template import router as resume_template_router
 from router.skill_enhance import router as skill_enhance_router
@@ -53,6 +54,7 @@ router.include_router(candidate_explanation_router)
 router.include_router(resume_extractor_router)
 router.include_router(translation_router)
 router.include_router(resume_template_router)
+router.include_router(language_detection_router)
 app.include_router(router)
 
 
