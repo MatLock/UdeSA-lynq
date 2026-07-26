@@ -42,9 +42,13 @@ class QuerySuggestion(BaseModel):
 class UpskillingResponse(BaseModel):
     """The recruiter verdict plus course links grouped by search query.
 
-    When the candidate is a perfect match, ``outcome`` is the fixed
-    "You are perfect for this role." string and ``suggestions`` is empty.
+    ``reasons`` lists the concrete gaps that keep the candidate from being a
+    perfect match — one short reason per entry — so the caller can show *why*
+    rather than a bare "not a perfect match". When the candidate is a perfect
+    match, ``outcome`` is the fixed "You are perfect for this role." string and
+    both ``reasons`` and ``suggestions`` are empty.
     """
 
     outcome: str
+    reasons: list[str] = []
     suggestions: list[QuerySuggestion]

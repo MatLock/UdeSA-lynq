@@ -38,12 +38,15 @@ async def upskilling_suggestion(
     lynq_request_uuid: str = Header(alias="lynq-request-uuid"),
     user_id: str = Header(alias="user-id"),
     company_id: str = Header(alias="company-id"),
+    output_language: str | None = Header(default=None, alias="output-language"),
 ) -> GlobalRestResponse[UpskillingResponse]:
     """Assess a candidate against a job and return upskilling course links.
 
     The LLM produces a recruiter verdict plus 0-5 search queries for the
     candidate's missing competencies; each query is then resolved to Udemy
-    courses. A perfect match yields the fixed outcome and no suggestions.
+    courses. A perfect match yields the fixed outcome and no suggestions. The
+    human-readable prose (outcome + reasons) is written in ``output-language``
+    (the caller's UI language, e.g. ``es``), defaulting to English.
     """
     log.info(
         "message= Started upskilling-suggestion, " + _LOG_CONTEXT,
@@ -53,7 +56,9 @@ async def upskilling_suggestion(
 
     client = get_llm_client()
     input_json = json.dumps(body.model_dump(), ensure_ascii=False, indent=2)
-    prompt = render_upskilling_prompt(client.provider, input_json=input_json)
+    prompt = render_upskilling_prompt(
+        client.provider, input_json=input_json, language=output_language
+    )
 
     try:
         raw = await client.generate(prompt)
@@ -67,7 +72,7 @@ async def upskilling_suggestion(
         )
         raise HTTPException(status_code=502, detail=f"LLM request failed: {exc}") from exc
 
-    outcome, queries = _parse_llm_output(raw, user_id, company_id)
+    outcome, reasons, queries = _parse_llm_output(raw, user_id, company_id)
     suggestions = await _collect_courses(queries, user_id, company_id)
 
     log.info(
@@ -77,26 +82,38 @@ async def upskilling_suggestion(
         len(queries),
     )
     return GlobalRestResponse(
-        data=UpskillingResponse(outcome=outcome, suggestions=suggestions)
+        data=UpskillingResponse(
+            outcome=outcome, reasons=reasons, suggestions=suggestions
+        )
     )
 
 
-def _parse_llm_output(raw: str, user_id: str, company_id: str) -> tuple[str, list[str]]:
+def _parse_llm_output(
+    raw: str, user_id: str, company_id: str
+) -> tuple[str, list[str], list[str]]:
     """Parse and validate the model's JSON completion.
 
     Returns:
-        A ``(outcome, search_queries)`` pair.
+        An ``(outcome, reasons, search_queries)`` triple. ``reasons`` is the
+        list of gaps that keep the candidate from a perfect match; it defaults
+        to an empty list when the model omits it (e.g. a perfect match).
 
     Raises:
         HTTPException: 502 if the output is not JSON or does not match the
-            expected ``{"outcome": str, "search_queries": [str]}`` shape.
+            expected ``{"outcome": str, "reasons": [str], "search_queries":
+            [str]}`` shape.
     """
     try:
         parsed = json.loads(raw)
         outcome = parsed["outcome"]
         queries = parsed["search_queries"]
+        # reasons is optional for backward compatibility: a perfect match omits
+        # it, and older prompt variants may not emit it.
+        reasons = parsed.get("reasons", [])
         if not isinstance(outcome, str):
             raise TypeError("outcome is not a string")
+        if not isinstance(reasons, list) or not all(isinstance(r, str) for r in reasons):
+            raise TypeError("reasons is not a list of strings")
         if not isinstance(queries, list) or not all(isinstance(q, str) for q in queries):
             raise TypeError("search_queries is not a list of strings")
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
@@ -110,7 +127,7 @@ def _parse_llm_output(raw: str, user_id: str, company_id: str) -> tuple[str, lis
         raise HTTPException(
             status_code=502, detail="LLM returned malformed output"
         ) from exc
-    return outcome, queries
+    return outcome, reasons, queries
 
 
 async def _collect_courses(
