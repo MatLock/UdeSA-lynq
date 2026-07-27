@@ -22,7 +22,7 @@ _LANGUAGE_NAMES = {
     Language.PR: "Portuguese",
 }
 
-_env = Environment(
+_env = Environment(  # NOSONAR: plain-text LLM prompts, not HTML — autoescaping would corrupt the output
     loader=FileSystemLoader(str(_PROMPTS_DIR)),
     undefined=StrictUndefined,
     autoescape=False,

@@ -57,7 +57,8 @@ services:
         - LYNQ_IAM_BASE_URL=${LYNQ_IAM_BASE_URL:-http://localhost:8080/lynq-iam}
         - LYNQ_BACKEND_BASE_URL=${LYNQ_BACKEND_BASE_URL:-http://localhost:8082/lynq-backend-app}
     ports:
-      - "3000:80"
+      # The image serves on 8080 (unprivileged nginx); still exposed on 3000.
+      - "3000:8080"
     depends_on:
       - lynq-iam
       - lynq-app-backend

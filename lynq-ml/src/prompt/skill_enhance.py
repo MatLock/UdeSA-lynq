@@ -12,7 +12,7 @@ from llm_client import LLMProvider
 # under resources/prompts/.
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "resources" / "prompts"
 
-_env = Environment(
+_env = Environment(  # NOSONAR: plain-text LLM prompts, not HTML — autoescaping would corrupt the output
     loader=FileSystemLoader(str(_PROMPTS_DIR)),
     undefined=StrictUndefined,
     autoescape=False,

@@ -49,7 +49,7 @@ import pymysql
 DEFAULT_HOST = os.environ.get("LYNQ_DB_HOST", "127.0.0.1")
 DEFAULT_PORT = int(os.environ.get("LYNQ_DB_PORT", "3306"))
 DEFAULT_USER = os.environ.get("LYNQ_DB_USER", "root")
-DEFAULT_PASSWORD = os.environ.get("LYNQ_DB_PASSWORD", "federico")
+DEFAULT_PASSWORD = os.environ.get("LYNQ_DB_PASSWORD", "")
 DEFAULT_DATABASE = os.environ.get("LYNQ_DB_NAME", "lynq_backend_db")
 
 # Deterministic-UUID namespace so keys are stable across runs (idempotent upserts).

@@ -14,8 +14,10 @@ COPY . .
 RUN npm run build
 
 # --- Serve stage ---
-FROM nginx:1.27-alpine
+# The unprivileged variant runs as user nginx (101) instead of root, so it
+# serves on 8080 (non-root processes can't bind ports below 1024).
+FROM nginxinc/nginx-unprivileged:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
+EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]

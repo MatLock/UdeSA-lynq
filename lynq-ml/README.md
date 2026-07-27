@@ -574,5 +574,6 @@ lynq-ml/
 ├── tests/                      # unittest suite (puts src/ on the path)
 ├── set_env.sh                  # environment defaults
 ├── Dockerfile
-└── requirements.txt
+├── requirements.in             # direct dependencies (source of truth)
+└── requirements.txt            # full lock with hashes (pip-compile --generate-hashes requirements.in)
 ```

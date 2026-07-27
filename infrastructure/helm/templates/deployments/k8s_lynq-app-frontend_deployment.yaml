@@ -27,7 +27,8 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 80
+              # 8080 because the image runs nginx unprivileged (non-root).
+              containerPort: 8080
           livenessProbe:
             httpGet:
               path: /

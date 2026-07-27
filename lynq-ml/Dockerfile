@@ -22,8 +22,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies first so the layer is cached across code changes.
+# requirements.txt is a full lock (pip-compile --generate-hashes from
+# requirements.in); --require-hashes makes the install reproducible.
 COPY requirements.txt .
-RUN pip install --no-cache-dir --only-binary :all: -r requirements.txt
+RUN pip install --no-cache-dir --require-hashes --only-binary :all: -r requirements.txt
 
 # Copy the application source. Copy only the paths the service needs at
 # runtime (avoids recursively pulling in unrelated/sensitive files).

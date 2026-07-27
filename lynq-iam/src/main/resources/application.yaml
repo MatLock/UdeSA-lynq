@@ -7,7 +7,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/lynq_iam_db
     username: root
-    password: federico
+    password: ${DB_PASSWORD:federico}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 20
@@ -20,7 +20,7 @@ spring:
       host: localhost
       port: 6379
       username: root
-      password: password
+      password: ${REDIS_PASSWORD:password}
   jpa:
     open-in-view: false
     properties:
@@ -38,7 +38,7 @@ spring:
 lynq:
   security:
     jwt:
-      secret: 8d2b6d2a9c5e8f4f8f9d1c7a4e3b5f6d8c9a1e2f3a4b5c6d7e8f9a1b2c3d4e5
+      secret: ${JWT_SECRET:8d2b6d2a9c5e8f4f8f9d1c7a4e3b5f6d8c9a1e2f3a4b5c6d7e8f9a1b2c3d4e5}
       access-token-expiration-minutes: 15
       refresh-token-expiration-days: 30
 

@@ -25,7 +25,9 @@ jobs:
 
       - name: Install dependencies
         working-directory: lynq-app-frontend
-        run: npm ci
+        # --ignore-scripts blocks lifecycle scripts of third-party packages, the
+        # same way the production image installs (see lynq-app-frontend/Dockerfile).
+        run: npm ci --ignore-scripts
 
       - name: Lint
         working-directory: lynq-app-frontend
