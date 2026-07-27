@@ -75,48 +75,55 @@ const MyJobPostsPage = () => {
       </header>
 
       <main className="my-jobs-results">
-        {loading ? (
-          <div className="my-jobs-state">
-            <Spinner label={t.loading} />
-          </div>
-        ) : error ? (
-          <p className="my-jobs-state my-jobs-error">{t.error}</p>
-        ) : jobs.length === 0 ? (
-          <div className="my-jobs-state my-jobs-empty">
-            <p>{t.empty}</p>
-            <button
-              type="button"
-              className="my-jobs-empty-cta"
-              onClick={() => navigate('/create-job')}
-            >
-              <span aria-hidden="true">+</span>
-              {t.emptyCreate}
-            </button>
-          </div>
-        ) : (
-          <div className="my-jobs-list">
-            {jobs.map((job) => (
-              <JobCard
-                key={job.jobId}
-                job={job}
-                showScore={false}
-                showStatus
-                showCandidates
-                actions={
-                  <Link
-                    to={`/job/${job.jobId}/edit`}
-                    state={{ job }}
-                    className="job-card-edit"
-                    aria-label={`${strings.jobCard.edit} — ${job.title}`}
-                  >
-                    <EditOutlinedIcon sx={{ fontSize: 15 }} />
-                    {strings.jobCard.edit}
-                  </Link>
-                }
-              />
-            ))}
-          </div>
-        )}
+        {(() => {
+          if (loading) {
+            return (
+              <div className="my-jobs-state">
+                <Spinner label={t.loading} />
+              </div>
+            )
+          }
+          if (error) return <p className="my-jobs-state my-jobs-error">{t.error}</p>
+          if (jobs.length === 0) {
+            return (
+              <div className="my-jobs-state my-jobs-empty">
+                <p>{t.empty}</p>
+                <button
+                  type="button"
+                  className="my-jobs-empty-cta"
+                  onClick={() => navigate('/create-job')}
+                >
+                  <span aria-hidden="true">+</span>
+                  {t.emptyCreate}
+                </button>
+              </div>
+            )
+          }
+          return (
+            <div className="my-jobs-list">
+              {jobs.map((job) => (
+                <JobCard
+                  key={job.jobId}
+                  job={job}
+                  showScore={false}
+                  showStatus
+                  showCandidates
+                  actions={
+                    <Link
+                      to={`/job/${job.jobId}/edit`}
+                      state={{ job }}
+                      className="job-card-edit"
+                      aria-label={`${strings.jobCard.edit} — ${job.title}`}
+                    >
+                      <EditOutlinedIcon sx={{ fontSize: 15 }} />
+                      {strings.jobCard.edit}
+                    </Link>
+                  }
+                />
+              ))}
+            </div>
+          )
+        })()}
       </main>
 
       {!loading && !error && jobs.length > 0 && (

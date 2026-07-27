@@ -108,10 +108,10 @@ const update_job = async (
   { title, description, workType, status, salaryRangeDown, salaryRangeTop, skills } = {},
 ) => {
   const body = { title, description, workType, status };
-  if (salaryRangeDown != null && salaryRangeDown !== '') {
+  if (salaryRangeDown != null && String(salaryRangeDown) !== '') {
     body.salaryRangeDown = Number(salaryRangeDown);
   }
-  if (salaryRangeTop != null && salaryRangeTop !== '') {
+  if (salaryRangeTop != null && String(salaryRangeTop) !== '') {
     body.salaryRangeTop = Number(salaryRangeTop);
   }
   body.skills = skills ?? [];
@@ -284,10 +284,10 @@ const create_job = async (
     workType,
     jobPostSource: 'LYNQ',
   };
-  if (salaryRangeDown != null && salaryRangeDown !== '') {
+  if (salaryRangeDown != null && String(salaryRangeDown) !== '') {
     body.salaryRangeDown = Number(salaryRangeDown);
   }
-  if (salaryRangeTop != null && salaryRangeTop !== '') {
+  if (salaryRangeTop != null && String(salaryRangeTop) !== '') {
     body.salaryRangeTop = Number(salaryRangeTop);
   }
   if (skills?.length) {

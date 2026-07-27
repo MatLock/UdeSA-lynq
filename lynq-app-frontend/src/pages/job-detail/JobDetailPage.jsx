@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { Chip } from '@mui/material'
-import strings from '../../i18n'
-import { activeLocale } from '../../i18n'
+import strings, { activeLocale } from '../../i18n'
 import useApi from '../../hooks/useApi'
 import useAuth from '../../hooks/useAuth'
 import jobService from '../../services/jobService'
@@ -29,12 +28,11 @@ const truncateCompanyAbout = (text) =>
 
 // The work-type chip is filled with the matching brand color; an unknown type
 // falls back to the brand blend.
-const workTypeBg = (workType) =>
-  workType === 'REMOTE'
-    ? 'var(--brand-blue)'
-    : workType === 'IN_OFFICE'
-      ? 'var(--brand-purple)'
-      : 'var(--brand-gradient)'
+const workTypeBg = (workType) => {
+  if (workType === 'REMOTE') return 'var(--brand-blue)'
+  if (workType === 'IN_OFFICE') return 'var(--brand-purple)'
+  return 'var(--brand-gradient)'
+}
 
 // Map a 0–100 LYNQ score to its band color token (see index.css --score-*).
 const scoreColorVar = (score) => {
@@ -58,35 +56,11 @@ const formatSalary = (down, top) => {
   return null
 }
 
-const JobDetailPage = () => {
-  const t = strings.jobDetail
-  const location = useLocation()
-  const { jobId } = useParams()
-  const { authFetch } = useApi()
-  const { user } = useAuth()
-  // The JobCard click hands the job in via router state for an instant first
-  // paint; the authoritative data (including the counters below) is then loaded
-  // from GET /job/{jobId}/details, which also lets direct navigation / reload
-  // work without any router state.
-  const initialJob = location.state?.job ?? null
+// Loads the authoritative job details and view/applicant counters, seeding from
+// the router-state placeholder (if any) for an instant first paint. Extracted
+// from JobDetailPage so that component's render logic stays readable.
+const useJobDetails = (jobId, initialJob, authFetch) => {
   const [job, setJob] = useState(initialJob)
-
-  // Mirror the feed's rule (HomePage/JobCard): candidate-only concerns (the LYNQ
-  // score, the Apply action) are shown to everyone except COMPANY users. We
-  // derive from isCompany rather than a positive `userType === 'CANDIDATE'` check
-  // so behavior matches the feed even when the profile hasn't populated userType
-  // (e.g. the login profile lookup failed) — otherwise the score would show in
-  // the feed but silently vanish here.
-  const isCompany = user?.userType === 'COMPANY'
-  // Reaching this page from "My Applications" (ApplicationCard) means the user has
-  // already applied to this job, so seed the apply state accordingly to disable
-  // the button and show the "already applied" legend without needing an attempt.
-  const alreadyApplied = location.state?.alreadyApplied === true
-  const [applyState, setApplyState] = useState(alreadyApplied ? 'already' : 'idle') // idle|applying|applied|already|error
-  // Owner-only close/re-open action. The button shown (and which endpoint it
-  // hits) is derived from the job's live status; this only tracks the in-flight
-  // request so the button can disable and surface an error.
-  const [ownerAction, setOwnerAction] = useState('idle') // idle|working|error
   // The two counters returned by the details endpoint, seeded from the router
   // placeholder (if any) so they render immediately, then refreshed from the
   // fetch below.
@@ -106,7 +80,7 @@ const JobDetailPage = () => {
   // On mount: count this view (best-effort — the details endpoint is read-only
   // and does not increment), then load the authoritative details and counters.
   useEffect(() => {
-    if (!jobId) return
+    if (!jobId) return undefined
     let cancelled = false
     const load = async () => {
       if (seenCountedForRef.current !== jobId) {
@@ -135,6 +109,426 @@ const JobDetailPage = () => {
       cancelled = true
     }
   }, [authFetch, jobId])
+
+  return { job, setJob, seenCount, appliedCount, loading }
+}
+
+// Hero right-hand column: the owner's close/re-open controls, or (for
+// candidates) the LYNQ score chip and Apply action. Company viewers see nothing.
+const JobHeroSide = ({
+  isOwner,
+  isCompany,
+  isClosed,
+  ownerAction,
+  onOwnerAction,
+  hasScore,
+  job,
+  applyState,
+  onApply,
+  t,
+}) => {
+  if (isOwner) {
+    return (
+      <div className="job-detail-hero-side">
+        {/* Owner action: close the post to stop seeking candidates, or
+            re-open it (green) once it has been closed. */}
+        <div className="job-detail-hero-actions">
+          {isClosed ? (
+            <button
+              type="button"
+              className="job-detail-reopen"
+              onClick={() => onOwnerAction(false)}
+              disabled={ownerAction === 'working'}
+            >
+              {ownerAction === 'working' ? t.reopening : t.reopen}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="job-detail-stop"
+              onClick={() => onOwnerAction(true)}
+              disabled={ownerAction === 'working'}
+            >
+              {ownerAction === 'working' ? t.stopping : t.stopSeeking}
+            </button>
+          )}
+          {isClosed && ownerAction !== 'error' && (
+            <p className="job-detail-apply-status is-info">
+              {t.closedNotice}
+            </p>
+          )}
+          {ownerAction === 'error' && (
+            <p className="job-detail-apply-status is-error">
+              {isClosed ? t.reopenError : t.stopError}
+            </p>
+          )}
+        </div>
+      </div>
+    )
+  }
+  if (!isCompany) {
+    return (
+      <div className="job-detail-hero-side">
+        {/* LYNQ score pinned to the hero's top-right corner. */}
+        {hasScore && (
+          <Chip
+            label={`${t.lynqScoreLabel}: ${job.lynqScore}`}
+            size="small"
+            variant="outlined"
+            sx={{
+              height: 24,
+              fontSize: 11,
+              fontWeight: 700,
+              color: `var(${scoreColorVar(job.lynqScore)})`,
+              borderColor: `var(${scoreColorVar(job.lynqScore)})`,
+              backgroundColor: `color-mix(in srgb, var(${scoreColorVar(job.lynqScore)}) 14%, transparent)`,
+              '& .MuiChip-label': { px: 1.2 },
+            }}
+          />
+        )}
+        {/* Apply action, vertically centered on the hero's right edge. */}
+        <div className="job-detail-hero-actions">
+          <button
+            type="button"
+            className="job-detail-apply"
+            onClick={onApply}
+            disabled={
+              applyState === 'applying' ||
+              applyState === 'applied' ||
+              applyState === 'already'
+            }
+          >
+            {applyState === 'applying' ? t.applying : t.apply}
+          </button>
+          {applyState === 'applied' && (
+            <p className="job-detail-apply-status is-success">
+              {t.applied}
+            </p>
+          )}
+          {applyState === 'already' && (
+            <p className="job-detail-apply-status is-info">
+              {t.alreadyApplied}
+            </p>
+          )}
+          {applyState === 'error' && (
+            <p className="job-detail-apply-status is-error">
+              {t.applyError}
+            </p>
+          )}
+        </div>
+      </div>
+    )
+  }
+  return null
+}
+
+// Right-column "at a glance" facts card.
+const JobOverviewFacts = ({
+  t,
+  workTypeLabel,
+  salary,
+  publishedAt,
+  isExternal,
+  job,
+  seenCount,
+  appliedCount,
+  hasScore,
+}) => (
+  <section className="job-detail-card">
+    <h2 className="job-detail-card-title">{t.overviewHeading}</h2>
+    <dl className="job-detail-facts">
+      <div className="job-detail-fact">
+        <dt>{t.workTypeLabel}</dt>
+        <dd>{workTypeLabel}</dd>
+      </div>
+      <div className="job-detail-fact">
+        <dt>{t.salaryLabel}</dt>
+        <dd>{salary ?? t.salaryNotDisclosed}</dd>
+      </div>
+      {publishedAt && (
+        <div className="job-detail-fact">
+          <dt>{t.postedLabel}</dt>
+          <dd>{publishedAt}</dd>
+        </div>
+      )}
+      {isExternal && (
+        <div className="job-detail-fact">
+          <dt>{t.sourceLabel}</dt>
+          <dd>{prettySource(job.jobPostSource)}</dd>
+        </div>
+      )}
+      {seenCount != null && (
+        <div className="job-detail-fact">
+          <dt>{t.seenLabel}</dt>
+          <dd>{seenCount}</dd>
+        </div>
+      )}
+      {appliedCount != null && (
+        <div className="job-detail-fact">
+          <dt>{t.candidatesLabel}</dt>
+          <dd>{appliedCount}</dd>
+        </div>
+      )}
+      {hasScore && (
+        <div className="job-detail-fact">
+          <dt>{t.lynqScoreLabel}</dt>
+          <dd style={{ color: `var(${scoreColorVar(job.lynqScore)})` }}>
+            {job.lynqScore}
+          </dd>
+        </div>
+      )}
+    </dl>
+  </section>
+)
+
+// Right-column company card: logo, name, size and a link to the company page.
+const JobCompanyCard = ({ t, company, companyLogo }) => (
+  <section className="job-detail-card">
+    <h2 className="job-detail-card-title">{t.companyHeading}</h2>
+    <div className="job-detail-entity">
+      <span className="job-detail-entity-logo">
+        {companyLogo ? (
+          <img src={companyLogo} alt={company?.name ?? t.companyLogoAlt} />
+        ) : (
+          <CompanyIcon />
+        )}
+      </span>
+      <div className="job-detail-entity-text">
+        <span className="job-detail-entity-name">
+          {company?.name ?? t.unknownCompany}
+        </span>
+        {company?.size != null && (
+          <span className="job-detail-entity-sub">
+            {t.companySize.replace('{count}', company.size)}
+          </span>
+        )}
+      </div>
+    </div>
+    <p className="job-detail-about">
+      {company?.about ? truncateCompanyAbout(company.about) : t.noCompanyAbout}
+    </p>
+    {/* Links to the company's detail page at /company/{companyId}. Falls back to
+        nothing when the post carries no identified company (e.g. external). */}
+    {company?.id && (
+      <Link to={`/company/${company.id}`} className="job-detail-external-link">
+        {t.viewCompany}
+        <span aria-hidden="true"> ›</span>
+      </Link>
+    )}
+  </section>
+)
+
+// Right-column trailing card: the original-source pointer for external postings,
+// or the recruiter's identity for LYNQ-native ones.
+const JobRecruiterSection = ({ t, isExternal, job, recruiter }) => {
+  if (isExternal) {
+    return (
+      <section className="job-detail-card">
+        <h2 className="job-detail-card-title">{t.externalHeading}</h2>
+        <p className="job-detail-about">
+          {t.externalBody.replace('{source}', prettySource(job.jobPostSource))}
+        </p>
+        {job.jobUrl && (
+          <a
+            className="job-detail-external-link"
+            href={job.jobUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            {t.viewOriginal}
+            <span aria-hidden="true"> ↗</span>
+          </a>
+        )}
+      </section>
+    )
+  }
+  return (
+    <section className="job-detail-card">
+      <h2 className="job-detail-card-title">{t.recruiterHeading}</h2>
+      {recruiter ? (
+        <>
+          <div className="job-detail-entity">
+            <span className="job-detail-entity-avatar">
+              {recruiter.profileImageUrl ? (
+                <img
+                  src={recruiter.profileImageUrl}
+                  alt={recruiter.fullName ?? t.recruiterAvatarAlt}
+                />
+              ) : (
+                <UserIcon />
+              )}
+            </span>
+            <div className="job-detail-entity-text">
+              <span className="job-detail-entity-name">
+                {recruiter.fullName ?? t.unknownRecruiter}
+              </span>
+              {recruiter.currentPosition && (
+                <span className="job-detail-entity-sub">
+                  {recruiter.currentPosition}
+                </span>
+              )}
+            </div>
+          </div>
+          {recruiter.id && (
+            <Link
+              to={`/user/${recruiter.id}`}
+              className="job-detail-external-link"
+            >
+              {t.viewProfile}
+              <span aria-hidden="true"> ›</span>
+            </Link>
+          )}
+        </>
+      ) : (
+        <p className="job-detail-muted">{t.recruiterFallback}</p>
+      )}
+    </section>
+  )
+}
+
+// The hero: company logo, work-type tag, title, company/publish line and salary,
+// with the caller-supplied right-hand column (`heroSide`).
+const JobHero = ({
+  t,
+  job,
+  workTypeLabel,
+  company,
+  companyLogo,
+  publishedAt,
+  salary,
+  heroSide,
+}) => (
+  <section className="job-detail-hero">
+    <span className="job-detail-logo">
+      {companyLogo ? (
+        <img src={companyLogo} alt={company?.name ?? t.companyLogoAlt} />
+      ) : (
+        <CompanyIcon />
+      )}
+    </span>
+
+    <div className="job-detail-hero-main">
+      <div className="job-detail-tags">
+        <Chip
+          label={workTypeLabel}
+          size="small"
+          sx={{
+            height: 24,
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.3px',
+            textTransform: 'uppercase',
+            color: '#fff',
+            background: workTypeBg(job.workType),
+            '& .MuiChip-label': { px: 1.2 },
+          }}
+        />
+      </div>
+
+      <h1 className="job-detail-title">{job.title}</h1>
+
+      <div className="job-detail-hero-meta">
+        <span className="job-detail-company-name">
+          {company?.name ?? t.unknownCompany}
+        </span>
+        {publishedAt && (
+          <>
+            <span className="job-detail-sep" aria-hidden="true">
+              •
+            </span>
+            <span>
+              {t.postedLabel} {publishedAt}
+            </span>
+          </>
+        )}
+      </div>
+
+      {salary && (
+        <p className="job-detail-hero-salary">
+          <span className="job-detail-hero-salary-label">
+            {t.salaryLabel}
+          </span>
+          {salary}
+        </p>
+      )}
+    </div>
+
+    {heroSide}
+  </section>
+)
+
+// Left column: the long-form description and skills list.
+const JobMainColumn = ({ t, job, skills }) => (
+  <div className="job-detail-col job-detail-col--main">
+    <section className="job-detail-card">
+      <h2 className="job-detail-card-title">{t.descriptionHeading}</h2>
+      <p className="job-detail-description">
+        {job.description || t.noDescription}
+      </p>
+    </section>
+
+    <section className="job-detail-card">
+      <h2 className="job-detail-card-title">{t.skillsHeading}</h2>
+      {skills.length > 0 ? (
+        <div className="job-detail-skills">
+          {skills.map((skill) => (
+            <Chip
+              key={skill}
+              label={skill}
+              size="small"
+              variant="outlined"
+              sx={{
+                height: 26,
+                fontSize: 12,
+                fontWeight: 600,
+                color: 'var(--brand-purple-dark)',
+                borderColor: 'var(--accent-border)',
+                backgroundColor: 'var(--accent-bg)',
+                '& .MuiChip-label': { px: 1.2 },
+              }}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="job-detail-muted">{t.noSkills}</p>
+      )}
+    </section>
+  </div>
+)
+
+const JobDetailPage = () => {
+  const t = strings.jobDetail
+  const location = useLocation()
+  const { jobId } = useParams()
+  const { authFetch } = useApi()
+  const { user } = useAuth()
+  // The JobCard click hands the job in via router state for an instant first
+  // paint; the authoritative data (including the counters below) is then loaded
+  // from GET /job/{jobId}/details, which also lets direct navigation / reload
+  // work without any router state.
+  const initialJob = location.state?.job ?? null
+  const { job, setJob, seenCount, appliedCount, loading } = useJobDetails(
+    jobId,
+    initialJob,
+    authFetch,
+  )
+
+  // Mirror the feed's rule (HomePage/JobCard): candidate-only concerns (the LYNQ
+  // score, the Apply action) are shown to everyone except COMPANY users. We
+  // derive from isCompany rather than a positive `userType === 'CANDIDATE'` check
+  // so behavior matches the feed even when the profile hasn't populated userType
+  // (e.g. the login profile lookup failed) — otherwise the score would show in
+  // the feed but silently vanish here.
+  const isCompany = user?.userType === 'COMPANY'
+  // Reaching this page from "My Applications" (ApplicationCard) means the user has
+  // already applied to this job, so seed the apply state accordingly to disable
+  // the button and show the "already applied" legend without needing an attempt.
+  const alreadyApplied = location.state?.alreadyApplied === true
+  const [applyState, setApplyState] = useState(alreadyApplied ? 'already' : 'idle') // idle|applying|applied|already|error
+  // Owner-only close/re-open action. The button shown (and which endpoint it
+  // hits) is derived from the job's live status; this only tracks the in-flight
+  // request so the button can disable and surface an error.
+  const [ownerAction, setOwnerAction] = useState('idle') // idle|working|error
 
   const handleApply = async () => {
     if (applyState === 'applying' || applyState === 'applied') return
@@ -229,342 +623,55 @@ const JobDetailPage = () => {
         </Link>
 
         {/* Hero: logo, tags, title, company line, salary, and the apply action. */}
-        <section className="job-detail-hero">
-          <span className="job-detail-logo">
-            {companyLogo ? (
-              <img src={companyLogo} alt={company?.name ?? t.companyLogoAlt} />
-            ) : (
-              <CompanyIcon />
-            )}
-          </span>
-
-          <div className="job-detail-hero-main">
-            <div className="job-detail-tags">
-              <Chip
-                label={workTypeLabel}
-                size="small"
-                sx={{
-                  height: 24,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: '0.3px',
-                  textTransform: 'uppercase',
-                  color: '#fff',
-                  background: workTypeBg(job.workType),
-                  '& .MuiChip-label': { px: 1.2 },
-                }}
-              />
-            </div>
-
-            <h1 className="job-detail-title">{job.title}</h1>
-
-            <div className="job-detail-hero-meta">
-              <span className="job-detail-company-name">
-                {company?.name ?? t.unknownCompany}
-              </span>
-              {publishedAt && (
-                <>
-                  <span className="job-detail-sep" aria-hidden="true">
-                    •
-                  </span>
-                  <span>
-                    {t.postedLabel} {publishedAt}
-                  </span>
-                </>
-              )}
-            </div>
-
-            {salary && (
-              <p className="job-detail-hero-salary">
-                <span className="job-detail-hero-salary-label">
-                  {t.salaryLabel}
-                </span>
-                {salary}
-              </p>
-            )}
-          </div>
-
-          {isOwner ? (
-            <div className="job-detail-hero-side">
-              {/* Owner action: close the post to stop seeking candidates, or
-                  re-open it (green) once it has been closed. */}
-              <div className="job-detail-hero-actions">
-                {isClosed ? (
-                  <button
-                    type="button"
-                    className="job-detail-reopen"
-                    onClick={() => handleOwnerAction(false)}
-                    disabled={ownerAction === 'working'}
-                  >
-                    {ownerAction === 'working' ? t.reopening : t.reopen}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="job-detail-stop"
-                    onClick={() => handleOwnerAction(true)}
-                    disabled={ownerAction === 'working'}
-                  >
-                    {ownerAction === 'working' ? t.stopping : t.stopSeeking}
-                  </button>
-                )}
-                {isClosed && ownerAction !== 'error' && (
-                  <p className="job-detail-apply-status is-info">
-                    {t.closedNotice}
-                  </p>
-                )}
-                {ownerAction === 'error' && (
-                  <p className="job-detail-apply-status is-error">
-                    {isClosed ? t.reopenError : t.stopError}
-                  </p>
-                )}
-              </div>
-            </div>
-          ) : !isCompany ? (
-            <div className="job-detail-hero-side">
-              {/* LYNQ score pinned to the hero's top-right corner. */}
-              {hasScore && (
-                <Chip
-                  label={`${t.lynqScoreLabel}: ${job.lynqScore}`}
-                  size="small"
-                  variant="outlined"
-                  sx={{
-                    height: 24,
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: `var(${scoreColorVar(job.lynqScore)})`,
-                    borderColor: `var(${scoreColorVar(job.lynqScore)})`,
-                    backgroundColor: `color-mix(in srgb, var(${scoreColorVar(job.lynqScore)}) 14%, transparent)`,
-                    '& .MuiChip-label': { px: 1.2 },
-                  }}
-                />
-              )}
-              {/* Apply action, vertically centered on the hero's right edge. */}
-              <div className="job-detail-hero-actions">
-                <button
-                  type="button"
-                  className="job-detail-apply"
-                  onClick={handleApply}
-                  disabled={
-                    applyState === 'applying' ||
-                    applyState === 'applied' ||
-                    applyState === 'already'
-                  }
-                >
-                  {applyState === 'applying' ? t.applying : t.apply}
-                </button>
-                {applyState === 'applied' && (
-                  <p className="job-detail-apply-status is-success">
-                    {t.applied}
-                  </p>
-                )}
-                {applyState === 'already' && (
-                  <p className="job-detail-apply-status is-info">
-                    {t.alreadyApplied}
-                  </p>
-                )}
-                {applyState === 'error' && (
-                  <p className="job-detail-apply-status is-error">
-                    {t.applyError}
-                  </p>
-                )}
-              </div>
-            </div>
-          ) : null}
-        </section>
+        <JobHero
+          t={t}
+          job={job}
+          workTypeLabel={workTypeLabel}
+          company={company}
+          companyLogo={companyLogo}
+          publishedAt={publishedAt}
+          salary={salary}
+          heroSide={
+            <JobHeroSide
+              isOwner={isOwner}
+              isCompany={isCompany}
+              isClosed={isClosed}
+              ownerAction={ownerAction}
+              onOwnerAction={handleOwnerAction}
+              hasScore={hasScore}
+              job={job}
+              applyState={applyState}
+              onApply={handleApply}
+              t={t}
+            />
+          }
+        />
 
         <div className="job-detail-grid">
-          {/* Left column: the long-form content. */}
-          <div className="job-detail-col job-detail-col--main">
-            <section className="job-detail-card">
-              <h2 className="job-detail-card-title">{t.descriptionHeading}</h2>
-              <p className="job-detail-description">
-                {job.description || t.noDescription}
-              </p>
-            </section>
-
-            <section className="job-detail-card">
-              <h2 className="job-detail-card-title">{t.skillsHeading}</h2>
-              {skills.length > 0 ? (
-                <div className="job-detail-skills">
-                  {skills.map((skill) => (
-                    <Chip
-                      key={skill}
-                      label={skill}
-                      size="small"
-                      variant="outlined"
-                      sx={{
-                        height: 26,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: 'var(--brand-purple-dark)',
-                        borderColor: 'var(--accent-border)',
-                        backgroundColor: 'var(--accent-bg)',
-                        '& .MuiChip-label': { px: 1.2 },
-                      }}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <p className="job-detail-muted">{t.noSkills}</p>
-              )}
-            </section>
-          </div>
+          <JobMainColumn t={t} job={job} skills={skills} />
 
           {/* Right column: at-a-glance facts, company and recruiter. */}
           <aside className="job-detail-col job-detail-col--side">
-            <section className="job-detail-card">
-              <h2 className="job-detail-card-title">{t.overviewHeading}</h2>
-              <dl className="job-detail-facts">
-                <div className="job-detail-fact">
-                  <dt>{t.workTypeLabel}</dt>
-                  <dd>{workTypeLabel}</dd>
-                </div>
-                <div className="job-detail-fact">
-                  <dt>{t.salaryLabel}</dt>
-                  <dd>{salary ?? t.salaryNotDisclosed}</dd>
-                </div>
-                {publishedAt && (
-                  <div className="job-detail-fact">
-                    <dt>{t.postedLabel}</dt>
-                    <dd>{publishedAt}</dd>
-                  </div>
-                )}
-                {isExternal && (
-                  <div className="job-detail-fact">
-                    <dt>{t.sourceLabel}</dt>
-                    <dd>{prettySource(job.jobPostSource)}</dd>
-                  </div>
-                )}
-                {seenCount != null && (
-                  <div className="job-detail-fact">
-                    <dt>{t.seenLabel}</dt>
-                    <dd>{seenCount}</dd>
-                  </div>
-                )}
-                {appliedCount != null && (
-                  <div className="job-detail-fact">
-                    <dt>{t.candidatesLabel}</dt>
-                    <dd>{appliedCount}</dd>
-                  </div>
-                )}
-                {hasScore && (
-                  <div className="job-detail-fact">
-                    <dt>{t.lynqScoreLabel}</dt>
-                    <dd
-                      style={{ color: `var(${scoreColorVar(job.lynqScore)})` }}
-                    >
-                      {job.lynqScore}
-                    </dd>
-                  </div>
-                )}
-              </dl>
-            </section>
+            <JobOverviewFacts
+              t={t}
+              workTypeLabel={workTypeLabel}
+              salary={salary}
+              publishedAt={publishedAt}
+              isExternal={isExternal}
+              job={job}
+              seenCount={seenCount}
+              appliedCount={appliedCount}
+              hasScore={hasScore}
+            />
 
-            <section className="job-detail-card">
-              <h2 className="job-detail-card-title">{t.companyHeading}</h2>
-              <div className="job-detail-entity">
-                <span className="job-detail-entity-logo">
-                  {companyLogo ? (
-                    <img
-                      src={companyLogo}
-                      alt={company?.name ?? t.companyLogoAlt}
-                    />
-                  ) : (
-                    <CompanyIcon />
-                  )}
-                </span>
-                <div className="job-detail-entity-text">
-                  <span className="job-detail-entity-name">
-                    {company?.name ?? t.unknownCompany}
-                  </span>
-                  {company?.size != null && (
-                    <span className="job-detail-entity-sub">
-                      {t.companySize.replace('{count}', company.size)}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <p className="job-detail-about">
-                {company?.about ? truncateCompanyAbout(company.about) : t.noCompanyAbout}
-              </p>
-              {/* Links to the company's detail page at /company/{companyId}.
-                  Falls back to nothing when the post carries no identified
-                  company (e.g. external postings). */}
-              {company?.id && (
-                <Link
-                  to={`/company/${company.id}`}
-                  className="job-detail-external-link"
-                >
-                  {t.viewCompany}
-                  <span aria-hidden="true"> ›</span>
-                </Link>
-              )}
-            </section>
+            <JobCompanyCard t={t} company={company} companyLogo={companyLogo} />
 
-            {isExternal ? (
-              <section className="job-detail-card">
-                <h2 className="job-detail-card-title">{t.externalHeading}</h2>
-                <p className="job-detail-about">
-                  {t.externalBody.replace(
-                    '{source}',
-                    prettySource(job.jobPostSource),
-                  )}
-                </p>
-                {job.jobUrl && (
-                  <a
-                    className="job-detail-external-link"
-                    href={job.jobUrl}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                  >
-                    {t.viewOriginal}
-                    <span aria-hidden="true"> ↗</span>
-                  </a>
-                )}
-              </section>
-            ) : (
-              <section className="job-detail-card">
-                <h2 className="job-detail-card-title">{t.recruiterHeading}</h2>
-                {recruiter ? (
-                  <>
-                    <div className="job-detail-entity">
-                      <span className="job-detail-entity-avatar">
-                        {recruiter.profileImageUrl ? (
-                          <img
-                            src={recruiter.profileImageUrl}
-                            alt={recruiter.fullName ?? t.recruiterAvatarAlt}
-                          />
-                        ) : (
-                          <UserIcon />
-                        )}
-                      </span>
-                      <div className="job-detail-entity-text">
-                        <span className="job-detail-entity-name">
-                          {recruiter.fullName ?? t.unknownRecruiter}
-                        </span>
-                        {recruiter.currentPosition && (
-                          <span className="job-detail-entity-sub">
-                            {recruiter.currentPosition}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {recruiter.id && (
-                      <Link
-                        to={`/user/${recruiter.id}`}
-                        className="job-detail-external-link"
-                      >
-                        {t.viewProfile}
-                        <span aria-hidden="true"> ›</span>
-                      </Link>
-                    )}
-                  </>
-                ) : (
-                  <p className="job-detail-muted">{t.recruiterFallback}</p>
-                )}
-              </section>
-            )}
+            <JobRecruiterSection
+              t={t}
+              isExternal={isExternal}
+              job={job}
+              recruiter={recruiter}
+            />
           </aside>
         </div>
       </div>

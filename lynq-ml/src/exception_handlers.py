@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from response import ErrorRestResponse
 
 
-async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """Wrap raised HTTPExceptions in the standard error envelope."""
     return JSONResponse(
         status_code=exc.status_code,
@@ -21,7 +21,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     )
 
 
-async def validation_exception_handler(
+def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
     """Return per-field validation errors in the standard error envelope."""
@@ -35,7 +35,7 @@ async def validation_exception_handler(
     )
 
 
-async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Catch-all: return unexpected errors in the standard error envelope."""
     return JSONResponse(
         status_code=500,

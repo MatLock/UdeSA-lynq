@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, Header, HTTPException
@@ -31,14 +32,19 @@ _LOG_CONTEXT = "user_id=%s, company_id=%s"
 
 @router.post(
     "/upskilling_suggestion",
-    response_model=GlobalRestResponse[UpskillingResponse],
+    responses={
+        502: {
+            "description": "The upstream LLM request or course search failed, "
+            "or the LLM returned malformed output."
+        },
+    },
 )
 async def upskilling_suggestion(
     body: UpskillingRequest,
-    lynq_request_uuid: str = Header(alias="lynq-request-uuid"),
-    user_id: str = Header(alias="user-id"),
-    company_id: str = Header(alias="company-id"),
-    output_language: str | None = Header(default=None, alias="output-language"),
+    lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
+    user_id: Annotated[str, Header(alias="user-id")],
+    company_id: Annotated[str, Header(alias="company-id")],
+    output_language: Annotated[str | None, Header(alias="output-language")] = None,
 ) -> GlobalRestResponse[UpskillingResponse]:
     """Assess a candidate against a job and return upskilling course links.
 

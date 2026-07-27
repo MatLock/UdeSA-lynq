@@ -104,8 +104,8 @@ const DatePicker = ({ id, value, onChange, placeholder, ariaInvalid, disableFutu
   const startOffset = (new Date(year, month, 1).getDay() + 6) % 7
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const cells = []
-  for (let i = 0; i < startOffset; i += 1) cells.push(null)
-  for (let d = 1; d <= daysInMonth; d += 1) cells.push(d)
+  for (let i = 0; i < startOffset; i += 1) cells.push({ key: `blank-${i}`, day: null })
+  for (let d = 1; d <= daysInMonth; d += 1) cells.push({ key: `day-${d}`, day: d })
 
   const maxDay = disableFuture ? startOfDay(new Date()) : null
   const isDisabled = (day) => maxDay && new Date(year, month, day) > maxDay
@@ -176,18 +176,18 @@ const DatePicker = ({ id, value, onChange, placeholder, ariaInvalid, disableFutu
             </div>
 
             <div className="date-picker-grid date-picker-weekdays">
-              {WEEKDAYS.map((label, i) => (
-                <span key={i} className="date-picker-weekday">{label}</span>
+              {WEEKDAYS.map((label) => (
+                <span key={label} className="date-picker-weekday">{label}</span>
               ))}
             </div>
 
             <div className="date-picker-grid">
-              {cells.map((day, i) =>
+              {cells.map(({ key, day }) =>
                 day === null ? (
-                  <span key={`blank-${i}`} className="date-picker-cell empty" />
+                  <span key={key} className="date-picker-cell empty" />
                 ) : (
                   <button
-                    key={day}
+                    key={key}
                     type="button"
                     className={isSelected(day) ? 'date-picker-cell selected' : 'date-picker-cell'}
                     disabled={isDisabled(day)}

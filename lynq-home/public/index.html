@@ -511,12 +511,12 @@
   .stats-section {
     background: var(--ink);
     color: var(--bg);
+    border-bottom-color: var(--ink);
   }
   .stats-section .label,
   .stats-section .section-head h2,
   .stats-section p { color: var(--bg); }
   .stats-section .section-head h2 em { color: var(--accent); }
-  .stats-section { border-bottom-color: var(--ink); }
 
   .stats-grid {
     display: grid;
@@ -746,7 +746,7 @@
 
   <!-- ====== B2C persona ====== -->
   <div class="persona" id="panel-b2c" data-panel="b2c">
-    <aside class="persona-card reveal">
+    <aside class="persona-card reveal" aria-label="Perfil B2C: Valentina M.">
       <div class="persona-name">Valentina <em>M.</em></div>
       <div class="persona-role">Profesional en transición · 29 años</div>
       <dl class="persona-attrs">
@@ -790,7 +790,7 @@
 
   <!-- ====== B2B persona ====== -->
   <div class="persona" id="panel-b2b" data-panel="b2b" style="display:none;">
-    <aside class="persona-card reveal">
+    <aside class="persona-card reveal" aria-label="Perfil B2B: TechScale S.A.">
       <div class="persona-name">TechScale <em>S.A.</em></div>
       <div class="persona-role">Scale-up · Fintech · LATAM</div>
       <dl class="persona-attrs">
@@ -991,7 +991,7 @@
     entries.forEach((entry) => {
       if (entry.isIntersecting) {
         const el = entry.target;
-        const target = parseInt(el.dataset.count, 10);
+        const target = Number.parseInt(el.dataset.count, 10);
         const supHTML = el.querySelector('sup') ? el.querySelector('sup').outerHTML : '';
         let current = 0;
         const duration = 1400;

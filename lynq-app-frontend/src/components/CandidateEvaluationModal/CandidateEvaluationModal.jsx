@@ -72,8 +72,8 @@ const CandidateEvaluationModal = ({ candidateName, result, onClose }) => {
                 {t.aiStrengths}
               </h4>
               <ul className="candidate-modal-list">
-                {result.strengths.map((item, index) => (
-                  <li key={index}>{item}</li>
+                {result.strengths.map((item) => (
+                  <li key={item}>{item}</li>
                 ))}
               </ul>
             </div>
@@ -85,8 +85,8 @@ const CandidateEvaluationModal = ({ candidateName, result, onClose }) => {
                 {t.aiConcerns}
               </h4>
               <ul className="candidate-modal-list">
-                {result.concerns.map((item, index) => (
-                  <li key={index}>{item}</li>
+                {result.concerns.map((item) => (
+                  <li key={item}>{item}</li>
                 ))}
               </ul>
             </div>

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, Header, HTTPException
@@ -26,11 +27,20 @@ router = APIRouter()
 _LOG_CONTEXT = "user_id=%s"
 
 
-@router.post("/parse-resume", response_model=GlobalRestResponse[Resume])
+@router.post(
+    "/parse-resume",
+    responses={
+        400: {"description": "The document format is unsupported (expected PDF or DOCX)."},
+        502: {
+            "description": "The resume could not be read, or the LLM request "
+            "failed or returned malformed output."
+        },
+    },
+)
 async def parse_resume(
     body: ParseResumeRequest,
-    lynq_request_uuid: str = Header(alias="lynq-request-uuid"),
-    user_id: str = Header(alias="user-id"),
+    lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
+    user_id: Annotated[str, Header(alias="user-id")],
 ) -> GlobalRestResponse[Resume]:
     """Download a resume, extract its text, and structure it into JSON.
 

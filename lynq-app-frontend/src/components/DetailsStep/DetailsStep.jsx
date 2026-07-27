@@ -18,7 +18,7 @@ import StepIndicator from '../StepIndicator/StepIndicator'
 import strings from '../../i18n'
 import './DetailsStep.css'
 
-const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+const isEmail = (value) => /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(value)
 
 // The shared "user form" — same fields for candidates and companies. It is the
 // final step for candidates (submits the registration) and an intermediate step
@@ -242,7 +242,7 @@ const DetailsStep = ({ active, isLast, stepNumber, totalSteps }) => {
             <p className="details-error" role="alert">{usernameError}</p>
           )}
           {check.username.status === 'available' && (
-            <p className="details-ok" role="status">{td.usernameAvailable}</p>
+            <output className="details-ok">{td.usernameAvailable}</output>
           )}
         </div>
 
@@ -292,7 +292,7 @@ const DetailsStep = ({ active, isLast, stepNumber, totalSteps }) => {
             <p className="details-error" role="alert">{emailError}</p>
           )}
           {check.email.status === 'available' && (
-            <p className="details-ok" role="status">{td.emailAvailable}</p>
+            <output className="details-ok">{td.emailAvailable}</output>
           )}
         </div>
 

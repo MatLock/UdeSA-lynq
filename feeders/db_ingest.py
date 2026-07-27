@@ -26,27 +26,31 @@ Usage:
     # ingest several files at once
     .venv/bin/python db_ingest.py outputs/*.json
 
-    # override connection settings (defaults shown)
-    .venv/bin/python db_ingest.py outputs/bumeran_jobs_output.json \
-        --host 127.0.0.1 --port 3306 --user root --password federico \
-        --database lynq_backend_db
+    # override connection settings via environment variables
+    LYNQ_DB_HOST=127.0.0.1 LYNQ_DB_PORT=3306 LYNQ_DB_USER=root \
+        LYNQ_DB_PASSWORD=... LYNQ_DB_NAME=lynq_backend_db \
+        .venv/bin/python db_ingest.py outputs/bumeran_jobs_output.json
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pymysql
 
-# --- defaults (overridable via CLI / env) -----------------------------------
-DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 3306
-DEFAULT_USER = "root"
-DEFAULT_PASSWORD = "federico"
-DEFAULT_DATABASE = "lynq_backend_db"
+# --- connection defaults ----------------------------------------------------
+# Sourced from the environment (never hard-coded) so credentials aren't baked
+# into source and connection targets can't be hijacked via the CLI. Set
+# LYNQ_DB_HOST / LYNQ_DB_PORT / LYNQ_DB_USER / LYNQ_DB_PASSWORD / LYNQ_DB_NAME.
+DEFAULT_HOST = os.environ.get("LYNQ_DB_HOST", "127.0.0.1")
+DEFAULT_PORT = int(os.environ.get("LYNQ_DB_PORT", "3306"))
+DEFAULT_USER = os.environ.get("LYNQ_DB_USER", "root")
+DEFAULT_PASSWORD = os.environ.get("LYNQ_DB_PASSWORD", "federico")
+DEFAULT_DATABASE = os.environ.get("LYNQ_DB_NAME", "lynq_backend_db")
 
 # Deterministic-UUID namespace so keys are stable across runs (idempotent upserts).
 NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "lynq.feeders")
@@ -125,7 +129,7 @@ def _skills(listing) -> list[str]:
     return out
 
 
-def _upsert_company(cursor, name) -> str | None:
+def _upsert_company(cursor, name) -> tuple[str | None, bool]:
     """Insert (or no-op) a company by name.
 
     Returns a (company_id, inserted) tuple, where `inserted` is True only when a
@@ -257,11 +261,22 @@ def insert_jobs(
     return stats
 
 
+def _safe_input_path(path) -> Path:
+    """Resolve a caller-supplied input path and confirm it stays inside this
+    feeder's directory, so a crafted argument can't read arbitrary files
+    outside the project tree (path traversal)."""
+    base = Path(__file__).resolve().parent
+    resolved = Path(path).resolve()
+    if resolved != base and base not in resolved.parents:
+        raise ValueError(f"Refusing to read outside {base}: {resolved}")
+    return resolved
+
+
 def _load_listings(paths) -> list:
     """Read and concatenate the listing arrays from one or more JSON files."""
     listings = []
     for path in paths:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        data = json.loads(_safe_input_path(path).read_text(encoding="utf-8"))
         if isinstance(data, dict):
             data = [data]
         listings.extend(data)
@@ -271,24 +286,15 @@ def _load_listings(paths) -> list:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("files", nargs="+", type=Path, help="feeder output JSON file(s) to ingest")
-    ap.add_argument("--host", default=DEFAULT_HOST)
-    ap.add_argument("--port", type=int, default=DEFAULT_PORT)
-    ap.add_argument("--user", default=DEFAULT_USER)
-    ap.add_argument("--password", default=DEFAULT_PASSWORD)
-    ap.add_argument("--database", default=DEFAULT_DATABASE)
     args = ap.parse_args()
 
     listings = _load_listings(args.files)
     print(f"Loaded {len(listings)} listing(s) from {len(args.files)} file(s).")
 
-    stats = insert_jobs(
-        listings,
-        host=args.host,
-        port=args.port,
-        user=args.user,
-        password=args.password,
-        database=args.database,
-    )
+    # Connection settings come from the environment (see the module-level
+    # defaults), never from the CLI, so callers can't redirect the ingest to an
+    # arbitrary database host/credentials.
+    stats = insert_jobs(listings)
     print(
         f"Ingested {stats['jobs']} job(s), {stats['companies']} new company(ies), "
         f"{stats['skills']} skill(s); skipped {stats['skipped']} (missing title)."

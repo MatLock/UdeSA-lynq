@@ -46,6 +46,17 @@ USER_AGENTS = [
 ]
 
 
+def _safe_output_path(path: Path) -> Path:
+    """Resolve a caller-supplied output path and confirm it stays inside this
+    feeder's directory, so a crafted --out cannot escape the project tree
+    (path traversal) before we touch the filesystem."""
+    base = Path(__file__).resolve().parent
+    resolved = path.resolve()
+    if resolved != base and base not in resolved.parents:
+        raise ValueError(f"Refusing to write outside {base}: {resolved}")
+    return resolved
+
+
 def slugify(text: str) -> str:
     """'Desarrollador Python' -> 'desarrollador-python'."""
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
@@ -108,9 +119,15 @@ def _new_session() -> requests.Session:
     return session
 
 
+def _pick_user_agent() -> str:
+    # Not security-sensitive: `random` only rotates a cosmetic User-Agent header
+    # for polite scraping; unpredictability/crypto strength is irrelevant here.
+    return random.choice(USER_AGENTS)  # NOSONAR
+
+
 def _warmup(session: requests.Session) -> None:
     """Visit a public page to (re)acquire the Cloudflare __cf_bm cookie."""
-    session.get(WARMUP_URL, headers={"User-Agent": random.choice(USER_AGENTS)}, timeout=25)
+    session.get(WARMUP_URL, headers={"User-Agent": _pick_user_agent()}, timeout=25)
 
 
 def _is_challenge(text: str) -> bool:
@@ -131,7 +148,7 @@ def fetch_search(session: requests.Session, query: str, api_page: int,
     }
     url = f"{API}?pageSize={page_size}&page={api_page}&sort=RECIENTES"
     for attempt in range(max_retries):
-        resp = session.post(url, json=body, headers={"User-Agent": random.choice(USER_AGENTS)}, timeout=25)
+        resp = session.post(url, json=body, headers={"User-Agent": _pick_user_agent()}, timeout=25)
         if resp.status_code == 200 and not _is_challenge(resp.text):
             return resp.json()
         wait = (2 ** attempt) + random.uniform(0, 1.5)
@@ -194,9 +211,10 @@ def main() -> None:
     jobs = scrape(args.query, page=args.page, page_limit=args.page_limit)
     print(f"\nGot {len(jobs)} jobs (latest first).")
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(jobs, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"Wrote -> {args.out}")
+    out_path = _safe_output_path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(jobs, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"Wrote -> {out_path}")
 
 
 if __name__ == "__main__":

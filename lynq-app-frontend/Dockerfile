@@ -9,7 +9,7 @@ ENV LYNQ_IAM_BASE_URL=${LYNQ_IAM_BASE_URL}
 ENV LYNQ_BACKEND_BASE_URL=${LYNQ_BACKEND_BASE_URL}
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build
 

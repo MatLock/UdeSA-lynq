@@ -111,6 +111,9 @@ resource "aws_instance" "redis_db" {
   instance_type = var.ec2_instance_type
   subnet_id     = var.subnet_id
 
+  # Reachable only over the internal VPC network; no public IP.
+  associate_public_ip_address = false
+
   vpc_security_group_ids = [
     aws_security_group.mysql.id,
     aws_security_group.redis.id,
