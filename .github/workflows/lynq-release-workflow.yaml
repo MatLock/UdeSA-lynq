@@ -217,7 +217,6 @@ jobs:
       - name: Code Checkout
         uses: actions/checkout@v5
         with:
-          # Full history: SonarCloud uses it to attribute issues to new code.
           fetch-depth: 0
           ref: main
 
@@ -237,9 +236,6 @@ jobs:
           mvn -B -q -f lynq-app-backend/pom.xml clean test-compile
 
       - name: SonarCloud Scan
-        # sonar.qualitygate.wait=true makes the scanner block until SonarCloud
-        # finishes processing and returns the gate; a red gate exits non-zero,
-        # failing this job (and therefore blocking the release).
         uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -339,10 +335,6 @@ jobs:
           context: lynq-app-frontend
           file: lynq-app-frontend/Dockerfile
           push: true
-          # Local-testing image: the SPA bakes the ingress URLs at build time, so
-          # these point at the local shared host (lynq.local), letting a new user
-          # bring the frontend up with just `helm install`. In prod the frontend
-          # is served from Cloudflare, not from this image.
           build-args: |
             LYNQ_IAM_BASE_URL=http://lynq.local/lynq-iam
             LYNQ_BACKEND_BASE_URL=http://lynq.local/lynq-backend-app
