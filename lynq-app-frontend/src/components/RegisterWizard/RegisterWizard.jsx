@@ -41,7 +41,7 @@ const RegisterWizard = () => {
             const isActive = index === step
             return (
               <div
-                key={index}
+                key={StepComponent.name}
                 ref={(el) => (slideRefs.current[index] = el)}
                 className="register-wizard-slide"
                 aria-hidden={!isActive}

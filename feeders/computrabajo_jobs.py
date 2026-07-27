@@ -42,6 +42,29 @@ USER_AGENTS = [
 ]
 
 
+# Shared, precompiled patterns (defining the digit literal once — see _first_int).
+_DIGIT_RE = re.compile(r"(\d+)")
+_HOURS_RE = re.compile(r"(\d+)\s{0,3}hora")
+_MINUTES_RE = re.compile(r"(\d+)\s{0,3}minuto")
+
+
+def _pick_user_agent() -> str:
+    # Not security-sensitive: `random` only rotates a cosmetic User-Agent header
+    # for polite scraping; unpredictability/crypto strength is irrelevant here.
+    return random.choice(USER_AGENTS)  # NOSONAR
+
+
+def _safe_output_path(path: Path) -> Path:
+    """Resolve a caller-supplied output path and confirm it stays inside this
+    feeder's directory, so a crafted --out cannot escape the project tree
+    (path traversal) before we touch the filesystem."""
+    base = Path(__file__).resolve().parent
+    resolved = path.resolve()
+    if resolved != base and base not in resolved.parents:
+        raise ValueError(f"Refusing to write outside {base}: {resolved}")
+    return resolved
+
+
 def slugify(text: str) -> str:
     """'Desarrollador Python' -> 'desarrollador-python' (Computrabajo SEO slug)."""
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
@@ -56,34 +79,40 @@ def _txt(node) -> str | None:
     return t or None
 
 
+def _first_int(text: str, default: int = 1) -> int:
+    """First integer found in `text`, or `default` if there is none."""
+    m = _DIGIT_RE.search(text)
+    return int(m.group(1)) if m else default
+
+
+def _recent_delta(s: str) -> timedelta:
+    """Delta for 'hoy' / 'hace N horas' / 'hace N minutos' strings."""
+    m = _HOURS_RE.search(s)
+    if m:
+        return timedelta(hours=int(m.group(1)))
+    m = _MINUTES_RE.search(s)
+    if m:
+        return timedelta(minutes=int(m.group(1)))
+    return timedelta(0)
+
+
 def parse_relative_date(raw: str | None, now: datetime):
     """Turn 'Hace 6 horas' / 'Ayer' / 'Hace 3 dias' into an epoch-ms timestamp."""
     if not raw:
         return None
     s = unicodedata.normalize("NFKD", raw).encode("ascii", "ignore").decode().lower()
     if "hoy" in s or "hora" in s or "minuto" in s or "segundo" in s:
-        delta = timedelta(0)
-        m = re.search(r"(\d+)\s*hora", s)
-        if m:
-            delta = timedelta(hours=int(m.group(1)))
-        m = re.search(r"(\d+)\s*minuto", s)
-        if m:
-            delta = timedelta(minutes=int(m.group(1)))
-        dt = now - delta
+        dt = now - _recent_delta(s)
     elif "ayer" in s:
         dt = now - timedelta(days=1)
     elif "dia" in s:
-        m = re.search(r"(\d+)", s)
-        dt = now - timedelta(days=int(m.group(1)) if m else 1)
+        dt = now - timedelta(days=_first_int(s))
     elif "semana" in s:
-        m = re.search(r"(\d+)", s)
-        dt = now - timedelta(weeks=int(m.group(1)) if m else 1)
+        dt = now - timedelta(weeks=_first_int(s))
     elif "mes" in s:
-        m = re.search(r"(\d+)", s)
-        dt = now - timedelta(days=30 * (int(m.group(1)) if m else 1))
+        dt = now - timedelta(days=30 * _first_int(s))
     elif "ano" in s:  # "año"
-        m = re.search(r"(\d+)", s)
-        dt = now - timedelta(days=365 * (int(m.group(1)) if m else 1))
+        dt = now - timedelta(days=365 * _first_int(s))
     else:
         return None
     return int(dt.timestamp() * 1000)
@@ -179,7 +208,7 @@ def _get(session: requests.Session, url: str, max_retries: int = 4) -> str:
     """GET a URL with retry/backoff on 403/429."""
     resp = None
     for attempt in range(max_retries):
-        resp = session.get(url, headers={"User-Agent": random.choice(USER_AGENTS)}, timeout=25)
+        resp = session.get(url, headers={"User-Agent": _pick_user_agent()}, timeout=25)
         if resp.status_code == 200:
             return resp.text
         if resp.status_code in (403, 429):
@@ -233,7 +262,7 @@ def fetch_detail(session: requests.Session, url: str | None) -> dict:
     out["skills"] = ", ".join(dict.fromkeys(tags)) or None
 
     # Experience: "5 años de experiencia" in the requirements block, if present.
-    m = re.search(r"(\d+)\s+a[nñ]os?\s+de\s+experiencia", block.get_text(" ", strip=True), re.I)
+    m = re.search(r"(\d+)\s{1,3}a[nñ]os?\s{1,3}de\s{1,3}experiencia", block.get_text(" ", strip=True), re.I)
     if m:
         out["experienceLevel"] = f"{m.group(1)} años de experiencia"
     return out
@@ -316,9 +345,10 @@ def main() -> None:
     jobs = scrape(args.query, page=args.page, page_limit=args.page_limit, details=args.details)
     print(f"\nGot {len(jobs)} jobs (latest first).")
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(jobs, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"Wrote -> {args.out}")
+    out_path = _safe_output_path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(jobs, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"Wrote -> {out_path}")
 
 
 if __name__ == "__main__":

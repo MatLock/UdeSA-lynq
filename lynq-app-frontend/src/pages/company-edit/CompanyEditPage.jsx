@@ -142,15 +142,22 @@ const CompanyEditPage = () => {
         <h1 className="login-title">{t.title}</h1>
         <p className="login-subtitle">{t.subtitle}</p>
 
-        {loading ? (
-          <div className="company-edit-loading">
-            <Spinner label={t.loading} />
-          </div>
-        ) : loadError ? (
-          <p className="company-edit-error company-edit-load-error" role="alert">
-            {loadError}
-          </p>
-        ) : (
+        {(() => {
+          if (loading) {
+            return (
+              <div className="company-edit-loading">
+                <Spinner label={t.loading} />
+              </div>
+            )
+          }
+          if (loadError) {
+            return (
+              <p className="company-edit-error company-edit-load-error" role="alert">
+                {loadError}
+              </p>
+            )
+          }
+          return (
           <form className="company-edit-form" onSubmit={handleSubmit} noValidate>
             <div className="company-edit-logo-field">
               <button
@@ -238,7 +245,8 @@ const CompanyEditPage = () => {
               {t.save}
             </button>
           </form>
-        )}
+          )
+        })()}
       </main>
     </div>
   )

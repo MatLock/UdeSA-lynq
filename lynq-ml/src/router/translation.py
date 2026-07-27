@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, Header, HTTPException
@@ -24,11 +25,16 @@ router = APIRouter()
 _LOG_CONTEXT = "user_id=%s, language=%s"
 
 
-@router.post("/translate", response_model=GlobalRestResponse[Resume])
+@router.post(
+    "/translate",
+    responses={
+        502: {"description": "The upstream LLM request failed or returned malformed output."},
+    },
+)
 async def translate(
     body: TranslateRequest,
-    lynq_request_uuid: str = Header(alias="lynq-request-uuid"),
-    user_id: str = Header(alias="user-id"),
+    lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
+    user_id: Annotated[str, Header(alias="user-id")],
 ) -> GlobalRestResponse[Resume]:
     """Translate every value of a resume JSON into the requested language.
 

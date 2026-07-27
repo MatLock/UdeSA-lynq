@@ -1,4 +1,4 @@
-import { createContext, useCallback, useState } from 'react'
+import { createContext, useCallback, useMemo, useState } from 'react'
 
 // Holds the registration wizard's data, its current step, AND the config for the
 // static footer (the action buttons that live below the carousel). State lives
@@ -30,10 +30,13 @@ const RegisterProvider = ({ children }) => {
     setStep(0)
   }, [])
 
+  const value = useMemo(
+    () => ({ data, updateData, step, next, back, goTo, reset, footer, setFooter }),
+    [data, updateData, step, next, back, goTo, reset, footer, setFooter],
+  )
+
   return (
-    <RegisterContext.Provider
-      value={{ data, updateData, step, next, back, goTo, reset, footer, setFooter }}
-    >
+    <RegisterContext.Provider value={value}>
       {children}
     </RegisterContext.Provider>
   )

@@ -75,7 +75,7 @@ class ParseResumeRouterTests(unittest.TestCase):
         self.assertEqual(data["skills"]["technical"], ["Java", "AWS"])
         # Defaulted fields are present even when the model omits them.
         self.assertEqual(data["education"], [])
-        self.assertEqual(data["personal_info"]["links"]["linkedin"], None)
+        self.assertIsNone(data["personal_info"]["links"]["linkedin"])
         fake.generate.assert_awaited_once()
 
     def test_prompt_is_built_from_resume_text(self) -> None:

@@ -135,17 +135,25 @@ const JobCandidatesPage = () => {
       </header>
 
       <main className="job-candidates-results">
-        {loading ? (
-          <div className="job-candidates-state">
-            <Spinner label={t.loading} />
-          </div>
-        ) : error ? (
-          <p className="job-candidates-state job-candidates-error">{t.error}</p>
-        ) : candidates.length === 0 ? (
-          <div className="job-candidates-state job-candidates-empty">
-            <p>{t.empty}</p>
-          </div>
-        ) : (
+        {(() => {
+          if (loading) {
+            return (
+              <div className="job-candidates-state">
+                <Spinner label={t.loading} />
+              </div>
+            )
+          }
+          if (error) {
+            return <p className="job-candidates-state job-candidates-error">{t.error}</p>
+          }
+          if (candidates.length === 0) {
+            return (
+              <div className="job-candidates-state job-candidates-empty">
+                <p>{t.empty}</p>
+              </div>
+            )
+          }
+          return (
           <div className="job-candidates-list">
             {candidates.map((candidate) => {
               const appliedOn = formatRelativeDate(candidate.userAppliedOn)
@@ -233,7 +241,8 @@ const JobCandidatesPage = () => {
               )
             })}
           </div>
-        )}
+          )
+        })()}
       </main>
 
       {!loading && !error && candidates.length > 0 && (

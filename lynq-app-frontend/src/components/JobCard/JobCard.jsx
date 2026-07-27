@@ -28,12 +28,11 @@ const CHIP_SX = {
 
 // The work-type chip is filled with the matching brand color; an unknown type
 // falls back to the brand blend.
-const workTypeBg = (workType) =>
-  workType === 'REMOTE'
-    ? 'var(--brand-blue)'
-    : workType === 'IN_OFFICE'
-      ? 'var(--brand-purple)'
-      : 'var(--brand-gradient)'
+const workTypeBg = (workType) => {
+  if (workType === 'REMOTE') return 'var(--brand-blue)'
+  if (workType === 'IN_OFFICE') return 'var(--brand-purple)'
+  return 'var(--brand-gradient)'
+}
 
 // Human-friendly names for scraped sources; unknown values pass through as-is.
 const SOURCE_LABELS = {
@@ -57,6 +56,69 @@ const scoreColorVar = (score) => {
 // dropped so short descriptions stay untouched.
 const truncate = (text, max) =>
   text && text.length > max ? `${text.slice(0, max).trimEnd()}…` : text ?? ''
+
+// The posting-meta row: either the scraped-source badge (external posts) or the
+// poster's avatar + name, followed by the relative publish time. Split out from
+// JobCard so the card's own render stays readable.
+const JobCardMeta = ({ isExternal, jobPostSource, poster, publishedAt }) => {
+  const t = strings.jobCard
+  return (
+    <div className="job-card-meta">
+      {isExternal ? (
+        <span
+          className="job-card-source"
+          title={`${t.source} ${prettySource(jobPostSource)}`}
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+            <path
+              d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+          {prettySource(jobPostSource)}
+        </span>
+      ) : (
+        <>
+          <span className="job-card-poster-avatar">
+            {poster?.profileImageUrl ? (
+              <img src={poster.profileImageUrl} alt={poster.fullName ?? ''} />
+            ) : (
+              <UserIcon />
+            )}
+          </span>
+          <span className="job-card-poster-name">
+            <span className="job-card-poster-label">{t.postedBy}</span>
+            {/* The name links to the poster's user detail page (created
+                later) — not the signed-in user's own /profile. Falls back to
+                plain text when the post has no identified poster. */}
+            {poster?.id ? (
+              <Link to={`/user/${poster.id}`} className="job-card-poster-value">
+                {poster.fullName ?? t.unknownPoster}
+              </Link>
+            ) : (
+              <span className="job-card-poster-value">
+                {poster?.fullName ?? t.unknownPoster}
+              </span>
+            )}
+          </span>
+        </>
+      )}
+      {publishedAt && (
+        <>
+          <span className="job-card-meta-sep" aria-hidden="true">
+            •
+          </span>
+          <span className="job-card-published">
+            {t.published} {publishedAt}
+          </span>
+        </>
+      )}
+    </div>
+  )
+}
 
 const JobCard = ({
   job,
@@ -194,60 +256,12 @@ const JobCard = ({
           </div>
         )}
 
-        <div className="job-card-meta">
-          {isExternal ? (
-            <span
-              className="job-card-source"
-              title={`${t.source} ${prettySource(job.jobPostSource)}`}
-            >
-              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
-                <path
-                  d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-              {prettySource(job.jobPostSource)}
-            </span>
-          ) : (
-            <>
-              <span className="job-card-poster-avatar">
-                {poster?.profileImageUrl ? (
-                  <img src={poster.profileImageUrl} alt={poster.fullName ?? ''} />
-                ) : (
-                  <UserIcon />
-                )}
-              </span>
-              <span className="job-card-poster-name">
-                <span className="job-card-poster-label">{t.postedBy}</span>
-                {/* The name links to the poster's user detail page (created
-                    later) — not the signed-in user's own /profile. Falls back to
-                    plain text when the post has no identified poster. */}
-                {poster?.id ? (
-                  <Link to={`/user/${poster.id}`} className="job-card-poster-value">
-                    {poster.fullName ?? t.unknownPoster}
-                  </Link>
-                ) : (
-                  <span className="job-card-poster-value">
-                    {poster?.fullName ?? t.unknownPoster}
-                  </span>
-                )}
-              </span>
-            </>
-          )}
-          {publishedAt && (
-            <>
-              <span className="job-card-meta-sep" aria-hidden="true">
-                •
-              </span>
-              <span className="job-card-published">
-                {t.published} {publishedAt}
-              </span>
-            </>
-          )}
-        </div>
+        <JobCardMeta
+          isExternal={isExternal}
+          jobPostSource={job.jobPostSource}
+          poster={poster}
+          publishedAt={publishedAt}
+        />
       </div>
 
       {/* Trailing column on the far right: the action (Edit / See details) on

@@ -13,20 +13,23 @@ WORKDIR /app
 # Native libraries required by WeasyPrint (Pango/Cairo/GDK-PixBuf) plus base
 # fonts so PDFs render text (including accents) correctly.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      libpango-1.0-0 \
-      libpangocairo-1.0-0 \
-      libgdk-pixbuf-2.0-0 \
+      fonts-dejavu-core \
       libcairo2 \
       libffi8 \
-      fonts-dejavu-core \
+      libgdk-pixbuf-2.0-0 \
+      libpango-1.0-0 \
+      libpangocairo-1.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies first so the layer is cached across code changes.
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --only-binary :all: -r requirements.txt
 
-# Copy the application source.
-COPY . .
+# Copy the application source. Copy only the paths the service needs at
+# runtime (avoids recursively pulling in unrelated/sensitive files).
+COPY src/ ./src/
+COPY resources/ ./resources/
+COPY VERSION ./
 
 # Run as a non-root user.
 RUN useradd --create-home --uid 1000 appuser \

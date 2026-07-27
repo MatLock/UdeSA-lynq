@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, status
 from fastapi.concurrency import run_in_threadpool
@@ -27,12 +28,15 @@ _LOG_CONTEXT = "user_id=%s, template=%s"
 @router.post(
     "/resume-template-creation",
     status_code=status.HTTP_201_CREATED,
-    response_model=GlobalRestResponse,
+    responses={
+        500: {"description": "The resume PDF could not be rendered."},
+        502: {"description": "The rendered PDF could not be uploaded to storage."},
+    },
 )
 async def create_resume_template(
     body: ResumeTemplateCreationRequest,
-    lynq_request_uuid: str = Header(alias="lynq-request-uuid"),
-    user_id: str = Header(alias="user-id"),
+    lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
+    user_id: Annotated[str, Header(alias="user-id")],
 ) -> GlobalRestResponse:
     """Render the resume into a styled PDF and upload it to the presigned URL.
 

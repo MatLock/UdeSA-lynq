@@ -120,21 +120,24 @@ const HomePage = () => {
       </header>
 
       <main className="home-results">
-        {loading ? (
-          <div className="home-state">
-            <Spinner label={t.loading} />
-          </div>
-        ) : error ? (
-          <p className="home-state home-error">{t.error}</p>
-        ) : jobs.length === 0 ? (
-          <p className="home-state">{t.empty}</p>
-        ) : (
-          <div className="home-jobs">
-            {jobs.map((job) => (
-              <JobCard key={job.jobId} job={job} showScore={!isCompany} />
-            ))}
-          </div>
-        )}
+        {(() => {
+          if (loading) {
+            return (
+              <div className="home-state">
+                <Spinner label={t.loading} />
+              </div>
+            )
+          }
+          if (error) return <p className="home-state home-error">{t.error}</p>
+          if (jobs.length === 0) return <p className="home-state">{t.empty}</p>
+          return (
+            <div className="home-jobs">
+              {jobs.map((job) => (
+                <JobCard key={job.jobId} job={job} showScore={!isCompany} />
+              ))}
+            </div>
+          )
+        })()}
       </main>
 
       {!loading && !error && (

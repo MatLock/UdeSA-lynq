@@ -93,7 +93,7 @@ body {
   margin-bottom: 1.6mm;
   font-size: 8.8pt;
   color: var(--sidebar-fg);
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .dots li {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, Header, HTTPException
@@ -23,12 +24,17 @@ router = APIRouter()
 _LOG_CONTEXT = "user_id=%s, company_id=%s"
 
 
-@router.post("/skill-enhance", response_model=GlobalRestResponse[SkillEnhanceResponse])
+@router.post(
+    "/skill-enhance",
+    responses={
+        502: {"description": "The upstream LLM request failed or returned malformed output."},
+    },
+)
 async def skill_enhance(
     body: SkillEnhanceRequest,
-    lynq_request_uuid: str = Header(alias="lynq-request-uuid"),
-    user_id: str = Header(alias="user-id"),
-    company_id: str = Header(alias="company-id"),
+    lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
+    user_id: Annotated[str, Header(alias="user-id")],
+    company_id: Annotated[str, Header(alias="company-id")],
 ) -> GlobalRestResponse[SkillEnhanceResponse]:
     """Extract 5-15 key technical skills from a job posting."""
     log.info(

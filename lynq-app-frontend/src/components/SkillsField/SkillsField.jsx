@@ -81,6 +81,10 @@ const SkillsField = ({
     }
   }
 
+  let generateLabel = t.generate
+  if (generating) generateLabel = t.generating
+  else if (skills.length > 0) generateLabel = t.regenerate
+
   return (
     <section className="skills-field">
       {/* Skill generation can take a moment; block the whole page with the brand
@@ -116,7 +120,7 @@ const SkillsField = ({
             title={canGenerate ? undefined : t.generateHint}
           >
             <AutoAwesomeOutlinedIcon sx={{ fontSize: 16 }} />
-            {generating ? t.generating : skills.length > 0 ? t.regenerate : t.generate}
+            {generateLabel}
           </button>
         </div>
 

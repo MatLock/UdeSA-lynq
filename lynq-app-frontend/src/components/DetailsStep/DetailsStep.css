@@ -18,16 +18,13 @@
 }
 
 /* Field: label on top, then an icon + input row that stays vertically centered
-   regardless of input/icon size (no magic offsets). */
+   regardless of input/icon size (no magic offsets).
+   --icon-col = icon width (26) + control gap (8); used to align the label and
+   error text with the input edge, to the right of the icon. */
 .details-field {
   display: flex;
   flex-direction: column;
   gap: 3px;
-}
-
-/* --icon-col = icon width (26) + control gap (8); used to align the label and
-   error text with the input edge, to the right of the icon. */
-.details-field {
   --icon-col: 34px;
 }
 

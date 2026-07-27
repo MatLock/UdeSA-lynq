@@ -25,6 +25,17 @@ DATASET = "datastax/linkedin_job_listings"
 OUTPUT = Path(__file__).parent / "outputs" / "linked_jobs_output.json"
 
 
+def _safe_output_path(path: Path) -> Path:
+    """Resolve a caller-supplied output path and confirm it stays inside this
+    feeder's directory, so a crafted --out cannot escape the project tree
+    (path traversal) before we touch the filesystem."""
+    base = Path(__file__).resolve().parent
+    resolved = path.resolve()
+    if resolved != base and base not in resolved.parents:
+        raise ValueError(f"Refusing to write outside {base}: {resolved}")
+    return resolved
+
+
 def _clean(value):
     """Normalize the dataset's stringly-typed nulls ('None', '', 'nan') to None."""
     if value is None:
@@ -113,9 +124,10 @@ def main() -> None:
 
     jobs = [normalize(row) for row in rows]
 
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(jobs, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"Wrote {len(jobs)} jobs -> {args.out}")
+    out_path = _safe_output_path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(jobs, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"Wrote {len(jobs)} jobs -> {out_path}")
 
 
 if __name__ == "__main__":

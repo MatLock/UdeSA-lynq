@@ -33,7 +33,7 @@ export OPENAI_MODEL="${OPENAI_MODEL:-gpt-4o-mini}"
 export OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}"
 
 # Warn early if OpenAI is selected without an API key.
-if [ "$LLM_PROVIDER" = "openai" ] && [ -z "$OPENAI_API_KEY" ]; then
+if [[ "$LLM_PROVIDER" == "openai" ]] && [[ -z "$OPENAI_API_KEY" ]]; then
   echo "WARNING: LLM_PROVIDER=openai but OPENAI_API_KEY is empty." >&2
 fi
 

@@ -16,6 +16,39 @@ resource "aws_s3_bucket_public_access_block" "lynq" {
   restrict_public_buckets = true
 }
 
+# Enforce HTTPS-only access: deny any request made over plain HTTP. This is a
+# Deny statement (not a public grant), so it coexists with the public-access
+# block above.
+data "aws_iam_policy_document" "lynq_https_only" {
+  statement {
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.lynq.arn,
+      "${aws_s3_bucket.lynq.arn}/*",
+    ]
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "lynq" {
+  bucket     = aws_s3_bucket.lynq.id
+  policy     = data.aws_iam_policy_document.lynq_https_only.json
+  depends_on = [aws_s3_bucket_public_access_block.lynq]
+}
+
 # CORS so the browser can PUT/GET directly against the pre-signed URLs the
 # backend hands out.
 resource "aws_s3_bucket_cors_configuration" "lynq" {
@@ -28,6 +61,64 @@ resource "aws_s3_bucket_cors_configuration" "lynq" {
     expose_headers  = ["ETag"]
     max_age_seconds = 3000
   }
+}
+
+# ---------------------------------------------------------------------------
+# Server access logging. Logs are delivered to a dedicated, private log bucket
+# (a log bucket does not log itself, to avoid a delivery loop).
+# ---------------------------------------------------------------------------
+data "aws_caller_identity" "current" {}
+
+resource "aws_s3_bucket" "lynq_logs" {
+  bucket = "${var.s3_bucket_name}-logs"
+}
+
+resource "aws_s3_bucket_public_access_block" "lynq_logs" {
+  bucket                  = aws_s3_bucket.lynq_logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Allow the S3 log delivery service to write access logs into the log bucket.
+data "aws_iam_policy_document" "lynq_logs" {
+  statement {
+    sid    = "S3ServerAccessLogsPolicy"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["logging.s3.amazonaws.com"]
+    }
+
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.lynq_logs.arn}/*"]
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = [aws_s3_bucket.lynq.arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "lynq_logs" {
+  bucket     = aws_s3_bucket.lynq_logs.id
+  policy     = data.aws_iam_policy_document.lynq_logs.json
+  depends_on = [aws_s3_bucket_public_access_block.lynq_logs]
+}
+
+resource "aws_s3_bucket_logging" "lynq" {
+  bucket        = aws_s3_bucket.lynq.id
+  target_bucket = aws_s3_bucket.lynq_logs.id
+  target_prefix = "s3-access-logs/"
 }
 
 # ---------------------------------------------------------------------------

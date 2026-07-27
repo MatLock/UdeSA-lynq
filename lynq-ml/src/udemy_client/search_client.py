@@ -29,11 +29,11 @@ _DDG_HTML_URL = "https://html.duckduckgo.com/html/"
 _COURSE_URL_RE = re.compile(r"^https://www\.udemy\.com/course/[^/?#]+/?$")
 
 # DuckDuckGo wraps each organic result target in a `uddg=<url-encoded>` redirect
-# parameter; ad results use a different (`y.js`) redirect we skip via the regex.
-_RESULT_ANCHOR_RE = re.compile(
-    r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>',
-    re.DOTALL,
-)
+# parameter; ad results use a different (`y.js`) redirect we skip when parsing.
+# A single non-backtracking attribute capture (`[^>]*`) keeps matching linear;
+# the class filter and href are resolved from the captured attributes in code.
+_RESULT_ANCHOR_RE = re.compile(r"<a\s([^>]*)>(.*?)</a>", re.DOTALL)
+_HREF_RE = re.compile(r'href="([^"]+)"')
 _TAG_RE = re.compile(r"<[^>]+>")
 
 
@@ -98,7 +98,13 @@ class UdemySearchClient:
         """Extract deduplicated ``(title, url)`` course results from HTML."""
         courses: list[Course] = []
         seen: set[str] = set()
-        for href, text in _RESULT_ANCHOR_RE.findall(body):
+        for attrs, text in _RESULT_ANCHOR_RE.findall(body):
+            if 'class="result__a"' not in attrs:
+                continue
+            href_match = _HREF_RE.search(attrs)
+            if not href_match:
+                continue
+            href = href_match.group(1)
             match = re.search(r"uddg=([^&\"]+)", href)
             if not match:
                 continue
