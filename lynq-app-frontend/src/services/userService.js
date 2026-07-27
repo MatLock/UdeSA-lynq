@@ -131,6 +131,88 @@ const generate_profile_image_upload_url = async (authFetch, fileName) => {
  * @returns {Promise<void>} Resolves once S3 accepts the upload.
  * @throws {Error} On a non-OK S3 response. Carries `status`.
  */
+/**
+ * Fetch a page of the authenticated candidate's job applications, most recent
+ * first.
+ *
+ * Calls GET /user/application?page&size (UserController.getUserApplications)
+ * through `authFetch`. The candidate is resolved from the bearer token; only
+ * CANDIDATE users may call it. Each entry describes the job applied to, its
+ * owning company's public fields, the date the application was submitted, and
+ * the candidate's LyNQ score against that job. `companyId`, `companyName` and
+ * `companyProfileImage` are null for scraped jobs that have no company.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
+ * @param {object} [params]
+ * @param {number} [params.page=0] - Zero-based page index.
+ * @param {number} [params.size=10] - Page size.
+ * @returns {Promise<{
+ *   content: Array<{
+ *     id: string,
+ *     jobId: string,
+ *     jobTitle: string,
+ *     jobDescription: string,
+ *     companyId: string | null,
+ *     companyName: string | null,
+ *     companyProfileImage: string | null,
+ *     appliedOn: string,
+ *     lynqScore: number | null,
+ *   }>,
+ *   page: number,
+ *   size: number,
+ *   totalElements: number,
+ *   totalPages: number,
+ *   hasNext: boolean,
+ *   hasPrevious: boolean,
+ * }>} The unwrapped PagedRestResponse of UserApplicationResponse.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const get_user_applications = async (authFetch, { page = 0, size = 10 } = {}) => {
+  const query = new URLSearchParams({ page: String(page), size: String(size) });
+  const payload = await authFetch(`/user/application?${query}`, { method: 'GET' });
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
+  return payload?.data;
+};
+
+/**
+ * Fetch the AI score explanation and course recommendations for one of the
+ * authenticated candidate's applications.
+ *
+ * Calls GET /user/upskilling-suggestion/{jobPostId}
+ * (UserController.suggestUpskilling) through `authFetch`. The backend asks
+ * lynq-ml to explain the candidate's LYNQ score against that job and, when the
+ * candidate isn't a perfect match, to suggest courses that close each skill gap.
+ * The correlation-id header the endpoint requires is added by authFetch, so we
+ * only pass the job id. Candidate-resolved from the bearer token.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
+ * @param {string} jobPostId - The applied-to job's id (application.jobId).
+ * @param {string} [language] - The caller's UI language code (e.g. `es`),
+ *   forwarded so lynq-ml writes the explanation and reasons in it. Defaults to
+ *   English at the backend when omitted.
+ * @returns {Promise<{
+ *   outcome: string,
+ *   reasons: string[],
+ *   suggestions: Array<{
+ *     query: string,
+ *     courses: Array<{ title: string, url: string }>,
+ *   }>,
+ * }>} The unwrapped UpskillingSuggestionResponse. `reasons` lists the concrete
+ *   gaps behind the score. Both `reasons` and `suggestions` are empty when the
+ *   candidate is a perfect match (then `outcome` carries the match message).
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const get_upskilling_suggestion = async (authFetch, jobPostId, language) => {
+  const query = language ? `?${new URLSearchParams({ language })}` : '';
+  const payload = await authFetch(`/user/upskilling-suggestion/${jobPostId}${query}`, {
+    method: 'GET',
+  });
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
+  return payload?.data;
+};
+
 const upload_profile_image = async (preSignedUrl, file) => {
   const response = await fetch(preSignedUrl, {
     method: 'PUT',
@@ -151,6 +233,8 @@ export default {
   get_user,
   get_user_profile,
   update_user_profile,
+  get_user_applications,
+  get_upskilling_suggestion,
   generate_profile_image_upload_url,
   upload_profile_image,
 };

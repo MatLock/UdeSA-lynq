@@ -16,10 +16,14 @@ spec:
       labels:
         app: lynq-app-frontend
     spec:
+      imagePullSecrets:
+        - name: dockerhub-secret
       containers:
         - name: lynq-app-frontend
           image: {{ .Values.lynq_app_frontend.image }}
-          # Locally-built image loaded into the cluster; never pull from a registry.
+          # Defaults to the image published per release (local ingress URLs baked
+          # in). IfNotPresent so an override to a locally-built/loaded image (e.g.
+          # lynq-app-frontend:local via `minikube image load`) is used as-is.
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

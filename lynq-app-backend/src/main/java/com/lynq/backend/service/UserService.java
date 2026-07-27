@@ -6,6 +6,8 @@ import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
+import com.lynq.backend.controller.response.PagedRestResponse;
+import com.lynq.backend.controller.response.UserApplicationResponse;
 import com.lynq.backend.controller.response.UserProfileCompanyRestResponse;
 import com.lynq.backend.controller.response.UserProfileJobRestResponse;
 import com.lynq.backend.exceptions.BadRequestException;
@@ -14,13 +16,18 @@ import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.model.UserResumeEntity;
+import com.lynq.backend.model.UserSkillsEntity;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
+import com.lynq.backend.repository.UserApplicationJobRepository;
 import com.lynq.backend.repository.UserRepository;
 import com.lynq.backend.repository.UserResumeRepository;
+import com.lynq.backend.repository.projection.UserApplicationProjection;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,22 +37,29 @@ public class UserService {
   private static final String USER_NOT_FOUND = "User '%s' not found";
   private static final String ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES =
       "Only users of type CANDIDATE can access resumes";
+  private static final String ONLY_CANDIDATE_USERS_CAN_VIEW_APPLICATIONS =
+      "Only users of type CANDIDATE can view their applications";
+  private static final String ONLY_CANDIDATE_USERS_CAN_UPLOAD_RESUMES =
+      "Only users of type CANDIDATE can upload resumes";
   private static final String RESUME_NOT_VALID_JSON = "Stored resume is not valid JSON";
 
   private final UserRepository userRepository;
   private final UserResumeRepository userResumeRepository;
   private final CompanyRepository companyRepository;
   private final JobPostRepository jobPostRepository;
+  private final UserApplicationJobRepository userApplicationJobRepository;
   private final StorageService storageService;
   private final ObjectMapper objectMapper;
 
   public UserService(UserRepository userRepository, UserResumeRepository userResumeRepository,
       CompanyRepository companyRepository, JobPostRepository jobPostRepository,
+      UserApplicationJobRepository userApplicationJobRepository,
       StorageService storageService, ObjectMapper objectMapper){
     this.userRepository = userRepository;
     this.userResumeRepository = userResumeRepository;
     this.companyRepository = companyRepository;
     this.jobPostRepository = jobPostRepository;
+    this.userApplicationJobRepository = userApplicationJobRepository;
     this.storageService = storageService;
     this.objectMapper = objectMapper;
   }
@@ -186,6 +200,19 @@ public class UserService {
 
   @AuditLog
   @Transactional(readOnly = true)
+  public String generateResumeUploadUrl(String userId, String fileName) {
+    UserEntity user = userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
+
+    if (user.getType() != UserType.CANDIDATE) {
+      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_UPLOAD_RESUMES);
+    }
+
+    return storageService.createUserResumePreSignedUrl(user, fileName).url();
+  }
+
+  @AuditLog
+  @Transactional(readOnly = true)
   public String obtainProfileImagePreSignedUrl(UserEntity user) {
     if (user.getProfileImageUrl() == null || user.getProfileImageUrl().isBlank()) {
       return null;
@@ -205,6 +232,52 @@ public class UserService {
 
     return userResumeRepository.findByUserId(userId).stream()
         .map(this::toResponse)
+        .toList();
+  }
+
+  @AuditLog
+  @Transactional(readOnly = true)
+  public PagedRestResponse<UserApplicationResponse> getUserApplications(String userId,
+      Pageable pageable) {
+    UserEntity user = userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
+
+    if (user.getType() != UserType.CANDIDATE) {
+      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_VIEW_APPLICATIONS);
+    }
+
+    // The candidate is the same for every application, so their skills are read once here rather
+    // than pulled per-row by the query, and reused to score each job the candidate applied to.
+    List<String> candidateSkills = user.getSkills() == null ? List.of() : user.getSkills().stream()
+        .map(UserSkillsEntity::getSkill)
+        .toList();
+
+    return PagedRestResponse.from(userApplicationJobRepository
+        .findApplicationsByUserId(userId, pageable)
+        .map(projection -> toApplicationResponse(projection, candidateSkills)));
+  }
+
+  private UserApplicationResponse toApplicationResponse(UserApplicationProjection projection,
+      List<String> candidateSkills) {
+    return UserApplicationResponse.builder()
+        .id(projection.id())
+        .jobId(projection.jobId())
+        .jobTitle(projection.jobTitle())
+        .jobDescription(projection.jobDescription())
+        .companyId(projection.companyId())
+        .companyName(projection.companyName())
+        .companyProfileImage(obtainImageUrl(projection.companyProfileImageUrl()))
+        .appliedOn(projection.appliedOn())
+        .lynqScore(LyNQScoreCalculator.score(splitSkills(projection.jobSkills()), candidateSkills))
+        .build();
+  }
+
+  private static List<String> splitSkills(String concatenatedSkills) {
+    if (concatenatedSkills == null || concatenatedSkills.isBlank()) {
+      return List.of();
+    }
+    return Arrays.stream(concatenatedSkills.split(","))
+        .map(String::trim)
         .toList();
   }
 

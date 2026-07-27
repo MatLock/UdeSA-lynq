@@ -22,6 +22,7 @@ public interface LynqMLClient {
   String REQUEST_UUID_HEADER = "lynq-request-uuid";
   String USER_ID_HEADER = "user-id";
   String COMPANY_ID_HEADER = "company-id";
+  String OUTPUT_LANGUAGE_HEADER = "output-language";
 
   @PostMapping("/skill-enhance")
   GlobalRestResponse<SkillEnhanceResponse> enhanceSkills(
@@ -35,7 +36,8 @@ public interface LynqMLClient {
       @RequestBody CandidateEvaluationRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
       @RequestHeader(USER_ID_HEADER) String userId,
-      @RequestHeader(COMPANY_ID_HEADER) String companyId);
+      @RequestHeader(COMPANY_ID_HEADER) String companyId,
+      @RequestHeader(OUTPUT_LANGUAGE_HEADER) String outputLanguage);
 
   @PostMapping("/candidate-explanation")
   GlobalRestResponse<CandidateExplanationResponse> candidateExplanation(

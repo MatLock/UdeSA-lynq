@@ -43,7 +43,20 @@ class RenderUpskillingPromptTests(unittest.TestCase):
         for provider in (LLMProvider.OLLAMA, LLMProvider.OPENAI):
             prompt = render_upskilling_prompt(provider, input_json=_INPUT_JSON)
             self.assertIn('"outcome"', prompt)
+            self.assertIn('"reasons"', prompt)
             self.assertIn('"search_queries"', prompt)
+
+    def test_language_code_is_resolved_to_name_in_prompt(self) -> None:
+        for provider in (LLMProvider.OLLAMA, LLMProvider.OPENAI):
+            prompt = render_upskilling_prompt(
+                provider, input_json=_INPUT_JSON, language="es"
+            )
+            self.assertIn("Spanish", prompt)
+
+    def test_language_defaults_to_english_when_omitted(self) -> None:
+        for provider in (LLMProvider.OLLAMA, LLMProvider.OPENAI):
+            prompt = render_upskilling_prompt(provider, input_json=_INPUT_JSON)
+            self.assertIn("English", prompt)
 
     def test_provider_selects_distinct_templates(self) -> None:
         ollama = render_upskilling_prompt(LLMProvider.OLLAMA, input_json=_INPUT_JSON)

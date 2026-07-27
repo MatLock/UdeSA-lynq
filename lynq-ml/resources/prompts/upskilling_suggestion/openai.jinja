@@ -18,13 +18,16 @@ You will receive a JSON with this structure:
 Rules:
 
 - Compare the job description, candidate description, and both skill lists.
-- Respond in the SAME LANGUAGE used in the input JSON.
+- Write all human-readable text (the outcome and every reason) in {{ language }}.
+- Search queries are the exception: keep the original technology, framework, or skill names (do not translate them).
 - If the candidate is an excellent match with no meaningful gaps:
-  - Set the outcome to exactly:
-    "You are perfect for this role."
+  - Set the outcome to the sentence "You are perfect for this role." written in {{ language }}.
+  - Return an empty array for reasons.
   - Return an empty array for search_queries.
 - Otherwise:
   - Write a concise paragraph explaining what the candidate should improve.
+  - Populate reasons with the specific, concrete reasons the candidate is NOT a perfect match — one short reason per array entry (between 1 and 5 reasons).
+  - Each reason should name the missing skill, technology, or experience and briefly say why it matters for this job.
   - Generate between 1 and 5 search queries that the candidate could use to find learning resources.
   - Each search query should focus on one missing competency or closely related group of competencies.
   - Search queries should be concise (2-6 words).
@@ -37,6 +40,10 @@ Return ONLY a valid JSON object with this exact structure:
 
 {
   "outcome": "<text>",
+  "reasons": [
+    "<reason>",
+    "<reason>"
+  ],
   "search_queries": [
     "<query>",
     "<query>"

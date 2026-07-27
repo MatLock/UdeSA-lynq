@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Annotated
 
 import httpx
@@ -25,6 +26,42 @@ router = APIRouter()
 # The lynq-request-uuid is rendered by the log formatter (MDC-style), so it is
 # not repeated here — only the request-specific identifiers the format omits.
 _LOG_CONTEXT = "user_id=%s, company_id=%s"
+
+# The recommendation is a language-independent machine key: the client keys both
+# its localized label and the badge color on it, so it must stay one of these
+# three literals regardless of the evaluation's language. The model is asked to
+# emit them verbatim, but for a non-English evaluation it sometimes returns a
+# human-readable label instead ("Not recommended", "No se recomienda"); map the
+# known variants back to the canonical key so the client can always localize it.
+_CANONICAL_RECOMMENDATIONS = frozenset({"hire", "no_hire", "maybe"})
+_RECOMMENDATION_ALIASES = {
+    # English human-readable labels.
+    "recommended": "hire",
+    "recommended_to_hire": "hire",
+    "not_recommended": "no_hire",
+    "consider_with_caution": "maybe",
+    # Spanish human-readable labels.
+    "se_recomienda_contratar": "hire",
+    "recomendado": "hire",
+    "contratar": "hire",
+    "no_se_recomienda": "no_hire",
+    "no_recomendado": "no_hire",
+    "considerar_con_cautela": "maybe",
+}
+
+
+def _normalize_recommendation(recommendation: str) -> str:
+    """Snap the model's recommendation to a canonical ``hire|no_hire|maybe`` key.
+
+    Slugifies the value (lowercase, spaces/hyphens to underscores) and, when it
+    is not already canonical, resolves it through the alias table. Unknown values
+    are returned as their slug so the client falls back to showing them verbatim
+    rather than losing the recommendation entirely.
+    """
+    slug = re.sub(r"[\s-]+", "_", recommendation.strip().lower())
+    if slug in _CANONICAL_RECOMMENDATIONS:
+        return slug
+    return _RECOMMENDATION_ALIASES.get(slug, slug)
 
 
 @router.post(
@@ -120,7 +157,7 @@ def _parse_llm_output(
             status_code=502, detail="LLM returned malformed output"
         ) from exc
     return CandidateExplanationResponse(
-        recommendation=recommendation,
+        recommendation=_normalize_recommendation(recommendation),
         explanation=explanation,
         strengths=strengths,
         concerns=concerns,

@@ -7,13 +7,19 @@ Evaluate whether the candidate perfectly matches the job.
 Rules:
 
 - Compare the job description, candidate description, and both skill lists.
-- Respond ONLY in the SAME LANGUAGE used in the input JSON.
+- Write all human-readable text (the outcome and every reason) ONLY in {{ language }}.
+- Search queries are the exception: keep the original technology, framework, or skill names (do not translate them).
 - If the candidate has no meaningful gaps:
-  - Set the outcome to exactly:
-    "You are perfect for this role."
+  - Set the outcome to the sentence "You are perfect for this role." written in {{ language }}.
+  - Return an empty array for reasons.
   - Return an empty array for search_queries.
 - Otherwise:
   - Write a short paragraph explaining what the candidate should improve.
+  - Populate reasons with the specific, concrete reasons the candidate is NOT a
+    perfect match — one short reason per array entry.
+  - Generate between 1 and 5 reasons.
+  - Each reason must name the missing skill, technology, or experience and
+    briefly say why it matters for this job.
   - Generate between 1 and 5 search queries.
   - Each search query should represent one missing competency.
   - Queries must contain between 2 and 6 words.
@@ -29,6 +35,10 @@ The output format must be exactly:
 
 {
   "outcome": "<text>",
+  "reasons": [
+    "<reason>",
+    "<reason>"
+  ],
   "search_queries": [
     "<query>",
     "<query>"

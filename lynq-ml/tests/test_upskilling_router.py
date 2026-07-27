@@ -55,8 +55,14 @@ def _fake_udemy(*, courses=None, search_side_effect=None):
     return udemy
 
 
-def _llm_output(outcome: str, queries: list[str]) -> str:
-    return json.dumps({"outcome": outcome, "search_queries": queries})
+def _llm_output(outcome: str, queries: list[str], reasons: list[str] | None = None) -> str:
+    return json.dumps(
+        {
+            "outcome": outcome,
+            "reasons": reasons if reasons is not None else [],
+            "search_queries": queries,
+        }
+    )
 
 
 class UpskillingRouterTests(unittest.TestCase):
@@ -66,7 +72,10 @@ class UpskillingRouterTests(unittest.TestCase):
         self.client = TestClient(app)
 
     def test_returns_outcome_and_courses_on_valid_output(self) -> None:
-        llm = _fake_llm(generate_return=_llm_output("Close, but improve infra.", _QUERIES))
+        reasons = ["Missing Kubernetes experience.", "No GraphQL exposure."]
+        llm = _fake_llm(
+            generate_return=_llm_output("Close, but improve infra.", _QUERIES, reasons)
+        )
         udemy = _fake_udemy(
             courses=[Course(title="K8s course", url="https://www.udemy.com/course/k8s/")]
         )
@@ -81,6 +90,7 @@ class UpskillingRouterTests(unittest.TestCase):
         self.assertTrue(payload["success"])
         data = payload["data"]
         self.assertEqual(data["outcome"], "Close, but improve infra.")
+        self.assertEqual(data["reasons"], reasons)
         self.assertEqual([s["query"] for s in data["suggestions"]], _QUERIES)
         self.assertEqual(
             data["suggestions"][0]["courses"][0]["url"],
@@ -101,6 +111,30 @@ class UpskillingRouterTests(unittest.TestCase):
         self.assertIn(_BODY["job"]["description"], prompt)
         self.assertIn(_BODY["candidate"]["description"], prompt)
         self.assertIn("Kubernetes", prompt)
+
+    def test_output_language_header_selects_prompt_language(self) -> None:
+        llm = _fake_llm(generate_return=_llm_output("You are perfect for this role.", []))
+
+        with patch("router.upskilling_suggestion.get_llm_client", return_value=llm), patch(
+            "router.upskilling_suggestion.get_course_provider"
+        ):
+            self.client.post(
+                _ENDPOINT, json=_BODY, headers={**_HEADERS, "output-language": "es"}
+            )
+
+        prompt = llm.generate.await_args.args[0]
+        self.assertIn("Spanish", prompt)
+
+    def test_defaults_to_english_when_output_language_header_absent(self) -> None:
+        llm = _fake_llm(generate_return=_llm_output("You are perfect for this role.", []))
+
+        with patch("router.upskilling_suggestion.get_llm_client", return_value=llm), patch(
+            "router.upskilling_suggestion.get_course_provider"
+        ):
+            self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
+
+        prompt = llm.generate.await_args.args[0]
+        self.assertIn("English", prompt)
 
     def test_perfect_match_returns_no_suggestions_and_skips_udemy(self) -> None:
         llm = _fake_llm(generate_return=_llm_output("You are perfect for this role.", []))
@@ -154,6 +188,36 @@ class UpskillingRouterTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 502)
         self.assertEqual(response.json()["reason"], "LLM returned malformed output")
+
+    def test_returns_502_when_reasons_not_list_of_strings(self) -> None:
+        llm = _fake_llm(
+            generate_return=json.dumps(
+                {"outcome": "x", "reasons": [1, 2], "search_queries": []}
+            )
+        )
+
+        with patch("router.upskilling_suggestion.get_llm_client", return_value=llm):
+            response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.json()["reason"], "LLM returned malformed output")
+
+    def test_missing_reasons_defaults_to_empty_list(self) -> None:
+        # reasons is optional: a completion without it (e.g. a perfect match, or
+        # an older prompt variant) is still valid and yields an empty list.
+        llm = _fake_llm(
+            generate_return=json.dumps(
+                {"outcome": "You are perfect for this role.", "search_queries": []}
+            )
+        )
+
+        with patch("router.upskilling_suggestion.get_llm_client", return_value=llm), patch(
+            "router.upskilling_suggestion.get_course_provider"
+        ):
+            response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["reasons"], [])
 
     def test_returns_502_when_course_search_fails(self) -> None:
         llm = _fake_llm(generate_return=_llm_output("Improve infra.", _QUERIES))

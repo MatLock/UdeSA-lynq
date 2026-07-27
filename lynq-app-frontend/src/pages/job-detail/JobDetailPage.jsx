@@ -192,7 +192,11 @@ const JobHeroSide = ({
             type="button"
             className="job-detail-apply"
             onClick={onApply}
-            disabled={applyState === 'applying' || applyState === 'applied'}
+            disabled={
+              applyState === 'applying' ||
+              applyState === 'applied' ||
+              applyState === 'already'
+            }
           >
             {applyState === 'applying' ? t.applying : t.apply}
           </button>
@@ -516,7 +520,11 @@ const JobDetailPage = () => {
   // (e.g. the login profile lookup failed) — otherwise the score would show in
   // the feed but silently vanish here.
   const isCompany = user?.userType === 'COMPANY'
-  const [applyState, setApplyState] = useState('idle') // idle|applying|applied|already|error
+  // Reaching this page from "My Applications" (ApplicationCard) means the user has
+  // already applied to this job, so seed the apply state accordingly to disable
+  // the button and show the "already applied" legend without needing an attempt.
+  const alreadyApplied = location.state?.alreadyApplied === true
+  const [applyState, setApplyState] = useState(alreadyApplied ? 'already' : 'idle') // idle|applying|applied|already|error
   // Owner-only close/re-open action. The button shown (and which endpoint it
   // hits) is derived from the job's live status; this only tracks the in-flight
   // request so the button can disable and surface an error.

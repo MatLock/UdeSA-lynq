@@ -70,23 +70,34 @@ Prerequisites: a running minikube cluster, `helm`, and (by default) an Ollama se
    > For Docker Desktop's Kubernetes, set `OLLAMA_BASE_URL` to `http://host.docker.internal:11434` in the values.
    > To run Ollama in the cluster instead, set `ollamaInCluster: true` and point `OLLAMA_BASE_URL` at `http://ollama:11434`.
 
-3. Build the frontend image with the local ingress URLs baked in (Vite bakes them at build time) and load it into the cluster:
-
-   ```bash
-   docker build -t lynq-app-frontend:local \
-     --build-arg LYNQ_IAM_BASE_URL=http://lynq.local/lynq-iam \
-     --build-arg LYNQ_BACKEND_BASE_URL=http://lynq.local/lynq-backend-app \
-     ./lynq-app-frontend
-   minikube image load lynq-app-frontend:local
-   ```
-
-4. Install the chart:
+3. Install the chart:
 
    ```bash
    helm install lynq ./infrastructure/helm -f infrastructure/helm/values/k8s_values-local.yaml
    ```
 
+   This is the single command that brings the whole platform up: the apps, the
+   local infra (MySQL / Redis / LocalStack), and the frontend all pull published
+   images — including `lynq-app-frontend`, which is built on each release with the
+   local ingress URLs baked in. No manual frontend build is needed.
+
 The platform is then reachable on the shared host: the frontend at `http://lynq.local/`, IAM at `http://lynq.local/lynq-iam`, and the backend at `http://lynq.local/lynq-backend-app` (path-based routing; the more specific paths take precedence).
+
+> **macOS (docker driver).** On Mac, minikube runs with the `docker` driver by
+> default, and its IP (e.g. `192.168.49.2`) lives inside Docker's internal
+> network — it is **not routable from the host**, so pointing `/etc/hosts` at
+> `minikube ip` does not work. Instead point the host at loopback and run
+> `minikube tunnel`, which exposes the ingress (port 80) on `127.0.0.1`:
+>
+> ```bash
+> echo "127.0.0.1  lynq.local" | sudo tee -a /etc/hosts
+> minikube tunnel   # leave running in a dedicated terminal (asks for sudo)
+> ```
+>
+> Keep the tunnel running while you use the platform; closing that terminal
+> cuts access. As an alternative without the tunnel, port-forward the ingress
+> controller (`kubectl -n ingress-nginx port-forward svc/ingress-nginx-controller 8080:80`)
+> and reach it at `http://lynq.local:8080/`.
 
 To preview what Helm will render without installing:
 

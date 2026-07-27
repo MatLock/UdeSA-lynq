@@ -12,17 +12,26 @@ import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.model.UserResumeEntity;
+import com.lynq.backend.model.UserSkillsEntity;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
+import com.lynq.backend.controller.response.PagedRestResponse;
+import com.lynq.backend.controller.response.UserApplicationResponse;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
+import com.lynq.backend.repository.UserApplicationJobRepository;
 import com.lynq.backend.repository.UserRepository;
 import com.lynq.backend.repository.UserResumeRepository;
+import com.lynq.backend.repository.projection.UserApplicationProjection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -30,6 +39,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -79,9 +89,18 @@ class UserServiceTest {
   private static final String JOB_TITLE = "Senior Backend Engineer";
   private static final String JOB_DESCRIPTION = "Build and scale the Lynq hiring platform.";
 
+  private static final String APPLICATION_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
+  private static final String APPLICATION_ID_NEWEST = "application-newest";
+  private static final String APPLICATION_ID_OLDEST = "application-oldest";
+  private static final LocalDate APPLIED_ON = LocalDate.of(2026, 7, 20);
+  private static final String JOB_SKILLS_CSV = "Java,Python";
+  private static final Pageable DEFAULT_PAGEABLE = PageRequest.of(0, 10);
+
   private static final String USER_NOT_FOUND = "User '" + USER_ID + "' not found";
   private static final String ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES =
       "Only users of type CANDIDATE can access resumes";
+  private static final String ONLY_CANDIDATE_USERS_CAN_VIEW_APPLICATIONS =
+      "Only users of type CANDIDATE can view their applications";
 
   @Mock
   private UserRepository userRepository;
@@ -96,6 +115,9 @@ class UserServiceTest {
   private JobPostRepository jobPostRepository;
 
   @Mock
+  private UserApplicationJobRepository userApplicationJobRepository;
+
+  @Mock
   private UpdateUserProfileRequest updateRequest;
 
   @Mock
@@ -108,7 +130,7 @@ class UserServiceTest {
   @BeforeEach
   void setUp() {
     userService = new UserService(userRepository, userResumeRepository, companyRepository,
-        jobPostRepository, storageService, objectMapper);
+        jobPostRepository, userApplicationJobRepository, storageService, objectMapper);
   }
 
   @Test
@@ -317,6 +339,39 @@ class UserServiceTest {
   }
 
   @Test
+  void generateResumeUploadUrlReturnsPreSignedUrlForCandidate() {
+    UserEntity existing = existingUser();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+    when(storageService.createUserResumePreSignedUrl(existing, FILE_NAME))
+        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+
+    String result = userService.generateResumeUploadUrl(USER_ID, FILE_NAME);
+
+    assertThat(result, is(PRE_SIGNED_URL));
+  }
+
+  @Test
+  void generateResumeUploadUrlThrowsBadRequestWhenUserIsNotCandidate() {
+    UserEntity company = UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(company));
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> userService.generateResumeUploadUrl(USER_ID, FILE_NAME));
+    assertThat(exception.getMessage(), is("Only users of type CANDIDATE can upload resumes"));
+    verify(storageService, never()).createUserResumePreSignedUrl(any(), any());
+  }
+
+  @Test
+  void generateResumeUploadUrlThrowsNotFoundWhenUserDoesNotExist() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> userService.generateResumeUploadUrl(USER_ID, FILE_NAME));
+    assertThat(exception.getMessage(), is(USER_NOT_FOUND));
+    verify(storageService, never()).createUserResumePreSignedUrl(any(), any());
+  }
+
+  @Test
   void getUserResumesMapsEntitiesWithParsedJsonAndPresignedPdfUrl() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
     when(userResumeRepository.findByUserId(USER_ID))
@@ -481,6 +536,140 @@ class UserServiceTest {
   void obtainOwnedCompanyIdReturnsNullForNonCompanyUserWithoutQueryingCompanies() {
     assertThat(userService.obtainOwnedCompanyId(candidate()), is(nullValue()));
     verify(companyRepository, never()).findByOwner(any());
+  }
+
+  @Test
+  void getUserApplicationsMapsProjectionFieldsAndGeneratesPresignedCompanyImage() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateWithSkills()));
+    when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
+        .thenReturn(COMPANY_IMAGE_URL);
+    when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
+        .thenReturn(new PageImpl<>(List.of(applicationProjection(APPLICATION_ID, COMPANY_IMAGE_PATH)),
+            DEFAULT_PAGEABLE, 1));
+
+    PagedRestResponse<UserApplicationResponse> result =
+        userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE);
+
+    assertThat(result.getContent(), hasSize(1));
+    UserApplicationResponse application = result.getContent().get(0);
+    assertThat(application.getId(), is(APPLICATION_ID));
+    assertThat(application.getJobId(), is(JOB_ID));
+    assertThat(application.getJobTitle(), is(JOB_TITLE));
+    assertThat(application.getJobDescription(), is(JOB_DESCRIPTION));
+    assertThat(application.getCompanyId(), is(COMPANY_ID));
+    assertThat(application.getCompanyName(), is(COMPANY_NAME));
+    assertThat(application.getCompanyProfileImage(), is(COMPANY_IMAGE_URL));
+    assertThat(application.getAppliedOn(), is(APPLIED_ON));
+  }
+
+  @Test
+  void getUserApplicationsScoresLynqAsPercentageOfMatchingJobSkills() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateWithSkills()));
+    when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
+        .thenReturn(new PageImpl<>(List.of(applicationProjection(APPLICATION_ID, null)),
+            DEFAULT_PAGEABLE, 1));
+
+    UserApplicationResponse application =
+        userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE).getContent().get(0);
+
+    // Candidate has [java, kotlin]; job requires [Java, Python] -> 1 of 2 skills match.
+    assertThat(application.getLynqScore(), is(50));
+  }
+
+  @Test
+  void getUserApplicationsScoresLynqZeroWhenCandidateHasNoSkills() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
+    when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
+        .thenReturn(new PageImpl<>(List.of(applicationProjection(APPLICATION_ID, null)),
+            DEFAULT_PAGEABLE, 1));
+
+    UserApplicationResponse application =
+        userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE).getContent().get(0);
+
+    assertThat(application.getLynqScore(), is(0));
+  }
+
+  @Test
+  void getUserApplicationsLeavesCompanyImageNullWhenPathIsBlank() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateWithSkills()));
+    when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
+        .thenReturn(new PageImpl<>(List.of(applicationProjection(APPLICATION_ID, null)),
+            DEFAULT_PAGEABLE, 1));
+
+    UserApplicationResponse application =
+        userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE).getContent().get(0);
+
+    assertThat(application.getCompanyProfileImage(), is(nullValue()));
+    verify(storageService, never()).obtainProfilePreSignedUrl(any());
+  }
+
+  @Test
+  void getUserApplicationsMapsPaginationMetadataAndPreservesOrder() {
+    Pageable pageable = PageRequest.of(1, 2);
+    Page<UserApplicationProjection> page = new PageImpl<>(
+        List.of(applicationProjection(APPLICATION_ID_NEWEST, null),
+            applicationProjection(APPLICATION_ID_OLDEST, null)), pageable, 6);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateWithSkills()));
+    when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, pageable)).thenReturn(page);
+
+    PagedRestResponse<UserApplicationResponse> result =
+        userService.getUserApplications(USER_ID, pageable);
+
+    assertThat(result.getPage(), is(1));
+    assertThat(result.getSize(), is(2));
+    assertThat(result.getTotalElements(), is(6L));
+    assertThat(result.getTotalPages(), is(3));
+    assertThat(result.isHasNext(), is(true));
+    assertThat(result.isHasPrevious(), is(true));
+    assertThat(result.getContent().stream().map(UserApplicationResponse::getId).toList(),
+        contains(APPLICATION_ID_NEWEST, APPLICATION_ID_OLDEST));
+  }
+
+  @Test
+  void getUserApplicationsReturnsEmptyContentWhenCandidateHasNoApplications() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateWithSkills()));
+    when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
+        .thenReturn(new PageImpl<>(List.of(), DEFAULT_PAGEABLE, 0));
+
+    PagedRestResponse<UserApplicationResponse> result =
+        userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE);
+
+    assertThat(result.getContent(), is(empty()));
+    assertThat(result.getTotalElements(), is(0L));
+  }
+
+  @Test
+  void getUserApplicationsThrowsBadRequestWhenUserIsNotCandidate() {
+    UserEntity company = UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(company));
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE));
+    assertThat(exception.getMessage(), is(ONLY_CANDIDATE_USERS_CAN_VIEW_APPLICATIONS));
+    verify(userApplicationJobRepository, never()).findApplicationsByUserId(any(), any());
+  }
+
+  @Test
+  void getUserApplicationsThrowsNotFoundWhenUserDoesNotExist() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE));
+    assertThat(exception.getMessage(), is(USER_NOT_FOUND));
+    verify(userApplicationJobRepository, never()).findApplicationsByUserId(any(), any());
+  }
+
+  private UserApplicationProjection applicationProjection(String id, String companyImagePath) {
+    return new UserApplicationProjection(id, JOB_ID, JOB_TITLE, JOB_DESCRIPTION, COMPANY_ID,
+        COMPANY_NAME, companyImagePath, APPLIED_ON, JOB_SKILLS_CSV);
+  }
+
+  private UserEntity candidateWithSkills() {
+    UserEntity candidate = candidate();
+    candidate.setSkills(List.of(
+        UserSkillsEntity.builder().skill("java").build(),
+        UserSkillsEntity.builder().skill("kotlin").build()));
+    return candidate;
   }
 
   private UserEntity candidate() {

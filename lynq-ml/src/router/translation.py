@@ -36,13 +36,6 @@ async def translate(
     lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
     user_id: Annotated[str, Header(alias="user-id")],
 ) -> GlobalRestResponse[Resume]:
-    """Translate every value of a resume JSON into the requested language.
-
-    The ``language`` field is validated against the ``Language`` enum (mirrors
-    lynq-app-backend); any unsupported language fails validation with a 400.
-    Returns the translated resume wrapped in the standard ``GlobalRestResponse``
-    envelope.
-    """
     log.info(
         "message= Started translate, " + _LOG_CONTEXT,
         user_id,
@@ -78,12 +71,6 @@ async def translate(
 
 
 def _parse_llm_output(raw: str, user_id: str, language: str) -> Resume:
-    """Parse and validate the model's JSON completion into a ``Resume``.
-
-    Raises:
-        HTTPException: 502 if the output is not JSON or does not match the
-            expected resume schema.
-    """
     try:
         return Resume.model_validate(json.loads(raw))
     except (json.JSONDecodeError, ValidationError) as exc:

@@ -47,7 +47,7 @@ const Sidebar = () => {
         ]
       : [
           { key: 'resume', icon: '📄', label: t.resume, to: '/my-resume' },
-          { key: 'applications', icon: '📨', label: t.applications, to: '/applications' },
+          { key: 'applications', icon: '📨', label: t.applications, to: '/user/application' },
         ]),
   ]
 

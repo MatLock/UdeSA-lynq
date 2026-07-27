@@ -72,6 +72,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
   private static final String USER_ID_HEADER = "user-id";
   private static final String COMPANY_ID_HEADER = "company-id";
+  private static final String OUTPUT_LANGUAGE_HEADER = "output-language";
   private static final String CONTENT_TYPE_HEADER = "Content-Type";
   private static final String APPLICATION_JSON = "application/json";
   private static final String BEARER_TOKEN = "Bearer test-access-token";
@@ -162,6 +163,8 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final List<String> CANDIDATE_SKILLS = List.of(SKILL_JAVA, SKILL_SPRING);
   private static final String UPSKILLING_OUTCOME =
       "The candidate should strengthen container orchestration.";
+  private static final String UPSKILLING_REASON =
+      "No hands-on Kubernetes experience for the required infra work.";
   private static final String UPSKILLING_QUERY = "Kubernetes orchestration";
   private static final String UPSKILLING_COURSE_TITLE = "Kubernetes for Developers";
   private static final String UPSKILLING_COURSE_URL = "https://udemy.com/kubernetes";
@@ -1240,6 +1243,9 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     Map<String, Object> data = (Map<String, Object>) body.get("data");
     assertThat(data.get("outcome"), is(UPSKILLING_OUTCOME));
     @SuppressWarnings("unchecked")
+    List<String> reasons = (List<String>) data.get("reasons");
+    assertThat(reasons, is(List.of(UPSKILLING_REASON)));
+    @SuppressWarnings("unchecked")
     List<Map<String, Object>> suggestions = (List<Map<String, Object>>) data.get("suggestions");
     assertThat(suggestions.get(0).get("query"), is(UPSKILLING_QUERY));
 
@@ -1251,7 +1257,28 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID)
         .withHeader(USER_ID_HEADER, USER_ID)
         .withHeader(COMPANY_ID_HEADER, COMPANY_ID)
+        // no ?language on the request → the endpoint defaults the header to "en"
+        .withHeader(OUTPUT_LANGUAGE_HEADER, "en")
         .withBody(subString("\"candidate\"")));
+  }
+
+  @Test
+  void upskillingSuggestionForwardsUiLanguageToMlAsOutputLanguageHeader() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCandidateWithSkills(USER_ID, FULL_NAME, CURRENT_POSITION, CANDIDATE_SKILLS);
+    seedJobWithCompany(JOB_SKILLS);
+    stubMlUpskillingSuggestion();
+
+    HttpResponse<String> response = getUpskillingSuggestion(JOB_ID, "es");
+
+    assertThat(response.statusCode(), is(200));
+    // the ?language=es query param is forwarded to lynq-ml as the output-language
+    // header so the explanation and reasons come back in the caller's UI language
+    lynqMlMock.verify(request()
+        .withMethod("POST")
+        .withPath(ML_UPSKILLING_PATH)
+        .withHeader(OUTPUT_LANGUAGE_HEADER, "es"));
   }
 
   @Test
@@ -1898,8 +1925,17 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   private HttpResponse<String> getUpskillingSuggestion(String jobId) throws Exception {
+    return getUpskillingSuggestion(jobId, null);
+  }
+
+  private HttpResponse<String> getUpskillingSuggestion(String jobId, String language)
+      throws Exception {
+    String url = upskillingSuggestionUrl(jobId);
+    if (language != null) {
+      url += "?language=" + language;
+    }
     HttpRequest httpRequest = HttpRequest.newBuilder()
-        .uri(URI.create(upskillingSuggestionUrl(jobId)))
+        .uri(URI.create(url))
         .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
         .header(REQUEST_UUID_HEADER, REQUEST_UUID)
         .GET()
@@ -1943,6 +1979,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
                   "success": true,
                   "data": {
                     "outcome": "%s",
+                    "reasons": ["%s"],
                     "suggestions": [
                       {
                         "query": "%s",
@@ -1950,8 +1987,8 @@ class BackendAppApplicationTests extends AbstractE2ETest {
                       }
                     ]
                   }
-                }""".formatted(UPSKILLING_OUTCOME, UPSKILLING_QUERY, UPSKILLING_COURSE_TITLE,
-                UPSKILLING_COURSE_URL)));
+                }""".formatted(UPSKILLING_OUTCOME, UPSKILLING_REASON, UPSKILLING_QUERY,
+                UPSKILLING_COURSE_TITLE, UPSKILLING_COURSE_URL)));
   }
 
   private void stubMlCandidateExplanation() {
