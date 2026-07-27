@@ -70,7 +70,7 @@ jobs:
           # contain characters special to the "label-message-color" path syntax
           # (e.g. the hyphen in "1.0.4-SNAPSHOT") don't produce a "404: badge not
           # found" placeholder.
-          curl -sSL --fail -G \
+          curl -sSL --proto '=https' --proto-redir '=https' --fail -G \
             --data-urlencode "label=lynq-latest-version" \
             --data-urlencode "message=${{ steps.resolve.outputs.version }}" \
             --data-urlencode "color=blue" \
@@ -78,7 +78,7 @@ jobs:
             -o .github/badges/version.svg
 
       - name: Commit version bump back to main
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
         with:
           commit_message: "chore: set release version ${{ steps.resolve.outputs.version }} [skip ci]"
           file_pattern: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml .github/badges/version.svg
@@ -177,9 +177,9 @@ jobs:
       - name: Install dependencies
         working-directory: lynq-ml
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install coverage
+          python -m pip install --upgrade "pip==26.1.2"
+          pip install --only-binary :all: -r requirements.txt
+          pip install --only-binary :all: "coverage==7.15.2"
 
       - name: Run tests
         working-directory: lynq-ml
@@ -195,13 +195,95 @@ jobs:
           path: lynq-ml/coverage.xml
 
   # ===========================================================================
-  # Stage 3 — Build the Docker images from the tested artifacts and push them
-  # to Docker Hub. Runs once every service has built and tested successfully.
+  # Stage 3 — Run a SonarCloud analysis of the whole monorepo right after the
+  # tests pass and BEFORE any image is built. The Quality Gate is blocking: a
+  # red gate fails this job, so the image push (stage 4) never runs and the
+  # release is stopped. On success the results are captured for the notes.
   # ===========================================================================
-  push-images:
-    name: "3 · Push Docker images"
+  sonar-scan:
+    name: "3 · SonarCloud analysis (Quality Gate)"
     runs-on: ubuntu-latest
     needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-ml]
+    outputs:
+      gate: ${{ steps.results.outputs.gate }}
+      bugs: ${{ steps.results.outputs.bugs }}
+      vulnerabilities: ${{ steps.results.outputs.vulnerabilities }}
+      code_smells: ${{ steps.results.outputs.code_smells }}
+      security_hotspots: ${{ steps.results.outputs.security_hotspots }}
+      reliability_rating: ${{ steps.results.outputs.reliability_rating }}
+      security_rating: ${{ steps.results.outputs.security_rating }}
+      maintainability_rating: ${{ steps.results.outputs.maintainability_rating }}
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+        with:
+          # Full history: SonarCloud uses it to attribute issues to new code.
+          fetch-depth: 0
+          ref: main
+
+      - name: Setup Java Environment
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: temurin
+          architecture: x64
+          cache: maven
+
+      - name: Compile Java modules for analysis
+        run: |
+          # The Java sensor needs compiled classes (sonar.java.binaries). Compile
+          # only — tests already ran in stage 2, so skip them here for speed.
+          mvn -B -q -f lynq-iam/pom.xml clean test-compile
+          mvn -B -q -f lynq-app-backend/pom.xml clean test-compile
+
+      - name: SonarCloud Scan
+        # sonar.qualitygate.wait=true makes the scanner block until SonarCloud
+        # finishes processing and returns the gate; a red gate exits non-zero,
+        # failing this job (and therefore blocking the release).
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          args: -Dsonar.qualitygate.wait=true
+
+      - name: Fetch Quality Gate and measures
+        id: results
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          PROJECT_KEY: MatLock_UdeSA-lynq
+        run: |
+          BASE="https://sonarcloud.io"
+          curl -sSL --proto '=https' --proto-redir '=https' -u "$SONAR_TOKEN:" \
+            "$BASE/api/qualitygates/project_status?projectKey=$PROJECT_KEY" -o /tmp/gate.json
+          curl -sSL --proto '=https' --proto-redir '=https' -u "$SONAR_TOKEN:" \
+            "$BASE/api/measures/component?component=$PROJECT_KEY&metricKeys=bugs,vulnerabilities,code_smells,security_hotspots,reliability_rating,security_rating,sqale_rating" \
+            -o /tmp/measures.json
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          gate = json.load(open('/tmp/gate.json')).get('projectStatus', {}).get('status', 'NONE')
+          measures = {m['metric']: m['value']
+                      for m in json.load(open('/tmp/measures.json')).get('component', {}).get('measures', [])}
+          letter = {'1.0': 'A', '2.0': 'B', '3.0': 'C', '4.0': 'D', '5.0': 'E'}
+          def rating(k): return letter.get(measures.get(k, ''), 'n/a')
+          print(f"gate={gate}")
+          print(f"bugs={measures.get('bugs', 'n/a')}")
+          print(f"vulnerabilities={measures.get('vulnerabilities', 'n/a')}")
+          print(f"code_smells={measures.get('code_smells', 'n/a')}")
+          print(f"security_hotspots={measures.get('security_hotspots', 'n/a')}")
+          print(f"reliability_rating={rating('reliability_rating')}")
+          print(f"security_rating={rating('security_rating')}")
+          print(f"maintainability_rating={rating('sqale_rating')}")
+          PY
+
+  # ===========================================================================
+  # Stage 4 — Build the Docker images from the tested artifacts and push them
+  # to Docker Hub. Runs only after the Quality Gate has passed.
+  # ===========================================================================
+  push-images:
+    name: "4 · Push Docker images"
+    runs-on: ubuntu-latest
+    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-ml, sonar-scan]
     steps:
       - name: Code Checkout
         uses: actions/checkout@v5
@@ -222,13 +304,13 @@ jobs:
           path: lynq-app-backend/target
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push lynq-iam image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: lynq-iam
           file: lynq-iam/Dockerfile
@@ -236,7 +318,7 @@ jobs:
           tags: ${{ env.DOCKER_NAMESPACE }}:lynq-iam-${{ needs.set-version.outputs.version }}
 
       - name: Build and push lynq-app-backend image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: lynq-app-backend
           file: lynq-app-backend/Dockerfile
@@ -244,7 +326,7 @@ jobs:
           tags: ${{ env.DOCKER_NAMESPACE }}:lynq-app-backend-${{ needs.set-version.outputs.version }}
 
       - name: Build and push lynq-ml image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: lynq-ml
           file: lynq-ml/Dockerfile
@@ -252,13 +334,14 @@ jobs:
           tags: ${{ env.DOCKER_NAMESPACE }}:lynq-ml-${{ needs.set-version.outputs.version }}
 
   # ===========================================================================
-  # Stage 4 — Publish the JaCoCo coverage produced in stage 2 into the release
-  # notes and attach the HTML reports. Runs after the images are published.
+  # Stage 5 — Publish the JaCoCo coverage produced in stage 2 and the SonarCloud
+  # results from stage 3 into the release notes, and attach the HTML reports.
+  # Runs after the images are published.
   # ===========================================================================
   publish-coverage:
-    name: "4 · Publish coverage to release notes"
+    name: "5 · Publish coverage & Sonar to release notes"
     runs-on: ubuntu-latest
-    needs: push-images
+    needs: [push-images, sonar-scan]
     permissions:
       contents: write
     steps:
@@ -313,7 +396,7 @@ jobs:
             echo "ml_branch=$ML_BRANCH"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Append coverage summary to release notes
+      - name: Append coverage & Sonar summary to release notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.event.release.tag_name }}
@@ -325,11 +408,32 @@ jobs:
           APP_BRANCH: ${{ steps.coverage.outputs.app_branch }}
           ML_LINE: ${{ steps.coverage.outputs.ml_line }}
           ML_BRANCH: ${{ steps.coverage.outputs.ml_branch }}
+          SONAR_GATE: ${{ needs.sonar-scan.outputs.gate }}
+          SONAR_BUGS: ${{ needs.sonar-scan.outputs.bugs }}
+          SONAR_VULNS: ${{ needs.sonar-scan.outputs.vulnerabilities }}
+          SONAR_SMELLS: ${{ needs.sonar-scan.outputs.code_smells }}
+          SONAR_HOTSPOTS: ${{ needs.sonar-scan.outputs.security_hotspots }}
+          SONAR_REL: ${{ needs.sonar-scan.outputs.reliability_rating }}
+          SONAR_SEC: ${{ needs.sonar-scan.outputs.security_rating }}
+          SONAR_MAINT: ${{ needs.sonar-scan.outputs.maintainability_rating }}
         run: |
+          case "$SONAR_GATE" in
+            OK)    GATE_LABEL='✅ Passed' ;;
+            ERROR) GATE_LABEL='❌ Failed' ;;
+            *)     GATE_LABEL="$SONAR_GATE" ;;
+          esac
           existing=$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json body -q .body)
           {
             printf '%s\n\n' "$existing"
             printf '%s\n\n' '---'
+            printf '## Code quality (SonarCloud)\n\n'
+            printf '**Quality Gate: %s** — [full report](https://sonarcloud.io/summary/new_code?id=MatLock_UdeSA-lynq)\n\n' "$GATE_LABEL"
+            printf '| Metric | Value | Rating |\n'
+            printf '| --- | --- | --- |\n'
+            printf '| Bugs | %s | %s |\n' "$SONAR_BUGS" "$SONAR_REL"
+            printf '| Vulnerabilities | %s | %s |\n' "$SONAR_VULNS" "$SONAR_SEC"
+            printf '| Code smells | %s | %s |\n' "$SONAR_SMELLS" "$SONAR_MAINT"
+            printf '| Security hotspots | %s | — |\n\n' "$SONAR_HOTSPOTS"
             printf '## Test coverage (lynq-iam)\n\n'
             printf '| Metric | Coverage |\n'
             printf '| --- | --- |\n'
@@ -363,14 +467,14 @@ jobs:
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/coverage-lynq-ml.xml --clobber
 
   # ===========================================================================
-  # Stage 5 — Once the release is fully published, open the next development
+  # Stage 6 — Once the release is fully published, open the next development
   # cycle by bumping every project's version one step higher and committing it
   # back to main. A released SNAPSHOT bumps the patch (1.0.5-SNAPSHOT ->
   # 1.0.6-SNAPSHOT); a released final version bumps the minor and resets the
   # patch (1.0.5 -> 1.1.0-SNAPSHOT).
   # ===========================================================================
   bump-next-version:
-    name: "5 · Bump to next development version"
+    name: "6 · Bump to next development version"
     runs-on: ubuntu-latest
     needs: [set-version, publish-coverage]
     permissions:
@@ -427,7 +531,7 @@ jobs:
           sed -i -E "s/^appVersion:.*/appVersion: \"${{ steps.next.outputs.version }}\"/" infrastructure/helm/Chart.yaml
 
       - name: Commit next development version to main
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
         with:
           commit_message: "chore: prepare next development version ${{ steps.next.outputs.version }} [skip ci]"
           file_pattern: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml

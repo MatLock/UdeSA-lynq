@@ -1,6 +1,7 @@
 # Lynq
 
 [![lynq-latest-version](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/version.svg)](https://github.com/MatLock/UdeSA-lynq/releases)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=MatLock_UdeSA-lynq&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=MatLock_UdeSA-lynq)
 
 Lynq is a job-search platform built around the idea that finding a job shouldn't be a job of its own. It aims to streamline the experience for candidates by bringing the pieces of the search — identity, listings, applications, and tracking — under one roof.
 
