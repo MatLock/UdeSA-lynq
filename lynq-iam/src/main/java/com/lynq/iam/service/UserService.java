@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.uuid.Generators;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Service
 public class UserService {
@@ -32,7 +33,7 @@ public class UserService {
         .username(username)
         .email(email)
         .password(passwordEncoder.encode(password))
-        .creationDate(LocalDateTime.now())
+        .creationDate(LocalDateTime.now(ZoneOffset.UTC))
         .build();
 
     return userRepository.save(user);

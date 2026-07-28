@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.Month;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -19,7 +20,7 @@ class UserResumeEntityTest {
   private static final String USER_RESUME_ID = "77777777-7777-7777-7777-777777777777";
   private static final String RESUME = "{\"summary\":\"Backend engineer\"}";
   private static final Language LANGUAGE = Language.EN;
-  private static final LocalDate CREATED_ON = LocalDate.of(2026, 6, 25);
+  private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
   private static final String STORAGE_PATH = "resumes/77777777.pdf";
 
   @Mock

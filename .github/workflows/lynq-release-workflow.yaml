@@ -1,4 +1,4 @@
-name: lynq CICD
+name: lynq CICD [Releases]
 
 on:
   release:

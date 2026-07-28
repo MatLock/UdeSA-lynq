@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Annotated
 
 import httpx
 from fastapi import APIRouter, Header, HTTPException
@@ -28,12 +29,14 @@ _LOG_CONTEXT = "user_id=%s"
 
 @router.post(
     "/detect-language",
-    response_model=GlobalRestResponse[LanguageDetectionResponse],
+    responses={
+        502: {"description": "The upstream LLM request failed or returned malformed output."},
+    },
 )
 async def detect_language(
     body: LanguageDetectionRequest,
-    lynq_request_uuid: str = Header(alias="lynq-request-uuid"),
-    user_id: str = Header(alias="user-id"),
+    lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
+    user_id: Annotated[str, Header(alias="user-id")],
 ) -> GlobalRestResponse[LanguageDetectionResponse]:
     """Detect the main language of the given text.
 

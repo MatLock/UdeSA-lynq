@@ -33,7 +33,8 @@ public class AuthService {
   private static final String USERNAME_TAKEN_REASON = "Username is already taken";
 
   private static final int EMAIL_MAX_LENGTH = 100;
-  private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+  private static final Pattern EMAIL_PATTERN =
+      Pattern.compile("^[^@\\s]+@[^@\\s.]+(?:\\.[^@\\s.]+)+$");
   private static final String EMAIL_BLANK_REASON = "Email must not be blank";
   private static final String EMAIL_LENGTH_REASON =
       "Email must not exceed " + EMAIL_MAX_LENGTH + " characters";

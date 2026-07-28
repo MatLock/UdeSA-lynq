@@ -10,6 +10,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.Month;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -26,7 +27,7 @@ class JobPostEntityTest {
   private static final Integer SALARY_RANGE_TOP = 120000;
   private static final String JOB_URL = "https://lynq.ai/jobs/backend-engineer";
   private static final JobPostSource JOB_POST_TYPE = JobPostSource.LYNQ;
-  private static final LocalDate CREATED_ON = LocalDate.of(2026, 6, 25);
+  private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
 
   @Mock
   private UserEntity createdByUser;

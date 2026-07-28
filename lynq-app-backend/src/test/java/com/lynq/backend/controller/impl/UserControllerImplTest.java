@@ -28,6 +28,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -48,8 +49,8 @@ class UserControllerImplTest {
   private static final String ABOUT = "Java developer focused on distributed systems.";
   private static final String GITHUB_URL = "https://github.com/janedoe";
   private static final String LINKEDIN_URL = "https://linkedin.com/in/janedoe";
-  private static final LocalDate BIRTH_DATE = LocalDate.of(1995, 4, 12);
-  private static final LocalDate CREATED_ON = LocalDate.of(2026, 6, 25);
+  private static final LocalDate BIRTH_DATE = LocalDate.of(1995, Month.APRIL, 12);
+  private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
   private static final String FILE_NAME = "avatar.png";
   private static final String PRE_SIGNED_URL =
       "https://lynq-bucket.s3.amazonaws.com/lynq/users/" + USER_ID + "/profile/" + FILE_NAME + "?X-Amz-Signature=abc";

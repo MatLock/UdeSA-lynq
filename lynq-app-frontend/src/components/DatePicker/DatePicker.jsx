@@ -149,10 +149,11 @@ const DatePicker = ({ id, value, onChange, placeholder, ariaInvalid, disableFutu
 
       {open && coords &&
         createPortal(
-          <div
+          <dialog
             ref={popupRef}
+            open
             className="date-picker-popup"
-            role="dialog"
+            aria-label={t.open}
             style={{ top: coords.top, left: coords.left, width: POPUP_WIDTH }}
           >
             <div className="date-picker-head">
@@ -198,7 +199,7 @@ const DatePicker = ({ id, value, onChange, placeholder, ariaInvalid, disableFutu
                 ),
               )}
             </div>
-          </div>,
+          </dialog>,
           document.body,
         )}
     </div>

@@ -34,6 +34,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
+import java.time.Month;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,7 +64,7 @@ class UserServiceTest {
   private static final String ABOUT = "Java developer focused on distributed systems.";
   private static final String GITHUB_URL = "https://github.com/janedoe";
   private static final String LINKEDIN_URL = "https://linkedin.com/in/janedoe";
-  private static final LocalDate BIRTH_DATE = LocalDate.of(1995, 4, 12);
+  private static final LocalDate BIRTH_DATE = LocalDate.of(1995, Month.APRIL, 12);
 
   private static final String UPDATED_FULL_NAME = "Jane Q. Doe";
   private static final String UPDATED_CURRENT_POSITION = "Staff Engineer";
@@ -76,7 +78,7 @@ class UserServiceTest {
   private static final String RESUME_ID = "resume-1";
   private static final String RESUME_NAME = "Jane Doe - Backend";
   private static final Language RESUME_LANGUAGE = Language.EN;
-  private static final LocalDate RESUME_CREATED_ON = LocalDate.of(2026, 7, 17);
+  private static final LocalDate RESUME_CREATED_ON = LocalDate.of(2026, Month.JULY, 17);
   private static final String RESUME_JSON = "{\"summary\":\"Backend engineer\",\"years\":8}";
   private static final String RESUME_STORAGE_PATH = "lynq/users/" + USER_ID + "/resume/cv.pdf";
   private static final String RESUME_PDF_URL = "https://presigned/cv.pdf";
@@ -92,7 +94,7 @@ class UserServiceTest {
   private static final String APPLICATION_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
   private static final String APPLICATION_ID_NEWEST = "application-newest";
   private static final String APPLICATION_ID_OLDEST = "application-oldest";
-  private static final LocalDate APPLIED_ON = LocalDate.of(2026, 7, 20);
+  private static final LocalDate APPLIED_ON = LocalDate.of(2026, Month.JULY, 20);
   private static final String JOB_SKILLS_CSV = "Java,Python";
   private static final Pageable DEFAULT_PAGEABLE = PageRequest.of(0, 10);
 
@@ -163,7 +165,7 @@ class UserServiceTest {
         GITHUB_URL, LINKEDIN_URL, BIRTH_DATE);
 
     verify(userRepository).save(userCaptor.capture());
-    assertThat(userCaptor.getValue().getCreatedOn(), is(LocalDate.now()));
+    assertThat(userCaptor.getValue().getCreatedOn(), is(LocalDate.now(ZoneOffset.UTC)));
   }
 
   @Test
@@ -711,7 +713,7 @@ class UserServiceTest {
         .githubUrl(GITHUB_URL)
         .linkedinUrl(LINKEDIN_URL)
         .birthDate(BIRTH_DATE)
-        .createdOn(LocalDate.of(2026, 6, 25))
+        .createdOn(LocalDate.of(2026, Month.JUNE, 25))
         .build();
   }
 }

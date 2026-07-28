@@ -16,6 +16,7 @@ import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,7 +59,7 @@ public class CompanyService {
         .about(request.getCompanyAbout())
         .size(request.getCompanySize())
         .profileImageUrl(request.getCompanyProfileImageUrl())
-        .createdOn(LocalDate.now())
+        .createdOn(LocalDate.now(ZoneOffset.UTC))
         .owner(owner)
         .build();
 

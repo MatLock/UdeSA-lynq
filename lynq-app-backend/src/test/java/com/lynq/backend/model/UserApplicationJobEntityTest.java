@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.Month;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -16,7 +17,7 @@ import static org.hamcrest.Matchers.sameInstance;
 class UserApplicationJobEntityTest {
 
   private static final String APPLICATION_ID = "55555555-5555-5555-5555-555555555555";
-  private static final LocalDate APPLIED_ON = LocalDate.of(2026, 6, 25);
+  private static final LocalDate APPLIED_ON = LocalDate.of(2026, Month.JUNE, 25);
 
   @Mock
   private JobPostEntity jobPost;

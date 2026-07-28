@@ -25,6 +25,7 @@ import com.lynq.backend.repository.UserRepository;
 import com.lynq.backend.repository.UserResumeRepository;
 import com.lynq.backend.repository.projection.UserApplicationProjection;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
@@ -77,7 +78,7 @@ public class UserService {
         .githubUrl(githubUrl)
         .linkedinUrl(linkedInUrl)
         .birthDate(birthDate)
-        .createdOn(LocalDate.now())
+        .createdOn(LocalDate.now(ZoneOffset.UTC))
         .build();
 
     return userRepository.save(user);
@@ -87,7 +88,7 @@ public class UserService {
   @Transactional(readOnly = true)
   public UserEntity getUser(String userId) {
     return userRepository.findById(userId)
-        .orElseThrow(() -> new NotFoundException("User '" + userId + "' not found"));
+        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
   }
 
   @AuditLog
@@ -154,7 +155,7 @@ public class UserService {
   @Transactional
   public UserEntity updateUserProfile(String userId, UpdateUserProfileRequest request) {
     UserEntity user = userRepository.findById(userId)
-        .orElseThrow(() -> new NotFoundException("User '" + userId + "' not found"));
+        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
 
     if (request.getFullName() != null) {
       user.setFullName(request.getFullName());
@@ -182,7 +183,7 @@ public class UserService {
   @Transactional
   public String generateProfileImageUploadUrl(String userId, String fileName) {
     UserEntity user = userRepository.findById(userId)
-        .orElseThrow(() -> new NotFoundException("User '" + userId + "' not found"));
+        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
 
     String previousImagePath = user.getProfileImageUrl();
     PreSignedUploadUrl preSignedUploadUrl = storageService.createUserProfilePreSignedUrl(user, fileName);

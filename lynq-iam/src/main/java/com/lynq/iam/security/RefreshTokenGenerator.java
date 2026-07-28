@@ -9,10 +9,17 @@ import java.util.Base64;
 @Service
 public class RefreshTokenGenerator {
 
+  private static final int TOKEN_BYTES = 64;
+
+  private final SecureRandom secureRandom;
+
+  public RefreshTokenGenerator(SecureRandom secureRandom) {
+    this.secureRandom = secureRandom;
+  }
+
   @AuditLog
   public String generate() {
-    byte[] bytes = new byte[64];
-    SecureRandom secureRandom = new SecureRandom();
+    byte[] bytes = new byte[TOKEN_BYTES];
     secureRandom.nextBytes(bytes);
     return Base64.getUrlEncoder()
         .withoutPadding()

@@ -33,6 +33,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -62,7 +63,7 @@ class JobControllerImplTest {
   private static final String SKILL_JAVA = "Java";
   private static final String SKILL_SPRING = "Spring";
   private static final List<String> SKILLS = List.of(SKILL_JAVA, SKILL_SPRING);
-  private static final LocalDate CREATED_ON = LocalDate.of(2026, 6, 26);
+  private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 26);
   private static final String RAW_FILTER_VALUE = "  Java  ";
   private static final String NORMALIZED_FILTER_VALUE = "Java";
   private static final int REQUESTED_PAGE = 2;
@@ -71,7 +72,7 @@ class JobControllerImplTest {
   private static final int DEFAULT_SIZE = 10;
   private static final Long SEEN_COUNT = 7L;
   private static final String APPLICATION_ID = "018f9c3a-2b1d-7c4e-9a6f-bbbbbbbbbbbb";
-  private static final LocalDate APPLIED_ON = LocalDate.of(2026, 7, 17);
+  private static final LocalDate APPLIED_ON = LocalDate.of(2026, Month.JULY, 17);
 
   @Mock
   private JobService jobService;

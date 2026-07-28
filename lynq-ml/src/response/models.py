@@ -8,14 +8,12 @@ Mirrors the Java classes in lynq-app-backend / lynq-iam:
 
 from __future__ import annotations
 
-from typing import Generic, Optional, TypeVar
+from typing import Optional
 
 from pydantic import BaseModel
 
-T = TypeVar("T")
 
-
-class GlobalRestResponse(BaseModel, Generic[T]):
+class GlobalRestResponse[T](BaseModel):
     """Standard success envelope wrapping a typed ``data`` payload."""
 
     success: bool = True

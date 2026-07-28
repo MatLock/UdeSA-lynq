@@ -93,11 +93,53 @@ const ApplicationsPage = () => {
   }
 
   // Candidate-only page: send company users back to the feed.
-  if (user && user.userType === 'COMPANY') {
+  if (user?.userType === 'COMPANY') {
     return <Navigate to="/home" replace />
   }
 
   const applications = data?.content ?? []
+
+  const renderResults = () => {
+    if (loading) {
+      return (
+        <div className="applications-state">
+          <Spinner label={t.loading} />
+        </div>
+      )
+    }
+
+    if (error) {
+      return <p className="applications-state applications-error">{t.error}</p>
+    }
+
+    if (applications.length === 0) {
+      return (
+        <div className="applications-state applications-empty">
+          <p>{t.empty}</p>
+          <button
+            type="button"
+            className="applications-empty-cta"
+            onClick={() => navigate('/home')}
+          >
+            {t.emptyCta}
+          </button>
+        </div>
+      )
+    }
+
+    return (
+      <div className="applications-list">
+        {applications.map((application) => (
+          <ApplicationCard
+            key={application.id}
+            application={application}
+            onExplain={handleExplain}
+            explainDisabled={explanationLoading}
+          />
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div className="applications-page">
@@ -111,37 +153,7 @@ const ApplicationsPage = () => {
         )}
       </header>
 
-      <main className="applications-results">
-        {loading ? (
-          <div className="applications-state">
-            <Spinner label={t.loading} />
-          </div>
-        ) : error ? (
-          <p className="applications-state applications-error">{t.error}</p>
-        ) : applications.length === 0 ? (
-          <div className="applications-state applications-empty">
-            <p>{t.empty}</p>
-            <button
-              type="button"
-              className="applications-empty-cta"
-              onClick={() => navigate('/home')}
-            >
-              {t.emptyCta}
-            </button>
-          </div>
-        ) : (
-          <div className="applications-list">
-            {applications.map((application) => (
-              <ApplicationCard
-                key={application.id}
-                application={application}
-                onExplain={handleExplain}
-                explainDisabled={explanationLoading}
-              />
-            ))}
-          </div>
-        )}
-      </main>
+      <main className="applications-results">{renderResults()}</main>
 
       {!loading && !error && applications.length > 0 && (
         <footer className="applications-pagination">

@@ -44,8 +44,8 @@ USER_AGENTS = [
 
 # Shared, precompiled patterns (defining the digit literal once — see _first_int).
 _DIGIT_RE = re.compile(r"(\d+)")
-_HOURS_RE = re.compile(r"(\d+)\s{0,3}hora")
-_MINUTES_RE = re.compile(r"(\d+)\s{0,3}minuto")
+_HOURS_RE = re.compile(r"(\d++)\s{0,3}hora")
+_MINUTES_RE = re.compile(r"(\d++)\s{0,3}minuto")
 
 
 def _pick_user_agent() -> str:
@@ -262,7 +262,7 @@ def fetch_detail(session: requests.Session, url: str | None) -> dict:
     out["skills"] = ", ".join(dict.fromkeys(tags)) or None
 
     # Experience: "5 años de experiencia" in the requirements block, if present.
-    m = re.search(r"(\d+)\s{1,3}a[nñ]os?\s{1,3}de\s{1,3}experiencia", block.get_text(" ", strip=True), re.I)
+    m = re.search(r"(\d++)\s{1,3}a[nñ]os?\s{1,3}de\s{1,3}experiencia", block.get_text(" ", strip=True), re.I)
     if m:
         out["experienceLevel"] = f"{m.group(1)} años de experiencia"
     return out

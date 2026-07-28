@@ -21,6 +21,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.Month;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -42,7 +44,7 @@ class CompanyServiceTest {
   private static final String CURRENT_POSITION = "Founder";
   private static final String USER_ABOUT = "Building the Lynq hiring platform.";
   private static final String LINKEDIN_URL = "https://linkedin.com/in/janedoe";
-  private static final LocalDate BIRTH_DATE = LocalDate.of(1995, 4, 12);
+  private static final LocalDate BIRTH_DATE = LocalDate.of(1995, Month.APRIL, 12);
   private static final String COMPANY_NAME = "Lynq Technologies";
   private static final String COMPANY_ABOUT = "We build talent matching platforms.";
   private static final Integer COMPANY_SIZE = 250;
@@ -56,7 +58,7 @@ class CompanyServiceTest {
   private static final String COMPANY_ID = "company-1";
   private static final String COMPANY_IMAGE_PATH = "lynq/companies/" + COMPANY_ID + "/profile/logo.png";
   private static final String COMPANY_IMAGE_URL = "https://presigned/company-logo.png";
-  private static final LocalDate COMPANY_CREATED_ON = LocalDate.of(2026, 6, 25);
+  private static final LocalDate COMPANY_CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
   private static final String JOB_ID = "job-1";
   private static final String JOB_TITLE = "Senior Backend Engineer";
   private static final String JOB_DESCRIPTION = "Build and scale the Lynq hiring platform.";
@@ -120,7 +122,7 @@ class CompanyServiceTest {
     assertThat(saved.getAbout(), is(COMPANY_ABOUT));
     assertThat(saved.getSize(), is(COMPANY_SIZE));
     assertThat(saved.getProfileImageUrl(), is(COMPANY_PROFILE_IMAGE_URL));
-    assertThat(saved.getCreatedOn(), is(LocalDate.now()));
+    assertThat(saved.getCreatedOn(), is(LocalDate.now(ZoneOffset.UTC)));
     assertThat(saved.getOwner(), is(sameInstance(owner)));
     assertThat(saved.getId(), is(notNullValue()));
   }
@@ -432,7 +434,7 @@ class CompanyServiceTest {
         .name(COMPANY_NAME)
         .about(COMPANY_ABOUT)
         .size(COMPANY_SIZE)
-        .createdOn(LocalDate.of(2026, 6, 25))
+        .createdOn(LocalDate.of(2026, Month.JUNE, 25))
         .owner(owner)
         .build();
   }

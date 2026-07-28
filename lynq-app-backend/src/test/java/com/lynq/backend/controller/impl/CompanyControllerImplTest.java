@@ -20,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.time.Month;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -37,7 +38,7 @@ class CompanyControllerImplTest {
   private static final String COMPANY_ABOUT = "We build talent matching platforms.";
   private static final Integer COMPANY_SIZE = 250;
   private static final String COMPANY_PROFILE_IMAGE_URL = "https://cdn.lynq.com/logos/lynq.png";
-  private static final LocalDate CREATED_ON = LocalDate.of(2026, 6, 25);
+  private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
   private static final String FILE_NAME = "logo.png";
   private static final String PRE_SIGNED_URL =
       "https://lynq-bucket.s3.amazonaws.com/logo.png?sig=abc";
