@@ -6,8 +6,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedConstruction;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.Month;
+import java.util.Arrays;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -32,6 +34,7 @@ class AppConfigTest {
   private static final String EXPECTED_SERIALIZED_YEAR_FRAGMENT = String.valueOf(SAMPLE_YEAR);
   private static final int FIRST_CONSTRUCTED_INDEX = 0;
   private static final int EXPECTED_CONSTRUCTED_COUNT = 1;
+  private static final int RANDOM_SAMPLE_BYTES = 32;
 
   private AppConfig appConfig;
 
@@ -73,5 +76,25 @@ class AppConfigTest {
       ObjectMapper constructedMapper = mockedObjectMapper.constructed().get(FIRST_CONSTRUCTED_INDEX);
       verify(constructedMapper).registerModule(any(JavaTimeModule.class));
     }
+  }
+
+  @Test
+  void createSecureRandomReturnsNonNullSecureRandomInstance() {
+    SecureRandom secureRandom = appConfig.createSecureRandom();
+
+    assertThat(secureRandom, is(notNullValue()));
+    assertThat(secureRandom, is(instanceOf(SecureRandom.class)));
+  }
+
+  @Test
+  void createSecureRandomProducesRandomBytes() {
+    SecureRandom secureRandom = appConfig.createSecureRandom();
+
+    byte[] first = new byte[RANDOM_SAMPLE_BYTES];
+    byte[] second = new byte[RANDOM_SAMPLE_BYTES];
+    secureRandom.nextBytes(first);
+    secureRandom.nextBytes(second);
+
+    assertThat(Arrays.equals(first, second), is(false));
   }
 }

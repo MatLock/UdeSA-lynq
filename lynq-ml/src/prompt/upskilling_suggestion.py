@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
 from llm_client import LLMProvider
 
@@ -12,10 +12,15 @@ from llm_client import LLMProvider
 # templates live under resources/prompts/.
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "resources" / "prompts"
 
-_env = Environment(  # NOSONAR: plain-text LLM prompts, not HTML — autoescaping would corrupt the output
+# Prompt templates are plain-text ".jinja" files, so select_autoescape never
+# escapes them; HTML/XML templates would still be escaped if any were added.
+_env = Environment(
     loader=FileSystemLoader(str(_PROMPTS_DIR)),
     undefined=StrictUndefined,
-    autoescape=False,
+    autoescape=select_autoescape(
+        enabled_extensions=("html", "htm", "xml"),
+        default_for_string=False,
+    ),
     keep_trailing_newline=True,
 )
 

@@ -33,6 +33,8 @@ import com.lynq.backend.repository.projection.JobCandidateProjection;
 import com.lynq.backend.repository.projection.JobWithDetailsProjection;
 import com.lynq.backend.security.LynqUserPrincipal;
 import java.time.LocalDate;
+import java.time.Month;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -95,7 +97,7 @@ class JobServiceTest {
   private static final String JOB_ID_NEWEST = "newest";
   private static final String JOB_ID_OLDEST = "oldest";
   private static final String JOB_URL = "https://lynq.ai/jobs/1";
-  private static final LocalDate CREATED_ON = LocalDate.of(2026, 6, 30);
+  private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 30);
   private static final Long TOTAL_SEEN = 0L;
   private static final Long TOTAL_CANDIDATES_APPLIED = 5L;
 
@@ -120,7 +122,7 @@ class JobServiceTest {
   private static final String CANDIDATE_CURRENT_POSITION = "Backend Engineer";
   private static final String CANDIDATE_IMAGE_PATH = "lynq/users/candidate-1/profile/pic.png";
   private static final String CANDIDATE_IMAGE_URL = "https://presigned/candidate.png";
-  private static final LocalDate APPLIED_ON = LocalDate.of(2026, 7, 17);
+  private static final LocalDate APPLIED_ON = LocalDate.of(2026, Month.JULY, 17);
   private static final String CANDIDATE_JOB_SKILLS = SKILL_JAVA + "," + SKILL_SPRING;
   private static final String CANDIDATE_MATCHING_SKILLS = SKILL_JAVA;
   private static final Integer CANDIDATE_LYNQ_SCORE = 50;
@@ -233,7 +235,7 @@ class JobServiceTest {
     assertThat(saved.getSalaryRangeDown(), is(SALARY_RANGE_DOWN));
     assertThat(saved.getSalaryRangeTop(), is(SALARY_RANGE_TOP));
     assertThat(saved.getJobPostSource(), is(JOB_POST_TYPE));
-    assertThat(saved.getCreatedOn(), is(LocalDate.now()));
+    assertThat(saved.getCreatedOn(), is(LocalDate.now(ZoneOffset.UTC)));
     assertThat(saved.getCreatedByUser(), is(sameInstance(user)));
     assertThat(saved.getCompany(), is(sameInstance(company)));
     assertThat(saved.getId(), is(notNullValue()));
@@ -649,7 +651,7 @@ class JobServiceTest {
     assertThat(UUID.fromString(saved.getId()), is(notNullValue()));
     assertThat(saved.getJobPost(), is(sameInstance(job)));
     assertThat(saved.getUser(), is(sameInstance(user)));
-    assertThat(saved.getAppliedOn(), is(LocalDate.now()));
+    assertThat(saved.getAppliedOn(), is(LocalDate.now(ZoneOffset.UTC)));
     assertThat(result, is(sameInstance(saved)));
   }
 
@@ -696,8 +698,8 @@ class JobServiceTest {
         .id(JOB_ID)
         .jobStatus(JobStatus.CLOSE)
         .createdByUser(owner)
-        .createdOn(LocalDate.of(2026, 1, 1))
-        .closedOn(LocalDate.of(2026, 5, 1))
+        .createdOn(LocalDate.of(2026, Month.JANUARY, 1))
+        .closedOn(LocalDate.of(2026, Month.MAY, 1))
         .build();
     stubAuthenticatedUser(owner);
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
@@ -707,7 +709,7 @@ class JobServiceTest {
     JobPostEntity result = jobService.refreshJob(JOB_ID);
 
     assertThat(result.getJobStatus(), is(JobStatus.OPEN));
-    assertThat(result.getCreatedOn(), is(LocalDate.now()));
+    assertThat(result.getCreatedOn(), is(LocalDate.now(ZoneOffset.UTC)));
     assertThat(result.getClosedOn(), is(nullValue()));
     verify(jobPostRepository).save(job);
   }
@@ -773,7 +775,7 @@ class JobServiceTest {
     JobPostEntity result = jobService.closeJob(JOB_ID);
 
     assertThat(result.getJobStatus(), is(JobStatus.CLOSE));
-    assertThat(result.getClosedOn(), is(LocalDate.now()));
+    assertThat(result.getClosedOn(), is(LocalDate.now(ZoneOffset.UTC)));
     verify(jobPostRepository).save(job);
   }
 
@@ -858,7 +860,7 @@ class JobServiceTest {
         SKILLS);
 
     assertThat(result.getJobStatus(), is(JobStatus.CLOSE));
-    assertThat(result.getClosedOn(), is(LocalDate.now()));
+    assertThat(result.getClosedOn(), is(LocalDate.now(ZoneOffset.UTC)));
   }
 
   @Test
@@ -866,7 +868,7 @@ class JobServiceTest {
     UserEntity owner = companyUser();
     JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
     job.setJobStatus(JobStatus.CLOSE);
-    job.setClosedOn(LocalDate.of(2026, 5, 1));
+    job.setClosedOn(LocalDate.of(2026, Month.MAY, 1));
     stubAuthenticatedUser(owner);
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
     when(jobPostRepository.save(any(JobPostEntity.class)))
@@ -885,7 +887,7 @@ class JobServiceTest {
     UserEntity owner = companyUser();
     JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
     job.setJobStatus(JobStatus.CLOSE);
-    LocalDate closedOn = LocalDate.of(2026, 5, 1);
+    LocalDate closedOn = LocalDate.of(2026, Month.MAY, 1);
     job.setClosedOn(closedOn);
     stubAuthenticatedUser(owner);
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));

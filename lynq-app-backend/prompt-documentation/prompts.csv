@@ -162,3 +162,4 @@ parameters:
 "26-07-2026","create new endpoint in UserController. GET ""/user/generate-upload-resume"" that given a fileName passed as a request parameter it generates an upload pre-signed url. This can only happen to user of type CANDIDATE"
 "26-07-2026","create endpoint in UserController GET ""/user/upskilling-suggestion/${job_post_id}"" that will get the jobPost application id, the userid from the auth context and will call ML endpoint /ml/upskilling-suggestion"
 "26-07-2026","instead of showing ""You are not perfect for this role"" I would like to show reasons of why. modify backend and ml endpoint if you need it""26-07-2026","commit the work done here. commit must start with preffix [lynq-app-backend]: . do not record this promtp and do not mention claude"
+"27-07-2026","build passes. read the report from the last release and fix all the code smell,bug and vulneravility"

@@ -18,6 +18,7 @@ import java.util.UUID;
 
 @Service
 @Log4j2
+@SuppressWarnings("java:S2143")
 public class JWTService {
 
   private static final String USERNAME_CLAIM = "username";

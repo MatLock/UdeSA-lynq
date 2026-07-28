@@ -38,6 +38,7 @@ import com.lynq.backend.repository.projection.JobCandidateProjection;
 import com.lynq.backend.repository.projection.JobWithDetailsProjection;
 import com.lynq.backend.security.LynqUserPrincipal;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -116,7 +117,7 @@ public class JobService {
         .salaryRangeDown(salaryRangeDown)
         .salaryRangeTop(salaryRangeTop)
         .jobPostSource(jobPostSource)
-        .createdOn(LocalDate.now())
+        .createdOn(LocalDate.now(ZoneOffset.UTC))
         .createdByUser(user)
         .company(company)
         .build();
@@ -147,7 +148,7 @@ public class JobService {
     }
 
     job.setJobStatus(JobStatus.OPEN);
-    job.setCreatedOn(LocalDate.now());
+    job.setCreatedOn(LocalDate.now(ZoneOffset.UTC));
     job.setClosedOn(null);
 
     return jobPostRepository.save(job);
@@ -164,7 +165,7 @@ public class JobService {
     }
 
     job.setJobStatus(JobStatus.CLOSE);
-    job.setClosedOn(LocalDate.now());
+    job.setClosedOn(LocalDate.now(ZoneOffset.UTC));
 
     return jobPostRepository.save(job);
   }
@@ -194,7 +195,7 @@ public class JobService {
     }
 
     job.setJobStatus(status);
-    job.setClosedOn(status == JobStatus.CLOSE ? LocalDate.now() : null);
+    job.setClosedOn(status == JobStatus.CLOSE ? LocalDate.now(ZoneOffset.UTC) : null);
   }
 
   private void updateSkills(JobPostEntity job, List<String> skills) {
@@ -257,7 +258,7 @@ public class JobService {
         .id(Generators.timeBasedEpochGenerator().generate().toString())
         .jobPost(job)
         .user(user)
-        .appliedOn(LocalDate.now())
+        .appliedOn(LocalDate.now(ZoneOffset.UTC))
         .build();
 
     return userApplicationJobRepository.save(application);

@@ -8,6 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -27,8 +28,8 @@ class UserEntityTest {
   private static final String ABOUT = "Backend developer focused on distributed systems.";
   private static final String GITHUB_URL = "https://github.com/lynq-user";
   private static final String LINKEDIN_URL = "https://linkedin.com/in/lynq-user";
-  private static final LocalDate BIRTH_DATE = LocalDate.of(1995, 4, 12);
-  private static final LocalDate CREATED_ON = LocalDate.of(2026, 6, 25);
+  private static final LocalDate BIRTH_DATE = LocalDate.of(1995, Month.APRIL, 12);
+  private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
 
   @Mock
   private UserSkillsEntity userSkill;

@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -23,7 +24,7 @@ class CompanyEntityTest {
   private static final String ABOUT = "We build talent matching platforms.";
   private static final Integer COMPANY_SIZE = 250;
   private static final String PROFILE_IMAGE_URL = "https://cdn.lynq.ai/companies/logo.png";
-  private static final LocalDate CREATED_ON = LocalDate.of(2026, 6, 25);
+  private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
 
   @Mock
   private JobPostEntity jobPost;

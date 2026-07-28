@@ -56,9 +56,15 @@
 }
 
 /* Popup — portaled to <body>, positioned via inline top/left (viewport coords). */
+/* A non-modal <dialog>: the UA's default margin/max sizing is reset so the
+   popup keeps the coordinates the field measures for it. */
 .date-picker-popup {
   position: fixed;
   z-index: 1000;
+  margin: 0;
+  max-width: none;
+  max-height: none;
+  color: inherit;
   padding: 10px;
   box-sizing: border-box;
   background: #fff;

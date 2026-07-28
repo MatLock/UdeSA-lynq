@@ -108,3 +108,4 @@ date,prompt
 "26-07-2026","create a modal page for Score Explanation button. When the user clicks on the button. this modal should be displayed where the user can see the score explanation and recommended courses. There is a backend endpoint for this ""/user/upskilling-suggestion"""
 "26-07-2026","the output is perfect, just that is in english. Can we make it to respect the language that is set on the UI? for example I have it set in Spanish"
 "26-07-2026","I see that the prompt.csv file in frontend project have some prompts whose date is fippled. fix this date. The right format is ""dd-MM-yyyy"". since line 87 all dates have invalid format"
+"27-07-2026","build passes. read the report from the last release and fix all the code smell,bug and vulneravility"

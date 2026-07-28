@@ -38,6 +38,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.LocalDate;
+import java.time.Month;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -90,7 +91,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String PROFILE_IMAGE_URL = "https://cdn.lynq.com/avatars/jane.png";
   private static final String GITHUB_URL = "https://github.com/janedoe";
   private static final String LINKEDIN_URL = "https://linkedin.com/in/janedoe";
-  private static final LocalDate BIRTH_DATE = LocalDate.of(1995, 4, 12);
+  private static final LocalDate BIRTH_DATE = LocalDate.of(1995, Month.APRIL, 12);
   private static final String UPLOAD_FILE_NAME = "avatar.png";
 
   private static final String COMPANY_NAME = "Lynq Technologies";
@@ -129,9 +130,9 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String JOB_ID_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
   private static final String JOB_ID_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
   private static final String JOB_ID_C = "cccccccc-cccc-cccc-cccc-cccccccccccc";
-  private static final LocalDate JOB_CREATED_OLD = LocalDate.of(2026, 6, 1);
-  private static final LocalDate JOB_CREATED_MID = LocalDate.of(2026, 6, 10);
-  private static final LocalDate JOB_CREATED_NEW = LocalDate.of(2026, 6, 20);
+  private static final LocalDate JOB_CREATED_OLD = LocalDate.of(2026, Month.JUNE, 1);
+  private static final LocalDate JOB_CREATED_MID = LocalDate.of(2026, Month.JUNE, 10);
+  private static final LocalDate JOB_CREATED_NEW = LocalDate.of(2026, Month.JUNE, 20);
   private static final String PLACEHOLDER_DESCRIPTION = "d";
   private static final String PRE_SIGNED_URL_SIGNATURE_MARKER = "X-Amz-Signature";
   private static final String LISTED_NEWEST_JOB_TITLE = "Frontend Engineer";
@@ -1740,23 +1741,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .createdOn(LocalDate.now())
         .totalSeen(totalSeen)
         .build());
-  }
-
-  private void seedSingleJobWithSkills(List<String> skills) {
-    JobPostEntity job = JobPostEntity.builder()
-        .id(JOB_ID)
-        .title(JOB_TITLE)
-        .workType(JOB_WORK_TYPE)
-        .jobPostSource(JOB_POST_TYPE)
-        .createdOn(LocalDate.now())
-        .totalSeen(INITIAL_SEEN)
-        .build();
-    skills.forEach(skill -> job.getSkills().add(JobPostSkillEntity.builder()
-        .id("jskill-" + skill)
-        .jobPost(job)
-        .skill(skill)
-        .build()));
-    jobPostRepository.save(job);
   }
 
   private UserEntity seedCompanyOwner(String id) {
