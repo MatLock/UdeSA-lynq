@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import SchoolOutlinedIcon from '@mui/icons-material/SchoolOutlined'
 import strings from '../../i18n'
+import useModalDialog from '../../hooks/useModalDialog'
 import Spinner from '../Spinner/Spinner.jsx'
 import './ScoreExplanationModal.css'
 
@@ -17,43 +17,9 @@ import './ScoreExplanationModal.css'
 // the error copy; otherwise `result` ({ outcome, suggestions }).
 const ScoreExplanationModal = ({ jobTitle, result, loading, error, onClose }) => {
   const t = strings.pages.applications
-  const dialogRef = useRef(null)
-
-  // showModal() is what puts the element in the top layer and paints the
-  // backdrop. Opening on the ref callback ties it to the element's own
-  // lifetime, so a re-render (e.g. `loading` flipping) can't close and reopen
-  // it. The callback is stable so React attaches it exactly once.
-  const attachDialog = useCallback((node) => {
-    dialogRef.current = node
-    if (node && !node.open) node.showModal()
-  }, [])
-
-  // Listeners are wired imperatively rather than as JSX props: a <dialog> is a
-  // non-interactive element, so React handlers on it would be an a11y smell.
-  useEffect(() => {
-    const dialog = dialogRef.current
-    if (!dialog) return undefined
-
-    // A click on the ::backdrop is reported with the dialog itself as target;
-    // clicks on the content land on the inner wrapper instead.
-    const onBackdropClick = (event) => {
-      if (event.target === dialog) onClose?.()
-    }
-    // Escape would close the element on its own, leaving the parent's state
-    // stale — intercept it and let the parent drive the unmount.
-    const onCancel = (event) => {
-      event.preventDefault()
-      onClose?.()
-    }
-
-    dialog.addEventListener('click', onBackdropClick)
-    dialog.addEventListener('cancel', onCancel)
-
-    return () => {
-      dialog.removeEventListener('click', onBackdropClick)
-      dialog.removeEventListener('cancel', onCancel)
-    }
-  }, [onClose])
+  // A re-render (e.g. `loading` flipping) must not close and reopen the dialog
+  // — see useModalDialog for how the ref callback pins it to the element.
+  const attachDialog = useModalDialog(onClose)
 
   // Only suggestions that actually carry courses are worth a section.
   const suggestions = (result?.suggestions ?? []).filter(

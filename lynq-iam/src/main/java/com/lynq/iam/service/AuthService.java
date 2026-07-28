@@ -33,8 +33,14 @@ public class AuthService {
   private static final String USERNAME_TAKEN_REASON = "Username is already taken";
 
   private static final int EMAIL_MAX_LENGTH = 100;
+  // Possessive quantifiers throughout: the greedy form recurses once per domain
+  // label inside java.util.regex, so an address with enough dots overflows the
+  // stack before the length check below can reject it. Each repetition here is
+  // over a character class that excludes its own delimiter, so giving up a
+  // repetition could never rescue a failing match — dropping the backtracking
+  // is free and leaves the accepted language unchanged.
   private static final Pattern EMAIL_PATTERN =
-      Pattern.compile("^[^@\\s]+@[^@\\s.]+(?:\\.[^@\\s.]+)+$");
+      Pattern.compile("^[^@\\s]++@[^@\\s.]++(?:\\.[^@\\s.]++)++$");
   private static final String EMAIL_BLANK_REASON = "Email must not be blank";
   private static final String EMAIL_LENGTH_REASON =
       "Email must not exceed " + EMAIL_MAX_LENGTH + " characters";

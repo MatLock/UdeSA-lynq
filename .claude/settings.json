@@ -18,7 +18,12 @@
       "Read(//Users/matlock/Desktop/resources/**)",
       "Bash(.venv/bin/python -m coverage run --branch -m unittest discover -s tests -t .)",
       "Bash(.venv/bin/python --version)",
-      "Bash(.venv/bin/python -m unittest discover -s tests -t .)"
+      "Bash(.venv/bin/python -m unittest discover -s tests -t .)",
+      "Bash(curl -s \"https://sonarcloud.io/api/issues/search?componentKeys=MatLock_UdeSA-lynq&inNewCodePeriod=true&types=BUG&statuses=OPEN,CONFIRMED,REOPENED&ps=100\")",
+      "Bash(curl -s \"https://sonarcloud.io/api/measures/component_tree?component=MatLock_UdeSA-lynq&metricKeys=new_duplicated_lines_density,new_duplicated_lines,new_lines&strategy=leaves&ps=100&s=metric&metricSort=new_duplicated_lines&asc=false\")",
+      "Bash(curl -s \"https://sonarcloud.io/api/duplications/show?key=MatLock_UdeSA-lynq:lynq-app-frontend/src/components/CandidateEvaluationModal/CandidateEvaluationModal.jsx\")",
+      "Bash(echo \"eslint exit=$?\")",
+      "Bash(npx vitest *)"
     ]
   }
 }

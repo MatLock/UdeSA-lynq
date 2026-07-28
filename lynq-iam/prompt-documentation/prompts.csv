@@ -28,3 +28,4 @@ date,prompt
 "04-07-2026","add another endpoint to check email. same rules an pattern"
 "04-07-2026","update lynq-iam readme.md with new endpoints"
 "27-07-2026","build passes. read the report from the last release and fix all the code smell,bug and vulneravility"
+"27-07-2026","sonar failed again (release scan quality gate FAILED: QUALITY GATE STATUS: FAILED - View details on https://sonarcloud.io/dashboard?id=MatLock_UdeSA-lynq)"
