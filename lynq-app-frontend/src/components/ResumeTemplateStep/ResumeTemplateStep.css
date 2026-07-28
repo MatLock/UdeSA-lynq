@@ -1,0 +1,7 @@
+/* ResumeTemplateStep — last step of the resume wizard: classic vs. modern. The
+   option cards come from ResumeOptionCards.css (shared with step 1), so this file
+   only centers them the way the method step does. */
+
+.resume-template-step {
+  align-items: center;
+}

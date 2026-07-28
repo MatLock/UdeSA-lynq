@@ -1,0 +1,288 @@
+/* MyResumePage — the candidate's resume viewer and creation flow. Fills the
+   AppLayout outlet next to the sidebar; mirrors the applications layout (fixed
+   header, one scrollable region) with brand tokens from index.css. */
+
+.resume-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  /* Lock to the viewport so the header stays fixed; only the document scrolls. */
+  height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 32px;
+  gap: 16px;
+  text-align: initial;
+  background:
+    radial-gradient(ellipse at top left, #efeafc 0%, transparent 45%),
+    radial-gradient(ellipse at bottom right, #e8f1fc 0%, transparent 45%),
+    #f7f6fb;
+}
+
+/* Loading, error and creation modes are single tall blocks rather than a pinned
+   header over a scroll area — let the whole page scroll instead. */
+.resume-page--scroll {
+  height: 100vh;
+  overflow-y: auto;
+  justify-content: flex-start;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+
+.resume-page-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.resume-page-hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.resume-page-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.resume-page-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.resume-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Primary pill action (new resume, retry, refresh); the ghost variant is for the
+   secondary PDF download. */
+.resume-page-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand-gradient);
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.resume-page-action:hover {
+  opacity: 0.92;
+}
+
+.resume-page-action--ghost {
+  color: var(--brand-purple-dark);
+  background: #fff;
+  border: 1px solid var(--accent-border);
+}
+
+.resume-page-action--ghost:hover {
+  opacity: 1;
+  border-color: var(--brand-purple);
+}
+
+/* ── Resume switcher (only with more than one resume) ────────────────────── */
+
+.resume-page-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.resume-page-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 280px;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.resume-page-tab:hover {
+  border-color: var(--brand-purple-light);
+  color: var(--text-h);
+}
+
+.resume-page-tab.active {
+  border-color: transparent;
+  color: #fff;
+  background: var(--brand-gradient);
+  font-weight: 600;
+}
+
+.resume-page-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Language code badge (ES / EN / …) inside each switcher chip. */
+.resume-page-tab-language {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+}
+
+.resume-page-tab.active .resume-page-tab-language {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ── Meta line (created date + language fallback note) ──────────────────── */
+
+.resume-page-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.resume-page-created {
+  color: var(--text);
+}
+
+/* Shown when no resume exists in the configured UI language. */
+.resume-page-note {
+  padding: 2px 12px;
+  border-radius: 999px;
+  color: var(--brand-blue-dark);
+  background: var(--accent-blue-bg);
+  border: 1px solid var(--accent-blue-border);
+}
+
+/* ── Body: nav rail + scrollable document ───────────────────────────────── */
+
+.resume-page-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 20px;
+}
+
+/* The document is the sole scrollable region — min-height:0 lets it shrink below
+   its content so the overflow scrolls here instead of past the viewport. */
+.resume-page-document {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  scroll-behavior: smooth;
+}
+
+.resume-page-empty {
+  margin: 0;
+  padding: 40px;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text);
+  background: #fff;
+}
+
+/* ── States (loading, error) and the post-upload panel ──────────────────── */
+
+.resume-page-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 320px;
+}
+
+.resume-page-error {
+  margin: 0;
+  font-size: 14px;
+  color: var(--danger);
+}
+
+.resume-page-panel {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 520px;
+  margin-top: 24px;
+  padding: 32px;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(80, 60, 150, 0.12);
+  text-align: center;
+}
+
+.resume-page-panel-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--brand-gradient);
+}
+
+.resume-page-panel-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.resume-page-panel-body {
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+@media (max-width: 900px) {
+  .resume-page-body {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .resume-page {
+    padding: 20px 16px;
+  }
+
+  .resume-page-actions {
+    width: 100%;
+  }
+
+  .resume-page-action {
+    flex: 1;
+    justify-content: center;
+  }
+}

@@ -1,0 +1,124 @@
+/* ResumeSectionNav — sticky jump-to-section rail beside the resume document.
+   Brand tokens come from index.css. */
+
+.resume-nav {
+  flex: none;
+  width: 216px;
+  align-self: flex-start;
+  position: sticky;
+  top: 0;
+  padding: 14px;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(80, 60, 150, 0.08);
+}
+
+.resume-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resume-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.resume-nav-item:hover {
+  background: var(--accent-bg);
+  color: var(--text-h);
+}
+
+.resume-nav-item:focus-visible {
+  outline: 2px solid var(--brand-purple);
+  outline-offset: 1px;
+}
+
+/* The section currently in view: brand gradient bar, white content. */
+.resume-nav-item.active {
+  background: var(--brand-gradient);
+  color: #fff;
+  font-weight: 600;
+}
+
+.resume-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--accent-blue-bg);
+  color: var(--brand-blue-dark);
+}
+
+.resume-nav-item.active .resume-nav-icon {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.resume-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Entry count for list sections (experience, projects, …). */
+.resume-nav-count {
+  flex: none;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+}
+
+.resume-nav-item.active .resume-nav-count {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Narrow viewports: the rail becomes a horizontal, scrollable chip strip above
+   the document instead of a column beside it. */
+@media (max-width: 900px) {
+  .resume-nav {
+    width: 100%;
+    position: static;
+    padding: 8px;
+  }
+
+  .resume-nav-list {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 6px;
+  }
+
+  .resume-nav-item {
+    width: auto;
+    white-space: nowrap;
+  }
+}

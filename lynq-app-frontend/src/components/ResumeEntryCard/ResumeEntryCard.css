@@ -1,0 +1,66 @@
+/* ResumeEntryCard — one repeatable entry inside a wizard group. The two-column
+   field grid it wraps is defined here so every entry type lays out the same. */
+
+.resume-entry-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+  transition: border-color 0.15s ease;
+}
+
+.resume-entry-card:focus-within {
+  border-color: var(--brand-purple-light);
+}
+
+.resume-entry-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.resume-entry-card-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--brand-purple-dark);
+}
+
+.resume-entry-card-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.resume-entry-card-remove:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Two columns on desktop; the fields that need the full width opt in with
+   .resume-field--full (see ResumeField.css). */
+.resume-entry-card-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+@media (max-width: 700px) {
+  .resume-entry-card-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

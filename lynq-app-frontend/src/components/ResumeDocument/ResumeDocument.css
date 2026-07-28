@@ -1,0 +1,447 @@
+/* ResumeDocument — read-only rendering of a resume JSON. Reads brand tokens from
+   index.css; the page (MyResumePage) owns the scroll container around it. */
+
+.resume-document {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: left;
+}
+
+/* ── Header (personal_info) ──────────────────────────────────────────────── */
+
+/* The one section that isn't a plain titled block: the name/headline banner,
+   tinted with the brand gradient at low opacity. */
+.resume-header {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 24px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse at top left, rgba(168, 85, 247, 0.1), transparent 60%),
+    radial-gradient(ellipse at bottom right, rgba(56, 189, 248, 0.1), transparent 60%),
+    #fff;
+  box-shadow: 0 12px 32px rgba(80, 60, 150, 0.08);
+}
+
+.resume-header-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Initials stand in for the picture the resume JSON doesn't carry. */
+.resume-avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--brand-gradient);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.resume-header-text {
+  min-width: 0;
+}
+
+.resume-name {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--text-h);
+}
+
+.resume-headline {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--brand-purple-dark);
+  font-weight: 600;
+}
+
+.resume-contacts,
+.resume-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resume-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.resume-contact svg {
+  color: var(--brand-blue-dark);
+}
+
+.resume-contact a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.resume-contact a:hover {
+  color: var(--text-h);
+  text-decoration: underline;
+}
+
+/* Outlined pill for an external link (profile links, project links). */
+.resume-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.resume-link:hover {
+  background: var(--brand-gradient);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* ── Titled sections ─────────────────────────────────────────────────────── */
+
+.resume-section {
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(80, 60, 150, 0.06);
+}
+
+/* Heading with a short brand rule underneath. */
+.resume-section-title {
+  position: relative;
+  margin: 0 0 16px;
+  padding-bottom: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-h);
+}
+
+.resume-section-title::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 42px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--brand-gradient);
+}
+
+.resume-summary {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text);
+  white-space: pre-line;
+}
+
+/* ── Timeline (work experience, education) ───────────────────────────────── */
+
+.resume-timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 0;
+  padding: 0 0 0 22px;
+  list-style: none;
+}
+
+/* Vertical rail behind the entries. */
+.resume-timeline::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 4px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    var(--brand-blue) 0%,
+    var(--brand-purple) 100%
+  );
+  opacity: 0.35;
+}
+
+.resume-timeline-item {
+  position: relative;
+}
+
+/* Dot on the rail, aligned with the entry's first line. */
+.resume-timeline-item::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: -22px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--brand-purple);
+}
+
+.resume-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.resume-entry-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.resume-entry-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.resume-entry-meta {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* Right-hand column of an entry header: dates stacked over the current badge. */
+.resume-entry-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.resume-entry-dates {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-blue-dark);
+  white-space: nowrap;
+}
+
+.resume-badge {
+  padding: 1px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-gradient);
+}
+
+.resume-entry-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-line;
+}
+
+.resume-entry-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resume-entry-block-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-h);
+}
+
+.resume-bullets {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.resume-bullets li::marker {
+  color: var(--brand-purple);
+}
+
+/* ── Chips (skills, technologies) ────────────────────────────────────────── */
+
+.resume-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resume-chip {
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.resume-chips.tone-blue .resume-chip {
+  color: var(--brand-blue-dark);
+  background: var(--accent-blue-bg);
+  border: 1px solid var(--accent-blue-border);
+}
+
+.resume-chips.tone-purple .resume-chip {
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+}
+
+.resume-skill-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.resume-skill-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Languages ───────────────────────────────────────────────────────────── */
+
+.resume-language-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resume-language {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--text-h);
+}
+
+.resume-language-level {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand-gradient);
+}
+
+/* ── Cards (certifications, projects) ────────────────────────────────────── */
+
+.resume-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resume-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.resume-card:hover {
+  border-color: var(--brand-purple-light);
+  box-shadow: 0 8px 20px rgba(80, 60, 150, 0.08);
+}
+
+.resume-card-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--brand-purple);
+  background: var(--accent-bg);
+}
+
+.resume-card-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.resume-card-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.resume-card-meta {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+@media (max-width: 560px) {
+  .resume-header,
+  .resume-section {
+    padding: 16px;
+  }
+
+  .resume-entry-head {
+    flex-direction: column;
+  }
+
+  .resume-entry-side {
+    align-items: flex-start;
+  }
+}

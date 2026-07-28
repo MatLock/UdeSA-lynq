@@ -1,0 +1,12 @@
+/* ResumePersonalStep — step 2 of the resume wizard. Field and step chrome come
+   from ResumeField.css / ResumeWizard.css; only this step's specifics live here. */
+
+.resume-personal-step {
+  gap: 14px;
+}
+
+/* The summary is the one free-prose field of the step — give it more room than
+   the shared textarea default so a few paragraphs are comfortable to write. */
+.resume-personal-summary {
+  min-height: 104px;
+}

@@ -1,0 +1,9 @@
+/* ResumeEducationStep — step 3 of the resume wizard (studies, languages,
+   certifications). Field, card and step chrome come from ResumeField.css,
+   ResumeEntryCard.css and ResumeWizard.css; only this step's rhythm lives here. */
+
+/* Three stacked groups make this the tallest slide — a slightly wider gap keeps
+   the boundaries between studies / languages / certifications readable. */
+.resume-education-step {
+  gap: 20px;
+}

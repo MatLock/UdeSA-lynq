@@ -1,0 +1,49 @@
+/* ResumeEmploymentStep — step 4 of the resume wizard (jobs, skills, projects).
+   Field, card and step chrome come from ResumeField.css, ResumeEntryCard.css and
+   ResumeWizard.css; only this step's specifics live here. */
+
+.resume-employment-step {
+  gap: 20px;
+}
+
+/* The three skill buckets are plain tag lists rather than repeatable cards, so
+   they stack full width instead of using the two-column entry grid. */
+.resume-employment-skills {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* AI action in the skills group header. Filled with the brand gradient (rather
+   than the outlined "add another" look) since it is the group's main affordance —
+   the same treatment the create-job skill generator gets. */
+.resume-employment-generate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border: none;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand-gradient);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.resume-employment-generate:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.resume-employment-generate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.resume-employment-generate-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text);
+}

@@ -1,0 +1,102 @@
+/* ResumeOptionCards — the either/or radio cards shared by the resume wizard's
+   first and last steps. Mirrors the register flow's account-type cards; tokens
+   from index.css. */
+
+.resume-options {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+}
+
+.resume-option-card {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 24px 20px;
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.resume-option-card:hover {
+  border-color: var(--brand-purple-light);
+}
+
+.resume-option-card.selected {
+  border-color: var(--brand-purple);
+  box-shadow: 0 0 0 1px var(--brand-purple);
+}
+
+/* Native radio is kept for accessibility but hidden; the visual is below. */
+.resume-option-card input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.resume-option-radio {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  transition: border-color 0.15s ease;
+}
+
+.resume-option-card.selected .resume-option-radio {
+  border-color: var(--brand-purple);
+}
+
+.resume-option-card.selected .resume-option-radio::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--brand-purple);
+}
+
+.resume-option-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+
+.resume-option-card.tone-blue .resume-option-icon {
+  background: var(--accent-blue-bg);
+  color: var(--brand-blue-dark);
+}
+
+.resume-option-card.tone-purple .resume-option-icon {
+  background: var(--accent-bg);
+  color: var(--brand-purple);
+}
+
+.resume-option-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.resume-option-desc {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+@media (max-width: 560px) {
+  .resume-options {
+    flex-direction: column;
+  }
+}

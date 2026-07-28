@@ -1,0 +1,119 @@
+/* ResumeWizard — horizontal carousel of resume-creation steps inside the card.
+   Same mechanics as RegisterWizard.css (the flow is deliberately identical). */
+
+.resume-wizard {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* Clips the off-screen slides; height is driven by JS to match the active step so
+   the card resizes smoothly between steps of different heights. */
+.resume-wizard-viewport {
+  width: 100%;
+  overflow: hidden;
+  transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* The sliding track: each slide is full width, laid out in a row and shifted left
+   by translateX as the step advances. */
+.resume-wizard-track {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  width: 100%;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.resume-wizard-slide {
+  flex: 0 0 100%;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Respect users who prefer no motion — snap instead of slide. */
+@media (prefers-reduced-motion: reduce) {
+  .resume-wizard-viewport,
+  .resume-wizard-track {
+    transition: none;
+  }
+}
+
+/* ── Shared step chrome ──────────────────────────────────────────────────────
+   Layout every slide shares (heading, field grid, entry stack, date row). It
+   lives with the wizard — the component that renders the steps — so the four
+   steps don't each restate it, the same way the auth pages share .login-form. */
+
+.resume-step {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  text-align: left;
+}
+
+.resume-step-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+.resume-step-question {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.resume-step-helper {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* Two-column field grid; long fields opt out with .resume-field--full. */
+.resume-step-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+/* Stack of ResumeEntryCards within a group. */
+.resume-step-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* "From"/"To" pair of MonthYearFields, side by side across both grid columns. */
+.resume-step-dates {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+/* Checkbox row ("I still work here"), which also disables the end date. */
+.resume-step-check {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.resume-step-check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--brand-purple);
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .resume-step-grid,
+  .resume-step-dates {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

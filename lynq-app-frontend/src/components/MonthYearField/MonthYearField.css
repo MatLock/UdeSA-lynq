@@ -1,0 +1,41 @@
+/* MonthYearField — year + month selects for the partial dates a resume carries.
+   Control styling is inherited from ResumeField.css; only layout lives here. */
+
+.month-year-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.month-year-select {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.month-year-select:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.month-year-clear {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.month-year-clear:hover {
+  border-color: var(--brand-purple-light);
+  color: var(--brand-purple);
+}
