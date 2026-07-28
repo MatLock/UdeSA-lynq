@@ -3,6 +3,7 @@ package com.lynq.backend.service;
 import com.lynq.backend.client.LynqMLClient;
 import com.lynq.backend.client.request.SkillEnhanceRequest;
 import com.lynq.backend.client.response.SkillEnhanceResponse;
+import com.lynq.backend.client.response.SkillExtractionResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.enums.WorkType;
@@ -44,6 +45,7 @@ class LynqMLProxyServiceTest {
   private static final String EMAIL = "jane@lynq.com";
   private static final String COMPANY_ID = "company-1";
   private static final String REQUEST_UUID = "11111111-1111-1111-1111-111111111111";
+  private static final String LANGUAGE = "es";
 
   private static final String TITLE = "Senior Backend Engineer";
   private static final String DESCRIPTION = "Build and scale the Lynq hiring platform.";
@@ -53,8 +55,14 @@ class LynqMLProxyServiceTest {
   private static final String SKILL_SPRING = "Spring";
   private static final List<String> SKILLS = List.of(SKILL_JAVA, SKILL_SPRING);
 
+  private static final String TOOL_GIT = "Git";
+  private static final String SOFT_TEAMWORK = "Teamwork";
+  private static final Object RESUME_PAYLOAD = new Object();
+
   private static final String ONLY_COMPANY_USERS_CAN_ENHANCE_SKILLS =
       "Only users of type COMPANY can enhance skills";
+  private static final String ONLY_CANDIDATE_USERS_CAN_EXTRACT_RESUME_SKILLS =
+      "Only users of type CANDIDATE can extract resume skills";
   private static final String USER_NOT_LINKED_TO_COMPANY = "User is not linked to any company";
   private static final String AUTHENTICATED_USER_NOT_FOUND = "Authenticated user not found";
 
@@ -155,12 +163,79 @@ class LynqMLProxyServiceTest {
     verify(lynqMLClient, never()).enhanceSkills(any(), any(), any(), any());
   }
 
+  @Test
+  void extractResumeSkillsForwardsPayloadHeadersAndLanguageToClient() {
+    stubAuthenticatedPrincipal();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateUser()));
+    when(lynqMLClient.extractResumeSkills(eq(RESUME_PAYLOAD), eq(REQUEST_UUID), eq(USER_ID),
+        eq(LANGUAGE)))
+        .thenReturn(new GlobalRestResponse<>(true, extractionResponse()));
+
+    lynqMLProxyService.extractResumeSkills(RESUME_PAYLOAD, REQUEST_UUID, LANGUAGE);
+
+    verify(lynqMLClient).extractResumeSkills(eq(RESUME_PAYLOAD), eq(REQUEST_UUID), eq(USER_ID),
+        eq(LANGUAGE));
+  }
+
+  @Test
+  void extractResumeSkillsReturnsSkillsFromClientResponse() {
+    stubAuthenticatedPrincipal();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateUser()));
+    SkillExtractionResponse mlResponse = extractionResponse();
+    when(lynqMLClient.extractResumeSkills(eq(RESUME_PAYLOAD), eq(REQUEST_UUID), eq(USER_ID),
+        eq(LANGUAGE)))
+        .thenReturn(new GlobalRestResponse<>(true, mlResponse));
+
+    SkillExtractionResponse result =
+        lynqMLProxyService.extractResumeSkills(RESUME_PAYLOAD, REQUEST_UUID, LANGUAGE);
+
+    assertThat(result, is(sameInstance(mlResponse)));
+    assertThat(result.getSkills(), contains(SKILL_JAVA, SKILL_SPRING));
+    assertThat(result.getTools(), contains(TOOL_GIT));
+    assertThat(result.getSoft(), contains(SOFT_TEAMWORK));
+  }
+
+  @Test
+  void extractResumeSkillsThrowsBadRequestWhenAuthenticatedUserNotFound() {
+    stubAuthenticatedPrincipal();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> lynqMLProxyService.extractResumeSkills(RESUME_PAYLOAD, REQUEST_UUID, LANGUAGE));
+    assertThat(exception.getMessage(), is(AUTHENTICATED_USER_NOT_FOUND));
+    verify(lynqMLClient, never()).extractResumeSkills(any(), any(), any(), any());
+  }
+
+  @Test
+  void extractResumeSkillsThrowsBadRequestWhenUserIsNotCandidateType() {
+    UserEntity company = UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
+    stubAuthenticatedPrincipal();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(company));
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> lynqMLProxyService.extractResumeSkills(RESUME_PAYLOAD, REQUEST_UUID, LANGUAGE));
+    assertThat(exception.getMessage(), is(ONLY_CANDIDATE_USERS_CAN_EXTRACT_RESUME_SKILLS));
+    verify(lynqMLClient, never()).extractResumeSkills(any(), any(), any(), any());
+  }
+
   private SkillEnhanceResponse response() {
     return SkillEnhanceResponse.builder().skills(SKILLS).build();
   }
 
+  private SkillExtractionResponse extractionResponse() {
+    return SkillExtractionResponse.builder()
+        .skills(SKILLS)
+        .tools(List.of(TOOL_GIT))
+        .soft(List.of(SOFT_TEAMWORK))
+        .build();
+  }
+
   private UserEntity companyUser() {
     return UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
+  }
+
+  private UserEntity candidateUser() {
+    return UserEntity.builder().id(USER_ID).type(UserType.CANDIDATE).build();
   }
 
   private void stubAuthenticatedPrincipal() {

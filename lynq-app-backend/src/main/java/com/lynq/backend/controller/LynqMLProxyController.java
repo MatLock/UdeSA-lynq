@@ -1,6 +1,7 @@
 package com.lynq.backend.controller;
 
 import com.lynq.backend.client.response.SkillEnhanceResponse;
+import com.lynq.backend.client.response.SkillExtractionResponse;
 import com.lynq.backend.controller.request.SkillEnhanceRequest;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,4 +22,16 @@ public interface LynqMLProxyController {
       security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<GlobalRestResponse<SkillEnhanceResponse>> enhanceSkills(
       @Valid SkillEnhanceRequest request, String requestUuid);
+
+  @Operation(
+      summary = "Extract the skills from a resume",
+      description = "Forwards the structured resume payload to the lynq-ml service, which "
+          + "consolidates all of its skills into technical/tools/soft buckets via an LLM. The "
+          + "authenticated user must be a CANDIDATE-type user; the request is enriched with the "
+          + "caller's user id, the request uuid and the caller's UI language before being sent to "
+          + "lynq-ml. The soft skills come back written in that language (technical and tool names "
+          + "are always kept verbatim), defaulting to English when 'language' is omitted.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<SkillExtractionResponse>> extractResumeSkills(
+      Object resumePayload, String requestUuid, String language);
 }

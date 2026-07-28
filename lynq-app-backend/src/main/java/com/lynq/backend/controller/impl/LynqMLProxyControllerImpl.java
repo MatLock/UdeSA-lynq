@@ -2,6 +2,7 @@ package com.lynq.backend.controller.impl;
 
 import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.client.response.SkillEnhanceResponse;
+import com.lynq.backend.client.response.SkillExtractionResponse;
 import com.lynq.backend.controller.LynqMLProxyController;
 import com.lynq.backend.controller.request.SkillEnhanceRequest;
 import com.lynq.backend.controller.response.GlobalRestResponse;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -39,6 +41,21 @@ public class LynqMLProxyControllerImpl implements LynqMLProxyController {
         request.getDescription(),
         request.getWorkType(),
         requestUuid);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, response));
+  }
+
+  @Override
+  @PostMapping("/resume/skill-extraction")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<SkillExtractionResponse>> extractResumeSkills(
+      @RequestBody Object resumePayload,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestParam(defaultValue = "en") String language) {
+    SkillExtractionResponse response =
+        lynqMLProxyService.extractResumeSkills(resumePayload, requestUuid, language);
 
     return ResponseEntity
         .status(HttpStatus.OK)

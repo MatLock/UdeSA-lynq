@@ -4,6 +4,7 @@ import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.client.LynqMLClient;
 import com.lynq.backend.client.request.SkillEnhanceRequest;
 import com.lynq.backend.client.response.SkillEnhanceResponse;
+import com.lynq.backend.client.response.SkillExtractionResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.enums.WorkType;
@@ -28,6 +29,8 @@ public class LynqMLProxyService {
 
   private static final String ONLY_COMPANY_USERS_CAN_ENHANCE_SKILLS =
       "Only users of type COMPANY can enhance skills";
+  private static final String ONLY_CANDIDATE_USERS_CAN_EXTRACT_RESUME_SKILLS =
+      "Only users of type CANDIDATE can extract resume skills";
   private static final String USER_NOT_LINKED_TO_COMPANY = "User is not linked to any company";
   private static final String AUTHENTICATED_USER_NOT_FOUND = "Authenticated user not found";
 
@@ -62,6 +65,21 @@ public class LynqMLProxyService {
 
     GlobalRestResponse<SkillEnhanceResponse> response = lynqMLClient.enhanceSkills(
         request, requestUuid, user.getId(), company.getId());
+
+    return response.getData();
+  }
+
+  @AuditLog
+  public SkillExtractionResponse extractResumeSkills(Object resume, String requestUuid,
+      String outputLanguage) {
+    UserEntity user = getAuthenticatedUser();
+
+    if (user.getType() != UserType.CANDIDATE) {
+      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_EXTRACT_RESUME_SKILLS);
+    }
+
+    GlobalRestResponse<SkillExtractionResponse> response = lynqMLClient.extractResumeSkills(
+        resume, requestUuid, user.getId(), outputLanguage);
 
     return response.getData();
   }

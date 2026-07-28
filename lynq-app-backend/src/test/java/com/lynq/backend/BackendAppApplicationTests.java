@@ -65,6 +65,9 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String SKILL_ENHANCE_PROXY_PATH = "/ml/skill-enhance";
   private static final String ML_SKILL_ENHANCE_PATH = "/skill-enhance";
   private static final String ML_UPSKILLING_PATH = "/upskilling_suggestion";
+  private static final String ML_SKILL_EXTRACTION_PATH = "/resume/skill-extraction";
+  private static final String SKILL_EXTRACTION_PROXY_PATH = "/ml/resume/skill-extraction";
+  private static final String LANGUAGE_PARAM = "language";
   private static final String ML_CANDIDATE_EXPLANATION_PATH = "/candidate-explanation";
   private static final String VALIDATE_PATH = "/auth/validate";
   private static final String USERINFO_PATH = "/auth/user-info";
@@ -1222,6 +1225,47 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   // ---------------------------------------------------------------------------
+  // ML resume skill-extraction proxy (authenticated candidate)
+  // ---------------------------------------------------------------------------
+
+  @Test
+  void extractResumeSkillsForwardsUiLanguageToMlAsQueryParam() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCandidate(USER_ID, FULL_NAME, CURRENT_POSITION);
+    stubMlSkillExtraction();
+
+    HttpResponse<String> response = postSkillExtraction("es");
+
+    assertThat(response.statusCode(), is(200));
+
+    // the ?language=es query param is forwarded to lynq-ml as a query param too
+    // (not a header), so the soft skills come back in the caller's UI language
+    lynqMlMock.verify(request()
+        .withMethod("POST")
+        .withPath(ML_SKILL_EXTRACTION_PATH)
+        .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .withHeader(USER_ID_HEADER, USER_ID)
+        .withQueryStringParameter(LANGUAGE_PARAM, "es"));
+  }
+
+  @Test
+  void extractResumeSkillsDefaultsLanguageToEnglishWhenParamOmitted() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCandidate(USER_ID, FULL_NAME, CURRENT_POSITION);
+    stubMlSkillExtraction();
+
+    HttpResponse<String> response = postSkillExtraction(null);
+
+    assertThat(response.statusCode(), is(200));
+    lynqMlMock.verify(request()
+        .withMethod("POST")
+        .withPath(ML_SKILL_EXTRACTION_PATH)
+        .withQueryStringParameter(LANGUAGE_PARAM, "en"));
+  }
+
+  // ---------------------------------------------------------------------------
   // Job upskilling-suggestion (authenticated candidate; no ownership required)
   // ---------------------------------------------------------------------------
 
@@ -1884,6 +1928,32 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .GET()
         .build();
     return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> postSkillExtraction(String language) throws Exception {
+    String url = "http://localhost:" + port + CONTEXT_PATH + SKILL_EXTRACTION_PROXY_PATH;
+    if (language != null) {
+      url += "?" + LANGUAGE_PARAM + "=" + language;
+    }
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(url))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .POST(HttpRequest.BodyPublishers.ofString("""
+            {"personal_info": {"full_name": "Jane Doe"}, "summary": "Backend engineer."}"""))
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private void stubMlSkillExtraction() {
+    lynqMlMock.when(request().withMethod("POST").withPath(ML_SKILL_EXTRACTION_PATH))
+        .respond(response()
+            .withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody("""
+                {"success": true, "data": {"skills": ["%s"], "tools": [], "soft": []}}"""
+                .formatted(SKILL_JAVA)));
   }
 
   private void stubMlSkillEnhance() {
