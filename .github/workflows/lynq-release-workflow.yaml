@@ -265,13 +265,40 @@ jobs:
           # produced it; rewrite it so the scanner resolves the files here.
           sed -i -E "s|<source>.*</source>|<source>${GITHUB_WORKSPACE}/lynq-ml</source>|" lynq-ml/coverage.xml
 
+      - name: Verify coverage reports are present
+        run: |
+          # A missing report makes the scanner report 0% coverage silently and
+          # the Quality Gate then fails on "Coverage on New Code" with no clue
+          # as to why. Fail here instead, with the actual missing path.
+          missing=0
+          for f in lynq-iam/target/site/jacoco/jacoco.xml \
+                   lynq-app-backend/target/site/jacoco/jacoco.xml \
+                   lynq-ml/coverage.xml; do
+            if [ -s "$f" ]; then
+              echo "✓ $f"
+            else
+              echo "✗ missing or empty: $f"
+              missing=1
+            fi
+          done
+          [ "$missing" -eq 0 ] || {
+            echo "::error::Coverage reports missing; SonarCloud would report 0% coverage."
+            exit 1
+          }
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
         with:
-          args: -Dsonar.qualitygate.wait=true
+          # projectVersion is what the "previous_version" New Code definition
+          # compares against; without it every analysis is version
+          # "not provided" and the leak period never advances past the first
+          # analysis, so New Code keeps growing across releases.
+          args: >-
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.projectVersion=${{ needs.set-version.outputs.version }}
 
       - name: Fetch Quality Gate and measures
         id: results

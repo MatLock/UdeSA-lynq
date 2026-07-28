@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://sonarcloud.io/api/measures/search_history?component=MatLock_UdeSA-lynq&metrics=coverage,new_coverage,ncloc&ps=20\")",
+      "Bash(curl -s \"https://sonarcloud.io/api/measures/component_tree?component=MatLock_UdeSA-lynq&metricKeys=new_lines_to_cover,new_uncovered_lines,new_lines&qualifiers=FIL&strategy=leaves&ps=100&metricSortFilter=withMeasuresOnly\")",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s \"https://sonarcloud.io/api/measures/component_tree?component=MatLock_UdeSA-lynq&metricKeys=new_lines_to_cover,new_uncovered_lines&qualifiers=FIL&strategy=leaves&ps=200\")",
+      "Bash(curl -s \"https://sonarcloud.io/api/measures/component_tree?component=MatLock_UdeSA-lynq&metricKeys=new_lines_to_cover,new_uncovered_lines&qualifiers=FIL&strategy=leaves&ps=200&p=2\")"
+    ]
+  }
+}
