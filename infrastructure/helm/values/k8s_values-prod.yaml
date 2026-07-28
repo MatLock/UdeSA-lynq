@@ -62,7 +62,7 @@ ingress:
 
 lynq_ml:
   replicas: 1
-  image: matlock0o/lynq:lynq-ml-1.0.5-SNAPSHOT
+  image: matlock0o/lynq:lynq-ml-1.0.8-SNAPSHOT
   config:
     PORT: "8084"
     HOST: "0.0.0.0"
@@ -78,7 +78,7 @@ lynq_ml:
 
 lynq_app_backend:
   replicas: 1
-  image: matlock0o/lynq:lynq-app-backend-1.0.5-SNAPSHOT
+  image: matlock0o/lynq:lynq-app-backend-1.0.8-SNAPSHOT
   path: /lynq-backend-app
   config:
     SPRING_PROFILES_ACTIVE: production
@@ -92,7 +92,7 @@ lynq_app_backend:
 
 lynq_iam:
   replicas: 1
-  image: matlock0o/lynq:lynq-iam-1.0.5-SNAPSHOT
+  image: matlock0o/lynq:lynq-iam-1.0.8-SNAPSHOT
   path: /lynq-iam
   config:
     SPRING_PROFILES_ACTIVE: production
