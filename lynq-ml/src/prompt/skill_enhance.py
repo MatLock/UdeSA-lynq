@@ -32,7 +32,7 @@ def render_key_extractor_prompt(
     work_type: str,
     job_description: str,
 ) -> str:
-    """Render ``skill_extractor/<provider>.jinja`` with the job posting data.
+    """Render ``job_post_skill_extraction/<provider>.jinja`` with the job posting data.
 
     Args:
         provider: Selects the provider-specific template variant.
@@ -43,7 +43,7 @@ def render_key_extractor_prompt(
     Returns:
         The rendered prompt ready to send to the model.
     """
-    template = _env.get_template(f"skill_extractor/{provider.value}.jinja")
+    template = _env.get_template(f"job_post_skill_extraction/{provider.value}.jinja")
     return template.render(
         job_title=job_title,
         work_type=work_type,

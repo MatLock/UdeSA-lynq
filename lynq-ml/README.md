@@ -88,7 +88,7 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
 - **Middleware** (`middleware/`) — `require_request_uuid` enforces the `lynq-request-uuid` header on every non-exempt route and binds it to the logging context.
 - **Feature router** (`skill_enhance/`) — the `POST /skill-enhance` endpoint plus its request/response models and the Jinja prompt renderer.
 - **LLM clients** (`llm_client/`) — a common `LLMClient` interface with `OllamaClient` and `OpenAIClient` implementations, selected by the `get_llm_client()` factory from environment configuration.
-- **Prompts** (`resources/prompts/`) — provider-specific Jinja templates (`skill_extractor/ollama.jinja`, `skill_extractor/openai.jinja`).
+- **Prompts** (`resources/prompts/`) — provider-specific Jinja templates (`job_post_skill_extraction/ollama.jinja`, `job_post_skill_extraction/openai.jinja`).
 - **Response envelopes** (`response/`) — `GlobalRestResponse` / `ErrorRestResponse`, mirroring the Java services.
 - **Logging context** (`logging_context.py`) — the MDC-style request-UUID contextvar and logging filter.
 - **Document helpers** (`file_downloader/`, `file_reader/`) — download a resume from a presigned S3 URL and extract text from PDF/DOCX. Building blocks not yet exposed via an endpoint.
@@ -569,8 +569,8 @@ lynq-ml/
 ├── resources/                  # service config + assets (loaded at runtime)
 │   ├── log_config.json         # logging dictConfig
 │   └── prompts/
-│       ├── skill_extractor/       # ollama.jinja, openai.jinja
-│       └── upskilling_suggestion/ # ollama.jinja, openai.jinja
+│       ├── job_post_skill_extraction/ # ollama.jinja, openai.jinja
+│       └── upskilling_suggestion/     # ollama.jinja, openai.jinja
 ├── tests/                      # unittest suite (puts src/ on the path)
 ├── set_env.sh                  # environment defaults
 ├── Dockerfile

@@ -1,4 +1,4 @@
-"""Renders the upskilling-suggestion prompt for the selected LLM provider."""
+"""Renders the skill-extraction prompt for the selected LLM provider."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from llm_client import LLMProvider
 
 from prompt.language import language_name
 
-# src/prompt/upskilling_suggestion.py -> parents[2] is the repo root;
-# templates live under resources/prompts/.
+# src/prompt/user_resume_skill_extraction.py -> parents[2] is the repo root; templates live
+# under resources/prompts/.
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "resources" / "prompts"
 
 # Prompt templates are plain-text ".jinja" files, so select_autoescape never
@@ -26,21 +26,21 @@ _env = Environment(
     keep_trailing_newline=True,
 )
 
-def render_upskilling_prompt(
-    provider: LLMProvider, *, input_json: str, language: str | None = None
+
+def render_skill_extraction_prompt(
+    provider: LLMProvider, *, resume_json: str, language: str | None = None
 ) -> str:
-    """Render ``upskilling_suggestion/<provider>.jinja`` with the input JSON.
+    """Render ``user_resume_skill_extraction/<provider>.jinja`` with the resume JSON.
 
     Args:
         provider: Selects the provider-specific template variant.
-        input_json: The ``{"job": ..., "candidate": ...}`` payload, already
-            serialized to a JSON string exactly as the prompt expects it.
-        language: The UI language code the response prose should be written in
+        resume_json: The resume serialized as a JSON string.
+        language: The UI language code the soft skills should be written in
             (e.g. ``"es"``); resolved to a language name and injected into the
-            template. Defaults to English.
+            template. Defaults to English when absent.
 
     Returns:
         The rendered prompt ready to send to the model.
     """
-    template = _env.get_template(f"upskilling_suggestion/{provider.value}.jinja")
-    return template.render(input_json=input_json, language=language_name(language))
+    template = _env.get_template(f"user_resume_skill_extraction/{provider.value}.jinja")
+    return template.render(resume_json=resume_json, language=language_name(language))

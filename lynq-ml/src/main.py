@@ -10,6 +10,7 @@ from router.resume_template import router as resume_template_router
 from router.skill_enhance import router as skill_enhance_router
 from router.translation import router as translation_router
 from router.upskilling_suggestion import router as upskilling_suggestion_router
+from router.user_resume_skill_extraction import router as skill_extraction_router
 
 import logging.config
 import os
@@ -49,6 +50,7 @@ register_exception_handlers(app)
 router = APIRouter(prefix="/lynq-ml")
 router.include_router(health_router)
 router.include_router(skill_enhance_router)
+router.include_router(skill_extraction_router)
 router.include_router(upskilling_suggestion_router)
 router.include_router(candidate_explanation_router)
 router.include_router(resume_extractor_router)

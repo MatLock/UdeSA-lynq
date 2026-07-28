@@ -10,7 +10,7 @@ from .base import LLMClient, LLMProvider
 class OpenAIClient(LLMClient):
     """Calls the OpenAI ``/chat/completions`` endpoint.
 
-    The ``skill_extractor/openai.jinja`` template is plain text and is sent as a
+    The ``job_post_skill_extraction/openai.jinja`` template is plain text and is sent as a
     single user message. JSON output is requested via ``response_format``.
     """
 

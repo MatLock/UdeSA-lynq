@@ -52,7 +52,7 @@ class RenderKeyExtractorPromptTests(unittest.TestCase):
     def test_missing_variable_raises_under_strict_undefined(self) -> None:
         # The environment uses StrictUndefined, so rendering the template
         # without all variables must raise rather than emit empty strings.
-        template = prompts_module._env.get_template("skill_extractor/ollama.jinja")
+        template = prompts_module._env.get_template("job_post_skill_extraction/ollama.jinja")
 
         with self.assertRaises(UndefinedError):
             template.render(job_title="only title")
