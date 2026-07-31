@@ -69,12 +69,12 @@
 }
 
 .company-field-icon.tone-blue {
-  background: rgba(56, 189, 248, 0.12);
+  background: rgb(var(--brand-teal-rgb) / 0.16);
   color: var(--brand-blue-dark);
 }
 
 .company-field-icon.tone-purple {
-  background: rgba(168, 85, 247, 0.12);
+  background: rgb(var(--brand-violet-rgb) / 0.1);
   color: var(--brand-purple);
 }
 
@@ -105,11 +105,11 @@
 
 .company-control > input[aria-invalid='true'],
 .company-control > select[aria-invalid='true'] {
-  border-color: #ef4444;
+  border-color: var(--danger);
 }
 
 .company-error {
-  color: #ef4444;
+  color: var(--danger-ink);
   font-size: 11px;
   margin: 0 0 0 var(--icon-col);
 }

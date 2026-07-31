@@ -354,8 +354,6 @@ const en = {
           uploadError: 'We could not upload your resume. Please try again.',
         },
         personal: {
-          heading: 'Personal info',
-          helper: 'This is how recruiters will reach you.',
           fullNameLabel: 'Full name',
           fullNamePlaceholder: 'e.g. Jane Doe',
           headlineLabel: 'Professional headline',

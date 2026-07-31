@@ -354,8 +354,6 @@ const es = {
           uploadError: 'No pudimos subir tu CV. Intentá de nuevo.',
         },
         personal: {
-          heading: 'Datos personales',
-          helper: 'Así te van a contactar los reclutadores.',
           fullNameLabel: 'Nombre completo',
           fullNamePlaceholder: 'Ej: Juana Pérez',
           headlineLabel: 'Titular profesional',

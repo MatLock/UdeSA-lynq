@@ -72,11 +72,6 @@ const ResumePersonalStep = ({ active, stepNumber, totalSteps }) => {
 
   return (
     <div className="resume-step resume-personal-step">
-      <div className="resume-step-intro">
-        <p className="resume-step-question">{tp.heading}</p>
-        <p className="resume-step-helper">{tp.helper}</p>
-      </div>
-
       <StepIndicator
         current={stepNumber}
         total={totalSteps}

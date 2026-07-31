@@ -8,6 +8,7 @@ import ResumeCreation from '../../components/ResumeCreation/ResumeCreation.jsx'
 import ResumeDocument from '../../components/ResumeDocument/ResumeDocument.jsx'
 import ResumeSectionNav from '../../components/ResumeSectionNav/ResumeSectionNav.jsx'
 import Spinner from '../../components/Spinner/Spinner.jsx'
+import LynqTitle from '../../components/LynqTitle/LynqTitle.jsx'
 import Toast from '../../components/Toast/Toast.jsx'
 import ResumeWizardProvider from '../../context/ResumeWizardContext.jsx'
 import useApi from '../../hooks/useApi'
@@ -157,7 +158,12 @@ const MyResumePage = () => {
     <>
       <header className="resume-page-hero">
         <div className="resume-page-hero-text">
-          <h1 className="resume-page-title">{t.title}</h1>
+          <LynqTitle
+            as="h1"
+            className="resume-page-title"
+            text={t.title}
+            placement="leading"
+          />
           <p className="resume-page-subtitle">{t.subtitle}</p>
         </div>
 

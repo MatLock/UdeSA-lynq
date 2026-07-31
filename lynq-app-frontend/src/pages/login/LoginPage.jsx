@@ -13,6 +13,7 @@ import requestUuidUtil from '../../utils/requestUuid'
 import securedFetch from '../../utils/securedFetch'
 import Toast from '../../components/Toast/Toast'
 import GoogleIcon from '../../components/GoogleIcon/GoogleIcon'
+import LynqTitle from '../../components/LynqTitle/LynqTitle'
 import strings from '../../i18n'
 import './LoginPage.css'
 
@@ -84,7 +85,7 @@ const LoginPage = () => {
       <div className="login-dots login-dots-br" />
 
       <main className="login-card">
-        <h1 className="login-title">{t.title}</h1>
+        <LynqTitle as="h1" className="login-title" text={t.title} placement="leading" />
         <p className="login-subtitle">{t.subtitle}</p>
 
         <form className="login-form" onSubmit={handleLogin}>

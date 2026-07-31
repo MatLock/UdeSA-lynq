@@ -8,10 +8,7 @@
   justify-content: center;
   padding: 24px;
   overflow: auto;
-  background:
-    radial-gradient(ellipse at top left, #efeafc 0%, transparent 45%),
-    radial-gradient(ellipse at bottom right, #e8f1fc 0%, transparent 45%),
-    #f7f6fb;
+  background: var(--page-bg);
 }
 
 /* Soft brand blobs in opposite corners. */
@@ -28,7 +25,7 @@
   left: -140px;
   width: 380px;
   height: 380px;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.18), transparent 70%);
+  background: radial-gradient(circle, rgb(var(--brand-violet-rgb) / 0.18), transparent 70%);
 }
 
 .register-bg::after {
@@ -36,7 +33,7 @@
   right: -140px;
   width: 400px;
   height: 400px;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.18), transparent 70%);
+  background: radial-gradient(circle, rgb(var(--brand-teal-rgb) / 0.22), transparent 70%);
 }
 
 /* Dotted grids, top-right and bottom-left. */
@@ -47,7 +44,7 @@
   pointer-events: none;
   background-image: radial-gradient(
     circle,
-    rgba(56, 189, 248, 0.45) 1.5px,
+    rgb(var(--brand-teal-rgb) / 0.5) 1.5px,
     transparent 1.5px
   );
   background-size: 16px 16px;
@@ -64,6 +61,11 @@
 }
 
 .register-card {
+  /* Render scale for the form itself (wizard steps + action bar), leaving the
+     brand mark and heading at full size. One knob rather than 15%-off px values
+     spread across four step stylesheets — and it catches the icon sizes passed
+     to MUI as inline props, which a stylesheet edit could not reach. */
+  --register-form-scale: 0.85;
   position: relative;
   z-index: 1;
   width: 100%;
@@ -76,11 +78,16 @@
   padding: 48px;
   background: #fff;
   border-radius: 24px;
-  box-shadow: 0 20px 60px rgba(80, 60, 150, 0.12);
+  box-shadow: var(--shadow-modal);
   text-align: center;
 }
 
+/* Mark + wordmark as one lockup (LynqTitle inline placement). The mark is set
+   above the cap height so it reads as the brand rather than as a letter, and
+   the tracking below is cancelled on it — the 2px is there to open up the
+   wordmark's letters, not to push the mark off the L. */
 .register-logo {
+  --lynq-logo-size: 1.25em;
   font-size: 30px;
   font-weight: 700;
   letter-spacing: 2px;
@@ -91,6 +98,10 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+.register-logo .lynq-logo {
+  letter-spacing: normal;
 }
 
 @media (max-width: 640px) {

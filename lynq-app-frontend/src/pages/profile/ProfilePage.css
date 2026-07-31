@@ -96,7 +96,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--scrim);
   color: #fff;
   opacity: 0;
   transition: opacity 0.15s ease;
@@ -164,12 +164,12 @@
 }
 
 .profile-field-icon.tone-blue {
-  background: rgba(56, 189, 248, 0.12);
+  background: rgb(var(--brand-teal-rgb) / 0.16);
   color: var(--brand-blue-dark);
 }
 
 .profile-field-icon.tone-purple {
-  background: rgba(168, 85, 247, 0.12);
+  background: rgb(var(--brand-violet-rgb) / 0.1);
   color: var(--brand-purple);
 }
 
@@ -208,17 +208,17 @@
 }
 
 .profile-field input[aria-invalid='true'] {
-  border-color: #ef4444;
+  border-color: var(--danger);
 }
 
 .profile-field input[aria-invalid='true']:focus {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+  box-shadow: 0 0 0 3px var(--danger-ring);
 }
 
 .profile-error {
   margin: 0 0 0 var(--icon-col);
   font-size: 11px;
-  color: #ef4444;
+  color: var(--danger-ink);
 }
 
 .profile-input-wrap {

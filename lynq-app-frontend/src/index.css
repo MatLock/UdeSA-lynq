@@ -1,32 +1,78 @@
 :root {
-  /* ── Lynq brand colors (parametrized — change here only) ───────────── */
-  --brand-blue: #38bdf8;
-  --brand-blue-light: #7dd3fc;
-  --brand-blue-dark: #0ea5e9;
+  /* ── Lynq brand colors (parametrized — change here only) ─────────────
+     The palette is organized in three tiers, and the tier decides where a color
+     is allowed to appear. This is the rule the old palette lacked: it held only
+     display colors (sky #38bdf8 at 2.1:1, orchid #a855f7 at 4.0:1) and used them
+     as if they were ink, so labels and buttons sat below the contrast floor on
+     white. Ratios below are measured against #fff.
 
-  --brand-purple: #a855f7;
-  --brand-purple-light: #c084fc;
-  --brand-purple-dark: #7c3aed;
+     Everything derives from the brand mark. The mark itself is the source of
+     truth and is never adjusted to fit the UI — contrast rules don't apply to a
+     logotype, so it stays faithful to the asset and the UI adapts around it. */
 
-  /* light blue → purple, the canonical Lynq blend */
+  --logo-navy: #0e2038;
+  --logo-teal: #4ac3ae;
+  --logo-violet: #5045e5;
+
+  /* Tier 1 — ink. Cleared to carry text on white. */
+  --ink: var(--logo-navy); /* 16.4:1 — headings */
+  --ink-muted: #5b6675; /* 5.8:1 — body */
+  --action: var(--logo-violet); /* 6.3:1 — links, buttons, focus */
+  --action-hover: #3f34cc; /* 8.2:1 */
+  --accent-ink: #0f7a68; /* 5.2:1 — the teal, in a legible register */
+
+  /* Tier 2 — display. Fills only; never text on white. */
+  --brand-teal: var(--logo-teal); /* 2.2:1 — decorative by definition */
+  --brand-violet: var(--logo-violet);
+  /* Channel forms of the two above, so component CSS can compose tints without
+     re-hardcoding hexes. These have to restate the values: a var() holding a hex
+     can't be unpacked into rgb() channels. Keep them in step by hand. */
+  --brand-teal-rgb: 74 195 174; /* --logo-teal   #4ac3ae */
+  --brand-violet-rgb: 80 69 229; /* --logo-violet #5045e5 */
+
+  /* Tier 3 — washes. Chip and icon-circle backgrounds. */
+  --wash-teal: #eef7f4;
+  --wash-violet: #edecfd;
+
+  /* The tinted page field behind every full-page view. Was pasted identically
+     into eight page stylesheets, each carrying the old sky blue in the bottom
+     corner; one token keeps the two corners on the mark's hues and keeps the
+     next tweak a one-line change. */
+  --page-bg:
+    radial-gradient(ellipse at top left, var(--wash-violet) 0%, transparent 45%),
+    radial-gradient(
+      ellipse at bottom right,
+      var(--wash-teal) 0%,
+      transparent 45%
+    ),
+    #f7f6fb;
+
+  --brand-blue: var(--brand-teal);
+  --brand-blue-light: #8fd9cb;
+  --brand-blue-dark: var(--accent-ink);
+
+  --brand-purple: var(--brand-violet);
+  --brand-purple-light: #8b83f0;
+  --brand-purple-dark: var(--action-hover);
+
   --brand-gradient: linear-gradient(
     135deg,
-    var(--brand-blue) 0%,
-    var(--brand-purple) 100%
+    var(--accent-ink) 0%,
+    var(--action) 100%
   );
 
   /* ──────────────────────────────────────────────────────────────────── */
 
-  --text: #6b6375;
-  --text-h: #08060d;
+  --text: var(--ink-muted);
+  --text-h: var(--ink);
   --bg: #fff;
   --border: #e5e4e7;
   --code-bg: #f4f3ec;
-  --accent: var(--brand-purple);
-  --accent-bg: rgba(168, 85, 247, 0.1);
-  --accent-border: rgba(168, 85, 247, 0.5);
-  --accent-blue-bg: rgba(56, 189, 248, 0.12);
-  --accent-blue-border: rgba(56, 189, 248, 0.4);
+  --accent: var(--action);
+  --accent-bg: rgb(var(--brand-violet-rgb) / 0.1);
+  --accent-border: rgb(var(--brand-violet-rgb) / 0.5);
+  --accent-blue-bg: rgb(var(--brand-teal-rgb) / 0.16);
+  --accent-blue-border: rgb(var(--brand-teal-rgb) / 0.5);
 
   /* LYNQ-score scale — job relevance shown to candidates, banded 0–100:
      0–20 red · 21–40 orange · 41–60 yellow · 61–80 light green · 81–100 green */
@@ -35,12 +81,56 @@
   --score-yellow: #eab308;
   --score-light-green: #84cc16;
   --score-green: #22c55e;
-  /* Destructive actions (e.g. closing a job post). */
-  --danger: #ef4444;
-  --danger-dark: #dc2626;
+  /* Status colors, split ink/display like the brand tiers above. Both bright
+     values were being used as label text: #ef4444 measures 3.8:1 on white and
+     #16a34a 3.3:1, so error and "username available" copy sat under the 4.5:1
+     floor. The bright value now fills borders and bars only; the -ink one is the
+     only version cleared for text. */
+  --danger: #ef4444; /* 3.8:1 — borders, bars, the Toast rule */
+  --danger-ink: #dc2626; /* 4.8:1 — error text */
+  --danger-rgb: 239 68 68;
+  --danger-ring: rgb(var(--danger-rgb) / 0.15); /* invalid-field focus ring */
+  --success: #16a34a; /* 3.3:1 — decorative */
+  --success-ink: #15803d; /* 5.0:1 — availability text */
+  --danger-dark: var(--danger-ink); /* legacy alias */
+
   --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+
+  /* Elevation. The violet cast is kept: at 253° it sits between the ink navy and
+     the action violet, so shadows read as part of the palette rather than as
+     grey. It was pasted raw into 29 places in twelve slightly different recipes
+     (0 12px 32px vs 0 12px 34px, and so on) — the differences were drift, not
+     intent, so they collapse into one ramp by role. */
+  --shadow-rgb: 80 60 150;
+  --shadow-sm: 0 6px 18px rgb(var(--shadow-rgb) / 0.06); /* pills, buttons */
+  --shadow-card: 0 10px 30px rgb(var(--shadow-rgb) / 0.06); /* cards at rest */
+  --shadow-panel: 0 12px 32px rgb(var(--shadow-rgb) / 0.08); /* panels, sheets */
+  --shadow-raised: 0 8px 20px rgb(var(--shadow-rgb) / 0.12); /* small, prominent */
+  --shadow-lift: 0 16px 40px rgb(var(--shadow-rgb) / 0.12); /* card hover */
+  --shadow-modal: 0 20px 60px rgb(var(--shadow-rgb) / 0.12); /* modals, auth */
+  --shadow-popover: 0 12px 32px rgb(var(--shadow-rgb) / 0.18); /* menus, toasts */
+
+  /* Overlay layer. Dialogs sit above a scrim, so they get an ink-tinted shadow
+     rather than the violet ramp above — a violet cast reads as brand at card
+     level and as haze at dialog level.
+     The scrim had drifted into four spellings of the same thing (#08060d,
+     #101828 and plain black, all at 0.45); one value, one name. */
+  --ink-rgb: 14 32 56;
+  --scrim: rgb(var(--ink-rgb) / 0.45);
+  --shadow-dialog: 0 24px 48px rgb(var(--ink-rgb) / 0.24);
+  --shadow-hairline: 0 1px 2px rgb(var(--ink-rgb) / 0.04);
+  /* White veil for chips sitting on a brand-gradient fill (was 0.22 and 0.25 in
+     adjacent rules of the same component). */
+  --overlay-light: rgb(255 255 255 / 0.24);
+
+  /* Global render scale for controls — the single knob for button size.
+     Lower it to shrink every button in the app; see the `button` rule below. */
+  --button-scale: 0.80;
+
+  /* Sidebar nav entries are <button>s, so --button-scale already applies to
+     them. This multiplies on top of it: 1.1 renders them 10% larger than every
+     other control, and they keep that relationship if --button-scale moves. */
+  --sidebar-scale: 1.2;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -103,6 +193,37 @@ h2 {
 }
 p {
   margin: 0;
+}
+
+/* Every control renders at --button-scale.
+
+   `zoom` rather than trimming padding and font-size inside each of the 21 button
+   rules in the app: those carry different values, so scaling them by hand drifts
+   apart, and zoom takes part in layout — the flex rows around a button close up
+   instead of keeping a full-size gap where it used to be.
+
+   The non-<button> elements that render as buttons are listed alongside — the
+   card actions are React Router <Link>s, so the `button` selector misses them.
+   For the two card actions the class sits on the <Link> wrapper, not on the
+   inner pill, so the trailing chevron scales with the pill instead of towering
+   over it. Plain text links (job-detail-back, job-card-candidates-link, …) are
+   deliberately absent: they are prose, not controls.
+
+   .resume-page-action also sits on real <button>s in its component; zoom applies
+   once per element, so matching both selectors costs nothing.
+
+   Controls inside the register wizard compound with its --register-form-scale,
+   which is what "5% smaller" means there: 5% off what they render at today.
+
+   Edit --button-scale in :root to resize every button — not the fallback here,
+   which only applies if the token is missing. */
+button,
+.resume-page-action,
+.job-card-actions,
+.job-card-edit,
+.application-card-actions,
+.candidate-review {
+  zoom: var(--button-scale, 1);
 }
 
 code,

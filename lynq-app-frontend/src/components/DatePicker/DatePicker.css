@@ -31,11 +31,11 @@
 }
 
 .date-picker-field input[aria-invalid='true'] {
-  border-color: #ef4444;
+  border-color: var(--danger);
 }
 
 .date-picker-field input[aria-invalid='true']:focus {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+  box-shadow: 0 0 0 3px var(--danger-ring);
 }
 
 .date-picker-toggle {
@@ -70,7 +70,7 @@
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(80, 60, 150, 0.18);
+  box-shadow: var(--shadow-popover);
 }
 
 .date-picker-head {

@@ -42,7 +42,7 @@
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 18px;
-  box-shadow: 0 12px 34px rgba(80, 60, 150, 0.08);
+  box-shadow: var(--shadow-panel);
 }
 
 .job-detail-logo {
@@ -255,7 +255,7 @@
 }
 
 .job-detail-apply-status.is-error {
-  color: #ef4444;
+  color: var(--danger-ink);
 }
 
 /* ── Body grid: long-form content + side facts ────────────────────────── */
@@ -278,7 +278,7 @@
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(80, 60, 150, 0.06);
+  box-shadow: var(--shadow-card);
 }
 
 .job-detail-card-title {
@@ -431,7 +431,7 @@
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 18px;
-  box-shadow: 0 12px 34px rgba(80, 60, 150, 0.08);
+  box-shadow: var(--shadow-panel);
 }
 
 .job-detail-empty-title {

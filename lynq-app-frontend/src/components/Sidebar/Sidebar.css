@@ -78,7 +78,12 @@
   gap: 4px;
 }
 
+/* The nav entries are <button>s, so index.css already zooms them to
+   --button-scale. Restating the zoom here overrides that rule rather than
+   stacking with it (zoom applies once per element), so the global scale has to
+   be multiplied back in — otherwise the sidebar would ignore it entirely. */
 .sidebar-item {
+  zoom: calc(var(--button-scale, 1) * var(--sidebar-scale, 1));
   display: flex;
   align-items: center;
   gap: 12px;
