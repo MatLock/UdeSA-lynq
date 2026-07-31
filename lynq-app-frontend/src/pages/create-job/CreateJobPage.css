@@ -123,19 +123,19 @@
 .create-job-field input[aria-invalid='true'],
 .create-job-select[aria-invalid='true'],
 .create-job-textarea[aria-invalid='true'] {
-  border-color: #ef4444;
+  border-color: var(--danger);
 }
 
 .create-job-field input[aria-invalid='true']:focus,
 .create-job-select[aria-invalid='true']:focus,
 .create-job-textarea[aria-invalid='true']:focus {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+  box-shadow: 0 0 0 3px var(--danger-ring);
 }
 
 .create-job-error {
   margin: 0 0 0 var(--icon-col);
   font-size: 11px;
-  color: #ef4444;
+  color: var(--danger-ink);
 }
 
 .create-job-hint {

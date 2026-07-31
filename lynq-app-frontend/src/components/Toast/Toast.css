@@ -16,12 +16,12 @@
   color: var(--text-h);
   font-size: 14px;
   text-align: left;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-popover);
   animation: toast-in 0.2s ease;
 }
 
 .toast-error {
-  border-left-color: #ef4444;
+  border-left-color: var(--danger);
 }
 
 .toast-success {

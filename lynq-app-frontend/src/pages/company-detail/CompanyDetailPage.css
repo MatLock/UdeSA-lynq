@@ -44,7 +44,7 @@
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 18px;
-  box-shadow: 0 12px 34px rgba(80, 60, 150, 0.08);
+  box-shadow: var(--shadow-panel);
   position: relative;
   overflow: hidden;
 }
@@ -79,7 +79,7 @@
   background: var(--accent-bg);
   color: var(--brand-purple);
   border: 2px solid #fff;
-  box-shadow: 0 6px 18px rgba(80, 60, 150, 0.12);
+  box-shadow: var(--shadow-raised);
 }
 
 .company-detail-logo img {
@@ -156,7 +156,7 @@
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(80, 60, 150, 0.06);
+  box-shadow: var(--shadow-card);
 }
 
 .company-detail-card-title {
@@ -235,7 +235,7 @@
 
 .company-detail-job-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(80, 60, 150, 0.12);
+  box-shadow: var(--shadow-raised);
 }
 
 /* Closed posts: muted surface + dashed border, with a red "Closed" badge so
@@ -266,7 +266,7 @@
   color: #fff;
   background: var(--score-red);
   border-radius: 999px;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 3px 8px rgb(var(--ink-rgb) / 0.12);
 }
 
 .company-detail-job-card-title {
@@ -340,7 +340,7 @@
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 18px;
-  box-shadow: 0 12px 34px rgba(80, 60, 150, 0.08);
+  box-shadow: var(--shadow-panel);
 }
 
 .company-detail-empty-title {

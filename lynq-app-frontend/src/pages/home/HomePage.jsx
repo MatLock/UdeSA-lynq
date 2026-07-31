@@ -7,6 +7,7 @@ import jobService from '../../services/jobService'
 import JobCard from '../../components/JobCard/JobCard.jsx'
 import Pagination from '../../components/Pagination/Pagination.jsx'
 import Spinner from '../../components/Spinner/Spinner.jsx'
+import LynqTitle from '../../components/LynqTitle/LynqTitle.jsx'
 import './HomePage.css'
 
 // The landing page: on mount it lists the first page of available jobs and lets
@@ -75,7 +76,7 @@ const HomePage = () => {
   return (
     <div className="home-page">
       <header className="home-hero">
-        <h1 className="home-banner">LYNQ</h1>
+        <LynqTitle as="h1" className="home-banner" text="LYNQ" />
         <form className="home-search" role="search" onSubmit={handleSearch}>
           <div className="home-search-field">
             <svg

@@ -29,6 +29,22 @@
   min-width: 0;
 }
 
+/* Steps render at --register-form-scale (set on the card). `zoom` rather than
+   `transform: scale` because zoom takes part in layout: the slide's box shrinks
+   with its content, so the card closes up instead of keeping a full-size hole
+   under the scaled step.
+
+   Deliberately on the step root *inside* the slide, not on the wizard or the
+   slide itself: the slide is the element useLayoutEffect measures via
+   offsetHeight, and offsetHeight on a zoomed element is read back in a
+   coordinate space that has historically differed between browsers. Keeping
+   both the measured slide and the viewport we assign that height to outside the
+   zoom avoids the question — the slide just reports the already-scaled height.
+   Each step component renders exactly one root element, so `> *` hits one box. */
+.register-wizard-slide > * {
+  zoom: var(--register-form-scale, 1);
+}
+
 /* Respect users who prefer no motion — snap instead of slide. */
 @media (prefers-reduced-motion: reduce) {
   .register-wizard-viewport,

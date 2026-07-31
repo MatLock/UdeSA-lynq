@@ -93,12 +93,12 @@
 }
 
 .tone-blue .account-type-icon {
-  background: rgba(56, 189, 248, 0.12);
+  background: rgb(var(--brand-teal-rgb) / 0.16);
   color: var(--brand-blue-dark);
 }
 
 .tone-purple .account-type-icon {
-  background: rgba(168, 85, 247, 0.12);
+  background: rgb(var(--brand-violet-rgb) / 0.1);
   color: var(--brand-purple);
 }
 

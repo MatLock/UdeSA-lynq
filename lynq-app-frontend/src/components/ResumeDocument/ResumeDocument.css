@@ -20,10 +20,10 @@
   border: 1px solid var(--border);
   border-radius: 18px;
   background:
-    radial-gradient(ellipse at top left, rgba(168, 85, 247, 0.1), transparent 60%),
-    radial-gradient(ellipse at bottom right, rgba(56, 189, 248, 0.1), transparent 60%),
+    radial-gradient(ellipse at top left, rgb(var(--brand-violet-rgb) / 0.1), transparent 60%),
+    radial-gradient(ellipse at bottom right, rgb(var(--brand-teal-rgb) / 0.14), transparent 60%),
     #fff;
-  box-shadow: 0 12px 32px rgba(80, 60, 150, 0.08);
+  box-shadow: var(--shadow-panel);
 }
 
 .resume-header-identity {
@@ -128,7 +128,7 @@
   border: 1px solid var(--border);
   border-radius: 18px;
   background: #fff;
-  box-shadow: 0 12px 32px rgba(80, 60, 150, 0.06);
+  box-shadow: var(--shadow-card);
 }
 
 /* Heading with a short brand rule underneath. */
@@ -394,7 +394,7 @@
 
 .resume-card:hover {
   border-color: var(--brand-purple-light);
-  box-shadow: 0 8px 20px rgba(80, 60, 150, 0.08);
+  box-shadow: var(--shadow-panel);
 }
 
 .resume-card-icon {

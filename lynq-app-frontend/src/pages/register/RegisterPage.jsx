@@ -1,5 +1,6 @@
 import strings from '../../i18n'
 import AuthHeading from '../../components/AuthHeading/AuthHeading'
+import LynqTitle from '../../components/LynqTitle/LynqTitle'
 import RegisterWizard from '../../components/RegisterWizard/RegisterWizard'
 import RegisterFooter from '../../components/RegisterFooter/RegisterFooter'
 import './RegisterPage.css'
@@ -14,7 +15,7 @@ const RegisterPage = () => {
       <div className="register-dots register-dots-bl" />
 
       <main className="register-card">
-        <span className="register-logo">LYNQ</span>
+        <LynqTitle className="register-logo" text="LYNQ" />
         <AuthHeading title={t.title} />
 
         <RegisterWizard />

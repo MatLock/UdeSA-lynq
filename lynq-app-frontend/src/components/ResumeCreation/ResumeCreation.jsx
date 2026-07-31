@@ -1,4 +1,5 @@
 import AuthHeading from '../AuthHeading/AuthHeading'
+import LynqTitle from '../LynqTitle/LynqTitle'
 import ResumeWizard from '../ResumeWizard/ResumeWizard'
 import ResumeWizardFooter from '../ResumeWizardFooter/ResumeWizardFooter'
 import strings from '../../i18n'
@@ -17,7 +18,7 @@ const ResumeCreation = ({ onCompleted, onCancel }) => {
   return (
     <div className="resume-create">
       <main className="resume-create-card">
-        <span className="resume-create-logo">LYNQ</span>
+        <LynqTitle className="resume-create-logo" text="LYNQ" />
         <AuthHeading title={t.title} subtitle={t.subtitle} />
 
         <ResumeWizard onCompleted={onCompleted} />

@@ -12,7 +12,7 @@
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 16px;
-  box-shadow: 0 12px 32px rgba(80, 60, 150, 0.08);
+  box-shadow: var(--shadow-panel);
 }
 
 .resume-nav-list {
@@ -72,7 +72,7 @@
 }
 
 .resume-nav-item.active .resume-nav-icon {
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--overlay-light);
   color: #fff;
 }
 
@@ -99,7 +99,7 @@
 
 .resume-nav-item.active .resume-nav-count {
   color: #fff;
-  background: rgba(255, 255, 255, 0.25);
+  background: var(--overlay-light);
 }
 
 /* Narrow viewports: the rail becomes a horizontal, scrollable chip strip above

@@ -1,0 +1,20 @@
+/* LynqLogo — the brand mark. Deliberately sized in em rather than px: the mark
+   almost always sits inside a heading, so it should follow that heading's
+   font-size (and its responsive overrides) without a second breakpoint here.
+
+   --lynq-logo-size is the knob for the exception: inside a sentence the mark
+   should match the text, but where the lockup *is* the heading (the home banner,
+   the register/resume cards) it reads better a bit taller than the letters. Set
+   the variable on the heading, not here.
+
+   The negative vertical-align drops the glyph so its optical center lines up
+   with the text beside it instead of sitting on the baseline; it is derived from
+   the size so the alignment holds at any scale. */
+
+.lynq-logo {
+  display: inline-block;
+  width: var(--lynq-logo-size, 1.1em);
+  height: var(--lynq-logo-size, 1.1em);
+  flex: none;
+  vertical-align: calc(var(--lynq-logo-size, 1.1em) * -0.2);
+}
