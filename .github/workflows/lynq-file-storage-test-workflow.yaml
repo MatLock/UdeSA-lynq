@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# Two runs of this workflow must never push the badge at the same time;
+# the older run's badge is stale anyway once a newer commit lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lynq-file-storage:
     name: "lynq-file-storage: Test & Coverage"
@@ -48,7 +54,7 @@ jobs:
 
       - name: Commit badge back to main
         if: github.ref == 'refs/heads/main'
-        uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
+        uses: ./.github/actions/commit-to-main
         with:
-          commit_message: "chore: update file-storage coverage badge [skip ci]"
-          file_pattern: .github/badges/jacoco-file-storage.svg
+          files: .github/badges/jacoco-file-storage.svg
+          message: "chore: update file-storage coverage badge [skip ci]"

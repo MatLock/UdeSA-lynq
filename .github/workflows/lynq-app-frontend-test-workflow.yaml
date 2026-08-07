@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# A newer commit supersedes the run in flight; no point in finishing the old one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lynq-app-frontend:
     name: "lynq-app-frontend: Lint & Build"

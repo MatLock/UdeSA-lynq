@@ -82,10 +82,10 @@ jobs:
             -o .github/badges/version.svg
 
       - name: Commit version bump back to main
-        uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
+        uses: ./.github/actions/commit-to-main
         with:
-          commit_message: "chore: set release version ${{ steps.resolve.outputs.version }} [skip ci]"
-          file_pattern: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml .github/badges/version.svg
+          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml .github/badges/version.svg
+          message: "chore: set release version ${{ steps.resolve.outputs.version }} [skip ci]"
 
   # ===========================================================================
   # Stage 2 — Build & test each service in parallel. Artifacts (jars + JaCoCo
@@ -646,10 +646,10 @@ jobs:
           done
 
       - name: Commit Helm image tag bump to main
-        uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
+        uses: ./.github/actions/commit-to-main
         with:
-          commit_message: "chore: point Helm image tags at release ${{ needs.set-version.outputs.version }} [skip ci]"
-          file_pattern: infrastructure/helm/values/k8s_values-local.yaml infrastructure/helm/values/k8s_values-prod.yaml
+          files: infrastructure/helm/values/k8s_values-local.yaml infrastructure/helm/values/k8s_values-prod.yaml
+          message: "chore: point Helm image tags at release ${{ needs.set-version.outputs.version }} [skip ci]"
 
   # ===========================================================================
   # Stage 7 — Once the release is fully published, open the next development
@@ -720,7 +720,7 @@ jobs:
           sed -i -E "s/^appVersion:.*/appVersion: \"${{ steps.next.outputs.version }}\"/" infrastructure/helm/Chart.yaml
 
       - name: Commit next development version to main
-        uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
+        uses: ./.github/actions/commit-to-main
         with:
-          commit_message: "chore: prepare next development version ${{ steps.next.outputs.version }} [skip ci]"
-          file_pattern: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml
+          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml
+          message: "chore: prepare next development version ${{ steps.next.outputs.version }} [skip ci]"
