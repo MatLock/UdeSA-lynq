@@ -23,7 +23,7 @@ class CompanyEntityTest {
   private static final String COMPANY_NAME = "Lynq Technologies";
   private static final String ABOUT = "We build talent matching platforms.";
   private static final Integer COMPANY_SIZE = 250;
-  private static final String PROFILE_IMAGE_URL = "https://cdn.lynq.ai/companies/logo.png";
+  private static final String LYNQ_FILE_STORAGE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
   private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
 
   @Mock
@@ -38,7 +38,7 @@ class CompanyEntityTest {
         .name(COMPANY_NAME)
         .about(ABOUT)
         .size(COMPANY_SIZE)
-        .profileImageUrl(PROFILE_IMAGE_URL)
+        .lynqFileStorageId(LYNQ_FILE_STORAGE_ID)
         .createdOn(CREATED_ON)
         .build();
   }
@@ -49,7 +49,7 @@ class CompanyEntityTest {
     assertThat(companyEntity.getName(), is(COMPANY_NAME));
     assertThat(companyEntity.getAbout(), is(ABOUT));
     assertThat(companyEntity.getSize(), is(COMPANY_SIZE));
-    assertThat(companyEntity.getProfileImageUrl(), is(PROFILE_IMAGE_URL));
+    assertThat(companyEntity.getLynqFileStorageId(), is(LYNQ_FILE_STORAGE_ID));
     assertThat(companyEntity.getCreatedOn(), is(CREATED_ON));
   }
 

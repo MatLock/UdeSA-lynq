@@ -49,6 +49,7 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,7 +60,6 @@ class UserServiceTest {
   private static final String USER_ID = "550e8400-e29b-41d4-a716-446655440000";
   private static final UserType USER_TYPE = UserType.CANDIDATE;
   private static final String FULL_NAME = "Jane Doe";
-  private static final String PROFILE_IMAGE_URL = "https://cdn.lynq.com/avatars/jane.png";
   private static final String CURRENT_POSITION = "Backend Engineer";
   private static final String ABOUT = "Java developer focused on distributed systems.";
   private static final String GITHUB_URL = "https://github.com/janedoe";
@@ -70,22 +70,23 @@ class UserServiceTest {
   private static final String UPDATED_CURRENT_POSITION = "Staff Engineer";
 
   private static final String FILE_NAME = "avatar.png";
-  private static final String S3_PATH = "lynq/users/" + USER_ID + "/profile/" + FILE_NAME;
-  private static final String PREVIOUS_S3_PATH = "lynq/users/" + USER_ID + "/profile/old-avatar.png";
+  private static final String FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
+  private static final String PREVIOUS_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-000000000000";
   private static final String PRE_SIGNED_URL =
-      "https://lynq-bucket.s3.amazonaws.com/" + S3_PATH + "?X-Amz-Signature=abc";
+      "https://lynq-bucket.s3.amazonaws.com/lynq/" + FILE_ID + "/" + FILE_NAME
+          + "?X-Amz-Signature=abc";
 
   private static final String RESUME_ID = "resume-1";
   private static final String RESUME_NAME = "Jane Doe - Backend";
   private static final Language RESUME_LANGUAGE = Language.EN;
   private static final LocalDate RESUME_CREATED_ON = LocalDate.of(2026, Month.JULY, 17);
   private static final String RESUME_JSON = "{\"summary\":\"Backend engineer\",\"years\":8}";
-  private static final String RESUME_STORAGE_PATH = "lynq/users/" + USER_ID + "/resume/cv.pdf";
+  private static final String RESUME_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42";
   private static final String RESUME_PDF_URL = "https://presigned/cv.pdf";
 
   private static final String COMPANY_ID = "company-1";
   private static final String COMPANY_NAME = "Lynq";
-  private static final String COMPANY_IMAGE_PATH = "lynq/companies/" + COMPANY_ID + "/profile/logo.png";
+  private static final String COMPANY_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d43";
   private static final String COMPANY_IMAGE_URL = "https://presigned/company-logo.png";
   private static final String JOB_ID = "job-1";
   private static final String JOB_TITLE = "Senior Backend Engineer";
@@ -123,7 +124,7 @@ class UserServiceTest {
   private UpdateUserProfileRequest updateRequest;
 
   @Mock
-  private StorageService storageService;
+  private FileStorageService fileStorageService;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -132,7 +133,7 @@ class UserServiceTest {
   @BeforeEach
   void setUp() {
     userService = new UserService(userRepository, userResumeRepository, companyRepository,
-        jobPostRepository, userApplicationJobRepository, storageService, objectMapper);
+        jobPostRepository, userApplicationJobRepository, fileStorageService, objectMapper);
   }
 
   @Test
@@ -148,7 +149,7 @@ class UserServiceTest {
     assertThat(saved.getId(), is(USER_ID));
     assertThat(saved.getType(), is(USER_TYPE));
     assertThat(saved.getFullName(), is(FULL_NAME));
-    assertThat(saved.getProfileImageUrl(), is(org.hamcrest.Matchers.nullValue()));
+    assertThat(saved.getLynqFileStorageId(), is(org.hamcrest.Matchers.nullValue()));
     assertThat(saved.getCurrentPosition(), is(CURRENT_POSITION));
     assertThat(saved.getAbout(), is(ABOUT));
     assertThat(saved.getGithubUrl(), is(GITHUB_URL));
@@ -190,10 +191,10 @@ class UserServiceTest {
   }
 
   @Test
-  void obtainProfileImagePreSignedUrlReturnsPreSignedUrlWhenImagePresent() {
+  void obtainProfileImagePreSignedUrlSignsTheStoredFileId() {
     UserEntity existing = existingUser();
-    existing.setProfileImageUrl(S3_PATH);
-    when(storageService.obtainUserProfilePreSignedUrl(existing)).thenReturn(PRE_SIGNED_URL);
+    existing.setLynqFileStorageId(FILE_ID);
+    when(fileStorageService.obtainDownloadUrl(FILE_ID)).thenReturn(PRE_SIGNED_URL);
 
     String result = userService.obtainProfileImagePreSignedUrl(existing);
 
@@ -203,12 +204,11 @@ class UserServiceTest {
   @Test
   void obtainProfileImagePreSignedUrlReturnsNullWhenImageAbsent() {
     UserEntity existing = existingUser();
-    existing.setProfileImageUrl(null);
+    existing.setLynqFileStorageId(null);
 
     String result = userService.obtainProfileImagePreSignedUrl(existing);
 
     assertThat(result, is(org.hamcrest.Matchers.nullValue()));
-    verify(storageService, never()).obtainUserProfilePreSignedUrl(any());
   }
 
   @Test
@@ -252,7 +252,7 @@ class UserServiceTest {
     assertThat(saved.getAbout(), is(ABOUT));
     assertThat(saved.getGithubUrl(), is(GITHUB_URL));
     assertThat(saved.getLinkedinUrl(), is(LINKEDIN_URL));
-    assertThat(saved.getProfileImageUrl(), is(PROFILE_IMAGE_URL));
+    assertThat(saved.getLynqFileStorageId(), is(FILE_ID));
     assertThat(saved.getBirthDate(), is(BIRTH_DATE));
   }
 
@@ -278,57 +278,59 @@ class UserServiceTest {
   }
 
   @Test
-  void generateProfileImageUploadUrlPersistsS3PathAndReturnsPreSignedUrl() {
+  void generateProfileImageUploadUrlPersistsFileIdAndReturnsPreSignedUrl() {
     UserEntity existing = existingUser();
+    existing.setLynqFileStorageId(null);
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-    when(storageService.createUserProfilePreSignedUrl(existing, FILE_NAME))
-        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+    when(fileStorageService.registerUpload(FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
     ArgumentCaptor<UserEntity> userCaptor = ArgumentCaptor.forClass(UserEntity.class);
 
-    String result = userService.generateProfileImageUploadUrl(USER_ID, FILE_NAME);
+    RegisteredUpload result = userService.generateProfileImageUploadUrl(USER_ID, FILE_NAME);
 
-    assertThat(result, is(PRE_SIGNED_URL));
+    assertThat(result.url(), is(PRE_SIGNED_URL));
+    assertThat(result.fileId(), is(FILE_ID));
     verify(userRepository).save(userCaptor.capture());
-    assertThat(userCaptor.getValue().getProfileImageUrl(), is(S3_PATH));
+    assertThat(userCaptor.getValue().getLynqFileStorageId(), is(FILE_ID));
   }
 
   @Test
-  void generateProfileImageUploadUrlDeletesPreviousObjectWhenPathChanges() {
+  void generateProfileImageUploadUrlDeletesTheFileItReplaces() {
     UserEntity existing = existingUser();
-    existing.setProfileImageUrl(PREVIOUS_S3_PATH);
+    existing.setLynqFileStorageId(PREVIOUS_FILE_ID);
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-    when(storageService.createUserProfilePreSignedUrl(existing, FILE_NAME))
-        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+    when(fileStorageService.registerUpload(FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
 
     userService.generateProfileImageUploadUrl(USER_ID, FILE_NAME);
 
-    verify(storageService).deleteObject(PREVIOUS_S3_PATH);
+    verify(fileStorageService).deleteFile(PREVIOUS_FILE_ID);
   }
 
   @Test
-  void generateProfileImageUploadUrlDoesNotDeleteWhenNoPreviousObjectExists() {
+  void generateProfileImageUploadUrlDoesNotDeleteWhenThereWasNoPreviousImage() {
     UserEntity existing = existingUser();
-    existing.setProfileImageUrl(null);
+    existing.setLynqFileStorageId(null);
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-    when(storageService.createUserProfilePreSignedUrl(existing, FILE_NAME))
-        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+    when(fileStorageService.registerUpload(FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
 
     userService.generateProfileImageUploadUrl(USER_ID, FILE_NAME);
 
-    verify(storageService, never()).deleteObject(any());
+    verify(fileStorageService, never()).deleteFile(any());
   }
 
   @Test
-  void generateProfileImageUploadUrlDoesNotDeleteWhenPathIsUnchanged() {
+  void generateProfileImageUploadUrlDoesNotDeleteWhenTheFileIdIsUnchanged() {
     UserEntity existing = existingUser();
-    existing.setProfileImageUrl(S3_PATH);
+    existing.setLynqFileStorageId(FILE_ID);
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-    when(storageService.createUserProfilePreSignedUrl(existing, FILE_NAME))
-        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+    when(fileStorageService.registerUpload(FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
 
     userService.generateProfileImageUploadUrl(USER_ID, FILE_NAME);
 
-    verify(storageService, never()).deleteObject(any());
+    verify(fileStorageService, never()).deleteFile(any());
   }
 
   @Test
@@ -341,15 +343,40 @@ class UserServiceTest {
   }
 
   @Test
+  void confirmProfileImageUploadConfirmsTheFileRegisteredForTheUser() {
+    UserEntity existing = existingUser();
+    existing.setLynqFileStorageId(FILE_ID);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+
+    userService.confirmProfileImageUpload(USER_ID, FILE_ID);
+
+    verify(fileStorageService).confirmUpload(FILE_ID);
+  }
+
+  @Test
+  void confirmProfileImageUploadThrowsBadRequestForAFileTheUserDoesNotOwn() {
+    UserEntity existing = existingUser();
+    existing.setLynqFileStorageId(FILE_ID);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> userService.confirmProfileImageUpload(USER_ID, PREVIOUS_FILE_ID));
+    assertThat(exception.getMessage(), is("File '" + PREVIOUS_FILE_ID
+        + "' is not the profile image currently registered for the user"));
+    verify(fileStorageService, never()).confirmUpload(any());
+  }
+
+  @Test
   void generateResumeUploadUrlReturnsPreSignedUrlForCandidate() {
     UserEntity existing = existingUser();
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-    when(storageService.createUserResumePreSignedUrl(existing, FILE_NAME))
-        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+    when(fileStorageService.registerUpload(FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
 
-    String result = userService.generateResumeUploadUrl(USER_ID, FILE_NAME);
+    RegisteredUpload result = userService.generateResumeUploadUrl(USER_ID, FILE_NAME);
 
-    assertThat(result, is(PRE_SIGNED_URL));
+    assertThat(result.url(), is(PRE_SIGNED_URL));
+    assertThat(result.fileId(), is(FILE_ID));
   }
 
   @Test
@@ -360,7 +387,7 @@ class UserServiceTest {
     BadRequestException exception = assertThrows(BadRequestException.class,
         () -> userService.generateResumeUploadUrl(USER_ID, FILE_NAME));
     assertThat(exception.getMessage(), is("Only users of type CANDIDATE can upload resumes"));
-    verify(storageService, never()).createUserResumePreSignedUrl(any(), any());
+    verify(fileStorageService, never()).registerUpload(any());
   }
 
   @Test
@@ -370,15 +397,35 @@ class UserServiceTest {
     NotFoundException exception = assertThrows(NotFoundException.class,
         () -> userService.generateResumeUploadUrl(USER_ID, FILE_NAME));
     assertThat(exception.getMessage(), is(USER_NOT_FOUND));
-    verify(storageService, never()).createUserResumePreSignedUrl(any(), any());
+    verify(fileStorageService, never()).registerUpload(any());
+  }
+
+  @Test
+  void confirmResumeUploadConfirmsTheGivenFileForACandidate() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
+
+    userService.confirmResumeUpload(USER_ID, RESUME_FILE_ID);
+
+    verify(fileStorageService).confirmUpload(RESUME_FILE_ID);
+  }
+
+  @Test
+  void confirmResumeUploadThrowsBadRequestWhenUserIsNotCandidate() {
+    UserEntity company = UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(company));
+
+    assertThrows(BadRequestException.class,
+        () -> userService.confirmResumeUpload(USER_ID, RESUME_FILE_ID));
+    verify(fileStorageService, never()).confirmUpload(any());
   }
 
   @Test
   void getUserResumesMapsEntitiesWithParsedJsonAndPresignedPdfUrl() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
     when(userResumeRepository.findByUserId(USER_ID))
-        .thenReturn(List.of(resume(RESUME_JSON, RESUME_STORAGE_PATH)));
-    when(storageService.obtainProfilePreSignedUrl(RESUME_STORAGE_PATH)).thenReturn(RESUME_PDF_URL);
+        .thenReturn(List.of(resume(RESUME_JSON, RESUME_FILE_ID)));
+    when(fileStorageService.obtainDownloadUrls(List.of(RESUME_FILE_ID)))
+        .thenReturn(Map.of(RESUME_FILE_ID, RESUME_PDF_URL));
 
     List<GetUserResumeRestResponse> result = userService.getUserResumes(USER_ID);
 
@@ -396,23 +443,24 @@ class UserServiceTest {
   }
 
   @Test
-  void getUserResumesLeavesPdfUrlNullWhenStoragePathIsBlank() {
+  void getUserResumesLeavesPdfUrlNullWhenTheResumeHasNoFile() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
     when(userResumeRepository.findByUserId(USER_ID))
         .thenReturn(List.of(resume(RESUME_JSON, null)));
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
 
     GetUserResumeRestResponse response = userService.getUserResumes(USER_ID).get(0);
 
     assertThat(response.getPdfUrl(), is(nullValue()));
-    verify(storageService, never()).obtainProfilePreSignedUrl(any());
   }
 
   @Test
   void getUserResumesLeavesResumeNullWhenJsonIsBlank() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
     when(userResumeRepository.findByUserId(USER_ID))
-        .thenReturn(List.of(resume(null, RESUME_STORAGE_PATH)));
-    when(storageService.obtainProfilePreSignedUrl(RESUME_STORAGE_PATH)).thenReturn(RESUME_PDF_URL);
+        .thenReturn(List.of(resume(null, RESUME_FILE_ID)));
+    when(fileStorageService.obtainDownloadUrls(List.of(RESUME_FILE_ID)))
+        .thenReturn(Map.of(RESUME_FILE_ID, RESUME_PDF_URL));
 
     GetUserResumeRestResponse response = userService.getUserResumes(USER_ID).get(0);
 
@@ -423,6 +471,7 @@ class UserServiceTest {
   void getUserResumesReturnsEmptyWhenCandidateHasNoResumes() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
     when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
+    when(fileStorageService.obtainDownloadUrls(List.of())).thenReturn(Map.of());
 
     assertThat(userService.getUserResumes(USER_ID), is(empty()));
   }
@@ -451,9 +500,9 @@ class UserServiceTest {
   @Test
   void getUserProfileMapsProfileFieldsAndPresignedImageForCandidate() {
     UserEntity existing = existingUser();
-    existing.setProfileImageUrl(S3_PATH);
+    existing.setLynqFileStorageId(FILE_ID);
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
-    when(storageService.obtainUserProfilePreSignedUrl(existing)).thenReturn(PRE_SIGNED_URL);
+    when(fileStorageService.obtainDownloadUrl(FILE_ID)).thenReturn(PRE_SIGNED_URL);
 
     GetUserProfileRestResponse profile = userService.getUserProfile(USER_ID);
 
@@ -472,16 +521,17 @@ class UserServiceTest {
   @Test
   void getUserProfileIncludesCompanyAndCreatedJobsWhenUserIsCompanyOwner() {
     UserEntity owner = companyOwner();
+    owner.setLynqFileStorageId(FILE_ID);
     CompanyEntity company = CompanyEntity.builder()
         .id(COMPANY_ID)
         .name(COMPANY_NAME)
-        .profileImageUrl(COMPANY_IMAGE_PATH)
+        .lynqFileStorageId(COMPANY_FILE_ID)
         .owner(owner)
         .build();
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(owner));
     when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
-    when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
-        .thenReturn(COMPANY_IMAGE_URL);
+    when(fileStorageService.obtainDownloadUrl(COMPANY_FILE_ID)).thenReturn(COMPANY_IMAGE_URL);
+    when(fileStorageService.obtainDownloadUrl(FILE_ID)).thenReturn(PRE_SIGNED_URL);
     when(jobPostRepository.findByCreatedByUserId(USER_ID)).thenReturn(List.of(job()));
 
     GetUserProfileRestResponse profile = userService.getUserProfile(USER_ID);
@@ -541,12 +591,12 @@ class UserServiceTest {
   }
 
   @Test
-  void getUserApplicationsMapsProjectionFieldsAndGeneratesPresignedCompanyImage() {
+  void getUserApplicationsMapsProjectionFieldsAndSignsTheCompanyLogo() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateWithSkills()));
-    when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
-        .thenReturn(COMPANY_IMAGE_URL);
+    when(fileStorageService.obtainDownloadUrls(List.of(COMPANY_FILE_ID)))
+        .thenReturn(Map.of(COMPANY_FILE_ID, COMPANY_IMAGE_URL));
     when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
-        .thenReturn(new PageImpl<>(List.of(applicationProjection(APPLICATION_ID, COMPANY_IMAGE_PATH)),
+        .thenReturn(new PageImpl<>(List.of(applicationProjection(APPLICATION_ID, COMPANY_FILE_ID)),
             DEFAULT_PAGEABLE, 1));
 
     PagedRestResponse<UserApplicationResponse> result =
@@ -570,6 +620,7 @@ class UserServiceTest {
     when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(applicationProjection(APPLICATION_ID, null)),
             DEFAULT_PAGEABLE, 1));
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
 
     UserApplicationResponse application =
         userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE).getContent().get(0);
@@ -584,6 +635,7 @@ class UserServiceTest {
     when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(applicationProjection(APPLICATION_ID, null)),
             DEFAULT_PAGEABLE, 1));
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
 
     UserApplicationResponse application =
         userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE).getContent().get(0);
@@ -592,17 +644,17 @@ class UserServiceTest {
   }
 
   @Test
-  void getUserApplicationsLeavesCompanyImageNullWhenPathIsBlank() {
+  void getUserApplicationsLeavesCompanyImageNullWhenTheCompanyHasNoLogo() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateWithSkills()));
     when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(applicationProjection(APPLICATION_ID, null)),
             DEFAULT_PAGEABLE, 1));
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
 
     UserApplicationResponse application =
         userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE).getContent().get(0);
 
     assertThat(application.getCompanyProfileImage(), is(nullValue()));
-    verify(storageService, never()).obtainProfilePreSignedUrl(any());
   }
 
   @Test
@@ -613,6 +665,7 @@ class UserServiceTest {
             applicationProjection(APPLICATION_ID_OLDEST, null)), pageable, 6);
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateWithSkills()));
     when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, pageable)).thenReturn(page);
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
 
     PagedRestResponse<UserApplicationResponse> result =
         userService.getUserApplications(USER_ID, pageable);
@@ -632,6 +685,7 @@ class UserServiceTest {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateWithSkills()));
     when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(), DEFAULT_PAGEABLE, 0));
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
 
     PagedRestResponse<UserApplicationResponse> result =
         userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE);
@@ -691,14 +745,14 @@ class UserServiceTest {
         .build();
   }
 
-  private UserResumeEntity resume(String resumeJson, String storagePath) {
+  private UserResumeEntity resume(String resumeJson, String lynqFileStorageId) {
     return UserResumeEntity.builder()
         .id(RESUME_ID)
         .name(RESUME_NAME)
         .language(RESUME_LANGUAGE)
         .createdOn(RESUME_CREATED_ON)
         .resume(resumeJson)
-        .storagePath(storagePath)
+        .lynqFileStorageId(lynqFileStorageId)
         .build();
   }
 
@@ -707,7 +761,7 @@ class UserServiceTest {
         .id(USER_ID)
         .type(USER_TYPE)
         .fullName(FULL_NAME)
-        .profileImageUrl(PROFILE_IMAGE_URL)
+        .lynqFileStorageId(FILE_ID)
         .currentPosition(CURRENT_POSITION)
         .about(ABOUT)
         .githubUrl(GITHUB_URL)

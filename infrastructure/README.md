@@ -2,7 +2,7 @@
 
 Kubernetes deployment for the Lynq platform, packaged as a Helm chart. The same chart runs both a self-contained local cluster (minikube) and the production cluster (AWS EKS); a small set of flags in the values files is what tells the two environments apart. In production the chart is not installed by hand — Terraform coordinates it — while locally you install it directly with Helm.
 
-The chart deploys the application modules (`lynq-iam`, `lynq-app-backend`, `lynq-ml`, and the frontend) together with their configuration, and — locally only — their infrastructure dependencies (MySQL, Redis, LocalStack). In production those dependencies come from managed services (RDS, ElastiCache, S3), the frontend is served from Cloudflare, and secrets are created outside the chart.
+The chart deploys the application modules (`lynq-iam`, `lynq-app-backend`, `lynq-file-storage`, `lynq-ml`, and the frontend) together with their configuration, and — locally only — their infrastructure dependencies (MySQL, Redis, LocalStack). In production those dependencies come from managed services (RDS, ElastiCache, S3), the frontend is served from Cloudflare, and secrets are created outside the chart.
 
 
 ## Layout
@@ -112,8 +112,8 @@ helm template lynq ./infrastructure/helm -f infrastructure/helm/values/k8s_value
 Production runs on AWS EKS and is applied **only with Terraform** (local uses Helm directly). Terraform creates everything the chart needs and then runs the `helm_release`:
 
 - **MySQL + Redis on an EC2 instance** (`ec2-lynq-redis-db`), reachable from EKS over the internal network. Two security groups open `3306` and `6379` to the VPC CIDR, and a third opens `22` to a single admin IP. The apps' `DB_URL` / `REDIS_ADDRESS` are derived automatically from the instance's private DNS.
-- **S3 bucket** (private, with CORS for pre-signed uploads) for the backend.
-- **External Secrets.** `manageSecrets: false` — Helm renders no Secrets; Terraform creates `dockerhub-secret`, `lynq-iam-secret`, `lynq-app-backend-secret`, and `lynq-ml-secret`, and the deployments consume them by reference. Sensitive values are supplied at apply time via `TF_VAR_*` (never committed).
+- **S3 bucket** (private, with CORS for pre-signed uploads) for `lynq-file-storage`, the only service that talks to S3.
+- **External Secrets.** `manageSecrets: false` — Helm renders no Secrets; Terraform creates `dockerhub-secret`, `lynq-iam-secret`, `lynq-app-backend-secret`, `lynq-file-storage-secret`, and `lynq-ml-secret`, and the deployments consume them by reference. Sensitive values are supplied at apply time via `TF_VAR_*` (never committed).
 - **Internet exposure via a shared ALB.** `lynq-iam` and `lynq-app-backend` sit behind a single AWS ALB (AWS Load Balancer Controller) with a shared `group.name`, path-based routing on one domain, and TLS terminated at the ALB.
 - **Certificate + DNS.** Terraform creates the ACM certificate for `api.lynqoficial.com`, validates it via a Cloudflare DNS record, feeds the ARN into the Ingress, and points `api.lynqoficial.com` at the ALB (Cloudflare CNAME, DNS-only). DNS for `lynqoficial.com` lives in Cloudflare.
 - **Frontend on Cloudflare.** `localFrontend: false` — the frontend is deployed separately with Wrangler, outside this chart.
@@ -178,9 +178,11 @@ sudo grep 'temporary password' /var/log/mysqld.log   # initial root password
 mysql -u root -p <<'SQL'
 CREATE DATABASE IF NOT EXISTS lynq_iam_db;
 CREATE DATABASE IF NOT EXISTS lynq_backend_db;
+CREATE DATABASE IF NOT EXISTS lynq_file_storage_db;
 CREATE USER '<DB_USER>'@'%' IDENTIFIED BY '<DB_PASSWORD>';
-GRANT ALL PRIVILEGES ON lynq_iam_db.*     TO '<DB_USER>'@'%';
-GRANT ALL PRIVILEGES ON lynq_backend_db.* TO '<DB_USER>'@'%';
+GRANT ALL PRIVILEGES ON lynq_iam_db.*          TO '<DB_USER>'@'%';
+GRANT ALL PRIVILEGES ON lynq_backend_db.*      TO '<DB_USER>'@'%';
+GRANT ALL PRIVILEGES ON lynq_file_storage_db.* TO '<DB_USER>'@'%';
 FLUSH PRIVILEGES;
 SQL
 
@@ -211,7 +213,7 @@ export TF_VAR_cloudflare_api_token=<cloudflare-dns-token>
 export TF_VAR_openai_api_key=<...>
 ```
 
-The backend's AWS S3 credentials are **not** set here: Terraform creates a least-privilege IAM user scoped to the bucket, generates its access key, and writes it straight into `lynq-app-backend-secret`.
+The AWS S3 credentials are **not** set here: Terraform creates a least-privilege IAM user scoped to the bucket, generates its access key, and writes it straight into `lynq-file-storage-secret` — the only service that needs it. `lynq-app-backend` gets no bucket credentials; it delegates every file operation to `lynq-file-storage` over HTTP.
 
 ### 4. Deploy everything else
 

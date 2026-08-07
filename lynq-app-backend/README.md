@@ -4,7 +4,7 @@
 [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/jacoco-app-backend.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-app-backend-test-workflow.yaml)
 [![Version](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/version.svg)](https://github.com/MatLock/UdeSA-lynq/releases)
 
-Core application service for the Lynq platform. It owns the product domain — **user profiles**, **companies**, and **job posts** — and exposes the **job feed** that mixes Lynq-native postings with externally scraped ones, ranked per candidate with a **LyNQ match score**. It also brokers **profile/company image uploads** through S3 pre-signed URLs and **proxies skill-enhancement requests** to the `lynq-ml` service.
+Core application service for the Lynq platform. It owns the product domain — **user profiles**, **companies**, and **job posts** — and exposes the **job feed** that mixes Lynq-native postings with externally scraped ones, ranked per candidate with a **LyNQ match score**. It also brokers **profile/company image uploads** through the [`lynq-file-storage`](../lynq-file-storage) service and **proxies skill-enhancement requests** to the `lynq-ml` service.
 
 Authentication is **not** handled here. Every protected request is validated against the [`lynq-iam`](../lynq-iam) identity provider, and the resolved user identity is loaded into the security context for the duration of the request.
 
@@ -39,15 +39,15 @@ Authentication is **not** handled here. Every protected request is validated aga
 | Framework         | Spring Boot 4.0.6 (Web, Data JPA, Actuator, AOP, Security, Validation)       |
 | Web server        | Jetty (Tomcat excluded)                                                      |
 | Persistence       | MySQL 9, Hibernate / Spring Data JPA, Liquibase migrations                   |
-| Inter-service     | Spring Cloud OpenFeign — clients for `lynq-iam` and `lynq-ml`               |
-| Object storage    | AWS SDK v2 (S3) with pre-signed PUT/GET URLs; LocalStack for local/dev       |
+| Inter-service     | Spring Cloud OpenFeign — clients for `lynq-iam`, `lynq-ml` and `lynq-file-storage` |
+| Object storage    | None here — delegated to `lynq-file-storage`, which owns the bucket and signs the URLs |
 | IDs               | `java-uuid-generator` (time-ordered UUIDv7) for domain entities             |
 | Validation        | Hibernate Validator, Bean Validation (Jakarta)                              |
 | Docs              | springdoc-openapi (Swagger UI)                                              |
 | Logging           | Log4j2 + SLF4J MDC for per-request correlation IDs; `@AuditLog` aspect       |
 | Metrics           | Micrometer + Prometheus registry                                            |
 | Build             | Maven (Spring Boot plugin), Dockerfile on `eclipse-temurin:21-jre-alpine`   |
-| Tests             | JUnit Jupiter, Testcontainers (MySQL / MockServer / LocalStack), H2, JaCoCo |
+| Tests             | JUnit Jupiter, Testcontainers (MockServer for `lynq-iam` / `lynq-ml` / `lynq-file-storage`), H2, JaCoCo |
 
 ---
 
@@ -77,22 +77,22 @@ Authentication is **not** handled here. Every protected request is validated aga
         └─────┬──────┘ └─────┬──────┘ └─────┬──────┘  └──────┬───────┘  (skill-enhance)
               │              │              │                │
               ▼              ▼              ▼                ▼
-        ┌───────────────────────────────────────┐   ┌────────────────┐
-        │        Spring Data JPA repositories    │   │ StorageService │
-        │  users / companies / job_posts / ...   │   │   (AWS S3)      │
-        └───────────────────┬───────────────────┘   └───────┬────────┘
+        ┌───────────────────────────────────────┐  ┌────────────────────┐
+        │        Spring Data JPA repositories    │  │ FileStorageService │
+        │  users / companies / job_posts / ...   │  │  (file ids only)   │
+        └───────────────────┬───────────────────┘  └─────────┬──────────┘
                             ▼                                ▼
-                       ┌─────────┐                     ┌──────────┐
-                       │ MySQL 9 │                     │  S3 /    │
-                       └─────────┘                     │LocalStack│
-                                                       └──────────┘
+                       ┌─────────┐                 ┌───────────────────┐
+                       │ MySQL 9 │                 │ lynq-file-storage │
+                       └─────────┘                 │  (owns the bucket)│
+                                                   └───────────────────┘
 ```
 
 **Layers**
 
 - **Controller** (`controller/`) — thin HTTP layer. Each interface (e.g. `JobController`) carries OpenAPI annotations; the `*Impl` maps HTTP verbs to service calls and wraps responses in `GlobalRestResponse<T>`. The authenticated user is injected via `@AuthenticationPrincipal LynqUserPrincipal`.
-- **Service** (`service/`) — business logic. `UserService`, `CompanyService`, and `JobService` own their aggregates; `StorageService` owns all S3 interaction; `LynqMLProxyService` brokers calls to `lynq-ml`.
-- **Client** (`client/`) — Feign clients for the two downstream services (`LynqIamClient`, `LynqMLClient`) plus their request/response DTOs.
+- **Service** (`service/`) — business logic. `UserService`, `CompanyService`, and `JobService` own their aggregates; `FileStorageService` is the only door to `lynq-file-storage`, which owns every stored file (this service keeps just the file ids); `LynqMLProxyService` brokers calls to `lynq-ml`.
+- **Client** (`client/`) — Feign clients for the three downstream services (`LynqIamClient`, `LynqMLClient`, `LynqFileStorageClient`) plus their request/response DTOs.
 - **Filters** (`filter/`) — cross-cutting request handling registered via `FilterConfig` with explicit ordering. `PublicPaths` is the single whitelist consulted by the auth filters (only Swagger assets are public).
 - **Security** (`security/`) — `LynqUserPrincipal` is the identity resolved from the IAM token and stored as the Spring Security principal.
 - **Aspect** (`aspect/`) — the `@AuditLog` annotation + `LogAspect` produce structured entry/exit logs around annotated methods, masking sensitive fields.
@@ -163,15 +163,16 @@ sequenceDiagram
     participant Ctrl as JobController
     participant Svc as JobService
     participant Repo as JobPostRepository
-    participant S3 as StorageService
+    participant FS as lynq-file-storage
 
     C->>Ctrl: GET /job?page=&size=&filterValue=
     Ctrl->>Svc: searchAvailableJobs(filter, pageable)
     Svc->>Repo: searchAvailableJobs(filterValue, pageable)
     Note over Repo: WHERE jobStatus = OPEN<br/>filter LIKE title/description/company/workType/skill<br/>ORDER BY createdOn DESC
     Repo-->>Svc: Page<JobWithDetailsProjection>
+    Svc->>FS: POST /files/download-urls (every company + poster file id on the page)
+    FS-->>Svc: { fileId: downloadUrl }
     loop each job
-        Svc->>S3: pre-sign company & poster image URLs
         Svc->>Svc: lynqScore = % of job skills the candidate has (CANDIDATE only)
     end
     Svc-->>Ctrl: PagedRestResponse<GetJobRestResponse>
@@ -203,10 +204,37 @@ sequenceDiagram
 
 ### 4. Image upload (pre-signed URLs)
 
-Uploads never pass through the backend. The client asks for a short-lived (15-minute) pre-signed S3 **PUT** URL, uploads the bytes directly to S3, and the object key is persisted on the entity. When reading, the backend hands back pre-signed **GET** URLs. Re-uploading replaces the stored key and best-effort deletes the previous object.
+Uploads never pass through the backend, and neither does the bucket: **`lynq-file-storage` owns every stored file**. Asking for an upload URL registers the file there and persists only the returned **file id** (`lynq_file_storage_id`) on the entity; the client PUTs the bytes straight to the short-lived (15-minute) pre-signed URL and then confirms the upload so the file becomes readable. Re-uploading replaces the stored id and deletes the file it replaces. When reading, the backend exchanges the stored ids for pre-signed **GET** URLs — a whole page of results in a single batched call.
 
-- `GET /user/generate-upload-image?file-name=…` → key `lynq/users/{userId}/profile/{fileName}`
-- `GET /company/generate-upload-image?file-name=…` → key `lynq/companies/{companyId}/profile/{fileName}`
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant BE as lynq-app-backend
+    participant FS as lynq-file-storage
+    participant S3 as Bucket
+
+    C->>BE: GET /user/generate-upload-image?file-name=avatar.png
+    BE->>FS: POST /files/upload-url { fileName }
+    FS-->>BE: { fileId, uploadUrl }
+    BE->>BE: persist fileId on the user (PENDING)
+    opt replacing an image
+        BE->>FS: DELETE /files/{previousFileId}
+    end
+    BE-->>C: { preSignedUrl, fileId }
+    C->>S3: PUT bytes to preSignedUrl
+    C->>BE: POST /user/confirm-upload-image?file-id=…
+    BE->>FS: POST /files/{fileId}/confirm
+    FS->>S3: HEAD object (must exist)
+    FS-->>BE: AVAILABLE
+    BE-->>C: 204 No Content
+```
+
+| Upload | Confirm |
+| ------ | ------- |
+| `GET /user/generate-upload-image?file-name=…`    | `POST /user/confirm-upload-image?file-id=…`    |
+| `GET /company/generate-upload-image?file-name=…` | `POST /company/confirm-upload-image?file-id=…` |
+| `GET /user/generate-upload-resume?file-name=…`   | `POST /user/confirm-upload-resume?file-id=…`   |
 
 ---
 
@@ -216,12 +244,12 @@ Liquibase provisions the `lynq_backend_db` schema on startup (`resources/changel
 
 | Table                  | Purpose                                                                                  |
 | ---------------------- | ---------------------------------------------------------------------------------------- |
-| `users`                | Profile of a Lynq user. **`id` equals the `lynq-iam` user id** (no local credentials). `type` ∈ {`CANDIDATE`, `COMPANY`}. |
-| `companies`            | Company profile, unique `name`, `owner_user_id` → `users`.                               |
+| `users`                | Profile of a Lynq user. **`id` equals the `lynq-iam` user id** (no local credentials). `type` ∈ {`CANDIDATE`, `COMPANY`}. `lynq_file_storage_id` points at the profile image held by `lynq-file-storage`. |
+| `companies`            | Company profile, unique `name`, `owner_user_id` → `users`. `lynq_file_storage_id` points at the logo held by `lynq-file-storage`. |
 | `job_posts`            | Job postings. `job_status` ∈ {`OPEN`, `CLOSE`}, `job_post_source` ∈ {`LYNQ`, `LINKEDIN`, `COMPUTRABAJO`, `BUMERAN`}, `work_type` ∈ {`REMOTE`, `IN_OFFICE`}. FKs to `users` (poster) and `companies` — both nullable for scraped jobs. |
 | `job_post_skills`      | Skills required by a job (`job_id`, `skill`), unique per pair.                           |
 | `user_skills`          | Skills a user has (`user_id`, `skill`), unique per pair — drives the LyNQ score.         |
-| `user_resumes`         | Uploaded/generated résumés (`resume` JSON, `language`, `storage_path`).                  |
+| `user_resumes`         | Uploaded/generated résumés (`resume` JSON, `language`, `lynq_file_storage_id` → the PDF held by `lynq-file-storage`). |
 | `user_application_job` | A user's application to a job (unique per `job_post_id` + `user_id`).                    |
 
 Domain entity IDs are time-ordered UUIDv7 strings, except `users.id`, which is inherited from `lynq-iam`. All JPA associations use `FetchType.LAZY`.
@@ -238,9 +266,13 @@ Base path: `/lynq-backend-app` (Spring `server.servlet.context-path`).
 | GET    | `/user`                         | —                                                                    | Get the authenticated user's profile (+ pre-signed image URL). |
 | POST   | `/user`                         | `{userType, fullName, currentPosition?, about?, githubUrl?, linkedinUrl?, birthDate}` | Create the profile for the authenticated user.           |
 | PATCH  | `/user`                         | Any subset of profile fields                                         | Partially update the profile (non-null fields only).    |
-| GET    | `/user/generate-upload-image`   | `?file-name=`                                                        | Pre-signed PUT URL for the user's profile image.         |
+| GET    | `/user/generate-upload-image`   | `?file-name=`                                                        | Register the profile image in `lynq-file-storage`; returns `{preSignedUrl, fileId}`. |
+| POST   | `/user/confirm-upload-image`    | `?file-id=`                                                          | Mark the uploaded profile image available (204).         |
+| GET    | `/user/generate-upload-resume`  | `?file-name=`                                                        | Register a résumé PDF; returns `{preSignedUrl, fileId}` (`CANDIDATE` only). |
+| POST   | `/user/confirm-upload-resume`   | `?file-id=`                                                          | Mark the uploaded résumé available (204, `CANDIDATE` only). |
 | POST   | `/company`                      | `{fullName, currentPosition, userAbout, birthDate, companyName, companyAbout, companySize?, …}` | Create the authenticated user as a `COMPANY` and its company. |
-| GET    | `/company/generate-upload-image`| `?file-name=`                                                        | Pre-signed PUT URL for the company logo.                 |
+| GET    | `/company/generate-upload-image`| `?file-name=`                                                        | Register the company logo in `lynq-file-storage`; returns `{preSignedUrl, fileId}`. |
+| POST   | `/company/confirm-upload-image` | `?file-id=`                                                          | Mark the uploaded logo available (204).                  |
 | POST   | `/job`                          | `{title, description, workType, salaryRangeDown?, salaryRangeTop?, jobPostSource, skills?}` | Create a job post (`COMPANY` users only).                |
 | GET    | `/job`                          | `?page=0&size=20&filterValue=`                                       | Paginated feed of OPEN jobs; free-text filter; LyNQ score per job for candidates. |
 | POST   | `/ml/skill-enhance`             | `{title, description, workType}`                                     | Extract key skills via `lynq-ml` (`COMPANY` users only). |
@@ -298,13 +330,18 @@ curl -X POST http://localhost:8082/lynq-backend-app/user \
   }'
 ```
 
-**Get a pre-signed URL, then upload the image straight to S3**
+**Get a pre-signed URL, upload the image straight to the bucket, then confirm it**
 
 ```bash
-URL=$(curl -s "http://localhost:8082/lynq-backend-app/user/generate-upload-image?file-name=avatar.png" \
-  -H "lynq-request-uuid: $UUID" -H "Authorization: Bearer $TOKEN" | jq -r '.data.preSignedUrl')
+UPLOAD=$(curl -s "http://localhost:8082/lynq-backend-app/user/generate-upload-image?file-name=avatar.png" \
+  -H "lynq-request-uuid: $UUID" -H "Authorization: Bearer $TOKEN")
+URL=$(echo "$UPLOAD" | jq -r '.data.preSignedUrl')
+FILE_ID=$(echo "$UPLOAD" | jq -r '.data.fileId')
 
 curl -X PUT "$URL" --upload-file ./avatar.png
+
+curl -X POST "http://localhost:8082/lynq-backend-app/user/confirm-upload-image?file-id=$FILE_ID" \
+  -H "lynq-request-uuid: $UUID" -H "Authorization: Bearer $TOKEN"
 ```
 
 **Register as a company**
@@ -375,16 +412,16 @@ Sample response:
 
 - JDK 21
 - Maven 3.9+ (or the bundled `./mvnw`)
-- A reachable MySQL 9 (`lynq_backend_db`), a running `lynq-iam`, and — for uploads — an S3 endpoint (LocalStack works)
+- A reachable MySQL 9 (`lynq_backend_db`), a running `lynq-iam`, and — for uploads — a running `lynq-file-storage`
 
-The default `application.yaml` targets `localhost:3306` (MySQL, `root` / `federico`), `lynq-iam` at `http://localhost:8080/lynq-iam`, `lynq-ml` at `http://localhost:8084/lynq-ml`, and LocalStack S3 at `http://localhost:4566`. Override anything that differs.
+The default `application.yaml` targets `localhost:3306` (MySQL, `root` / `federico`), `lynq-iam` at `http://localhost:8080/lynq-iam`, `lynq-ml` at `http://localhost:8084/lynq-ml`, and `lynq-file-storage` at `http://localhost:8085/lynq-file-storage`. Override anything that differs.
 
 **Steps**
 
 ```bash
-# 1. Bring up the data services + IAM (easiest via the repo-root compose file)
+# 1. Bring up the data services, IAM and file storage (easiest via the repo-root compose file)
 cd ..
-docker compose up -d mysql localstack lynq-iam
+docker compose up -d mysql localstack lynq-iam lynq-file-storage
 
 # 2. Build and run the backend
 cd lynq-app-backend
@@ -402,7 +439,7 @@ Service URLs (default profile):
 - Swagger UI: `http://localhost:8082/lynq-backend-app/swagger-ui.html`
 - Actuator / Prometheus: `http://localhost:8083/actuator`
 
-**Tests** (Testcontainers spins up MySQL, MockServer, and LocalStack — Docker must be running):
+**Tests** (Testcontainers spins up a MockServer per downstream service — `lynq-iam`, `lynq-ml` and `lynq-file-storage`; Docker must be running):
 
 ```bash
 ./mvnw test
@@ -412,7 +449,7 @@ Service URLs (default profile):
 
 ## Running with Docker
 
-The repo-root `docker-compose.yaml` provisions the whole platform — MySQL, LocalStack, `lynq-iam`, `lynq-ml` (+ Ollama), this backend, and the frontend. Run compose from the repository root (one level up):
+The repo-root `docker-compose.yaml` provisions the whole platform — MySQL, LocalStack, `lynq-iam`, `lynq-ml` (+ Ollama), `lynq-file-storage`, this backend, and the frontend. Run compose from the repository root (one level up):
 
 ```bash
 # Build the jar first (the image just COPYs it in)
@@ -422,7 +459,7 @@ cd ..
 docker compose up --build
 ```
 
-In compose the backend runs the `production` profile and is published on host ports **8082** (API) and **8083** (management), talking to `lynq-iam` at `http://lynq-iam:8080/lynq-iam` and S3 at LocalStack (`http://localstack:4566`).
+In compose the backend runs the `production` profile and is published on host ports **8082** (API) and **8083** (management), talking to `lynq-iam` at `http://lynq-iam:8080/lynq-iam` and `lynq-file-storage` at `http://lynq-file-storage:8080/lynq-file-storage`. Only `lynq-file-storage` holds bucket credentials.
 
 ---
 
@@ -440,13 +477,7 @@ Two profiles ship with the project:
 | `DB_PASSWORD`           | MySQL password                             | |
 | `LYNQ_IAM_URL`          | `lynq.iam.url` (Feign client)              | default `http://lynq-iam:8080/lynq-iam` |
 | `LYNQ_ML_URL`           | `lynq.ml.url` (Feign client)               | default `http://localhost:8084/lynq-ml` |
-| `AWS_REGION`            | S3 region                                  | default `us-east-1` |
-| `AWS_ACCESS_KEY_ID`     | S3 credentials                             | |
-| `AWS_SECRET_ACCESS_KEY` | S3 credentials                             | |
-| `AWS_BUCKET_NAME`       | Target bucket                              | |
-| `AWS_ENDPOINT`          | S3 endpoint override                       | empty = real AWS; set to LocalStack (`http://localstack:4566`) for local/dev |
-
-When `AWS_ENDPOINT` is set, the S3 client/presigner switch to **path-style** access so LocalStack works transparently.
+| `LYNQ_FILE_STORAGE_URL` | `lynq.file-storage.url` (Feign client)     | default `http://lynq-file-storage:8080/lynq-file-storage`. No `AWS_*` variables here — the bucket belongs to `lynq-file-storage` |
 
 ---
 
@@ -467,8 +498,8 @@ src/
 │   ├── java/com/lynq/backend/
 │   │   ├── LynqAppBackendApplication.java
 │   │   ├── aspect/        # @AuditLog + LogAspect (sensitive-field masking)
-│   │   ├── client/        # Feign clients for lynq-iam & lynq-ml + DTOs
-│   │   ├── config/        # App (S3/Jackson), Security, Filter, OpenAPI beans
+│   │   ├── client/        # Feign clients for lynq-iam, lynq-ml & lynq-file-storage + DTOs
+│   │   ├── config/        # App (Jackson), Security, Filter, OpenAPI beans
 │   │   ├── controller/    # Controller interfaces + impls, request/response DTOs, error handler
 │   │   ├── enums/         # UserType, WorkType, JobStatus, JobPostSource, Language
 │   │   ├── exceptions/    # BadRequest / Forbidden / NotFound

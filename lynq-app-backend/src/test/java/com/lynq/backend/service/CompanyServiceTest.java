@@ -48,15 +48,14 @@ class CompanyServiceTest {
   private static final String COMPANY_NAME = "Lynq Technologies";
   private static final String COMPANY_ABOUT = "We build talent matching platforms.";
   private static final Integer COMPANY_SIZE = 250;
-  private static final String COMPANY_PROFILE_IMAGE_URL = "https://cdn.lynq.com/logos/lynq.png";
   private static final String NO_GITHUB_URL = null;
   private static final String FULL_NAME = "Jane Doe";
   private static final String FILE_NAME = "logo.png";
-  private static final String S3_PATH = "lynq/companies/company-1/profile/logo.png";
-  private static final String PREVIOUS_S3_PATH = "lynq/companies/company-1/profile/old.png";
+  private static final String FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
+  private static final String PREVIOUS_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-000000000000";
   private static final String PRE_SIGNED_URL = "https://lynq-bucket.s3.amazonaws.com/logo.png?sig=abc";
   private static final String COMPANY_ID = "company-1";
-  private static final String COMPANY_IMAGE_PATH = "lynq/companies/" + COMPANY_ID + "/profile/logo.png";
+  private static final String COMPANY_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d43";
   private static final String COMPANY_IMAGE_URL = "https://presigned/company-logo.png";
   private static final LocalDate COMPANY_CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
   private static final String JOB_ID = "job-1";
@@ -84,14 +83,14 @@ class CompanyServiceTest {
   private UpdateCompanyRequest updateRequest;
 
   @Mock
-  private StorageService storageService;
+  private FileStorageService fileStorageService;
 
   private CompanyService companyService;
 
   @BeforeEach
   void setUp() {
     companyService = new CompanyService(userService, companyRepository, jobPostRepository,
-        storageService);
+        fileStorageService);
   }
 
   @Test
@@ -121,7 +120,8 @@ class CompanyServiceTest {
     assertThat(saved.getName(), is(COMPANY_NAME));
     assertThat(saved.getAbout(), is(COMPANY_ABOUT));
     assertThat(saved.getSize(), is(COMPANY_SIZE));
-    assertThat(saved.getProfileImageUrl(), is(COMPANY_PROFILE_IMAGE_URL));
+    // The logo is uploaded afterwards through lynq-file-storage, so a new company has no file id.
+    assertThat(saved.getLynqFileStorageId(), is(org.hamcrest.Matchers.nullValue()));
     assertThat(saved.getCreatedOn(), is(LocalDate.now(ZoneOffset.UTC)));
     assertThat(saved.getOwner(), is(sameInstance(owner)));
     assertThat(saved.getId(), is(notNullValue()));
@@ -174,65 +174,66 @@ class CompanyServiceTest {
   }
 
   @Test
-  void generateCompanyImageUploadUrlPersistsS3PathAndReturnsPreSignedUrl() {
+  void generateCompanyImageUploadUrlPersistsFileIdAndReturnsPreSignedUrl() {
     UserEntity owner = UserEntity.builder().id(USER_ID).build();
     CompanyEntity company = companyOwnedBy(owner);
     when(userService.getUser(USER_ID)).thenReturn(owner);
     when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
-    when(storageService.createCompanyProfilePreSignedUrl(company, FILE_NAME))
-        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+    when(fileStorageService.registerUpload(FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
     ArgumentCaptor<CompanyEntity> companyCaptor = ArgumentCaptor.forClass(CompanyEntity.class);
 
-    String result = companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME);
+    RegisteredUpload result = companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME);
 
-    assertThat(result, is(PRE_SIGNED_URL));
+    assertThat(result.url(), is(PRE_SIGNED_URL));
+    assertThat(result.fileId(), is(FILE_ID));
     verify(companyRepository).save(companyCaptor.capture());
-    assertThat(companyCaptor.getValue().getProfileImageUrl(), is(S3_PATH));
+    assertThat(companyCaptor.getValue().getLynqFileStorageId(), is(FILE_ID));
   }
 
   @Test
-  void generateCompanyImageUploadUrlDeletesPreviousObjectWhenPathChanges() {
+  void generateCompanyImageUploadUrlDeletesTheFileItReplaces() {
     UserEntity owner = UserEntity.builder().id(USER_ID).build();
     CompanyEntity company = companyOwnedBy(owner);
-    company.setProfileImageUrl(PREVIOUS_S3_PATH);
+    company.setLynqFileStorageId(PREVIOUS_FILE_ID);
     when(userService.getUser(USER_ID)).thenReturn(owner);
     when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
-    when(storageService.createCompanyProfilePreSignedUrl(company, FILE_NAME))
-        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+    when(fileStorageService.registerUpload(FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
 
     companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME);
 
-    verify(storageService).deleteObject(PREVIOUS_S3_PATH);
+    verify(fileStorageService).deleteFile(PREVIOUS_FILE_ID);
   }
 
   @Test
-  void generateCompanyImageUploadUrlDoesNotDeleteWhenNoPreviousObjectExists() {
+  void generateCompanyImageUploadUrlDoesNotDeleteWhenThereWasNoPreviousLogo() {
     UserEntity owner = UserEntity.builder().id(USER_ID).build();
     CompanyEntity company = companyOwnedBy(owner);
-    company.setProfileImageUrl(null);
+    company.setLynqFileStorageId(null);
     when(userService.getUser(USER_ID)).thenReturn(owner);
     when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
-    when(storageService.createCompanyProfilePreSignedUrl(company, FILE_NAME))
-        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+    when(fileStorageService.registerUpload(FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
 
     companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME);
 
-    verify(storageService, never()).deleteObject(any());
+    verify(fileStorageService, never()).deleteFile(any());
   }
 
   @Test
-  void generateCompanyImageUploadUrlDoesNotDeleteWhenPathIsUnchanged() {
+  void generateCompanyImageUploadUrlDoesNotDeleteWhenTheFileIdIsUnchanged() {
     UserEntity owner = UserEntity.builder().id(USER_ID).build();
     CompanyEntity company = companyOwnedBy(owner);
-    company.setProfileImageUrl(S3_PATH);
+    company.setLynqFileStorageId(FILE_ID);
     when(userService.getUser(USER_ID)).thenReturn(owner);
     when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
-    when(storageService.createCompanyProfilePreSignedUrl(company, FILE_NAME))
-        .thenReturn(new PreSignedUploadUrl(S3_PATH, PRE_SIGNED_URL));
+    when(fileStorageService.registerUpload(FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
 
     companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME);
 
-    verify(storageService, never()).deleteObject(any());
+    verify(fileStorageService, never()).deleteFile(any());
   }
 
   @Test
@@ -253,13 +254,12 @@ class CompanyServiceTest {
         .name(COMPANY_NAME)
         .about(COMPANY_ABOUT)
         .size(COMPANY_SIZE)
-        .profileImageUrl(COMPANY_IMAGE_PATH)
+        .lynqFileStorageId(COMPANY_FILE_ID)
         .createdOn(COMPANY_CREATED_ON)
         .owner(UserEntity.builder().id(USER_ID).build())
         .build();
     when(companyRepository.findById(COMPANY_ID)).thenReturn(Optional.of(company));
-    when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
-        .thenReturn(COMPANY_IMAGE_URL);
+    when(fileStorageService.obtainDownloadUrl(COMPANY_FILE_ID)).thenReturn(COMPANY_IMAGE_URL);
     when(jobPostRepository.findByCompanyId(COMPANY_ID)).thenReturn(java.util.List.of(job()));
 
     GetCompanyDetailRestResponse detail = companyService.getCompanyDetail(COMPANY_ID);
@@ -278,11 +278,11 @@ class CompanyServiceTest {
   }
 
   @Test
-  void getCompanyDetailLeavesProfileImageNullWhenPathIsBlank() {
+  void getCompanyDetailLeavesProfileImageNullWhenTheCompanyHasNoLogo() {
     CompanyEntity company = CompanyEntity.builder()
         .id(COMPANY_ID)
         .name(COMPANY_NAME)
-        .profileImageUrl(null)
+        .lynqFileStorageId(null)
         .owner(UserEntity.builder().id(USER_ID).build())
         .build();
     when(companyRepository.findById(COMPANY_ID)).thenReturn(Optional.of(company));
@@ -292,7 +292,6 @@ class CompanyServiceTest {
 
     assertThat(detail.getProfileImageUrl(), is(org.hamcrest.Matchers.nullValue()));
     assertThat(detail.getJobs(), is(org.hamcrest.Matchers.empty()));
-    verify(storageService, never()).obtainProfilePreSignedUrl(any());
   }
 
   @Test
@@ -407,12 +406,11 @@ class CompanyServiceTest {
   void updateCompanyMapsStoredLogoReferenceAsPreSignedDownloadUrl() {
     UserEntity owner = UserEntity.builder().id(USER_ID).build();
     CompanyEntity company = companyOwnedBy(owner);
-    company.setProfileImageUrl(COMPANY_IMAGE_PATH);
+    company.setLynqFileStorageId(COMPANY_FILE_ID);
     when(userService.getUser(USER_ID)).thenReturn(owner);
     when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
     when(companyRepository.save(company)).thenReturn(company);
-    when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
-        .thenReturn(COMPANY_IMAGE_URL);
+    when(fileStorageService.obtainDownloadUrl(COMPANY_FILE_ID)).thenReturn(COMPANY_IMAGE_URL);
 
     UpdateCompanyRestResponse response = companyService.updateCompany(USER_ID, updateRequest);
 
@@ -448,6 +446,5 @@ class CompanyServiceTest {
     when(request.getBirthDate()).thenReturn(BIRTH_DATE);
     when(request.getCompanyAbout()).thenReturn(COMPANY_ABOUT);
     when(request.getCompanySize()).thenReturn(COMPANY_SIZE);
-    when(request.getCompanyProfileImageUrl()).thenReturn(COMPANY_PROFILE_IMAGE_URL);
   }
 }

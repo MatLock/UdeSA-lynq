@@ -2,19 +2,23 @@
 // Spec: lynq-app-backend CompanyController.
 //
 // Mirrors the user profile-image upload flow (see userService): ask the backend
-// for a short-lived pre-signed S3 URL (which also persists the object key as the
-// company's logo reference), then PUT the image bytes straight to S3.
+// to register the logo in lynq-file-storage (which also persists the file id as
+// the company's logo reference), PUT the image bytes straight to the returned
+// pre-signed URL, then confirm the upload.
 
 
 /**
- * Request a short-lived pre-signed S3 URL to upload the authenticated owner's
- * company logo.
+ * Register the authenticated owner's new company logo and get a short-lived
+ * pre-signed URL to upload it to. Once the PUT succeeds, the upload must be
+ * confirmed with {@link confirm_company_image_upload} using the returned
+ * `fileId`, otherwise the file stays PENDING in lynq-file-storage.
  *
  * Calls GET /company/generate-upload-image?file-name=<fileName>
  * (CompanyController.generateCompanyImageUploadUrl). The endpoint is secured and,
- * as a side effect, persists the S3 object key as the company's logo reference —
- * so the returned URL is a pre-signed HTTP PUT target valid for ~15 minutes. The
- * company owned by the authenticated user must already exist.
+ * as a side effect, registers the file in lynq-file-storage and persists its id
+ * as the company's logo reference — so the returned URL is a pre-signed HTTP PUT
+ * target valid for ~15 minutes. The company owned by the authenticated user must
+ * already exist.
  *
  * Takes an `authFetch`-shaped fetcher rather than a raw token (mirrors
  * userService): in-session callers pass useApi's authFetch (auto-refreshes an
@@ -23,9 +27,10 @@
  *
  * @param {(path: string, options?: object) => Promise<object>} authFetch - The
  *   secured fetcher.
- * @param {string} fileName - Name of the file to upload; used to build the S3
- *   object key (e.g. `logo.png`).
- * @returns {Promise<string>} The pre-signed upload URL (data.preSignedUrl).
+ * @param {string} fileName - Name of the file to upload; lynq-file-storage uses
+ *   it to build the object key (e.g. `logo.png`).
+ * @returns {Promise<{preSignedUrl: string, fileId: string}>} The upload target
+ *   and the id of the registered file.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
 /**
@@ -96,12 +101,36 @@ const generate_company_image_upload_url = async (authFetch, fileName) => {
     method: 'GET',
   });
   // Success responses wrap the payload in a GlobalRestResponse ({ success, data });
-  // unwrap so callers receive the flat GenerateUploadImageRestResponse.
-  return payload?.data?.preSignedUrl;
+  // unwrap so callers receive the flat GenerateUploadImageRestResponse
+  // ({ preSignedUrl, fileId }).
+  return payload?.data;
 };
 
 /**
- * Upload an image binary directly to S3 using a pre-signed PUT URL.
+ * Confirm the logo upload finished, which marks the file available in
+ * lynq-file-storage.
+ *
+ * Calls POST /company/confirm-upload-image?file-id=<fileId>
+ * (CompanyController.confirmCompanyImageUpload) after the pre-signed PUT
+ * succeeded. The file id must be the one currently registered for the company.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
+ * @param {string} fileId - Id returned by
+ *   {@link generate_company_image_upload_url}.
+ * @returns {Promise<void>} Resolves once the file is marked available.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const confirm_company_image_upload = async (authFetch, fileId) => {
+  const query = new URLSearchParams({ 'file-id': fileId });
+  await authFetch(`/company/confirm-upload-image?${query}`, {
+    method: 'POST',
+  });
+};
+
+/**
+ * Upload an image binary directly to the storage bucket using a pre-signed PUT
+ * URL issued by lynq-file-storage.
  *
  * The pre-signed URL already carries the AWS credentials in its query string, so
  * this request must NOT send an Authorization header (it would break the
@@ -134,4 +163,5 @@ export default {
   update_company,
   generate_company_image_upload_url,
   upload_company_image,
+  confirm_company_image_upload,
 };

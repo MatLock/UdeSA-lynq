@@ -11,6 +11,7 @@ import com.lynq.backend.controller.response.UpdateCompanyRestResponse;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.security.LynqUserPrincipal;
 import com.lynq.backend.service.CompanyService;
+import com.lynq.backend.service.RegisteredUpload;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -46,7 +47,6 @@ public class CompanyControllerImpl implements com.lynq.backend.controller.Compan
         .companyName(company.getName())
         .companyAbout(company.getAbout())
         .companySize(company.getSize())
-        .companyProfileImageUrl(company.getProfileImageUrl())
         .companyCreatedOn(company.getCreatedOn())
         .ownerUserId(company.getOwner().getId())
         .build();
@@ -61,15 +61,26 @@ public class CompanyControllerImpl implements com.lynq.backend.controller.Compan
   @AuditLog
   public ResponseEntity<GlobalRestResponse<GenerateUploadImageRestResponse>> generateCompanyImageUploadUrl(
       @RequestParam("file-name") String fileName, @AuthenticationPrincipal LynqUserPrincipal principal) {
-    String preSignedUrl = companyService.generateCompanyImageUploadUrl(principal.getId(), fileName);
+    RegisteredUpload upload = companyService.generateCompanyImageUploadUrl(principal.getId(), fileName);
 
     GenerateUploadImageRestResponse response = GenerateUploadImageRestResponse.builder()
-        .preSignedUrl(preSignedUrl)
+        .preSignedUrl(upload.url())
+        .fileId(upload.fileId())
         .build();
 
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, response));
+  }
+
+  @Override
+  @PostMapping("/confirm-upload-image")
+  @AuditLog
+  public ResponseEntity<Void> confirmCompanyImageUpload(
+      @RequestParam("file-id") String fileId, @AuthenticationPrincipal LynqUserPrincipal principal) {
+    companyService.confirmCompanyImageUpload(principal.getId(), fileId);
+
+    return ResponseEntity.noContent().build();
   }
 
   @Override

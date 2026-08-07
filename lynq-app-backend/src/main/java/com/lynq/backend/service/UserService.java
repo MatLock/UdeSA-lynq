@@ -28,6 +28,8 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,25 +45,27 @@ public class UserService {
   private static final String ONLY_CANDIDATE_USERS_CAN_UPLOAD_RESUMES =
       "Only users of type CANDIDATE can upload resumes";
   private static final String RESUME_NOT_VALID_JSON = "Stored resume is not valid JSON";
+  private static final String NOT_THE_CURRENT_PROFILE_IMAGE =
+      "File '%s' is not the profile image currently registered for the user";
 
   private final UserRepository userRepository;
   private final UserResumeRepository userResumeRepository;
   private final CompanyRepository companyRepository;
   private final JobPostRepository jobPostRepository;
   private final UserApplicationJobRepository userApplicationJobRepository;
-  private final StorageService storageService;
+  private final FileStorageService fileStorageService;
   private final ObjectMapper objectMapper;
 
   public UserService(UserRepository userRepository, UserResumeRepository userResumeRepository,
       CompanyRepository companyRepository, JobPostRepository jobPostRepository,
       UserApplicationJobRepository userApplicationJobRepository,
-      StorageService storageService, ObjectMapper objectMapper){
+      FileStorageService fileStorageService, ObjectMapper objectMapper){
     this.userRepository = userRepository;
     this.userResumeRepository = userResumeRepository;
     this.companyRepository = companyRepository;
     this.jobPostRepository = jobPostRepository;
     this.userApplicationJobRepository = userApplicationJobRepository;
-    this.storageService = storageService;
+    this.fileStorageService = fileStorageService;
     this.objectMapper = objectMapper;
   }
 
@@ -131,7 +135,7 @@ public class UserService {
   private UserProfileCompanyRestResponse toCompanyResponse(CompanyEntity company) {
     return UserProfileCompanyRestResponse.builder()
         .name(company.getName())
-        .profileImageUrl(obtainImageUrl(company.getProfileImageUrl()))
+        .profileImageUrl(fileStorageService.obtainDownloadUrl(company.getLynqFileStorageId()))
         .build();
   }
 
@@ -142,13 +146,6 @@ public class UserService {
         .description(job.getDescription())
         .jobStatus(job.getJobStatus())
         .build();
-  }
-
-  private String obtainImageUrl(String s3Path) {
-    if (s3Path == null || s3Path.isBlank()) {
-      return null;
-    }
-    return storageService.obtainProfilePreSignedUrl(s3Path);
   }
 
   @AuditLog
@@ -179,29 +176,47 @@ public class UserService {
     return userRepository.save(user);
   }
 
+  /**
+   * Registers the new profile image in lynq-file-storage, points the user at it and drops the file
+   * it replaces. The returned upload URL is short-lived and the file only becomes readable once the
+   * browser has PUT the bytes and called {@link #confirmProfileImageUpload(String, String)}.
+   */
   @AuditLog
   @Transactional
-  public String generateProfileImageUploadUrl(String userId, String fileName) {
+  public RegisteredUpload generateProfileImageUploadUrl(String userId, String fileName) {
     UserEntity user = userRepository.findById(userId)
         .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
 
-    String previousImagePath = user.getProfileImageUrl();
-    PreSignedUploadUrl preSignedUploadUrl = storageService.createUserProfilePreSignedUrl(user, fileName);
+    String previousFileId = user.getLynqFileStorageId();
+    RegisteredUpload upload = fileStorageService.registerUpload(fileName);
 
-    user.setProfileImageUrl(preSignedUploadUrl.s3Path());
+    user.setLynqFileStorageId(upload.fileId());
     userRepository.save(user);
 
-    if (previousImagePath != null && !previousImagePath.isBlank()
-        && !previousImagePath.equals(preSignedUploadUrl.s3Path())) {
-      storageService.deleteObject(previousImagePath);
+    if (previousFileId != null && !previousFileId.isBlank()
+        && !previousFileId.equals(upload.fileId())) {
+      fileStorageService.deleteFile(previousFileId);
     }
 
-    return preSignedUploadUrl.url();
+    return upload;
   }
 
   @AuditLog
   @Transactional(readOnly = true)
-  public String generateResumeUploadUrl(String userId, String fileName) {
+  public void confirmProfileImageUpload(String userId, String fileId) {
+    UserEntity user = userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
+
+    if (!fileId.equals(user.getLynqFileStorageId())) {
+      throw new BadRequestException(String.format(NOT_THE_CURRENT_PROFILE_IMAGE, fileId));
+    }
+
+    fileStorageService.confirmUpload(fileId);
+  }
+
+  @AuditLog
+  @Transactional(readOnly = true)
+  public RegisteredUpload generateResumeUploadUrl(String userId, String fileName) {
     UserEntity user = userRepository.findById(userId)
         .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
 
@@ -209,16 +224,31 @@ public class UserService {
       throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_UPLOAD_RESUMES);
     }
 
-    return storageService.createUserResumePreSignedUrl(user, fileName).url();
+    return fileStorageService.registerUpload(fileName);
+  }
+
+  /**
+   * Resume rows are written by the ingestion pipeline, not here, so the file id cannot be looked up
+   * from the database: the caller confirms the id it got from
+   * {@link #generateResumeUploadUrl(String, String)}.
+   */
+  @AuditLog
+  @Transactional(readOnly = true)
+  public void confirmResumeUpload(String userId, String fileId) {
+    UserEntity user = userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
+
+    if (user.getType() != UserType.CANDIDATE) {
+      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_UPLOAD_RESUMES);
+    }
+
+    fileStorageService.confirmUpload(fileId);
   }
 
   @AuditLog
   @Transactional(readOnly = true)
   public String obtainProfileImagePreSignedUrl(UserEntity user) {
-    if (user.getProfileImageUrl() == null || user.getProfileImageUrl().isBlank()) {
-      return null;
-    }
-    return storageService.obtainUserProfilePreSignedUrl(user);
+    return fileStorageService.obtainDownloadUrl(user.getLynqFileStorageId());
   }
 
   @AuditLog
@@ -231,8 +261,15 @@ public class UserService {
       throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES);
     }
 
-    return userResumeRepository.findByUserId(userId).stream()
-        .map(this::toResponse)
+    List<UserResumeEntity> resumes = userResumeRepository.findByUserId(userId);
+
+    // As with the applications page, every resume PDF is signed in one call.
+    Map<String, String> pdfUrls = fileStorageService.obtainDownloadUrls(resumes.stream()
+        .map(UserResumeEntity::getLynqFileStorageId)
+        .toList());
+
+    return resumes.stream()
+        .map(resume -> toResponse(resume, pdfUrls))
         .toList();
   }
 
@@ -253,13 +290,22 @@ public class UserService {
         .map(UserSkillsEntity::getSkill)
         .toList();
 
-    return PagedRestResponse.from(userApplicationJobRepository
-        .findApplicationsByUserId(userId, pageable)
-        .map(projection -> toApplicationResponse(projection, candidateSkills)));
+    Page<UserApplicationProjection> applications =
+        userApplicationJobRepository.findApplicationsByUserId(userId, pageable);
+
+    // Every company logo on the page is signed in a single call to lynq-file-storage rather than
+    // one call per row.
+    Map<String, String> logoUrls = fileStorageService.obtainDownloadUrls(
+        applications.getContent().stream()
+            .map(UserApplicationProjection::companyFileStorageId)
+            .toList());
+
+    return PagedRestResponse.from(applications
+        .map(projection -> toApplicationResponse(projection, candidateSkills, logoUrls)));
   }
 
   private UserApplicationResponse toApplicationResponse(UserApplicationProjection projection,
-      List<String> candidateSkills) {
+      List<String> candidateSkills, Map<String, String> logoUrls) {
     return UserApplicationResponse.builder()
         .id(projection.id())
         .jobId(projection.jobId())
@@ -267,10 +313,15 @@ public class UserService {
         .jobDescription(projection.jobDescription())
         .companyId(projection.companyId())
         .companyName(projection.companyName())
-        .companyProfileImage(obtainImageUrl(projection.companyProfileImageUrl()))
+        .companyProfileImage(signedUrl(logoUrls, projection.companyFileStorageId()))
         .appliedOn(projection.appliedOn())
         .lynqScore(LyNQScoreCalculator.score(splitSkills(projection.jobSkills()), candidateSkills))
         .build();
+  }
+
+  /** Rows without a file — a scraped job with no company, a resume with no PDF — get no URL. */
+  private static String signedUrl(Map<String, String> downloadUrls, String fileId) {
+    return fileId == null ? null : downloadUrls.get(fileId);
   }
 
   private static List<String> splitSkills(String concatenatedSkills) {
@@ -282,14 +333,15 @@ public class UserService {
         .toList();
   }
 
-  private GetUserResumeRestResponse toResponse(UserResumeEntity resume) {
+  private GetUserResumeRestResponse toResponse(UserResumeEntity resume,
+      Map<String, String> pdfUrls) {
     return GetUserResumeRestResponse.builder()
         .id(resume.getId())
         .name(resume.getName())
         .language(resume.getLanguage())
         .createdOn(resume.getCreatedOn())
         .resume(parseResume(resume.getResume()))
-        .pdfUrl(obtainPdfUrl(resume.getStoragePath()))
+        .pdfUrl(signedUrl(pdfUrls, resume.getLynqFileStorageId()))
         .build();
   }
 
@@ -302,13 +354,6 @@ public class UserService {
     } catch (JsonProcessingException e) {
       throw new IllegalStateException(RESUME_NOT_VALID_JSON, e);
     }
-  }
-
-  private String obtainPdfUrl(String storagePath) {
-    if (storagePath == null || storagePath.isBlank()) {
-      return null;
-    }
-    return storageService.obtainProfilePreSignedUrl(storagePath);
   }
 
 }

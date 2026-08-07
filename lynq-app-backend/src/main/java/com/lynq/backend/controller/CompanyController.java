@@ -47,7 +47,6 @@ public interface CompanyController {
                           "companyName": "Lynq",
                           "companyAbout": "Hiring platform for engineers.",
                           "companySize": 42,
-                          "companyProfileImageUrl": "https://cdn.lynq.com/logos/lynq.png",
                           "companyCreatedOn": "2026-06-25",
                           "ownerUserId": "550e8400-e29b-41d4-a716-446655440000"
                         }
@@ -121,26 +120,27 @@ public interface CompanyController {
               name = "Company owner",
               value = """
                   {
-                    "userProfileImageUrl": "https://cdn.lynq.com/avatars/jane.png",
+                    "fullName": "Jane Doe",
                     "currentPosition": "Founder",
                     "userAbout": "Building the Lynq hiring platform.",
                     "linkedinUrl": "https://linkedin.com/in/janedoe",
                     "birthDate": "1995-04-12",
                     "companyName": "Lynq",
                     "companyAbout": "Hiring platform for engineers.",
-                    "companySize": 42,
-                    "companyProfileImageUrl": "https://cdn.lynq.com/logos/lynq.png"
+                    "companySize": 42
                   }""")))
       @Valid CreateUserWithCompanyRequest request,
       @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
       summary = "Generate a pre-signed URL to upload the authenticated owner's company logo",
-      description = "Builds the S3 path for the given file name, persists it as the profile image "
-          + "reference of the company owned by the authenticated user, and returns a short-lived "
-          + "pre-signed URL. The frontend uploads the image binary directly to S3 with an HTTP PUT "
-          + "against the returned URL. Calling this endpoint again replaces the stored reference, "
-          + "so the company logo can be changed at any time.",
+      description = "Registers the file in lynq-file-storage, persists the returned file id against "
+          + "the company owned by the authenticated user, and returns a short-lived pre-signed URL "
+          + "together with that id. The frontend uploads the image binary directly to the storage "
+          + "bucket with an HTTP PUT against the returned URL and then confirms it through "
+          + "POST /company/confirm-upload-image. Calling this endpoint again replaces the stored "
+          + "file id and deletes the logo it replaces, so the company logo can be changed at any "
+          + "time.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
       @ApiResponse(
@@ -154,7 +154,8 @@ public interface CompanyController {
                       {
                         "success": true,
                         "data": {
-                          "preSignedUrl": "https://lynq-bucket.s3.amazonaws.com/lynq/companies/018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60/profile/logo.png?X-Amz-Signature=..."
+                          "preSignedUrl": "https://lynq-bucket.s3.amazonaws.com/lynq/0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41/logo.png?X-Amz-Signature=...",
+                          "fileId": "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41"
                         }
                       }"""))),
       @ApiResponse(
@@ -206,11 +207,69 @@ public interface CompanyController {
           name = "file-name",
           in = ParameterIn.QUERY,
           required = true,
-          description = "Name of the company logo file to upload. Used to build the S3 object key.",
+          description = "Name of the company logo file to upload. lynq-file-storage uses it to build "
+              + "the object key.",
           example = "logo.png")
   })
   ResponseEntity<GlobalRestResponse<GenerateUploadImageRestResponse>> generateCompanyImageUploadUrl(
       String fileName,
+      @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
+      summary = "Confirm the company logo upload finished",
+      description = "Marks the uploaded logo as available in lynq-file-storage. Call it after the "
+          + "PUT to the pre-signed URL succeeded, with the file id returned by "
+          + "GET /company/generate-upload-image. The file id must be the one currently registered "
+          + "for the company, otherwise the call is rejected with 400; it is also rejected while the "
+          + "bytes have not reached the bucket.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "204",
+          description = "Logo confirmed and now readable"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The file id is not the company's current logo, or its bytes were never "
+              + "uploaded",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Not the current logo",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "File '0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41' is not the logo currently registered for the company"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "404",
+          description = "No company is owned by the authenticated user",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Company not found",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "No company owned by user '550e8400-e29b-41d4-a716-446655440000'"
+                      }""")))
+  })
+  @Parameters({
+      @Parameter(
+          name = "lynq-request-uuid",
+          in = ParameterIn.HEADER,
+          required = true,
+          description = "Unique identifier for the request, echoed back in the response and used "
+              + "for log correlation. Requests without it are rejected with 403.",
+          example = "550e8400-e29b-41d4-a716-446655440000"),
+      @Parameter(
+          name = "file-id",
+          in = ParameterIn.QUERY,
+          required = true,
+          description = "Id of the uploaded file, as returned by GET /company/generate-upload-image.",
+          example = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41")
+  })
+  ResponseEntity<Void> confirmCompanyImageUpload(
+      String fileId,
       @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
@@ -248,7 +307,7 @@ public interface CompanyController {
                           "name": "Lynq",
                           "about": "Hiring platform for engineers.",
                           "size": 48,
-                          "profileImageUrl": "https://lynq-bucket.s3.amazonaws.com/lynq/companies/018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60/profile/logo.png?X-Amz-Signature=...",
+                          "profileImageUrl": "https://lynq-bucket.s3.amazonaws.com/lynq/0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41/logo.png?X-Amz-Signature=...",
                           "createdOn": "2026-06-25"
                         }
                       }"""))),

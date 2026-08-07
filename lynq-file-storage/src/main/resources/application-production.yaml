@@ -1,0 +1,77 @@
+spring:
+  application:
+    name: lynq-file-storage
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        proc:
+          param_null_passing: true
+        ddl-auto: none
+        generate_statistics: false
+        dialect: org.hibernate.dialect.MySQLDialect
+        show_sql: false
+  liquibase:
+    change-log: classpath:changelog/db.changelog-config.xml
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+
+lynq:
+  aws:
+    region: ${AWS_REGION:us-east-1}
+    access-key-id: ${AWS_ACCESS_KEY_ID}
+    secret-access-key: ${AWS_SECRET_ACCESS_KEY}
+    bucket-name: ${AWS_BUCKET_NAME}
+    # Empty by default (real AWS). Set AWS_ENDPOINT to target LocalStack in the
+    # Docker Compose stack (http://localstack:4566).
+    endpoint: ${AWS_ENDPOINT:}
+
+
+server:
+  port: 8080
+  servlet:
+    context-path: '/lynq-file-storage'
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  server:
+    port: 8081
+  endpoint:
+    health:
+      enabled: true
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: [ health, prometheus ]
+      base-path: /actuator
+
+logging:
+  level:
+    root: INFO
+    com:
+      lynq: INFO
