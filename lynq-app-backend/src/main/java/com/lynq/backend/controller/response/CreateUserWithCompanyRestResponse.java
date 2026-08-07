@@ -19,7 +19,6 @@ public class CreateUserWithCompanyRestResponse {
   private String companyName;
   private String companyAbout;
   private Integer companySize;
-  private String companyProfileImageUrl;
   private LocalDate companyCreatedOn;
   private String ownerUserId;
 

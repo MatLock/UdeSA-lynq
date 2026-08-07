@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
@@ -68,6 +69,16 @@ public class StorageService {
     PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
 
     return presignedRequest.url().toString();
+  }
+
+  @AuditLog
+  public void deleteObject(String s3Key) {
+    DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+        .bucket(bucketName)
+        .key(s3Key)
+        .build();
+
+    s3Client.deleteObject(deleteObjectRequest);
   }
 
   @AuditLog

@@ -22,6 +22,27 @@ services:
       redis:
         condition: service_healthy
 
+  lynq-file-storage:
+    build: ./lynq-file-storage
+    ports:
+      - "8085:8080"
+      - "8086:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=production
+      - DB_URL=jdbc:mysql://mysql:3306/lynq_file_storage_db
+      - DB_USERNAME=${DB_USERNAME:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-testpassword123}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+      - AWS_BUCKET_NAME=${AWS_BUCKET_NAME:-lynq-bucket}
+      - AWS_ENDPOINT=${AWS_ENDPOINT:-http://localstack:4566}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+
   lynq-app-backend:
     build: ./lynq-app-backend
     ports:
@@ -33,11 +54,7 @@ services:
       - DB_USERNAME=${DB_USERNAME:-root}
       - DB_PASSWORD=${DB_PASSWORD:-testpassword123}
       - LYNQ_IAM_URL=http://lynq-iam:8080/lynq-iam
-      - AWS_REGION=${AWS_REGION:-us-east-1}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
-      - AWS_BUCKET_NAME=${AWS_BUCKET_NAME:-lynq-bucket}
-      - AWS_ENDPOINT=${AWS_ENDPOINT:-http://localstack:4566}
+      - LYNQ_FILE_STORAGE_URL=http://lynq-file-storage:8080/lynq-file-storage
     depends_on:
       mysql:
         condition: service_healthy
@@ -45,29 +62,21 @@ services:
         condition: service_healthy
       lynq-iam:
         condition: service_started
-      localstack:
-        condition: service_healthy
+      lynq-file-storage:
+        condition: service_started
 
   lynq-app-frontend:
     build:
       context: ./lynq-app-frontend
       args:
-        # Vite bakes these at build time; the browser runs on the host, so they
-        # point at the host-exposed ports of the IAM and backend services.
         - LYNQ_IAM_BASE_URL=${LYNQ_IAM_BASE_URL:-http://localhost:8080/lynq-iam}
         - LYNQ_BACKEND_BASE_URL=${LYNQ_BACKEND_BASE_URL:-http://localhost:8082/lynq-backend-app}
     ports:
-      # The image serves on 8080 (unprivileged nginx); still exposed on 3000.
       - "3000:8080"
     depends_on:
       - lynq-iam
       - lynq-app-backend
 
-  # Local LLM used by lynq-ml (skill enhancement). Serves llama3.1 over Ollama's
-  # HTTP API on 11434. lynq-ml defaults to LLM_PROVIDER=ollama with
-  # OLLAMA_BASE_URL=http://localhost:11434 and OLLAMA_MODEL=llama3.1, so running
-  # it on the host talks to this container through the exposed port with no extra
-  # config — the docker llama is the default.
   ollama:
     image: ollama/ollama:latest
     ports:
@@ -80,8 +89,6 @@ services:
       timeout: 5s
       retries: 10
 
-  # One-shot: pulls the default model (llama3.1) into the shared volume, then
-  # exits. Override the model with OLLAMA_MODEL to match lynq-ml's env var.
   ollama-pull:
     image: ollama/ollama:latest
     depends_on:
@@ -93,10 +100,6 @@ services:
     entrypoint: ["/bin/sh", "-c", "ollama pull \"$${OLLAMA_MODEL}\""]
     restart: "no"
 
-  # FastAPI skill-enhancement service. Defaults to the docker llama (ollama),
-  # reachable on the compose network at http://ollama:11434 — so OLLAMA_BASE_URL
-  # overrides lynq-ml's localhost default. Waits for the model to finish pulling
-  # before starting.
   lynq-ml:
     build: ./lynq-ml
     ports:

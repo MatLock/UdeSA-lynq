@@ -34,12 +34,8 @@ lynq:
     url: http://localhost:8080/lynq-iam
   ml:
     url: http://localhost:8084/lynq-ml
-  aws:
-    region: ${AWS_REGION:us-east-1}
-    access-key-id: ${AWS_ACCESS_KEY_ID:test}
-    secret-access-key: ${AWS_SECRET_ACCESS_KEY:test}
-    bucket-name: ${AWS_BUCKET_NAME:lynq-bucket}
-    endpoint: ${AWS_ENDPOINT:http://localhost:4566}
+  file-storage:
+    url: ${LYNQ_FILE_STORAGE_URL:http://localhost:8085/lynq-file-storage}
 
 
 server:

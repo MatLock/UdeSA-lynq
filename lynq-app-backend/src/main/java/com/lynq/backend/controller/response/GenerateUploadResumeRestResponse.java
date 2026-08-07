@@ -10,5 +10,6 @@ import lombok.*;
 public class GenerateUploadResumeRestResponse {
 
   private String preSignedUrl;
+  private String fileId;
 
 }

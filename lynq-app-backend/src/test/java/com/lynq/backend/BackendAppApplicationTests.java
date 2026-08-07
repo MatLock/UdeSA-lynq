@@ -24,7 +24,6 @@ import com.lynq.backend.repository.JobPostSkillRepository;
 import com.lynq.backend.repository.UserApplicationJobRepository;
 import com.lynq.backend.repository.UserRepository;
 import com.lynq.backend.repository.UserResumeRepository;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockserver.model.MediaType;
@@ -59,6 +58,9 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String CONTEXT_PATH = "/lynq-app-backend";
   private static final String CREATE_USER_PATH = "/user";
   private static final String GENERATE_UPLOAD_IMAGE_PATH = "/user/generate-upload-image";
+  private static final String CONFIRM_UPLOAD_IMAGE_PATH = "/user/confirm-upload-image";
+  private static final String FILE_STORAGE_UPLOAD_URL_PATH = "/files/upload-url";
+  private static final String FILE_STORAGE_DOWNLOAD_URLS_PATH = "/files/download-urls";
   private static final String CREATE_COMPANY_PATH = "/company";
   private static final String CREATE_JOB_PATH = "/job";
   private static final String RESUME_PATH = "/user/resume";
@@ -88,7 +90,10 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String UPDATED_FULL_NAME = "Jane Q. Doe";
   private static final String UPDATED_CURRENT_POSITION = "Staff Engineer";
   private static final String ABOUT = "Java developer focused on distributed systems.";
-  private static final String PROFILE_IMAGE_URL = "https://cdn.lynq.com/avatars/jane.png";
+  private static final String PROFILE_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
+  private static final String PROFILE_IMAGE_URL =
+      "https://lynq-bucket.s3.amazonaws.com/lynq/" + PROFILE_FILE_ID
+          + "/avatar.png?X-Amz-Signature=profile";
   private static final String GITHUB_URL = "https://github.com/janedoe";
   private static final String LINKEDIN_URL = "https://linkedin.com/in/janedoe";
   private static final LocalDate BIRTH_DATE = LocalDate.of(1995, Month.APRIL, 12);
@@ -97,7 +102,10 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String COMPANY_NAME = "Lynq Technologies";
   private static final String COMPANY_ABOUT = "We build talent matching platforms.";
   private static final Integer COMPANY_SIZE = 250;
-  private static final String COMPANY_PROFILE_IMAGE_URL = "https://cdn.lynq.com/logos/lynq.png";
+  private static final String COMPANY_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d43";
+  private static final String COMPANY_PROFILE_IMAGE_URL =
+      "https://lynq-bucket.s3.amazonaws.com/lynq/" + COMPANY_FILE_ID
+          + "/logo.png?X-Amz-Signature=logo";
   private static final String COMPANY_ID = "22222222-2222-2222-2222-222222222222";
   private static final String UPDATED_COMPANY_NAME = "Lynq Labs";
   private static final String UPDATED_COMPANY_ABOUT = "Now hiring across the globe.";
@@ -134,7 +142,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final LocalDate JOB_CREATED_MID = LocalDate.of(2026, Month.JUNE, 10);
   private static final LocalDate JOB_CREATED_NEW = LocalDate.of(2026, Month.JUNE, 20);
   private static final String PLACEHOLDER_DESCRIPTION = "d";
-  private static final String PRE_SIGNED_URL_SIGNATURE_MARKER = "X-Amz-Signature";
   private static final String LISTED_NEWEST_JOB_TITLE = "Frontend Engineer";
 
   private static final String JOB_ID = "77777777-7777-7777-7777-777777777777";
@@ -159,7 +166,14 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final int RESUME_YEARS = 8;
   private static final String RESUME_JSON =
       "{\"summary\":\"" + RESUME_SUMMARY + "\",\"years\":" + RESUME_YEARS + "}";
-  private static final String RESUME_STORAGE_PATH = "lynq/users/" + USER_ID + "/resume/cv.pdf";
+  private static final String RESUME_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42";
+  private static final String RESUME_PDF_URL =
+      "https://lynq-bucket.s3.amazonaws.com/lynq/" + RESUME_FILE_ID
+          + "/cv.pdf?X-Amz-Signature=resume";
+  private static final String NEW_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d99";
+  private static final String NEW_UPLOAD_URL =
+      "https://lynq-bucket.s3.amazonaws.com/lynq/" + NEW_FILE_ID
+          + "/avatar.png?X-Amz-Signature=upload";
 
   private static final List<String> CANDIDATE_SKILLS = List.of(SKILL_JAVA, SKILL_SPRING);
   private static final String UPSKILLING_OUTCOME =
@@ -205,6 +219,8 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   void setUp() {
     lynqIamMock.reset();
     lynqMlMock.reset();
+    lynqFileStorageMock.reset();
+    stubFileStorageDownloadUrls();
     userApplicationJobRepository.deleteAll();
     userResumeRepository.deleteAll();
     jobPostSkillRepository.deleteAll();
@@ -268,11 +284,8 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(data.get("id"), is(USER_ID));
     assertThat(data.get("userType"), is(UserType.CANDIDATE.name()));
     assertThat(data.get("fullName"), is(FULL_NAME));
-    // the stored profile image reference is returned as a pre-signed download URL
-    String userProfileImageUrl = (String) data.get("userProfileImageUrl");
-    assertThat(userProfileImageUrl, is(notNullValue()));
-    assertThat(userProfileImageUrl, containsString(PRE_SIGNED_URL_SIGNATURE_MARKER));
-    assertThat(userProfileImageUrl, containsString(PROFILE_IMAGE_URL.substring("https://".length())));
+    // the stored file id is exchanged with lynq-file-storage for a pre-signed download URL
+    assertThat(data.get("userProfileImageUrl"), is(PROFILE_IMAGE_URL));
     assertThat(data.get("currentPosition"), is(CURRENT_POSITION));
     assertThat(data.get("about"), is(ABOUT));
     assertThat(data.get("githubUrl"), is(GITHUB_URL));
@@ -410,7 +423,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     stubIamUserInfo();
     seedCompanyOwnerWithCompany();
     UserEntity otherOwner = seedCompanyUser(OTHER_USER_ID, FULL_NAME, CURRENT_POSITION,
-        COMPANY_PROFILE_IMAGE_URL);
+        COMPANY_FILE_ID);
     seedCompany(OTHER_COMPANY_ID, OTHER_COMPANY_NAME, otherOwner);
 
     UpdateCompanyRequest updateRequest = new UpdateCompanyRequest();
@@ -438,9 +451,12 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void generateUploadImageUrlReturnsPreSignedUrlThatUploadsToS3AndPersistsThePath() throws Exception {
+  @SuppressWarnings("unchecked")
+  void generateUploadImageUrlRegistersTheFileAndPersistsItsIdAgainstTheUser() throws Exception {
     stubIamValidateToken();
     stubIamUserInfo();
+    stubFileStorageCreateUpload();
+    stubFileStorageDelete(PROFILE_FILE_ID);
     seedCandidateUser();
 
     HttpResponse<String> response = getGenerateUploadImageUrl(UPLOAD_FILE_NAME);
@@ -449,29 +465,50 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     Map<String, Object> body = parse(response.body());
     assertThat(body.get("success"), is(true));
 
-    @SuppressWarnings("unchecked")
+    // the URL the browser PUTs the bytes to, and the file id it confirms afterwards, both come
+    // straight from lynq-file-storage
     Map<String, Object> data = (Map<String, Object>) body.get("data");
-    String preSignedUrl = (String) data.get("preSignedUrl");
-    assertThat(preSignedUrl, is(notNullValue()));
+    assertThat(data.get("preSignedUrl"), is(NEW_UPLOAD_URL));
+    assertThat(data.get("fileId"), is(NEW_FILE_ID));
 
-    // the generated S3 path is persisted as the user's profile image reference
-    String expectedKey = "lynq/users/" + USER_ID + "/profile/" + UPLOAD_FILE_NAME;
-    assertThat(userRepository.findById(USER_ID).orElseThrow().getProfileImageUrl(), is(expectedKey));
+    // the file id replaces the one the user had, and the file it replaced is deleted
+    assertThat(userRepository.findById(USER_ID).orElseThrow().getLynqFileStorageId(),
+        is(NEW_FILE_ID));
+    lynqFileStorageMock.verify(request()
+        .withMethod("POST")
+        .withPath(FILE_STORAGE_UPLOAD_URL_PATH)
+        .withBody(subString(UPLOAD_FILE_NAME)), VerificationTimes.exactly(1));
+    lynqFileStorageMock.verify(request()
+        .withMethod("DELETE")
+        .withPath("/files/" + PROFILE_FILE_ID), VerificationTimes.exactly(1));
+  }
 
-    // the frontend pushes the binary straight to S3 using the pre-signed URL
-    byte[] imageBytes = "profile-image-binary".getBytes();
-    HttpResponse<Void> uploadResponse = httpClient.send(
-        HttpRequest.newBuilder()
-            .uri(URI.create(preSignedUrl))
-            .PUT(HttpRequest.BodyPublishers.ofByteArray(imageBytes))
-            .build(),
-        HttpResponse.BodyHandlers.discarding());
-    assertThat(uploadResponse.statusCode(), is(200));
+  @Test
+  void confirmUploadImageMarksTheRegisteredFileAsUploaded() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    stubFileStorageConfirm(PROFILE_FILE_ID);
+    seedCandidateUser();
 
-    // and the object can be obtained back from S3 at the persisted path
-    byte[] storedBytes = s3TestClient.getObjectAsBytes(
-        GetObjectRequest.builder().bucket(AWS_BUCKET).key(expectedKey).build()).asByteArray();
-    assertThat(storedBytes, is(imageBytes));
+    HttpResponse<String> response = postConfirmUploadImage(PROFILE_FILE_ID);
+
+    assertThat(response.statusCode(), is(204));
+    lynqFileStorageMock.verify(request()
+        .withMethod("POST")
+        .withPath("/files/" + PROFILE_FILE_ID + "/confirm"), VerificationTimes.exactly(1));
+  }
+
+  @Test
+  void confirmUploadImageIsRejectedForAFileTheUserDoesNotOwn() throws Exception {
+    stubIamValidateToken();
+    stubIamUserInfo();
+    seedCandidateUser();
+
+    HttpResponse<String> response = postConfirmUploadImage(NEW_FILE_ID);
+
+    assertThat(response.statusCode(), is(400));
+    lynqFileStorageMock.verify(request().withMethod("POST").withPath("/files/.*/confirm"),
+        VerificationTimes.exactly(0));
   }
 
   @Test
@@ -502,7 +539,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(data.get("companyName"), is(COMPANY_NAME));
     assertThat(data.get("companyAbout"), is(COMPANY_ABOUT));
     assertThat(data.get("companySize"), is(COMPANY_SIZE));
-    assertThat(data.get("companyProfileImageUrl"), is(COMPANY_PROFILE_IMAGE_URL));
     assertThat(data.get("companyCreatedOn"), is(notNullValue()));
     assertThat(data.get("ownerUserId"), is(USER_ID));
 
@@ -657,7 +693,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     stubIamValidateToken();
     stubIamUserInfo();
     UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION,
-        PROFILE_IMAGE_URL);
+        PROFILE_FILE_ID);
     CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
     seedJob(JOB_ID_A, "Backend Engineer", "Older post", WorkType.REMOTE, JOB_CREATED_OLD, JobStatus.OPEN,
         company, poster, List.of(SKILL_JAVA));
@@ -687,24 +723,16 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(companyData.get("name"), is(COMPANY_NAME));
     assertThat(companyData.get("about"), is(COMPANY_ABOUT));
     assertThat(companyData.get("size"), is(COMPANY_SIZE));
-    // the stored company logo reference is returned as a pre-signed download URL
-    String companyProfileImageUrl = (String) companyData.get("profileImageUrl");
-    assertThat(companyProfileImageUrl, is(notNullValue()));
-    assertThat(companyProfileImageUrl, containsString(PRE_SIGNED_URL_SIGNATURE_MARKER));
-    assertThat(companyProfileImageUrl,
-        containsString(COMPANY_PROFILE_IMAGE_URL.substring("https://".length())));
+    // the stored company file id is exchanged with lynq-file-storage for a pre-signed URL
+    assertThat(companyData.get("profileImageUrl"), is(COMPANY_PROFILE_IMAGE_URL));
 
     @SuppressWarnings("unchecked")
     Map<String, Object> postedBy = (Map<String, Object>) newest.get("postedBy");
     assertThat(postedBy.get("id"), is(USER_ID));
     assertThat(postedBy.get("fullName"), is(POSTER_FULL_NAME));
     assertThat(postedBy.get("currentPosition"), is(POSTER_CURRENT_POSITION));
-    // the stored profile image reference is returned as a pre-signed download URL
-    String posterProfileImageUrl = (String) postedBy.get("profileImageUrl");
-    assertThat(posterProfileImageUrl, is(notNullValue()));
-    assertThat(posterProfileImageUrl, containsString(PRE_SIGNED_URL_SIGNATURE_MARKER));
-    assertThat(posterProfileImageUrl,
-        containsString(PROFILE_IMAGE_URL.substring("https://".length())));
+    // and so is the poster's, in the same batched call
+    assertThat(postedBy.get("profileImageUrl"), is(PROFILE_IMAGE_URL));
 
     @SuppressWarnings("unchecked")
     List<String> skills = (List<String>) newest.get("skills");
@@ -852,13 +880,13 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   private UserEntity seedCompanyUser(String id, String fullName, String currentPosition,
-      String profileImageUrl) {
+      String lynqFileStorageId) {
     return userRepository.save(UserEntity.builder()
         .id(id)
         .type(UserType.COMPANY)
         .fullName(fullName)
         .currentPosition(currentPosition)
-        .profileImageUrl(profileImageUrl)
+        .lynqFileStorageId(lynqFileStorageId)
         .createdOn(LocalDate.now())
         .build());
   }
@@ -869,7 +897,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .name(name)
         .about(COMPANY_ABOUT)
         .size(COMPANY_SIZE)
-        .profileImageUrl(COMPANY_PROFILE_IMAGE_URL)
+        .lynqFileStorageId(COMPANY_FILE_ID)
         .createdOn(LocalDate.now())
         .owner(owner)
         .build());
@@ -944,7 +972,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .id(USER_ID)
         .type(UserType.CANDIDATE)
         .fullName(FULL_NAME)
-        .profileImageUrl(PROFILE_IMAGE_URL)
+        .lynqFileStorageId(PROFILE_FILE_ID)
         .currentPosition(CURRENT_POSITION)
         .about(ABOUT)
         .githubUrl(GITHUB_URL)
@@ -1063,6 +1091,84 @@ class BackendAppApplicationTests extends AbstractE2ETest {
                 }""".formatted(USER_ID, USERNAME, EMAIL)));
   }
 
+  /**
+   * lynq-file-storage signs a batch of download URLs in one call; this covers every file the suite
+   * seeds, so any endpoint that renders images or resumes gets a URL back.
+   */
+  private void stubFileStorageDownloadUrls() {
+    lynqFileStorageMock.when(request().withMethod("POST").withPath(FILE_STORAGE_DOWNLOAD_URLS_PATH))
+        .respond(response()
+            .withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody("""
+                {
+                  "success": true,
+                  "data": {
+                    "%s": "%s",
+                    "%s": "%s",
+                    "%s": "%s"
+                  }
+                }""".formatted(PROFILE_FILE_ID, PROFILE_IMAGE_URL,
+                COMPANY_FILE_ID, COMPANY_PROFILE_IMAGE_URL,
+                RESUME_FILE_ID, RESUME_PDF_URL)));
+    lynqFileStorageMock.when(request().withMethod("GET").withPath("/files/" + PROFILE_FILE_ID + "/download-url"))
+        .respond(downloadUrlResponse(PROFILE_FILE_ID, PROFILE_IMAGE_URL));
+    lynqFileStorageMock.when(request().withMethod("GET").withPath("/files/" + COMPANY_FILE_ID + "/download-url"))
+        .respond(downloadUrlResponse(COMPANY_FILE_ID, COMPANY_PROFILE_IMAGE_URL));
+  }
+
+  private org.mockserver.model.HttpResponse downloadUrlResponse(String fileId, String downloadUrl) {
+    return response()
+        .withStatusCode(200)
+        .withContentType(MediaType.APPLICATION_JSON)
+        .withBody("""
+            {
+              "success": true,
+              "data": {
+                "fileId": "%s",
+                "s3Key": "lynq/%s/file",
+                "downloadUrl": "%s"
+              }
+            }""".formatted(fileId, fileId, downloadUrl));
+  }
+
+  private void stubFileStorageCreateUpload() {
+    lynqFileStorageMock.when(request().withMethod("POST").withPath(FILE_STORAGE_UPLOAD_URL_PATH))
+        .respond(response()
+            .withStatusCode(201)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody("""
+                {
+                  "success": true,
+                  "data": {
+                    "fileId": "%s",
+                    "s3Key": "lynq/%s/%s",
+                    "uploadUrl": "%s"
+                  }
+                }""".formatted(NEW_FILE_ID, NEW_FILE_ID, UPLOAD_FILE_NAME, NEW_UPLOAD_URL)));
+  }
+
+  private void stubFileStorageConfirm(String fileId) {
+    lynqFileStorageMock.when(request().withMethod("POST").withPath("/files/" + fileId + "/confirm"))
+        .respond(response()
+            .withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody("""
+                {
+                  "success": true,
+                  "data": {
+                    "fileId": "%s",
+                    "fileName": "%s",
+                    "status": "AVAILABLE"
+                  }
+                }""".formatted(fileId, UPLOAD_FILE_NAME)));
+  }
+
+  private void stubFileStorageDelete(String fileId) {
+    lynqFileStorageMock.when(request().withMethod("DELETE").withPath("/files/" + fileId))
+        .respond(response().withStatusCode(204));
+  }
+
   private void stubIamInvalidToken() {
     lynqIamMock.when(request().withMethod("GET").withPath(VALIDATE_PATH))
         .respond(response()
@@ -1070,6 +1176,17 @@ class BackendAppApplicationTests extends AbstractE2ETest {
             .withContentType(MediaType.APPLICATION_JSON)
             .withBody("""
                 {"success": true, "data": false}"""));
+  }
+
+  private HttpResponse<String> postConfirmUploadImage(String fileId) throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create("http://localhost:" + port + CONTEXT_PATH + CONFIRM_UPLOAD_IMAGE_PATH
+            + "?file-id=" + fileId))
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .POST(HttpRequest.BodyPublishers.noBody())
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
   }
 
   private String createUserUrl() {
@@ -1102,7 +1219,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   private CreateUserWithCompanyRequest validCompanyRequest() {
     CreateUserWithCompanyRequest request = new CreateUserWithCompanyRequest();
-    request.setUserProfileImageUrl(PROFILE_IMAGE_URL);
     request.setFullName(FULL_NAME);
     request.setCurrentPosition(CURRENT_POSITION);
     request.setUserAbout(ABOUT);
@@ -1111,7 +1227,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     request.setCompanyName(COMPANY_NAME);
     request.setCompanyAbout(COMPANY_ABOUT);
     request.setCompanySize(COMPANY_SIZE);
-    request.setCompanyProfileImageUrl(COMPANY_PROFILE_IMAGE_URL);
     return request;
   }
 
@@ -1675,7 +1790,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(resume.get("id"), is(RESUME_ID));
     assertThat(resume.get("name"), is(RESUME_NAME));
     assertThat(resume.get("language"), is(RESUME_LANGUAGE.name()));
-    assertThat(resume.get("pdfUrl"), is(notNullValue()));
+    assertThat(resume.get("pdfUrl"), is(RESUME_PDF_URL));
 
     Map<String, Object> resumeJson = (Map<String, Object>) resume.get("resume");
     assertThat(resumeJson.get("summary"), is(RESUME_SUMMARY));
@@ -1817,7 +1932,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .language(RESUME_LANGUAGE)
         .createdOn(LocalDate.now())
         .resume(RESUME_JSON)
-        .storagePath(RESUME_STORAGE_PATH)
+        .lynqFileStorageId(RESUME_FILE_ID)
         .user(user)
         .build());
   }

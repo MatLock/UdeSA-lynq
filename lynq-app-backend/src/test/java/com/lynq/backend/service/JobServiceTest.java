@@ -38,6 +38,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -66,7 +67,9 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -105,13 +108,13 @@ class JobServiceTest {
   private static final String COMPANY_NAME = "Lynq";
   private static final String COMPANY_ABOUT = "We hire";
   private static final Integer COMPANY_SIZE = 42;
-  private static final String COMPANY_IMAGE_PATH = "https://cdn/company.png";
+  private static final String COMPANY_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d43";
   private static final String COMPANY_IMAGE_URL = "https://presigned/company.png";
 
   private static final String POSTER_ID = "user-1";
   private static final String POSTER_FULL_NAME = "Jane Doe";
   private static final String POSTER_CURRENT_POSITION = "CTO";
-  private static final String POSTER_IMAGE_PATH = "https://cdn/user.png";
+  private static final String POSTER_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d44";
   private static final String POSTER_IMAGE_URL = "https://presigned/user.png";
 
   private static final String APPLICATION_ID = "application-1";
@@ -120,7 +123,7 @@ class JobServiceTest {
   private static final String CANDIDATE_ID = "candidate-1";
   private static final String CANDIDATE_FULL_NAME = "John Candidate";
   private static final String CANDIDATE_CURRENT_POSITION = "Backend Engineer";
-  private static final String CANDIDATE_IMAGE_PATH = "lynq/users/candidate-1/profile/pic.png";
+  private static final String CANDIDATE_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d45";
   private static final String CANDIDATE_IMAGE_URL = "https://presigned/candidate.png";
   private static final LocalDate APPLIED_ON = LocalDate.of(2026, Month.JULY, 17);
   private static final String CANDIDATE_JOB_SKILLS = SKILL_JAVA + "," + SKILL_SPRING;
@@ -191,7 +194,7 @@ class JobServiceTest {
   private JobPostSkillRepository jobPostSkillRepository;
 
   @Mock
-  private StorageService storageService;
+  private FileStorageService fileStorageService;
 
   @Mock
   private com.lynq.backend.client.LynqMLClient lynqMLClient;
@@ -207,7 +210,10 @@ class JobServiceTest {
   @BeforeEach
   void setUp() {
     jobService = new JobService(jobPostRepository, companyRepository, userRepository,
-        userApplicationJobRepository, jobPostSkillRepository, storageService, lynqMLClient);
+        userApplicationJobRepository, jobPostSkillRepository, fileStorageService, lynqMLClient);
+    // Signing the profile images of a page is a single batched call to lynq-file-storage; only the
+    // tests that assert the URLs care about its result, so the default is an empty map.
+    lenient().when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
     SecurityContextHolder.setContext(securityContext);
   }
 
@@ -351,15 +357,14 @@ class JobServiceTest {
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
-        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_IMAGE_PATH,
-        POSTER_ID, POSTER_FULL_NAME, POSTER_IMAGE_PATH, POSTER_CURRENT_POSITION,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID,
+        POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
         JOB_SKILLS_CONCATENATED);
     when(jobPostRepository.searchAvailableJobs(null, pageable))
         .thenReturn(new PageImpl<>(List.of(projection), pageable, 1));
-    when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
-        .thenReturn(COMPANY_IMAGE_URL);
-    when(storageService.obtainProfilePreSignedUrl(POSTER_IMAGE_PATH))
-        .thenReturn(POSTER_IMAGE_URL);
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of(
+        COMPANY_FILE_ID, COMPANY_IMAGE_URL,
+        POSTER_FILE_ID, POSTER_IMAGE_URL));
 
     PagedRestResponse<GetJobRestResponse> result = jobService.searchAvailableJobs(filter, pageable);
 
@@ -483,16 +488,15 @@ class JobServiceTest {
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.CLOSE,
-        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_IMAGE_PATH,
-        POSTER_ID, POSTER_FULL_NAME, POSTER_IMAGE_PATH, POSTER_CURRENT_POSITION,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID,
+        POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
         JOB_SKILLS_CONCATENATED);
     when(jobPostRepository.searchJobsOwnedByUser(USER_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
     when(userApplicationJobRepository.countByJobId(JOB_ID)).thenReturn(TOTAL_CANDIDATES_APPLIED);
-    when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
-        .thenReturn(COMPANY_IMAGE_URL);
-    when(storageService.obtainProfilePreSignedUrl(POSTER_IMAGE_PATH))
-        .thenReturn(POSTER_IMAGE_URL);
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of(
+        COMPANY_FILE_ID, COMPANY_IMAGE_URL,
+        POSTER_FILE_ID, POSTER_IMAGE_URL));
 
     PagedRestResponse<GetJobRestResponse> result = jobService.searchOwnedJobs(DEFAULT_PAGEABLE);
 
@@ -554,15 +558,14 @@ class JobServiceTest {
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
-        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_IMAGE_PATH,
-        POSTER_ID, POSTER_FULL_NAME, POSTER_IMAGE_PATH, POSTER_CURRENT_POSITION,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID,
+        POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
         JOB_SKILLS_CONCATENATED);
     when(jobPostRepository.findJobDetailsById(JOB_ID)).thenReturn(Optional.of(projection));
     when(userApplicationJobRepository.countByJobId(JOB_ID)).thenReturn(TOTAL_CANDIDATES_APPLIED);
-    when(storageService.obtainProfilePreSignedUrl(COMPANY_IMAGE_PATH))
-        .thenReturn(COMPANY_IMAGE_URL);
-    when(storageService.obtainProfilePreSignedUrl(POSTER_IMAGE_PATH))
-        .thenReturn(POSTER_IMAGE_URL);
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of(
+        COMPANY_FILE_ID, COMPANY_IMAGE_URL,
+        POSTER_FILE_ID, POSTER_IMAGE_URL));
 
     GetJobDetailForCandidateRestResponse job = jobService.getJobDetails(JOB_ID);
 
@@ -985,8 +988,8 @@ class JobServiceTest {
   @Test
   void getJobCandidatesMapsProjectionFieldsAndGeneratesPresignedImageUrl() {
     stubJobOwnedByAuthenticatedUser();
-    when(storageService.obtainProfilePreSignedUrl(CANDIDATE_IMAGE_PATH))
-        .thenReturn(CANDIDATE_IMAGE_URL);
+    when(fileStorageService.obtainDownloadUrls(anyList()))
+        .thenReturn(Map.of(CANDIDATE_FILE_ID, CANDIDATE_IMAGE_URL));
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(candidateProjection(APPLICATION_ID)),
             DEFAULT_PAGEABLE, 1));
@@ -1010,7 +1013,7 @@ class JobServiceTest {
   void getJobCandidatesScoresLynqAsPercentageOfMatchingJobSkills() {
     stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
-        JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_IMAGE_PATH, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
+        JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
         CANDIDATE_JOB_SKILLS, CANDIDATE_JOB_SKILLS);
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
@@ -1025,7 +1028,7 @@ class JobServiceTest {
   void getJobCandidatesScoresLynqZeroWhenCandidateHasNoSkills() {
     stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
-        JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_IMAGE_PATH, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
+        JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
         CANDIDATE_JOB_SKILLS, null);
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
@@ -1040,7 +1043,7 @@ class JobServiceTest {
   void getJobCandidatesScoresLynqZeroWhenJobHasNoSkills() {
     stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
-        JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_IMAGE_PATH, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
+        JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
         null, CANDIDATE_MATCHING_SKILLS);
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
@@ -1052,7 +1055,7 @@ class JobServiceTest {
   }
 
   @Test
-  void getJobCandidatesLeavesProfileImageNullWhenPathIsBlank() {
+  void getJobCandidatesLeavesProfileImageNullWhenTheCandidateHasNoImage() {
     stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
         JOB_ID, CANDIDATE_FULL_NAME, null, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
@@ -1064,7 +1067,6 @@ class JobServiceTest {
         jobService.getJobCandidates(JOB_ID, DEFAULT_PAGEABLE).getContent().get(0);
 
     assertThat(candidate.getUserProfileImage(), is(nullValue()));
-    verify(storageService, never()).obtainProfilePreSignedUrl(any());
   }
 
   @Test
@@ -1127,7 +1129,7 @@ class JobServiceTest {
 
   private JobCandidateProjection candidateProjection(String applicationId) {
     return new JobCandidateProjection(applicationId, CANDIDATE_ID, JOB_ID, CANDIDATE_FULL_NAME,
-        CANDIDATE_IMAGE_PATH, CANDIDATE_CURRENT_POSITION, APPLIED_ON, CANDIDATE_JOB_SKILLS,
+        CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, APPLIED_ON, CANDIDATE_JOB_SKILLS,
         CANDIDATE_MATCHING_SKILLS);
   }
 
@@ -1135,8 +1137,8 @@ class JobServiceTest {
     return new JobWithDetailsProjection(
         jobId, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         null, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
-        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_IMAGE_PATH,
-        POSTER_ID, POSTER_FULL_NAME, POSTER_IMAGE_PATH, POSTER_CURRENT_POSITION, null);
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID,
+        POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION, null);
   }
 
   @Test

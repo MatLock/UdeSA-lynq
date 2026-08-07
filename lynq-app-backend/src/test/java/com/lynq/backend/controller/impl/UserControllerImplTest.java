@@ -17,6 +17,7 @@ import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.security.LynqUserPrincipal;
 import com.lynq.backend.service.JobService;
+import com.lynq.backend.service.RegisteredUpload;
 import com.lynq.backend.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,7 @@ class UserControllerImplTest {
   private static final String LINKEDIN_URL = "https://linkedin.com/in/janedoe";
   private static final LocalDate BIRTH_DATE = LocalDate.of(1995, Month.APRIL, 12);
   private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
+  private static final String FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
   private static final String FILE_NAME = "avatar.png";
   private static final String PRE_SIGNED_URL =
       "https://lynq-bucket.s3.amazonaws.com/lynq/users/" + USER_ID + "/profile/" + FILE_NAME + "?X-Amz-Signature=abc";
@@ -223,7 +225,10 @@ class UserControllerImplTest {
 
   @Test
   void updateUserProfileMapsUpdatedEntityIntoResponseData() {
-    when(userService.updateUserProfile(USER_ID, updateRequest)).thenReturn(savedUser());
+    UserEntity updated = savedUser();
+    when(userService.updateUserProfile(USER_ID, updateRequest)).thenReturn(updated);
+    // The stored value is a lynq-file-storage id; the response carries the signed URL for it.
+    when(userService.obtainProfileImagePreSignedUrl(updated)).thenReturn(PROFILE_IMAGE_URL);
 
     ResponseEntity<GlobalRestResponse<UpdateUserProfileRestResponse>> response =
         userController.updateUserProfile(updateRequest, principal);
@@ -246,7 +251,8 @@ class UserControllerImplTest {
 
   @Test
   void generateUploadImageUrlDelegatesToServiceWithPrincipalIdAndFileName() {
-    when(userService.generateProfileImageUploadUrl(USER_ID, FILE_NAME)).thenReturn(PRE_SIGNED_URL);
+    when(userService.generateProfileImageUploadUrl(USER_ID, FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
 
     userController.generateUploadImageUrl(FILE_NAME, principal);
 
@@ -255,7 +261,8 @@ class UserControllerImplTest {
 
   @Test
   void generateUploadImageUrlRespondsWithOkStatusAndPreSignedUrl() {
-    when(userService.generateProfileImageUploadUrl(USER_ID, FILE_NAME)).thenReturn(PRE_SIGNED_URL);
+    when(userService.generateProfileImageUploadUrl(USER_ID, FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
 
     ResponseEntity<GlobalRestResponse<GenerateUploadImageRestResponse>> response =
         userController.generateUploadImageUrl(FILE_NAME, principal);
@@ -294,7 +301,8 @@ class UserControllerImplTest {
 
   @Test
   void generateUploadResumeUrlDelegatesToServiceWithPrincipalIdAndFileName() {
-    when(userService.generateResumeUploadUrl(USER_ID, FILE_NAME)).thenReturn(PRE_SIGNED_URL);
+    when(userService.generateResumeUploadUrl(USER_ID, FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
 
     userController.generateUploadResumeUrl(FILE_NAME, principal);
 
@@ -303,7 +311,8 @@ class UserControllerImplTest {
 
   @Test
   void generateUploadResumeUrlRespondsWithOkStatusAndPreSignedUrl() {
-    when(userService.generateResumeUploadUrl(USER_ID, FILE_NAME)).thenReturn(PRE_SIGNED_URL);
+    when(userService.generateResumeUploadUrl(USER_ID, FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
 
     ResponseEntity<GlobalRestResponse<GenerateUploadResumeRestResponse>> response =
         userController.generateUploadResumeUrl(FILE_NAME, principal);
@@ -425,7 +434,7 @@ class UserControllerImplTest {
         .id(USER_ID)
         .type(USER_TYPE)
         .fullName(FULL_NAME)
-        .profileImageUrl(PROFILE_IMAGE_URL)
+        .lynqFileStorageId(FILE_ID)
         .currentPosition(CURRENT_POSITION)
         .about(ABOUT)
         .githubUrl(GITHUB_URL)

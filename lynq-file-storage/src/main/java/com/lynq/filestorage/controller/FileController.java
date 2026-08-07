@@ -50,4 +50,12 @@ public interface FileController {
   ResponseEntity<GlobalRestResponse<Map<String, String>>> createDownloadUrls(
       @Valid CreateFileDownloadBatchRequest request);
 
+  @Operation(summary = "Delete a file from the bucket and forget its metadata. Idempotent: "
+      + "deleting an unknown id succeeds without doing anything")
+  @ApiResponses({
+      @ApiResponse(responseCode = "204", description = "File deleted"),
+      @ApiResponse(responseCode = "403", description = "Missing lynq-request-uuid header")
+  })
+  ResponseEntity<Void> deleteFile(String fileId);
+
 }

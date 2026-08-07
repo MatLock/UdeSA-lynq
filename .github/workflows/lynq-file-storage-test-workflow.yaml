@@ -1,0 +1,54 @@
+name: lynq-file-storage CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lynq-file-storage:
+    name: "lynq-file-storage: Test & Coverage"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+
+      - name: Setup Java Environment
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: temurin
+          architecture: x64
+          cache: maven
+
+      - name: Run tests with coverage
+        working-directory: lynq-file-storage
+        run: mvn -B clean verify
+
+      - name: Upload JaCoCo HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report-file-storage
+          path: lynq-file-storage/target/site/jacoco/
+
+      - name: Generate JaCoCo coverage badge
+        if: github.ref == 'refs/heads/main'
+        uses: cicirello/jacoco-badge-generator@72266185b7ee48a6fd74eaf0238395cc8b14fef8 # v2.12.1
+        with:
+          jacoco-csv-file: lynq-file-storage/target/site/jacoco/jacoco.csv
+          badges-directory: .github/badges
+          generate-coverage-badge: true
+          coverage-badge-filename: jacoco-file-storage.svg
+
+      - name: Commit badge back to main
+        if: github.ref == 'refs/heads/main'
+        uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403 # v5.2.0
+        with:
+          commit_message: "chore: update file-storage coverage badge [skip ci]"
+          file_pattern: .github/badges/jacoco-file-storage.svg

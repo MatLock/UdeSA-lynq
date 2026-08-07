@@ -21,7 +21,7 @@ class UserResumeEntityTest {
   private static final String RESUME = "{\"summary\":\"Backend engineer\"}";
   private static final Language LANGUAGE = Language.EN;
   private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
-  private static final String STORAGE_PATH = "resumes/77777777.pdf";
+  private static final String LYNQ_FILE_STORAGE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
 
   @Mock
   private UserEntity user;
@@ -35,7 +35,7 @@ class UserResumeEntityTest {
         .resume(RESUME)
         .language(LANGUAGE)
         .createdOn(CREATED_ON)
-        .storagePath(STORAGE_PATH)
+        .lynqFileStorageId(LYNQ_FILE_STORAGE_ID)
         .user(user)
         .build();
   }
@@ -46,7 +46,7 @@ class UserResumeEntityTest {
     assertThat(userResumeEntity.getResume(), is(RESUME));
     assertThat(userResumeEntity.getLanguage(), is(LANGUAGE));
     assertThat(userResumeEntity.getCreatedOn(), is(CREATED_ON));
-    assertThat(userResumeEntity.getStoragePath(), is(STORAGE_PATH));
+    assertThat(userResumeEntity.getLynqFileStorageId(), is(LYNQ_FILE_STORAGE_ID));
   }
 
   @Test
@@ -62,14 +62,14 @@ class UserResumeEntityTest {
     target.setResume(RESUME);
     target.setLanguage(LANGUAGE);
     target.setCreatedOn(CREATED_ON);
-    target.setStoragePath(STORAGE_PATH);
+    target.setLynqFileStorageId(LYNQ_FILE_STORAGE_ID);
     target.setUser(user);
 
     assertThat(target.getId(), is(USER_RESUME_ID));
     assertThat(target.getResume(), is(RESUME));
     assertThat(target.getLanguage(), is(LANGUAGE));
     assertThat(target.getCreatedOn(), is(CREATED_ON));
-    assertThat(target.getStoragePath(), is(STORAGE_PATH));
+    assertThat(target.getLynqFileStorageId(), is(LYNQ_FILE_STORAGE_ID));
     assertThat(target.getUser(), is(sameInstance(user)));
   }
 }

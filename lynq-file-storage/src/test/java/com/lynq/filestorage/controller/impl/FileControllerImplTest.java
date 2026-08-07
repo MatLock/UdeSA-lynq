@@ -24,6 +24,7 @@ import org.springframework.http.ResponseEntity;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -98,6 +99,14 @@ class FileControllerImplTest {
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(Map.of(FILE_ID, DOWNLOAD_URL)));
+  }
+
+  @Test
+  void deleteFileReturnsNoContentAndDelegatesToTheService() {
+    ResponseEntity<Void> response = fileController.deleteFile(FILE_ID);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.NO_CONTENT));
+    verify(fileService).deleteFile(FILE_ID);
   }
 
   private CreateFileUploadRequest buildRequest() {

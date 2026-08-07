@@ -46,8 +46,9 @@ public class UserResumeEntity {
   @Column(name = "name", length = 255)
   private String name;
 
-  @Column(name = "storage_path", length = 255)
-  private String storagePath;
+  /** Id of the resume PDF in lynq-file-storage, which owns the file itself. */
+  @Column(name = "lynq_file_storage_id", length = 36)
+  private String lynqFileStorageId;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id", nullable = false)

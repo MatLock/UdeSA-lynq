@@ -24,6 +24,10 @@ spring:
 lynq:
   iam:
     url: http://localhost:9999/lynq-iam
+  # The E2E suite overrides this with the lynq-file-storage mock container; the placeholder just
+  # keeps contexts that never touch files from failing to start.
+  file-storage:
+    url: http://localhost:9999/lynq-file-storage
   security:
     jwt:
       secret: 8d2b6d2a9c5e8f4f8f9d1c7a4e3b5f6d8c9a1e2f3a4b5c6d7e8f9a1b2c3d4e5

@@ -48,7 +48,7 @@ output "redis_db_security_group_ids" {
   value       = [aws_security_group.mysql.id, aws_security_group.redis.id, aws_security_group.ssh.id]
 }
 
-output "backend_s3_access_key_id" {
-  description = "Access key id of the backend's S3-only IAM user (secret is only in state / the k8s Secret)."
+output "file_storage_s3_access_key_id" {
+  description = "Access key id of the S3-only IAM user consumed by lynq-file-storage (the secret lives only in state / the k8s Secret)."
   value       = aws_iam_access_key.backend_s3.id
 }

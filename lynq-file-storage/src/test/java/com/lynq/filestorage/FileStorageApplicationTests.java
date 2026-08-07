@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import tools.jackson.databind.ObjectMapper;
 
@@ -204,6 +205,26 @@ class FileStorageApplicationTests extends AbstractE2ETest {
   }
 
   @Test
+  void deleteFileRemovesTheObjectFromTheBucketAndForgetsTheMetadata() throws Exception {
+    Map<String, Object> upload = data(postUploadUrl(FILE_NAME));
+    putBytesToPreSignedUrl((String) upload.get("uploadUrl"));
+    String fileId = (String) upload.get("fileId");
+
+    HttpResponse<String> response = delete(FILES_PATH + "/" + fileId);
+
+    assertThat(response.statusCode(), is(204));
+    assertThat(storedFileRepository.findById(fileId).isPresent(), is(false));
+    assertThat(objectExists((String) upload.get("s3Key")), is(false));
+  }
+
+  @Test
+  void deleteFileReturnsNoContentForAnUnknownFile() throws Exception {
+    HttpResponse<String> response = delete(FILES_PATH + "/" + UNKNOWN_FILE_ID);
+
+    assertThat(response.statusCode(), is(204));
+  }
+
+  @Test
   void seededObjectsUploadedOutOfBandAreStillReadableThroughTheDownloadUrl() throws Exception {
     Map<String, Object> upload = data(postUploadUrl(FILE_NAME));
     s3TestClient.putObject(
@@ -256,6 +277,11 @@ class FileStorageApplicationTests extends AbstractE2ETest {
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
+  private HttpResponse<String> delete(String path) throws Exception {
+    HttpRequest request = requestBuilder(path).DELETE().build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
   private HttpRequest.Builder requestBuilder(String path) {
     return HttpRequest.newBuilder()
         .uri(URI.create(baseUrl() + path))
@@ -274,6 +300,15 @@ class FileStorageApplicationTests extends AbstractE2ETest {
   private String getBytesFromPreSignedUrl(String downloadUrl) throws Exception {
     HttpRequest request = HttpRequest.newBuilder().uri(URI.create(downloadUrl)).GET().build();
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString()).body();
+  }
+
+  private boolean objectExists(String s3Key) {
+    try {
+      s3TestClient.headObject(HeadObjectRequest.builder().bucket(AWS_BUCKET).key(s3Key).build());
+      return true;
+    } catch (NoSuchKeyException e) {
+      return false;
+    }
   }
 
   private long objectSize(String s3Key) {

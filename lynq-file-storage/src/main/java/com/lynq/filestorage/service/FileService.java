@@ -80,6 +80,19 @@ public class FileService {
         .orElseThrow(() -> new NotFoundException(String.format(FILE_NOT_FOUND_MSG, fileId)));
   }
 
+  /**
+   * Removes the object from the bucket and forgets its metadata. Deleting an id that is not
+   * stored is a no-op so that callers retrying a delete do not have to special-case it.
+   */
+  @AuditLog
+  @Transactional
+  public void deleteFile(String fileId) {
+    storedFileRepository.findById(fileId).ifPresent(storedFile -> {
+      storageService.deleteObject(storedFile.getS3Key());
+      storedFileRepository.delete(storedFile);
+    });
+  }
+
   @AuditLog
   public String createDownloadUrl(StoredFileEntity storedFile) {
     return storageService.createDownloadPreSignedUrl(storedFile.getS3Key());

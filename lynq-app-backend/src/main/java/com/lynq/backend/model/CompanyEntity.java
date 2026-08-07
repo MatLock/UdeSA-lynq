@@ -40,8 +40,9 @@ public class CompanyEntity {
   @Column(name = "size")
   private Integer size;
 
-  @Column(name = "profile_image_url", length = 2048)
-  private String profileImageUrl;
+  /** Id of the company logo in lynq-file-storage, which owns the file itself. */
+  @Column(name = "lynq_file_storage_id", length = 36)
+  private String lynqFileStorageId;
 
   @Column(name = "created_on", nullable = false)
   private LocalDate createdOn;

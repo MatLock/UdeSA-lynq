@@ -94,19 +94,23 @@ const update_user_profile = async (authFetch, profile) => {
 };
 
 /**
- * Request a short-lived pre-signed S3 URL to upload the authenticated user's
- * profile image.
+ * Register the authenticated user's new profile image and get a short-lived
+ * pre-signed URL to upload it to.
  *
  * Calls GET /user/generate-upload-image?file-name=<fileName>
  * (UserController.generateUploadImageUrl). The endpoint is secured and, as a
- * side effect, persists the S3 object key as the user's profile image reference
- * — so the returned URL is a pre-signed HTTP PUT target valid for ~15 minutes.
+ * side effect, registers the file in lynq-file-storage and persists its id as
+ * the user's profile image reference — so the returned URL is a pre-signed HTTP
+ * PUT target valid for ~15 minutes. Once the PUT succeeds, the upload must be
+ * confirmed with {@link confirm_profile_image_upload} using the returned
+ * `fileId`, otherwise the file stays PENDING in lynq-file-storage.
  *
  * @param {(path: string, options?: object) => Promise<object>} authFetch - The
  *   secured fetcher (useApi's authFetch).
- * @param {string} fileName - Name of the file to upload; used to build the S3
- *   object key (e.g. `avatar.png`).
- * @returns {Promise<string>} The pre-signed upload URL (data.preSignedUrl).
+ * @param {string} fileName - Name of the file to upload; lynq-file-storage uses
+ *   it to build the object key (e.g. `avatar.png`).
+ * @returns {Promise<{preSignedUrl: string, fileId: string}>} The upload target
+ *   and the id of the registered file.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
 const generate_profile_image_upload_url = async (authFetch, fileName) => {
@@ -115,11 +119,34 @@ const generate_profile_image_upload_url = async (authFetch, fileName) => {
     method: 'GET',
   });
   // Unwrap the GlobalRestResponse envelope ({ success, data }).
-  return payload?.data?.preSignedUrl;
+  return payload?.data;
 };
 
 /**
- * Upload an image binary directly to S3 using a pre-signed PUT URL.
+ * Confirm the profile image upload finished, which marks the file available in
+ * lynq-file-storage.
+ *
+ * Calls POST /user/confirm-upload-image?file-id=<fileId>
+ * (UserController.confirmUploadImage) after the pre-signed PUT succeeded. The
+ * file id must be the one currently registered for the user.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
+ * @param {string} fileId - Id returned by
+ *   {@link generate_profile_image_upload_url}.
+ * @returns {Promise<void>} Resolves once the file is marked available.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const confirm_profile_image_upload = async (authFetch, fileId) => {
+  const query = new URLSearchParams({ 'file-id': fileId });
+  await authFetch(`/user/confirm-upload-image?${query}`, {
+    method: 'POST',
+  });
+};
+
+/**
+ * Upload an image binary directly to the storage bucket using a pre-signed PUT
+ * URL issued by lynq-file-storage.
  *
  * The pre-signed URL already carries the AWS credentials in its query string,
  * so this request must NOT send an Authorization header (it would break the
@@ -237,4 +264,5 @@ export default {
   get_upskilling_suggestion,
   generate_profile_image_upload_url,
   upload_profile_image,
+  confirm_profile_image_upload,
 };

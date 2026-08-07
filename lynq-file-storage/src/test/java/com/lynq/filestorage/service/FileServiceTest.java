@@ -146,6 +146,27 @@ class FileServiceTest {
   }
 
   @Test
+  void deleteFileRemovesTheObjectAndTheMetadata() {
+    StoredFileEntity storedFile = buildStoredFile(StoredFileStatus.AVAILABLE);
+    when(storedFileRepository.findById(FILE_ID)).thenReturn(Optional.of(storedFile));
+
+    fileService.deleteFile(FILE_ID);
+
+    verify(storageService).deleteObject(S3_KEY);
+    verify(storedFileRepository).delete(storedFile);
+  }
+
+  @Test
+  void deleteFileDoesNothingWhenTheFileIsUnknown() {
+    when(storedFileRepository.findById(UNKNOWN_FILE_ID)).thenReturn(Optional.empty());
+
+    fileService.deleteFile(UNKNOWN_FILE_ID);
+
+    verify(storageService, never()).deleteObject(anyString());
+    verify(storedFileRepository, never()).delete(any(StoredFileEntity.class));
+  }
+
+  @Test
   void createDownloadUrlDelegatesToTheStorageServiceWithTheStoredKey() {
     when(storageService.createDownloadPreSignedUrl(S3_KEY)).thenReturn(DOWNLOAD_URL);
 

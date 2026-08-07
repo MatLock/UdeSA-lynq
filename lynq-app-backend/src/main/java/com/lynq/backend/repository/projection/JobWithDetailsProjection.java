@@ -28,10 +28,10 @@ public record JobWithDetailsProjection(
     String companyName,
     String companyAbout,
     Integer companySize,
-    String companyProfileImageUrl,
+    String companyFileStorageId,
     String userId,
     String userFullName,
-    String userProfileImageUrl,
+    String userFileStorageId,
     String userCurrentPosition,
     String skills) {
 }

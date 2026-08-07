@@ -103,9 +103,10 @@ const ProfilePage = () => {
   // Clicking the avatar opens the OS file picker.
   const handleAvatarClick = () => fileInputRef.current?.click()
 
-  // Upload flow: ask the backend for a short-lived pre-signed S3 URL, PUT the
-  // image bytes straight to S3, then cache the image locally (the pre-signed URL
-  // expires after 15 minutes) and reflect it in the avatar + sidebar.
+  // Upload flow: ask the backend to register the image in lynq-file-storage, PUT
+  // the bytes straight to the pre-signed URL it returns, confirm the upload, then
+  // cache the image locally (the pre-signed URL expires after 15 minutes) and
+  // reflect it in the avatar + sidebar.
   const handleImageChange = async (event) => {
     const file = event.target.files?.[0]
     // Reset the input so picking the same file again still fires onChange.
@@ -115,11 +116,12 @@ const ProfilePage = () => {
     setImageError('')
     setUploading(true)
     try {
-      const preSignedUrl = await userService.generate_profile_image_upload_url(
+      const { preSignedUrl, fileId } = await userService.generate_profile_image_upload_url(
         authFetch,
         file.name,
       )
       await userService.upload_profile_image(preSignedUrl, file)
+      await userService.confirm_profile_image_upload(authFetch, fileId)
 
       // Cache the bytes so the avatar survives the pre-signed URL's 15-minute
       // lifetime, then show it here and in the sidebar.

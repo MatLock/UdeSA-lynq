@@ -8,7 +8,7 @@ all emit the same normalized listing shape and write it to a JSON array under
 onto the `companies`, `job_posts` and `job_post_skills` tables.
 
 The schema mirrors `lynq-app-backend/src/main/resources/changelog/ddl`:
-    companies       (id, name, about, size, profile_image_url, created_on, ...)
+    companies       (id, name, about, size, lynq_file_storage_id, created_on, ...)
     job_posts       (id, title, description, work_type, salary_range_down,
                      salary_range_top, job_url, job_post_source,
                      created_by_user_id, company_id, created_on, job_status)

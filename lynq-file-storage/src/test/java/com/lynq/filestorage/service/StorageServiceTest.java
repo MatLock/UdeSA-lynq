@@ -7,6 +7,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
@@ -112,6 +113,17 @@ class StorageServiceTest {
     String downloadUrl = storageService.createDownloadPreSignedUrl(S3_KEY);
 
     assertThat(downloadUrl, is(PRE_SIGNED_URL));
+  }
+
+  @Test
+  void deleteObjectRemovesTheKeyFromTheConfiguredBucket() {
+    ArgumentCaptor<DeleteObjectRequest> captor = ArgumentCaptor.forClass(DeleteObjectRequest.class);
+
+    storageService.deleteObject(S3_KEY);
+
+    verify(s3Client).deleteObject(captor.capture());
+    assertThat(captor.getValue().bucket(), is(BUCKET_NAME));
+    assertThat(captor.getValue().key(), is(S3_KEY));
   }
 
   @Test

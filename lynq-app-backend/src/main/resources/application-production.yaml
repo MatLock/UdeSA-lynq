@@ -33,14 +33,8 @@ lynq:
     url: ${LYNQ_IAM_URL:http://lynq-iam:8080/lynq-iam}
   ml:
     url: ${LYNQ_ML_URL:http://localhost:8084/lynq-ml}
-  aws:
-    region: ${AWS_REGION:us-east-1}
-    access-key-id: ${AWS_ACCESS_KEY_ID}
-    secret-access-key: ${AWS_SECRET_ACCESS_KEY}
-    bucket-name: ${AWS_BUCKET_NAME}
-    # Empty by default (real AWS). Set AWS_ENDPOINT to target LocalStack in the
-    # Docker Compose stack (http://localstack:4566).
-    endpoint: ${AWS_ENDPOINT:}
+  file-storage:
+    url: ${LYNQ_FILE_STORAGE_URL:http://lynq-file-storage:8080/lynq-file-storage}
 
 
 server:

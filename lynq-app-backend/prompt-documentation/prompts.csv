@@ -163,3 +163,8 @@ parameters:
 "26-07-2026","create endpoint in UserController GET ""/user/upskilling-suggestion/${job_post_id}"" that will get the jobPost application id, the userid from the auth context and will call ML endpoint /ml/upskilling-suggestion"
 "26-07-2026","instead of showing ""You are not perfect for this role"" I would like to show reasons of why. modify backend and ml endpoint if you need it""26-07-2026","commit the work done here. commit must start with preffix [lynq-app-backend]: . do not record this promtp and do not mention claude"
 "27-07-2026","build passes. read the report from the last release and fix all the code smell,bug and vulneravility"
+"07-08-2026","integrate lynq-app-backend with lynq-file-storage. remove all s3 dependencies and test from lynq-app-backend. modify db migration files replace s3 key column with new column ""lynq_file_storage_id"" because all file management is handled by lynq-file-storage"
+"07-08-2026","add CI/Sonar workflow for lynq-file-storage. and include it also in the release workflow"
+"07-08-2026","add README.md for lynq-file-storage follow the same pattern as lynq-iam and lynq-app-backend"
+"07-08-2026","add a short description about lynq-file-storage in root readme and include the badges there as well."
+"07-08-2026","are k8s, helm and terraform files updated"
