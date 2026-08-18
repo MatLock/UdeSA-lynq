@@ -22,6 +22,7 @@ import com.lynq.backend.service.UserService;
 import java.util.List;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import com.lynq.backend.service.RegisteredUpload;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -122,7 +123,7 @@ public class UserControllerImpl implements UserController {
         .id(user.getId())
         .userType(user.getType())
         .fullName(user.getFullName())
-        .userProfileImageUrl(user.getProfileImageUrl())
+        .userProfileImageUrl(userService.obtainProfileImagePreSignedUrl(user))
         .currentPosition(user.getCurrentPosition())
         .about(user.getAbout())
         .githubUrl(user.getGithubUrl())
@@ -141,10 +142,11 @@ public class UserControllerImpl implements UserController {
   @AuditLog
   public ResponseEntity<GlobalRestResponse<GenerateUploadImageRestResponse>> generateUploadImageUrl(
       @RequestParam("file-name") String fileName, @AuthenticationPrincipal LynqUserPrincipal principal) {
-    String preSignedUrl = userService.generateProfileImageUploadUrl(principal.getId(), fileName);
+    RegisteredUpload upload = userService.generateProfileImageUploadUrl(principal.getId(), fileName);
 
     GenerateUploadImageRestResponse response = GenerateUploadImageRestResponse.builder()
-        .preSignedUrl(preSignedUrl)
+        .preSignedUrl(upload.url())
+        .fileId(upload.fileId())
         .build();
 
     return ResponseEntity
@@ -153,19 +155,40 @@ public class UserControllerImpl implements UserController {
   }
 
   @Override
+  @PostMapping("/confirm-upload-image")
+  @AuditLog
+  public ResponseEntity<Void> confirmUploadImage(
+      @RequestParam("file-id") String fileId, @AuthenticationPrincipal LynqUserPrincipal principal) {
+    userService.confirmProfileImageUpload(principal.getId(), fileId);
+
+    return ResponseEntity.noContent().build();
+  }
+
+  @Override
   @GetMapping("/generate-upload-resume")
   @AuditLog
   public ResponseEntity<GlobalRestResponse<GenerateUploadResumeRestResponse>> generateUploadResumeUrl(
       @RequestParam("file-name") String fileName, @AuthenticationPrincipal LynqUserPrincipal principal) {
-    String preSignedUrl = userService.generateResumeUploadUrl(principal.getId(), fileName);
+    RegisteredUpload upload = userService.generateResumeUploadUrl(principal.getId(), fileName);
 
     GenerateUploadResumeRestResponse response = GenerateUploadResumeRestResponse.builder()
-        .preSignedUrl(preSignedUrl)
+        .preSignedUrl(upload.url())
+        .fileId(upload.fileId())
         .build();
 
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, response));
+  }
+
+  @Override
+  @PostMapping("/confirm-upload-resume")
+  @AuditLog
+  public ResponseEntity<Void> confirmUploadResume(
+      @RequestParam("file-id") String fileId, @AuthenticationPrincipal LynqUserPrincipal principal) {
+    userService.confirmResumeUpload(principal.getId(), fileId);
+
+    return ResponseEntity.noContent().build();
   }
 
   @Override

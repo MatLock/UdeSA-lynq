@@ -24,18 +24,21 @@ import org.springframework.transaction.annotation.Transactional;
 public class CompanyService {
 
   private static final String COMPANY_NOT_FOUND = "Company '%s' not found";
+  private static final String NO_COMPANY_OWNED_BY_USER = "No company owned by user '%s'";
+  private static final String NOT_THE_CURRENT_COMPANY_LOGO =
+      "File '%s' is not the logo currently registered for the company";
 
   private final UserService userService;
   private final CompanyRepository companyRepository;
   private final JobPostRepository jobPostRepository;
-  private final StorageService storageService;
+  private final FileStorageService fileStorageService;
 
   public CompanyService(UserService userService, CompanyRepository companyRepository,
-      JobPostRepository jobPostRepository, StorageService storageService) {
+      JobPostRepository jobPostRepository, FileStorageService fileStorageService) {
     this.userService = userService;
     this.companyRepository = companyRepository;
     this.jobPostRepository = jobPostRepository;
-    this.storageService = storageService;
+    this.fileStorageService = fileStorageService;
   }
 
   @AuditLog
@@ -58,7 +61,6 @@ public class CompanyService {
         .name(request.getCompanyName())
         .about(request.getCompanyAbout())
         .size(request.getCompanySize())
-        .profileImageUrl(request.getCompanyProfileImageUrl())
         .createdOn(LocalDate.now(ZoneOffset.UTC))
         .owner(owner)
         .build();
@@ -67,26 +69,40 @@ public class CompanyService {
   }
 
 
+  /**
+   * Registers the new logo in lynq-file-storage, points the company at it and drops the file it
+   * replaces. The logo only becomes readable once the browser has PUT the bytes and called
+   * {@link #confirmCompanyImageUpload(String, String)}.
+   */
   @AuditLog
   @Transactional
-  public String generateCompanyImageUploadUrl(String userId, String fileName) {
-    UserEntity owner = userService.getUser(userId);
-    CompanyEntity company = companyRepository.findByOwner(owner)
-        .orElseThrow(() -> new NotFoundException("No company owned by user '" + userId + "'"));
+  public RegisteredUpload generateCompanyImageUploadUrl(String userId, String fileName) {
+    CompanyEntity company = getOwnedCompany(userId);
 
-    String previousImagePath = company.getProfileImageUrl();
-    PreSignedUploadUrl preSignedUploadUrl =
-        storageService.createCompanyProfilePreSignedUrl(company, fileName);
+    String previousFileId = company.getLynqFileStorageId();
+    RegisteredUpload upload = fileStorageService.registerUpload(fileName);
 
-    company.setProfileImageUrl(preSignedUploadUrl.s3Path());
+    company.setLynqFileStorageId(upload.fileId());
     companyRepository.save(company);
 
-    if (previousImagePath != null && !previousImagePath.isBlank()
-        && !previousImagePath.equals(preSignedUploadUrl.s3Path())) {
-      storageService.deleteObject(previousImagePath);
+    if (previousFileId != null && !previousFileId.isBlank()
+        && !previousFileId.equals(upload.fileId())) {
+      fileStorageService.deleteFile(previousFileId);
     }
 
-    return preSignedUploadUrl.url();
+    return upload;
+  }
+
+  @AuditLog
+  @Transactional(readOnly = true)
+  public void confirmCompanyImageUpload(String userId, String fileId) {
+    CompanyEntity company = getOwnedCompany(userId);
+
+    if (!fileId.equals(company.getLynqFileStorageId())) {
+      throw new BadRequestException(String.format(NOT_THE_CURRENT_COMPANY_LOGO, fileId));
+    }
+
+    fileStorageService.confirmUpload(fileId);
   }
 
   @AuditLog
@@ -100,7 +116,7 @@ public class CompanyService {
         .name(company.getName())
         .about(company.getAbout())
         .size(company.getSize())
-        .profileImageUrl(obtainImageUrl(company.getProfileImageUrl()))
+        .profileImageUrl(fileStorageService.obtainDownloadUrl(company.getLynqFileStorageId()))
         .createdOn(company.getCreatedOn())
         .jobs(jobPostRepository.findByCompanyId(companyId).stream()
             .map(this::toJobResponse)
@@ -112,9 +128,7 @@ public class CompanyService {
   @AuditLog
   @Transactional
   public UpdateCompanyRestResponse updateCompany(String userId, UpdateCompanyRequest request) {
-    UserEntity owner = userService.getUser(userId);
-    CompanyEntity company = companyRepository.findByOwner(owner)
-        .orElseThrow(() -> new NotFoundException("No company owned by user '" + userId + "'"));
+    CompanyEntity company = getOwnedCompany(userId);
 
     if (request.getName() != null && !request.getName().equals(company.getName())) {
       validateCompanyNameIsUnique(request.getName());
@@ -134,7 +148,7 @@ public class CompanyService {
         .name(saved.getName())
         .about(saved.getAbout())
         .size(saved.getSize())
-        .profileImageUrl(obtainImageUrl(saved.getProfileImageUrl()))
+        .profileImageUrl(fileStorageService.obtainDownloadUrl(saved.getLynqFileStorageId()))
         .createdOn(saved.getCreatedOn())
         .build();
   }
@@ -148,11 +162,10 @@ public class CompanyService {
         .build();
   }
 
-  private String obtainImageUrl(String s3Path) {
-    if (s3Path == null || s3Path.isBlank()) {
-      return null;
-    }
-    return storageService.obtainProfilePreSignedUrl(s3Path);
+  private CompanyEntity getOwnedCompany(String userId) {
+    UserEntity owner = userService.getUser(userId);
+    return companyRepository.findByOwner(owner)
+        .orElseThrow(() -> new NotFoundException(String.format(NO_COMPANY_OWNED_BY_USER, userId)));
   }
 
   private void validateCompanyNameIsUnique(String companyName) {

@@ -41,10 +41,12 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -79,19 +81,19 @@ public class JobService {
   private final UserRepository userRepository;
   private final UserApplicationJobRepository userApplicationJobRepository;
   private final JobPostSkillRepository jobPostSkillRepository;
-  private final StorageService storageService;
+  private final FileStorageService fileStorageService;
   private final LynqMLClient lynqMLClient;
 
   public JobService(JobPostRepository jobPostRepository, CompanyRepository companyRepository,
       UserRepository userRepository, UserApplicationJobRepository userApplicationJobRepository,
-      JobPostSkillRepository jobPostSkillRepository, StorageService storageService,
+      JobPostSkillRepository jobPostSkillRepository, FileStorageService fileStorageService,
       LynqMLClient lynqMLClient) {
     this.jobPostRepository = jobPostRepository;
     this.companyRepository = companyRepository;
     this.userRepository = userRepository;
     this.userApplicationJobRepository = userApplicationJobRepository;
     this.jobPostSkillRepository = jobPostSkillRepository;
-    this.storageService = storageService;
+    this.fileStorageService = fileStorageService;
     this.lynqMLClient = lynqMLClient;
   }
 
@@ -270,9 +272,17 @@ public class JobService {
     UserEntity user = getAuthenticatedUser();
     getOwnedJob(jobId, user, ONLY_JOB_OWNER_CAN_VIEW_CANDIDATES);
 
-    return PagedRestResponse.from(userApplicationJobRepository
-        .findCandidatesByJobId(jobId, pageable)
-        .map(this::toCandidateResponse));
+    Page<JobCandidateProjection> candidates =
+        userApplicationJobRepository.findCandidatesByJobId(jobId, pageable);
+
+    // One call to lynq-file-storage signs every candidate picture on the page.
+    Map<String, String> profileImageUrls = fileStorageService.obtainDownloadUrls(
+        candidates.getContent().stream()
+            .map(JobCandidateProjection::userFileStorageId)
+            .toList());
+
+    return PagedRestResponse.from(
+        candidates.map(projection -> toCandidateResponse(projection, profileImageUrls)));
   }
 
   @AuditLog
@@ -359,10 +369,11 @@ public class JobService {
   public PagedRestResponse<GetJobRestResponse> searchAvailableJobs(JobFilter filter,
       Pageable pageable) {
     UserEntity user = getAuthenticatedUser();
-    return PagedRestResponse.from(jobPostRepository.searchAvailableJobs(
-            filter.filterValue(),
-            pageable)
-        .map(projection -> toResponse(projection, user)));
+    Page<JobWithDetailsProjection> jobs =
+        jobPostRepository.searchAvailableJobs(filter.filterValue(), pageable);
+    Map<String, String> imageUrls = signProfileImages(jobs.getContent());
+
+    return PagedRestResponse.from(jobs.map(projection -> toResponse(projection, user, imageUrls)));
   }
 
   @AuditLog
@@ -374,9 +385,13 @@ public class JobService {
       throw new BadRequestException(ONLY_COMPANY_USERS_CAN_VIEW_OWNED_JOBS);
     }
 
-    return PagedRestResponse.from(jobPostRepository.searchJobsOwnedByUser(user.getId(), pageable)
+    Page<JobWithDetailsProjection> jobs =
+        jobPostRepository.searchJobsOwnedByUser(user.getId(), pageable);
+    Map<String, String> imageUrls = signProfileImages(jobs.getContent());
+
+    return PagedRestResponse.from(jobs
         .map(projection -> {
-          GetJobRestResponse response = toResponse(projection, user);
+          GetJobRestResponse response = toResponse(projection, user, imageUrls);
           response.setTotalCandidatesApplied(
               userApplicationJobRepository.countByJobId(projection.jobId()));
           return response;
@@ -391,12 +406,13 @@ public class JobService {
         .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
 
     return GetJobDetailForCandidateRestResponse.from(
-        toResponse(projection, user),
+        toResponse(projection, user, signProfileImages(List.of(projection))),
         userApplicationJobRepository.countByJobId(jobId));
   }
 
 
-  private JobCandidateResponse toCandidateResponse(JobCandidateProjection projection) {
+  private JobCandidateResponse toCandidateResponse(JobCandidateProjection projection,
+      Map<String, String> profileImageUrls) {
     List<String> jobSkills = splitSkills(projection.jobSkills());
     List<String> candidateSkills = splitSkills(projection.userSkills());
     return JobCandidateResponse.builder()
@@ -404,14 +420,33 @@ public class JobService {
         .userId(projection.userId())
         .jobId(projection.jobId())
         .userFullName(projection.userFullName())
-        .userProfileImage(obtainProfileImageUrl(projection.userProfileImageUrl()))
+        .userProfileImage(signedUrl(profileImageUrls, projection.userFileStorageId()))
         .userCurrentPosition(projection.userCurrentPosition())
         .userAppliedOn(projection.appliedOn())
         .lynqScore(calculateLyNQScore(jobSkills, candidateSkills))
         .build();
   }
 
-  private GetJobRestResponse toResponse(JobWithDetailsProjection projection, UserEntity user) {
+  /**
+   * Signs the company logo and the poster's picture of every given job in a single call to
+   * lynq-file-storage, keyed by file id, so a page of jobs costs one round-trip instead of two per
+   * row.
+   */
+  private Map<String, String> signProfileImages(List<JobWithDetailsProjection> projections) {
+    return fileStorageService.obtainDownloadUrls(projections.stream()
+        .flatMap(projection -> Stream.of(
+            projection.companyFileStorageId(),
+            projection.userFileStorageId()))
+        .toList());
+  }
+
+  /** Rows without a file — a scraped job with no company, a user with no picture — get no URL. */
+  private static String signedUrl(Map<String, String> downloadUrls, String fileId) {
+    return fileId == null ? null : downloadUrls.get(fileId);
+  }
+
+  private GetJobRestResponse toResponse(JobWithDetailsProjection projection, UserEntity user,
+      Map<String, String> imageUrls) {
     List<String> skills = splitSkills(projection.skills());
     return GetJobRestResponse.builder()
         .jobId(projection.jobId())
@@ -430,12 +465,12 @@ public class JobService {
             .name(projection.companyName())
             .about(projection.companyAbout())
             .size(projection.companySize())
-            .profileImageUrl(obtainProfileImageUrl(projection.companyProfileImageUrl()))
+            .profileImageUrl(signedUrl(imageUrls, projection.companyFileStorageId()))
             .build())
         .postedBy(JobPostedByRestResponse.builder()
             .id(projection.userId())
             .fullName(projection.userFullName())
-            .profileImageUrl(obtainProfileImageUrl(projection.userProfileImageUrl()))
+            .profileImageUrl(signedUrl(imageUrls, projection.userFileStorageId()))
             .currentPosition(projection.userCurrentPosition())
             .build())
         .skills(skills)
@@ -450,13 +485,6 @@ public class JobService {
     return Arrays.stream(concatenatedSkills.split(","))
         .map(String::trim)
         .toList();
-  }
-
-  private String obtainProfileImageUrl(String s3Path) {
-    if (s3Path == null || s3Path.isBlank()) {
-      return null;
-    }
-    return storageService.obtainProfilePreSignedUrl(s3Path);
   }
 
   private void addSkills(JobPostEntity job, List<String> skills) {

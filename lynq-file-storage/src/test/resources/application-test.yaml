@@ -1,0 +1,41 @@
+
+spring:
+  application:
+    name: lynq-file-storage-test
+  datasource:
+    url: jdbc:h2:mem:lynq_file_storage_test;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ''
+    driver-class-name: org.h2.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        show_sql: false
+  liquibase:
+    enabled: false
+
+lynq:
+  aws:
+    region: us-east-1
+    access-key-id: test
+    secret-access-key: test
+    bucket-name: lynq-test-bucket
+    endpoint: http://localhost:4566
+
+server:
+  port: 0
+  servlet:
+    context-path: '/lynq-file-storage'
+
+management:
+  server:
+    port: -1
+
+logging:
+  level:
+    root: WARN
+    com.lynq: INFO

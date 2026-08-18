@@ -23,7 +23,7 @@ class UserEntityTest {
   private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
   private static final String FULL_NAME = "Ada Lovelace";
   private static final UserType USER_TYPE = UserType.CANDIDATE;
-  private static final String PROFILE_IMAGE_URL = "https://cdn.lynq.ai/users/avatar.png";
+  private static final String LYNQ_FILE_STORAGE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
   private static final String CURRENT_POSITION = "Senior Software Engineer";
   private static final String ABOUT = "Backend developer focused on distributed systems.";
   private static final String GITHUB_URL = "https://github.com/lynq-user";
@@ -42,7 +42,7 @@ class UserEntityTest {
         .id(USER_ID)
         .fullName(FULL_NAME)
         .type(USER_TYPE)
-        .profileImageUrl(PROFILE_IMAGE_URL)
+        .lynqFileStorageId(LYNQ_FILE_STORAGE_ID)
         .currentPosition(CURRENT_POSITION)
         .about(ABOUT)
         .githubUrl(GITHUB_URL)
@@ -57,7 +57,7 @@ class UserEntityTest {
     assertThat(userEntity.getId(), is(USER_ID));
     assertThat(userEntity.getFullName(), is(FULL_NAME));
     assertThat(userEntity.getType(), is(USER_TYPE));
-    assertThat(userEntity.getProfileImageUrl(), is(PROFILE_IMAGE_URL));
+    assertThat(userEntity.getLynqFileStorageId(), is(LYNQ_FILE_STORAGE_ID));
     assertThat(userEntity.getCurrentPosition(), is(CURRENT_POSITION));
     assertThat(userEntity.getAbout(), is(ABOUT));
     assertThat(userEntity.getGithubUrl(), is(GITHUB_URL));

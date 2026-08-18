@@ -1,0 +1,62 @@
+name: Commit to main
+description: >
+  Commit the given files back to main. Jobs that push to main run concurrently
+  (the five CI workflows push badges, the release workflow pushes version
+  bumps), so the branch tip usually moves while a job is still building. This
+  rebases onto the current tip and retries instead of failing the push.
+
+inputs:
+  files:
+    description: Space-separated paths to stage (passed straight to `git add`).
+    required: true
+  message:
+    description: Commit message.
+    required: true
+  attempts:
+    description: How many times to retry a rejected push.
+    required: false
+    default: "5"
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        FILES: ${{ inputs.files }}
+        MESSAGE: ${{ inputs.message }}
+        ATTEMPTS: ${{ inputs.attempts }}
+      run: |
+        set -euo pipefail
+
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+        # FILES is deliberately unquoted: it is a space-separated path list.
+        # shellcheck disable=SC2086
+        git add -- $FILES
+        if git diff --cached --quiet; then
+          echo "Nothing to commit for: $FILES"
+          exit 0
+        fi
+        git commit -m "$MESSAGE"
+
+        for attempt in $(seq 1 "$ATTEMPTS"); do
+          # HEAD:main rather than a plain push: on a re-run the checkout sits on
+          # the SHA that triggered the original run, not on the branch tip.
+          if git push origin HEAD:main; then
+            echo "Pushed to main on attempt ${attempt}."
+            exit 0
+          fi
+
+          echo "Push rejected — main moved on. Rebasing and retrying (${attempt}/${ATTEMPTS})."
+          git fetch origin main
+          if ! git rebase origin/main; then
+            git rebase --abort || true
+            echo "::error::Could not rebase onto the current main: $FILES"
+            exit 1
+          fi
+          sleep $((attempt * 3))
+        done
+
+        echo "::error::Gave up pushing to main after ${ATTEMPTS} attempts."
+        exit 1

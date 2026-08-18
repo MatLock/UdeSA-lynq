@@ -88,11 +88,12 @@ const CompanyEditPage = () => {
     setImageError('')
     setUploading(true)
     try {
-      const preSignedUrl = await companyService.generate_company_image_upload_url(
+      const { preSignedUrl, fileId } = await companyService.generate_company_image_upload_url(
         authFetch,
         file.name,
       )
       await companyService.upload_company_image(preSignedUrl, file)
+      await companyService.confirm_company_image_upload(authFetch, fileId)
       setImagePreview(await fileToDataUrl(file))
     } catch (error) {
       setImageError(error.reason ?? error.message ?? t.logoUploadError)

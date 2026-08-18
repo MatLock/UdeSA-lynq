@@ -335,11 +335,12 @@ public interface UserController {
 
   @Operation(
       summary = "Generate a pre-signed URL to upload the authenticated user's profile image",
-      description = "Builds the S3 path for the given file name, persists it as the user's profile "
-          + "image reference, and returns a short-lived pre-signed URL. The frontend uploads the "
-          + "image binary directly to S3 with an HTTP PUT against the returned URL. Calling this "
-          + "endpoint again replaces the stored reference, so the profile image can be changed at "
-          + "any time.",
+      description = "Registers the file in lynq-file-storage, persists the returned file id as the "
+          + "user's profile image reference, and returns a short-lived pre-signed URL together with "
+          + "that id. The frontend uploads the image binary directly to the storage bucket with an "
+          + "HTTP PUT against the returned URL and then confirms it through "
+          + "POST /user/confirm-upload-image. Calling this endpoint again replaces the stored file "
+          + "id and deletes the image it replaces, so the profile image can be changed at any time.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
       @ApiResponse(
@@ -353,7 +354,8 @@ public interface UserController {
                       {
                         "success": true,
                         "data": {
-                          "preSignedUrl": "https://lynq-bucket.s3.amazonaws.com/lynq/users/550e8400-e29b-41d4-a716-446655440000/profile/avatar.png?X-Amz-Signature=..."
+                          "preSignedUrl": "https://lynq-bucket.s3.amazonaws.com/lynq/0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41/avatar.png?X-Amz-Signature=...",
+                          "fileId": "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41"
                         }
                       }"""))),
       @ApiResponse(
@@ -417,7 +419,8 @@ public interface UserController {
           name = "file-name",
           in = ParameterIn.QUERY,
           required = true,
-          description = "Name of the profile image file to upload. Used to build the S3 object key.",
+          description = "Name of the profile image file to upload. lynq-file-storage uses it to build "
+              + "the object key.",
           example = "avatar.png")
   })
   ResponseEntity<GlobalRestResponse<GenerateUploadImageRestResponse>> generateUploadImageUrl(
@@ -425,11 +428,69 @@ public interface UserController {
       @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
+      summary = "Confirm the profile image upload finished",
+      description = "Marks the uploaded image as available in lynq-file-storage. Call it after the "
+          + "PUT to the pre-signed URL succeeded, with the file id returned by "
+          + "GET /user/generate-upload-image. The file id must be the one currently registered for "
+          + "the user, otherwise the call is rejected with 400; it is also rejected while the bytes "
+          + "have not reached the bucket.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "204",
+          description = "Image confirmed and now readable"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The file id is not the user's current profile image, or its bytes were "
+              + "never uploaded",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Not the current image",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "File '0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41' is not the profile image currently registered for the user"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "404",
+          description = "No user exists for the authenticated identity",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "User not found",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "User '550e8400-e29b-41d4-a716-446655440000' not found"
+                      }""")))
+  })
+  @Parameters({
+      @Parameter(
+          name = "lynq-request-uuid",
+          in = ParameterIn.HEADER,
+          required = true,
+          description = "Unique identifier for the request, echoed back in the response and used "
+              + "for log correlation. Requests without it are rejected with 403.",
+          example = "550e8400-e29b-41d4-a716-446655440000"),
+      @Parameter(
+          name = "file-id",
+          in = ParameterIn.QUERY,
+          required = true,
+          description = "Id of the uploaded file, as returned by GET /user/generate-upload-image.",
+          example = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41")
+  })
+  ResponseEntity<Void> confirmUploadImage(
+      String fileId,
+      @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
       summary = "Generate a pre-signed URL to upload the authenticated candidate's resume",
-      description = "Builds the S3 path for the given file name and returns a short-lived pre-signed "
-          + "URL. The frontend uploads the resume binary directly to S3 with an HTTP PUT against "
-          + "the returned URL. Only users of type CANDIDATE can upload resumes; any other type is "
-          + "rejected with 400.",
+      description = "Registers the file in lynq-file-storage and returns a short-lived pre-signed "
+          + "URL together with the file id. The frontend uploads the resume binary directly to the "
+          + "storage bucket with an HTTP PUT against the returned URL and then confirms it through "
+          + "POST /user/confirm-upload-resume. Only users of type CANDIDATE can upload resumes; any "
+          + "other type is rejected with 400.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
       @ApiResponse(
@@ -443,7 +504,8 @@ public interface UserController {
                       {
                         "success": true,
                         "data": {
-                          "preSignedUrl": "https://lynq-bucket.s3.amazonaws.com/lynq/user/550e8400-e29b-41d4-a716-446655440000/resume/resume.pdf?X-Amz-Signature=..."
+                          "preSignedUrl": "https://lynq-bucket.s3.amazonaws.com/lynq/0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41/resume.pdf?X-Amz-Signature=...",
+                          "fileId": "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41"
                         }
                       }"""))),
       @ApiResponse(
@@ -519,7 +581,8 @@ public interface UserController {
           name = "file-name",
           in = ParameterIn.QUERY,
           required = true,
-          description = "Name of the resume file to upload. Used to build the S3 object key.",
+          description = "Name of the resume file to upload. lynq-file-storage uses it to build the "
+              + "object key.",
           example = "resume.pdf")
   })
   ResponseEntity<GlobalRestResponse<GenerateUploadResumeRestResponse>> generateUploadResumeUrl(
@@ -527,11 +590,68 @@ public interface UserController {
       @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
+      summary = "Confirm the resume upload finished",
+      description = "Marks the uploaded resume as available in lynq-file-storage. Call it after the "
+          + "PUT to the pre-signed URL succeeded, with the file id returned by "
+          + "GET /user/generate-upload-resume. It is rejected while the bytes have not reached the "
+          + "bucket. Only users of type CANDIDATE can upload resumes; any other type is rejected "
+          + "with 400.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "204",
+          description = "Resume confirmed and now readable"),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The authenticated user is not a candidate, or the bytes were never uploaded",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Not a candidate",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Only users of type CANDIDATE can upload resumes"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "404",
+          description = "No user exists for the authenticated identity, or lynq-file-storage does "
+              + "not know the file id",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "User not found",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "User '550e8400-e29b-41d4-a716-446655440000' not found"
+                      }""")))
+  })
+  @Parameters({
+      @Parameter(
+          name = "lynq-request-uuid",
+          in = ParameterIn.HEADER,
+          required = true,
+          description = "Unique identifier for the request, echoed back in the response and used "
+              + "for log correlation. Requests without it are rejected with 403.",
+          example = "550e8400-e29b-41d4-a716-446655440000"),
+      @Parameter(
+          name = "file-id",
+          in = ParameterIn.QUERY,
+          required = true,
+          description = "Id of the uploaded file, as returned by GET /user/generate-upload-resume.",
+          example = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41")
+  })
+  ResponseEntity<Void> confirmUploadResume(
+      String fileId,
+      @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
       summary = "Get the authenticated user's resumes",
       description = "Returns every resume of the authenticated user in both formats: the structured "
-          + "JSON content and a short-lived public link to the PDF stored in S3. The user identity "
-          + "is resolved from the bearer token, so no parameters are required. Only users of type "
-          + "CANDIDATE can access resumes; any other type is rejected with 400.",
+          + "JSON content and a short-lived link to the PDF held by lynq-file-storage. The user "
+          + "identity is resolved from the bearer token, so no parameters are required. Only users "
+          + "of type CANDIDATE can access resumes; any other type is rejected with 400.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<GlobalRestResponse<List<GetUserResumeRestResponse>>> getUserResumes(
       @Parameter(hidden = true) LynqUserPrincipal principal);

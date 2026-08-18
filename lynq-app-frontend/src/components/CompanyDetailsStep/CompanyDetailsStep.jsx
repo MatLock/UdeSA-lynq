@@ -74,11 +74,13 @@ const CompanyDetailsStep = ({ active, stepNumber, totalSteps }) => {
       // already created, so a failed logo upload must not fail registration.
       if (logoFile) {
         try {
-          const preSignedUrl = await companyService.generate_company_image_upload_url(
-            securedFetch.tokenFetcher(auth.accessToken),
+          const logoFetch = securedFetch.tokenFetcher(auth.accessToken)
+          const { preSignedUrl, fileId } = await companyService.generate_company_image_upload_url(
+            logoFetch,
             logoFile.name,
           )
           await companyService.upload_company_image(preSignedUrl, logoFile)
+          await companyService.confirm_company_image_upload(logoFetch, fileId)
         } catch {
           // Keep going — the logo can be set later from the company page.
         }

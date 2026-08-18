@@ -10,6 +10,7 @@ import './RegisterWizard.css'
 const RegisterWizard = () => {
   const { step, data } = useRegister()
   const slideRefs = useRef([])
+  const viewportRef = useRef(null)
   const [viewportHeight, setViewportHeight] = useState('auto')
 
   // Companies create a user AND a company, so they get two extra steps (owner
@@ -19,6 +20,16 @@ const RegisterWizard = () => {
     : [AccountTypeStep, DetailsStep]
 
   useLayoutEffect(() => {
+    // The viewport clips its overflow but is still programmatically scrollable:
+    // anything that scrolls a field into view (the browser focusing an input, an
+    // assistive tool, a test driver) leaves this box offset. That offset would
+    // survive the step change and render the next step with its first fields cut
+    // off above the fold, so every step starts back at the top.
+    if (viewportRef.current) {
+      viewportRef.current.scrollTop = 0
+      viewportRef.current.scrollLeft = 0
+    }
+
     const activeSlide = slideRefs.current[step]
     if (!activeSlide) return
 
@@ -32,7 +43,11 @@ const RegisterWizard = () => {
 
   return (
     <div className="register-wizard">
-      <div className="register-wizard-viewport" style={{ height: viewportHeight }}>
+      <div
+        className="register-wizard-viewport"
+        ref={viewportRef}
+        style={{ height: viewportHeight }}
+      >
         <div
           className="register-wizard-track"
           style={{ transform: `translateX(-${step * 100}%)` }}

@@ -4,18 +4,22 @@ locals {
   # release implicitly depend on it, so the VM is created first.
   db_host = aws_instance.redis_db.private_dns
 
-  db_url_iam     = "jdbc:mysql://${local.db_host}:3306/lynq_iam_db"
-  db_url_backend = "jdbc:mysql://${local.db_host}:3306/lynq_backend_db"
+  db_url_iam          = "jdbc:mysql://${local.db_host}:3306/lynq_iam_db"
+  db_url_backend      = "jdbc:mysql://${local.db_host}:3306/lynq_backend_db"
+  db_url_file_storage = "jdbc:mysql://${local.db_host}:3306/lynq_file_storage_db"
 
   # Chart value overrides that fill the REPLACE_* placeholders in k8s_values-prod.yaml.
+  # The bucket name goes to lynq-file-storage: it is the only service that talks to
+  # S3, and lynq-app-backend delegates every file operation to it.
   chart_overrides = {
-    "ingress.host"                            = var.ingress_host
-    "ingress.certificateArn"                  = aws_acm_certificate_validation.lynq.certificate_arn
-    "lynq_iam.config.DB_URL"                  = local.db_url_iam
-    "lynq_iam.config.REDIS_ADDRESS"           = local.db_host
-    "lynq_app_backend.config.DB_URL"          = local.db_url_backend
-    "lynq_app_backend.config.AWS_BUCKET_NAME" = var.s3_bucket_name
-    "lynq_ml.config.OLLAMA_BASE_URL"          = var.ollama_base_url
+    "ingress.host"                             = var.ingress_host
+    "ingress.certificateArn"                   = aws_acm_certificate_validation.lynq.certificate_arn
+    "lynq_iam.config.DB_URL"                   = local.db_url_iam
+    "lynq_iam.config.REDIS_ADDRESS"            = local.db_host
+    "lynq_app_backend.config.DB_URL"           = local.db_url_backend
+    "lynq_file_storage.config.DB_URL"          = local.db_url_file_storage
+    "lynq_file_storage.config.AWS_BUCKET_NAME" = var.s3_bucket_name
+    "lynq_ml.config.OLLAMA_BASE_URL"           = var.ollama_base_url
   }
 }
 
@@ -70,9 +74,26 @@ resource "kubernetes_secret" "iam" {
   depends_on = [kubernetes_namespace.lynq]
 }
 
+# No bucket credentials here: lynq-app-backend delegates all file handling to
+# lynq-file-storage and holds only the file ids it returns.
 resource "kubernetes_secret" "backend" {
   metadata {
     name      = "lynq-app-backend-secret"
+    namespace = var.namespace
+  }
+  type = "Opaque"
+  data = {
+    DB_USERNAME = var.db_username
+    DB_PASSWORD = var.db_password
+  }
+  depends_on = [kubernetes_namespace.lynq]
+}
+
+# lynq-file-storage owns the bucket, so the least-privilege S3 access key is
+# wired into this Secret and nowhere else.
+resource "kubernetes_secret" "file_storage" {
+  metadata {
+    name      = "lynq-file-storage-secret"
     namespace = var.namespace
   }
   type = "Opaque"
@@ -125,6 +146,7 @@ resource "helm_release" "lynq" {
     kubernetes_secret.dockerhub,
     kubernetes_secret.iam,
     kubernetes_secret.backend,
+    kubernetes_secret.file_storage,
     kubernetes_secret.ml,
     aws_s3_bucket.lynq,
     aws_instance.redis_db,

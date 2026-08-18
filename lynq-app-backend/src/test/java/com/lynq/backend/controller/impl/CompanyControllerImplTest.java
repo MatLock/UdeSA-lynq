@@ -11,6 +11,7 @@ import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.security.LynqUserPrincipal;
 import com.lynq.backend.service.CompanyService;
+import com.lynq.backend.service.RegisteredUpload;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +40,7 @@ class CompanyControllerImplTest {
   private static final Integer COMPANY_SIZE = 250;
   private static final String COMPANY_PROFILE_IMAGE_URL = "https://cdn.lynq.com/logos/lynq.png";
   private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
+  private static final String FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
   private static final String FILE_NAME = "logo.png";
   private static final String PRE_SIGNED_URL =
       "https://lynq-bucket.s3.amazonaws.com/logo.png?sig=abc";
@@ -102,14 +104,14 @@ class CompanyControllerImplTest {
     assertThat(data.getCompanyName(), is(COMPANY_NAME));
     assertThat(data.getCompanyAbout(), is(COMPANY_ABOUT));
     assertThat(data.getCompanySize(), is(COMPANY_SIZE));
-    assertThat(data.getCompanyProfileImageUrl(), is(COMPANY_PROFILE_IMAGE_URL));
     assertThat(data.getCompanyCreatedOn(), is(CREATED_ON));
     assertThat(data.getOwnerUserId(), is(USER_ID));
   }
 
   @Test
   void generateCompanyImageUploadUrlDelegatesToServiceWithPrincipalIdAndFileName() {
-    when(companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME)).thenReturn(PRE_SIGNED_URL);
+    when(companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
 
     companyController.generateCompanyImageUploadUrl(FILE_NAME, principal);
 
@@ -118,7 +120,8 @@ class CompanyControllerImplTest {
 
   @Test
   void generateCompanyImageUploadUrlRespondsWithOkStatusAndPreSignedUrl() {
-    when(companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME)).thenReturn(PRE_SIGNED_URL);
+    when(companyService.generateCompanyImageUploadUrl(USER_ID, FILE_NAME))
+        .thenReturn(new RegisteredUpload(FILE_ID, PRE_SIGNED_URL));
 
     ResponseEntity<GlobalRestResponse<GenerateUploadImageRestResponse>> response =
         companyController.generateCompanyImageUploadUrl(FILE_NAME, principal);
@@ -128,6 +131,15 @@ class CompanyControllerImplTest {
     assertThat(body, is(notNullValue()));
     assertThat(body.isSuccess(), is(true));
     assertThat(body.getData().getPreSignedUrl(), is(PRE_SIGNED_URL));
+    assertThat(body.getData().getFileId(), is(FILE_ID));
+  }
+
+  @Test
+  void confirmCompanyImageUploadDelegatesToServiceAndRespondsWithNoContent() {
+    ResponseEntity<Void> response = companyController.confirmCompanyImageUpload(FILE_ID, principal);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.NO_CONTENT));
+    verify(companyService).confirmCompanyImageUpload(USER_ID, FILE_ID);
   }
 
   @Test
@@ -221,7 +233,7 @@ class CompanyControllerImplTest {
         .name(COMPANY_NAME)
         .about(COMPANY_ABOUT)
         .size(COMPANY_SIZE)
-        .profileImageUrl(COMPANY_PROFILE_IMAGE_URL)
+        .lynqFileStorageId(FILE_ID)
         .createdOn(CREATED_ON)
         .owner(UserEntity.builder().id(USER_ID).build())
         .build();

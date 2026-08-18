@@ -71,11 +71,11 @@ ingress:
 #     --set lynq_app_frontend.image=lynq-app-frontend:local
 lynq_app_frontend:
   replicas: 1
-  image: matlock0o/lynq:lynq-app-frontend-1.0.8-SNAPSHOT
+  image: matlock0o/lynq:lynq-app-frontend-1.0.12-SNAPSHOT
 
 lynq_ml:
   replicas: 1
-  image: matlock0o/lynq:lynq-ml-1.0.8-SNAPSHOT
+  image: matlock0o/lynq:lynq-ml-1.0.12-SNAPSHOT
   config:
     PORT: "8084"
     HOST: "0.0.0.0"
@@ -94,20 +94,32 @@ lynq_ml:
 
 lynq_app_backend:
   replicas: 1
-  image: matlock0o/lynq:lynq-app-backend-1.0.8-SNAPSHOT
+  image: matlock0o/lynq:lynq-app-backend-1.0.12-SNAPSHOT
   path: /lynq-backend-app
   config:
     SPRING_PROFILES_ACTIVE: production
     DB_URL: jdbc:mysql://mysql:3306/lynq_backend_db
     LYNQ_IAM_URL: http://lynq-iam-service:8080/lynq-iam
     LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
+    # Files are delegated to lynq-file-storage; this service holds no bucket config.
+    LYNQ_FILE_STORAGE_URL: http://lynq-file-storage-service:8080/lynq-file-storage
+
+# Owns every stored file: the bucket credentials, the pre-signed URLs and the
+# file metadata all live here.
+lynq_file_storage:
+  replicas: 1
+  image: matlock0o/lynq:lynq-file-storage-1.0.12-SNAPSHOT
+  path: /lynq-file-storage
+  config:
+    SPRING_PROFILES_ACTIVE: production
+    DB_URL: jdbc:mysql://mysql:3306/lynq_file_storage_db
     AWS_REGION: us-east-1
     AWS_BUCKET_NAME: lynq-bucket
     AWS_ENDPOINT: http://localstack:4566
 
 lynq_iam:
   replicas: 1
-  image: matlock0o/lynq:lynq-iam-1.0.8-SNAPSHOT
+  image: matlock0o/lynq:lynq-iam-1.0.12-SNAPSHOT
   path: /lynq-iam
   config:
     SPRING_PROFILES_ACTIVE: production

@@ -160,3 +160,7 @@ parameters:
 "27-07-2026","build passes. read the report from the last release and fix all the code smell,bug and vulneravility"
 "28-07-2026","create endpoint in MLProxyController POST "/ml/resume/skill-extraction" that takes a resumePayload and sent it over to ML service for skill extraction. It has to return the same json payload"
 "28-07-2026","change the backend feign client. language should be passed as request param. not header. also update implementation in the python ml service."
+"07-08-2026","integrate lynq-app-backend with lynq-file-storage. remove all s3 dependencies and test from lynq-app-backend. modify db migration files replace s3 key column with new column ""lynq_file_storage_id"" because all file management is handled by lynq-file-storage"
+"07-08-2026","add CI/Sonar workflow for lynq-file-storage. and include it also in the release workflow"
+"07-08-2026","add README.md for lynq-file-storage follow the same pattern as lynq-iam and lynq-app-backend"
+"07-08-2026","add a short description about lynq-file-storage in root readme and include the badges there as well."

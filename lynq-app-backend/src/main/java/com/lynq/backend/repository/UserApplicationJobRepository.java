@@ -27,7 +27,7 @@ public interface UserApplicationJobRepository extends JpaRepository<UserApplicat
   long countByJobId(@Param("jobId") String jobId);
 
   @Query(value = "SELECT new com.lynq.backend.repository.projection.JobCandidateProjection("
-      + "a.id, u.id, j.id, u.fullName, u.profileImageUrl, u.currentPosition, a.appliedOn, "
+      + "a.id, u.id, j.id, u.fullName, u.lynqFileStorageId, u.currentPosition, a.appliedOn, "
       + "CAST((SELECT function('group_concat', jsk.skill) FROM JobPostSkillEntity jsk "
       + "WHERE jsk.jobPost = j) AS string), "
       + "CAST((SELECT function('group_concat', usk.skill) FROM UserSkillsEntity usk "
@@ -41,7 +41,7 @@ public interface UserApplicationJobRepository extends JpaRepository<UserApplicat
   Page<JobCandidateProjection> findCandidatesByJobId(@Param("jobId") String jobId, Pageable pageable);
 
   @Query(value = "SELECT new com.lynq.backend.repository.projection.UserApplicationProjection("
-      + "a.id, j.id, j.title, j.description, c.id, c.name, c.profileImageUrl, a.appliedOn, "
+      + "a.id, j.id, j.title, j.description, c.id, c.name, c.lynqFileStorageId, a.appliedOn, "
       + "CAST((SELECT function('group_concat', jsk.skill) FROM JobPostSkillEntity jsk "
       + "WHERE jsk.jobPost = j) AS string)) "
       + "FROM UserApplicationJobEntity a "

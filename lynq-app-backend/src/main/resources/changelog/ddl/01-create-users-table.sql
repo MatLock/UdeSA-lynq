@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS lynq_backend_db.users (
     id                 VARCHAR(36)  NOT NULL,
     type               ENUM('CANDIDATE', 'COMPANY') NOT NULL,
-    profile_image_url  VARCHAR(2048),
+    lynq_file_storage_id VARCHAR(36),
     current_position   VARCHAR(255),
     about              TEXT,
     github_url         VARCHAR(2048),
