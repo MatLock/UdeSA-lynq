@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # Needed to publish the coverage comment on the pull request.
+      pull-requests: write
     steps:
       - name: Code Checkout
         uses: actions/checkout@v5
@@ -42,6 +44,16 @@ jobs:
         with:
           name: jacoco-report
           path: lynq-iam/target/site/jacoco/
+
+      - name: Comment coverage on the PR
+        if: always()
+        uses: ./.github/actions/coverage-pr-comment
+        with:
+          module: lynq-iam
+          icon: "🔐"
+          language: java
+          format: jacoco-csv
+          path: lynq-iam/target/site/jacoco/jacoco.csv
 
       - name: Generate JaCoCo coverage badge
         if: github.ref == 'refs/heads/main'
