@@ -12,8 +12,11 @@ language the UI runs in; the scripts themselves are in English.
 2. **Registers a recruiter (company account)** through the 4-step wizard —
    account details, owner profile and company details including the logo — and
    completes their profile with `images/recruiter_mock.jpeg`.
-3. **Publishes a job** with a title, description, remote work type, salary range
-   and six skills typed by hand. Then logs out.
+3. **Publishes a job** with a title, description, remote work type and salary
+   range, and lets the *Generar habilidades* button generate the skills with AI
+   (the backend's `POST /ml/skill-enhance`) instead of typing them by hand. The
+   test asserts at least one skill chip comes back before submitting. Then logs
+   out.
 4. **Logs back in as the candidate**, finds the job in the feed, opens its detail
    page, applies, and checks the application shows up under *Mis Postulaciones*.
 
