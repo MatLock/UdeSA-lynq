@@ -17,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - name: Code Checkout
         uses: actions/checkout@v5
@@ -52,6 +53,25 @@ jobs:
         with:
           name: coverage-report-ml
           path: lynq-ml/coverage.xml
+
+      - name: Render coverage table
+        id: coverage
+        if: always()
+        working-directory: lynq-ml
+        run: |
+          coverage report -m --format=markdown > coverage.md || true
+          echo "total=$(coverage report --format=total || true)" >> "$GITHUB_OUTPUT"
+
+      - name: Comment coverage on the PR
+        if: always()
+        uses: ./.github/actions/coverage-pr-comment
+        with:
+          module: lynq-ml
+          icon: "🤖"
+          language: python
+          format: markdown
+          path: lynq-ml/coverage.md
+          total: ${{ steps.coverage.outputs.total }}
 
       - name: Generate coverage badge
         if: github.ref == 'refs/heads/main'

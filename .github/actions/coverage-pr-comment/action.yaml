@@ -1,0 +1,196 @@
+name: Coverage PR comment
+description: >
+  Render the coverage report of one module and publish it on the pull request as
+  a single comment that is rewritten on every push, instead of piling up one
+  comment per run. Every module posts its own comment and claims it through a
+  hidden marker, so the CI workflows can post concurrently without stepping on
+  each other, and each comment is headed by the module icon, name and coverage
+  so the four of them stay apart at a glance. Outside a pull_request event (or
+  on a fork PR, where GITHUB_TOKEN is read-only) the summary only goes to the
+  job summary.
+
+inputs:
+  module:
+    description: Module name shown in the heading and used as the comment marker.
+    required: true
+  icon:
+    description: Emoji that fronts the heading, one per module.
+    required: true
+  format:
+    description: >
+      How to read `path`: `jacoco-csv` for the jacoco.csv produced by the JaCoCo
+      report goal, or `markdown` for a table that is already rendered
+      (`coverage report --format=markdown`).
+    required: true
+  path:
+    description: Path to the coverage report.
+    required: true
+  language:
+    description: >
+      Stack of the module, `java` or `python`. Picks the language badge, the
+      language emoji in the footer and the coverage tool named there.
+    required: true
+  total:
+    description: >
+      Overall coverage percentage for the heading. Only read for `markdown`
+      reports, which the action does not parse; for `jacoco-csv` it is derived
+      from the report itself.
+    required: false
+    default: ""
+  token:
+    description: Token used to post the comment.
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        MODULE: ${{ inputs.module }}
+        ICON: ${{ inputs.icon }}
+        FORMAT: ${{ inputs.format }}
+        REPORT: ${{ inputs.path }}
+        LANGUAGE: ${{ inputs.language }}
+        TOTAL: ${{ inputs.total }}
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        set -euo pipefail
+
+        # The badge carries the real Java/Python logo; the emoji repeats it in
+        # the footer so the language still reads if shields.io does not load.
+        case "$LANGUAGE" in
+          java)
+            badge="![Java](https://img.shields.io/badge/Java-ED8B00?logo=openjdk&logoColor=white)"
+            lang_emoji="☕"
+            tool="JaCoCo"
+            ;;
+          python)
+            badge="![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)"
+            lang_emoji="🐍"
+            tool="coverage.py"
+            ;;
+          *)
+            echo "::error::Unknown language '${LANGUAGE}' — expected 'java' or 'python'."
+            exit 1
+            ;;
+        esac
+
+        marker="<!-- coverage-report: ${MODULE} -->"
+        body="$(mktemp)"
+
+        # The report is written after the tests pass, so a missing file almost
+        # always means the test run itself failed.
+        have_report=false
+        [[ -s "$REPORT" ]] && have_report=true
+
+        total=""
+        if [[ "$have_report" == true ]]; then
+          if [[ "$FORMAT" == "jacoco-csv" ]]; then
+            total="$(awk -F, 'NR > 1 { missed += $4; covered += $5 }
+              END { if (covered + missed > 0) printf "%.1f", 100 * covered / (covered + missed) }' "$REPORT")"
+          else
+            total="$TOTAL"
+          fi
+        fi
+
+        # Traffic light on the heading: the number alone reads the same in every
+        # comment, the colour is what makes a weak module jump out.
+        headline="coverage unavailable"
+        if [[ -n "$total" ]]; then
+          light="$(awk -v t="$total" 'BEGIN { print (t >= 80) ? "🟢" : (t >= 60) ? "🟡" : "🔴" }')"
+          headline="${light} **${total}%**"
+        fi
+
+        {
+          echo "$marker"
+          echo "## ${ICON} \`${MODULE}\` — test coverage: ${headline}"
+          echo
+          echo "$badge"
+          echo
+
+          if [[ "$have_report" != true ]]; then
+            echo "> [!WARNING]"
+            echo "> No coverage report was produced (\`${REPORT}\` is missing or empty) — the test run probably failed."
+          elif [[ "$FORMAT" == "jacoco-csv" ]]; then
+            awk -F, '
+              function pct(covered, missed,    total) {
+                total = covered + missed
+                return total == 0 ? "n/a" : sprintf("%.1f%%", 100 * covered / total)
+              }
+              function row(label, covered, missed) {
+                printf "| %s | %s | %d / %d |\n", label, pct(covered, missed), covered, covered + missed
+              }
+              NR == 1 { next }
+              {
+                im[$2] += $4; ic[$2] += $5
+                lm[$2] += $8; lc[$2] += $9
+                IM += $4; IC += $5; BM += $6; BC += $7
+                LM += $8; LC += $9; MM += $12; MC += $13
+              }
+              END {
+                print "| Metric | Coverage | Covered / Total |"
+                print "| --- | --- | --- |"
+                row("Instructions", IC, IM)
+                row("Branches", BC, BM)
+                row("Lines", LC, LM)
+                row("Methods", MC, MM)
+                print ""
+                print "<details><summary>Per package</summary>"
+                print ""
+                print "| Package | Instructions | Lines |"
+                print "| --- | --- | --- |"
+                # Flush before piping into `sort`: awk buffers its own stdout,
+                # while sort writes to the same descriptor on close.
+                fflush()
+                # `for (p in ...)` has no defined order; sort so the comment
+                # does not reshuffle its rows on every push.
+                for (p in ic) {
+                  printf "| `%s` | %s | %s |\n", p, pct(ic[p], im[p]), pct(lc[p], lm[p]) | "sort"
+                }
+                close("sort")
+                print ""
+                print "</details>"
+              }
+            ' "$REPORT"
+          else
+            echo "<details open><summary>Per file</summary>"
+            echo
+            cat "$REPORT"
+            echo
+            echo "</details>"
+          fi
+
+          echo
+          printf '<sub>%s %s · [run #%s](%s/%s/actions/runs/%s) · commit `%s`</sub>\n' \
+            "$lang_emoji" "$tool" "$GITHUB_RUN_NUMBER" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
+            "$GITHUB_RUN_ID" "${GITHUB_SHA:0:7}"
+        } > "$body"
+
+        cat "$body" >> "$GITHUB_STEP_SUMMARY"
+
+        if [[ "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+          echo "Not a pull_request event — summary published to the job summary only."
+          exit 0
+        fi
+
+        if [[ "$(jq -r '.pull_request.head.repo.fork' "$GITHUB_EVENT_PATH")" == "true" ]]; then
+          echo "::warning::PR comes from a fork, where GITHUB_TOKEN is read-only — skipping the coverage comment."
+          exit 0
+        fi
+
+        pr="$(jq -r '.pull_request.number' "$GITHUB_EVENT_PATH")"
+        # --jq runs per page, so this yields at most one id per page; take the
+        # first line without piping into head, which would break the pipeline
+        # with EPIPE under `pipefail`.
+        matches="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${pr}/comments" \
+          --jq "map(select((.body // \"\") | startswith(\"${marker}\"))) | .[0].id // empty")"
+        existing="${matches%%$'\n'*}"
+
+        if [[ -n "$existing" ]]; then
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" -F "body=@${body}" --silent
+          echo "Updated the ${MODULE} coverage comment on PR #${pr}."
+        else
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${pr}/comments" -F "body=@${body}" --silent
+          echo "Posted the ${MODULE} coverage comment on PR #${pr}."
+        fi
