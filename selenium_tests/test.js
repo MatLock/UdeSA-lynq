@@ -7,7 +7,8 @@
  *      (picture, current position, about, links), then logs out.
  *   2. Registers a RECRUITER / COMPANY (4-step wizard) and completes their
  *      profile the same way.
- *   3. The recruiter publishes a job with skills and logs out.
+ *   3. The recruiter publishes a job, letting the "Generar habilidades"
+ *      (generate skills with AI) button fill in the skills, and logs out.
  *   4. The candidate logs back in, finds the job and applies to it.
  *
  * Every value typed into the app is in Spanish, since that is the language the
@@ -129,7 +130,10 @@ const JOB = {
   workType: 'REMOTE',
   minSalary: '1200000',
   maxSalary: '1800000',
-  skills: ['Java', 'Spring Boot', 'MySQL', 'Docker', 'AWS', 'Kubernetes'],
+  // Skills are not typed in: they come from the "Generar habilidades" button,
+  // which asks the backend's ML endpoint for them. The exact list depends on
+  // the model, so the test only requires that at least this many come back.
+  minSkills: 1,
 }
 
 // ---------------------------------------------------------------------------
@@ -415,6 +419,53 @@ const login = async (driver, username, password) => {
 // Publishing the job
 // ---------------------------------------------------------------------------
 
+// Fills the skills in with the "Generar habilidades" button of SkillsField,
+// which posts the title, description and work type to the backend's ML endpoint
+// (POST /ml/skill-enhance) and turns the answer into chips.
+//
+// The title, description and work type must already be filled in: the button
+// stays disabled until all three have a value.
+const generateSkillsWithAi = async (driver) => {
+  const button = await waitVisible(driver, By.css('.skills-field-generate'))
+  await scrollIntoView(driver, button)
+  await driver.wait(until.elementIsEnabled(button), TIMEOUT)
+  await button.click()
+  await pause()
+
+  // While the request is in flight the whole page is blocked by the brand
+  // overlay. It ends in one of two ways: chips show up on the right panel, or
+  // the page raises an error toast. Both are polled in the same loop so a
+  // failure is reported right away instead of timing out.
+  const outcome = await driver.wait(
+    async () => {
+      const failures = await driver.findElements(By.css('.toast.toast-error'))
+      if (failures.length > 0) {
+        try {
+          const message = await failures[0].findElement(By.css('.toast-message')).getText()
+          return { error: message }
+        } catch {
+          // The toast dismissed itself mid-read; keep polling.
+        }
+      }
+      const chips = await driver.findElements(By.css('.skills-field-chip'))
+      return chips.length > 0 ? { chips } : null
+    },
+    LONG_TIMEOUT,
+    'the AI generation neither returned skills nor reported an error',
+  )
+
+  if (outcome.error) {
+    throw new Error(`AI skill generation failed: \u00ab${outcome.error}\u00bb`)
+  }
+
+  // The overlay is gone by now, but wait explicitly so the submit click that
+  // follows is not swallowed by it.
+  await waitForNoOverlay(driver)
+
+  const labels = await Promise.all(outcome.chips.map((chip) => chip.getText()))
+  return labels.map((label) => label.trim()).filter(Boolean)
+}
+
 const publishJob = async (driver, job) => {
   log('Publishing the job')
   await navigate(driver, `${BASE_URL}/home`)
@@ -430,19 +481,12 @@ const publishJob = async (driver, job) => {
   await type(driver, By.css('#create-job-salary-down'), job.minSalary)
   await type(driver, By.css('#create-job-salary-top'), job.maxSalary)
 
-  // Skills are entered by hand (Enter commits each one) instead of using the AI
-  // generation, so the test does not depend on the model being available.
-  const skillsField = await waitVisible(driver, By.css('#create-job-skills'))
-  await scrollIntoView(driver, skillsField)
-  for (const skill of job.skills) {
-    await skillsField.sendKeys(skill, Key.ENTER)
-    await pause()
-  }
-  const chips = await driver.findElements(By.css('.skills-field-chip'))
+  const skills = await generateSkillsWithAi(driver)
   assert(
-    chips.length === job.skills.length,
-    `expected ${job.skills.length} skills but found ${chips.length}`,
+    skills.length >= job.minSkills,
+    `expected at least ${job.minSkills} generated skill(s) but found ${skills.length}`,
   )
+  detail(`skills generated with AI (${skills.length}): ${skills.join(', ')}`)
 
   await click(driver, By.css('.create-job-submit'))
   await waitForNoOverlay(driver)
