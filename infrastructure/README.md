@@ -2,7 +2,7 @@
 
 Kubernetes deployment for the Lynq platform, packaged as a Helm chart. The same chart runs both a self-contained local cluster (minikube) and the production cluster (AWS EKS); a small set of flags in the values files is what tells the two environments apart. In production the chart is not installed by hand — Terraform coordinates it — while locally you install it directly with Helm.
 
-The chart deploys the application modules (`lynq-iam`, `lynq-app-backend`, `lynq-file-storage`, `lynq-ml`, and the frontend) together with their configuration, and — locally only — their infrastructure dependencies (MySQL, Redis, LocalStack). In production those dependencies come from managed services (RDS, ElastiCache, S3), the frontend is served from Cloudflare, and secrets are created outside the chart.
+The chart deploys the application modules (`lynq-iam`, `lynq-bff`, `lynq-app-backend`, `lynq-file-storage`, `lynq-ml`, and the frontend) together with their configuration, and — locally only — their infrastructure dependencies (MySQL, Redis, LocalStack). In production those dependencies come from managed services (RDS, ElastiCache, S3), the frontend is served from Cloudflare, and secrets are created outside the chart.
 
 
 ## Layout
@@ -81,7 +81,7 @@ Prerequisites: a running minikube cluster, `helm`, and (by default) an Ollama se
    images — including `lynq-app-frontend`, which is built on each release with the
    local ingress URLs baked in. No manual frontend build is needed.
 
-The platform is then reachable on the shared host: the frontend at `http://lynq.local/`, IAM at `http://lynq.local/lynq-iam`, and the backend at `http://lynq.local/lynq-backend-app` (path-based routing; the more specific paths take precedence).
+The platform is then reachable on the shared host: the frontend at `http://lynq.local/`, IAM at `http://lynq.local/lynq-iam`, and the gateway at `http://lynq.local/lynq-bff` (path-based routing; the more specific paths take precedence). The DMZ services behind the gateway — `lynq-app-backend`, `lynq-ml`, `lynq-file-storage` — have no Ingress and are reachable only from inside the cluster.
 
 > **macOS (docker driver).** On Mac, minikube runs with the `docker` driver by
 > default, and its IP (e.g. `192.168.49.2`) lives inside Docker's internal
@@ -113,8 +113,8 @@ Production runs on AWS EKS and is applied **only with Terraform** (local uses He
 
 - **MySQL + Redis on an EC2 instance** (`ec2-lynq-redis-db`), reachable from EKS over the internal network. Two security groups open `3306` and `6379` to the VPC CIDR, and a third opens `22` to a single admin IP. The apps' `DB_URL` / `REDIS_ADDRESS` are derived automatically from the instance's private DNS.
 - **S3 bucket** (private, with CORS for pre-signed uploads) for `lynq-file-storage`, the only service that talks to S3.
-- **External Secrets.** `manageSecrets: false` — Helm renders no Secrets; Terraform creates `dockerhub-secret`, `lynq-iam-secret`, `lynq-app-backend-secret`, `lynq-file-storage-secret`, and `lynq-ml-secret`, and the deployments consume them by reference. Sensitive values are supplied at apply time via `TF_VAR_*` (never committed).
-- **Internet exposure via a shared ALB.** `lynq-iam` and `lynq-app-backend` sit behind a single AWS ALB (AWS Load Balancer Controller) with a shared `group.name`, path-based routing on one domain, and TLS terminated at the ALB.
+- **External Secrets.** `manageSecrets: false` — Helm renders no Secrets; Terraform creates `dockerhub-secret`, `lynq-iam-secret`, `lynq-bff-secret`, `lynq-app-backend-secret`, `lynq-file-storage-secret`, and `lynq-ml-secret`, and the deployments consume them by reference. Sensitive values are supplied at apply time via `TF_VAR_*` (never committed).
+- **Internet exposure via a shared ALB.** Only `lynq-iam` and `lynq-bff` are exposed: they sit behind a single AWS ALB (AWS Load Balancer Controller) with a shared `group.name`, path-based routing on one domain, and TLS terminated at the ALB. `lynq-bff` is the entry point for everything but identity; the DMZ services behind it (`lynq-app-backend`, `lynq-ml`, `lynq-file-storage`) have no Ingress and can only be reached from inside the cluster. The public DNS record is a CNAME to the ALB hostname read off `lynq-bff-ingress`.
 - **Certificate + DNS.** Terraform creates the ACM certificate for `api.lynqoficial.com`, validates it via a Cloudflare DNS record, feeds the ARN into the Ingress, and points `api.lynqoficial.com` at the ALB (Cloudflare CNAME, DNS-only). DNS for `lynqoficial.com` lives in Cloudflare.
 - **Frontend on Cloudflare.** `localFrontend: false` — the frontend is deployed separately with Wrangler, outside this chart.
 

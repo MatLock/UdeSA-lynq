@@ -57,6 +57,10 @@ jobs:
         working-directory: lynq-file-storage
         run: mvn -B versions:set -DnewVersion="${{ steps.resolve.outputs.version }}" -DgenerateBackupPoms=false
 
+      - name: Bump lynq-bff pom version
+        working-directory: lynq-bff
+        run: mvn -B versions:set -DnewVersion="${{ steps.resolve.outputs.version }}" -DgenerateBackupPoms=false
+
       - name: Bump lynq-ml (python) version
         run: echo "${{ steps.resolve.outputs.version }}" > lynq-ml/VERSION
 
@@ -84,7 +88,7 @@ jobs:
       - name: Commit version bump back to main
         uses: ./.github/actions/commit-to-main
         with:
-          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml .github/badges/version.svg
+          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml .github/badges/version.svg
           message: "chore: set release version ${{ steps.resolve.outputs.version }} [skip ci]"
 
   # ===========================================================================
@@ -196,6 +200,41 @@ jobs:
           name: jacoco-lynq-file-storage
           path: lynq-file-storage/target/site/jacoco/
 
+  build-lynq-bff:
+    name: "2 · Build & test: lynq-bff"
+    runs-on: ubuntu-latest
+    needs: set-version
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Setup Java Environment
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: temurin
+          architecture: x64
+          cache: maven
+
+      - name: Build and run tests
+        working-directory: lynq-bff
+        run: mvn -B clean verify
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: lynq-bff-jar
+          path: lynq-bff/target/lynq-bff.jar
+
+      - name: Upload JaCoCo report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-lynq-bff
+          path: lynq-bff/target/site/jacoco/
+
   build-lynq-ml:
     name: "2 · Build & test: lynq-ml"
     runs-on: ubuntu-latest
@@ -244,7 +283,7 @@ jobs:
   sonar-scan:
     name: "3 · SonarCloud analysis (Quality Gate)"
     runs-on: ubuntu-latest
-    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-ml]
+    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-ml]
     outputs:
       gate: ${{ steps.results.outputs.gate }}
       bugs: ${{ steps.results.outputs.bugs }}
@@ -276,6 +315,7 @@ jobs:
           mvn -B -q -f lynq-iam/pom.xml clean test-compile
           mvn -B -q -f lynq-app-backend/pom.xml clean test-compile
           mvn -B -q -f lynq-file-storage/pom.xml clean test-compile
+          mvn -B -q -f lynq-bff/pom.xml clean test-compile
 
       # Reuse the coverage reports produced by stage 2 (paths declared in
       # sonar-project.properties). Without them SonarCloud reports 0% coverage
@@ -299,6 +339,12 @@ jobs:
           name: jacoco-lynq-file-storage
           path: lynq-file-storage/target/site/jacoco
 
+      - name: Download lynq-bff coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: jacoco-lynq-bff
+          path: lynq-bff/target/site/jacoco
+
       - name: Download lynq-ml coverage report
         uses: actions/download-artifact@v4
         with:
@@ -320,6 +366,7 @@ jobs:
           for f in lynq-iam/target/site/jacoco/jacoco.xml \
                    lynq-app-backend/target/site/jacoco/jacoco.xml \
                    lynq-file-storage/target/site/jacoco/jacoco.xml \
+                   lynq-bff/target/site/jacoco/jacoco.xml \
                    lynq-ml/coverage.xml; do
             if [ -s "$f" ]; then
               echo "✓ $f"
@@ -383,7 +430,7 @@ jobs:
   push-images:
     name: "4 · Push Docker images"
     runs-on: ubuntu-latest
-    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-ml, sonar-scan]
+    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-ml, sonar-scan]
     steps:
       - name: Code Checkout
         uses: actions/checkout@v5
@@ -408,6 +455,12 @@ jobs:
         with:
           name: lynq-file-storage-jar
           path: lynq-file-storage/target
+
+      - name: Download lynq-bff jar
+        uses: actions/download-artifact@v4
+        with:
+          name: lynq-bff-jar
+          path: lynq-bff/target
 
       - name: Log in to Docker Hub
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
@@ -439,6 +492,14 @@ jobs:
           push: true
           tags: ${{ env.DOCKER_NAMESPACE }}:lynq-file-storage-${{ needs.set-version.outputs.version }}
 
+      - name: Build and push lynq-bff image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: lynq-bff
+          file: lynq-bff/Dockerfile
+          push: true
+          tags: ${{ env.DOCKER_NAMESPACE }}:lynq-bff-${{ needs.set-version.outputs.version }}
+
       - name: Build and push lynq-ml image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
@@ -455,7 +516,7 @@ jobs:
           push: true
           build-args: |
             LYNQ_IAM_BASE_URL=http://lynq.local/lynq-iam
-            LYNQ_BACKEND_BASE_URL=http://lynq.local/lynq-backend-app
+            LYNQ_BFF_BASE_URL=http://lynq.local/lynq-bff
           tags: ${{ env.DOCKER_NAMESPACE }}:lynq-app-frontend-${{ needs.set-version.outputs.version }}
 
   # ===========================================================================
@@ -488,6 +549,12 @@ jobs:
           name: jacoco-lynq-file-storage
           path: coverage/lynq-file-storage
 
+      - name: Download lynq-bff coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: jacoco-lynq-bff
+          path: coverage/lynq-bff
+
       - name: Download lynq-ml coverage
         uses: actions/download-artifact@v4
         with:
@@ -515,6 +582,7 @@ jobs:
           read IAM_INSTR IAM_LINE IAM_BRANCH <<<"$(extract_jacoco coverage/lynq-iam/jacoco.csv)"
           read APP_INSTR APP_LINE APP_BRANCH <<<"$(extract_jacoco coverage/lynq-app-backend/jacoco.csv)"
           read FS_INSTR FS_LINE FS_BRANCH <<<"$(extract_jacoco coverage/lynq-file-storage/jacoco.csv)"
+          read BFF_INSTR BFF_LINE BFF_BRANCH <<<"$(extract_jacoco coverage/lynq-bff/jacoco.csv)"
           ML_LINE="$(rate coverage/lynq-ml/coverage.xml line-rate)"
           ML_BRANCH="$(rate coverage/lynq-ml/coverage.xml branch-rate)"
           {
@@ -527,6 +595,9 @@ jobs:
             echo "fs_instruction=$FS_INSTR"
             echo "fs_line=$FS_LINE"
             echo "fs_branch=$FS_BRANCH"
+            echo "bff_instruction=$BFF_INSTR"
+            echo "bff_line=$BFF_LINE"
+            echo "bff_branch=$BFF_BRANCH"
             echo "ml_line=$ML_LINE"
             echo "ml_branch=$ML_BRANCH"
           } >> "$GITHUB_OUTPUT"
@@ -544,6 +615,9 @@ jobs:
           FS_INSTR: ${{ steps.coverage.outputs.fs_instruction }}
           FS_LINE: ${{ steps.coverage.outputs.fs_line }}
           FS_BRANCH: ${{ steps.coverage.outputs.fs_branch }}
+          BFF_INSTR: ${{ steps.coverage.outputs.bff_instruction }}
+          BFF_LINE: ${{ steps.coverage.outputs.bff_line }}
+          BFF_BRANCH: ${{ steps.coverage.outputs.bff_branch }}
           ML_LINE: ${{ steps.coverage.outputs.ml_line }}
           ML_BRANCH: ${{ steps.coverage.outputs.ml_branch }}
           SONAR_GATE: ${{ needs.sonar-scan.outputs.gate }}
@@ -590,6 +664,12 @@ jobs:
             printf '| Instructions | %s%% |\n' "$FS_INSTR"
             printf '| Lines | %s%% |\n' "$FS_LINE"
             printf '| Branches | %s%% |\n\n' "$FS_BRANCH"
+            printf '## Test coverage (lynq-bff)\n\n'
+            printf '| Metric | Coverage |\n'
+            printf '| --- | --- |\n'
+            printf '| Instructions | %s%% |\n' "$BFF_INSTR"
+            printf '| Lines | %s%% |\n' "$BFF_LINE"
+            printf '| Branches | %s%% |\n\n' "$BFF_BRANCH"
             printf '## Test coverage (lynq-ml)\n\n'
             printf '| Metric | Coverage |\n'
             printf '| --- | --- |\n'
@@ -606,10 +686,12 @@ jobs:
           (cd coverage/lynq-iam && zip -qr /tmp/jacoco-report-iam.zip .)
           (cd coverage/lynq-app-backend && zip -qr /tmp/jacoco-report-app-backend.zip .)
           (cd coverage/lynq-file-storage && zip -qr /tmp/jacoco-report-file-storage.zip .)
+          (cd coverage/lynq-bff && zip -qr /tmp/jacoco-report-bff.zip .)
           cp coverage/lynq-ml/coverage.xml /tmp/coverage-lynq-ml.xml
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-iam.zip --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-app-backend.zip --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-file-storage.zip --clobber
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-bff.zip --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/coverage-lynq-ml.xml --clobber
 
   # ===========================================================================
@@ -642,7 +724,7 @@ jobs:
           # image in both values files to the version pushed in stage 4.
           for f in infrastructure/helm/values/k8s_values-local.yaml \
                    infrastructure/helm/values/k8s_values-prod.yaml; do
-            sed -i -E "s#(image: ${DOCKER_NAMESPACE}:lynq-(iam|app-backend|app-frontend|file-storage|ml)-).*#\1${VERSION}#" "$f"
+            sed -i -E "s#(image: ${DOCKER_NAMESPACE}:lynq-(iam|app-backend|app-frontend|file-storage|bff|ml)-).*#\1${VERSION}#" "$f"
           done
 
       - name: Commit Helm image tag bump to main
@@ -712,6 +794,10 @@ jobs:
         working-directory: lynq-file-storage
         run: mvn -B versions:set -DnewVersion="${{ steps.next.outputs.version }}" -DgenerateBackupPoms=false
 
+      - name: Bump lynq-bff pom version
+        working-directory: lynq-bff
+        run: mvn -B versions:set -DnewVersion="${{ steps.next.outputs.version }}" -DgenerateBackupPoms=false
+
       - name: Bump lynq-ml (python) version
         run: echo "${{ steps.next.outputs.version }}" > lynq-ml/VERSION
 
@@ -722,5 +808,5 @@ jobs:
       - name: Commit next development version to main
         uses: ./.github/actions/commit-to-main
         with:
-          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml
+          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml
           message: "chore: prepare next development version ${{ steps.next.outputs.version }} [skip ci]"

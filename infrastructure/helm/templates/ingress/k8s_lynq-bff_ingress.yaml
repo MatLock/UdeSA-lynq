@@ -1,10 +1,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: lynq-app-backend-ingress
+  name: lynq-bff-ingress
   namespace: lynq-{{ .Values.k8s_namespace }}-namespace
   labels:
-    app: lynq-app-backend
+    app: lynq-bff
   annotations:
     # Merge into the single shared ALB.
     alb.ingress.kubernetes.io/group.name: {{ .Values.ingress.groupName }}
@@ -22,10 +22,10 @@ spec:
     - host: {{ .Values.ingress.host }}
       http:
         paths:
-          - path: {{ .Values.lynq_app_backend.path }}
+          - path: {{ .Values.lynq_bff.path }}
             pathType: Prefix
             backend:
               service:
-                name: lynq-app-backend-service
+                name: lynq-bff-service
                 port:
                   name: http

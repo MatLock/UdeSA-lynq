@@ -32,13 +32,16 @@ import static org.hamcrest.Matchers.notNullValue;
 class FileStorageApplicationTests extends AbstractE2ETest {
 
   private static final String CONTEXT_PATH = "/lynq-file-storage";
-  private static final String FILES_PATH = CONTEXT_PATH + "/files";
+  private static final String FILES_PATH = CONTEXT_PATH + "/dmz/files";
   private static final String UPLOAD_URL_PATH = FILES_PATH + "/upload-url";
 
   private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
+  private static final String USER_ID_HEADER = "user-id";
   private static final String CONTENT_TYPE_HEADER = "Content-Type";
   private static final String APPLICATION_JSON = "application/json";
   private static final String REQUEST_UUID = "550e8400-e29b-41d4-a716-446655440000";
+  private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
+  private static final String OTHER_USER_ID = "99999999-9999-9999-9999-999999999999";
 
   private static final String FILE_NAME = "cv.pdf";
   private static final String CONTENT_TYPE = "application/pdf";
@@ -75,6 +78,7 @@ class FileStorageApplicationTests extends AbstractE2ETest {
     assertThat(persisted.isPresent(), is(true));
     assertThat(persisted.get().getStatus(), is(StoredFileStatus.PENDING));
     assertThat(persisted.get().getFileName(), is(FILE_NAME));
+    assertThat(persisted.get().getOwnerUserId(), is(USER_ID));
   }
 
   @Test
@@ -82,6 +86,7 @@ class FileStorageApplicationTests extends AbstractE2ETest {
     HttpRequest request = HttpRequest.newBuilder()
         .uri(URI.create(baseUrl() + UPLOAD_URL_PATH))
         .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(USER_ID_HEADER, USER_ID)
         .POST(HttpRequest.BodyPublishers.ofString(uploadRequestBody(FILE_NAME)))
         .build();
 
@@ -218,6 +223,48 @@ class FileStorageApplicationTests extends AbstractE2ETest {
   }
 
   @Test
+  void deleteFileIsRefusedForAFileRegisteredBySomebodyElse() throws Exception {
+    Map<String, Object> upload = data(postUploadUrl(FILE_NAME));
+    String fileId = (String) upload.get("fileId");
+
+    HttpRequest request = requestBuilder(FILES_PATH + "/" + fileId, OTHER_USER_ID).DELETE().build();
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(response.statusCode(), is(403));
+    assertThat(storedFileRepository.findById(fileId).isPresent(), is(true));
+  }
+
+  @Test
+  void confirmUploadIsRefusedForAFileRegisteredBySomebodyElse() throws Exception {
+    Map<String, Object> upload = data(postUploadUrl(FILE_NAME));
+    putBytesToPreSignedUrl((String) upload.get("uploadUrl"));
+    String fileId = (String) upload.get("fileId");
+
+    HttpRequest request = requestBuilder(FILES_PATH + "/" + fileId + "/confirm", OTHER_USER_ID)
+        .POST(HttpRequest.BodyPublishers.noBody())
+        .build();
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(response.statusCode(), is(403));
+    assertThat(storedFileRepository.findById(fileId).get().getStatus(),
+        is(StoredFileStatus.PENDING));
+  }
+
+  @Test
+  void createDownloadUrlServesAFileRegisteredBySomebodyElse() throws Exception {
+    Map<String, Object> upload = data(postUploadUrl(FILE_NAME));
+    putBytesToPreSignedUrl((String) upload.get("uploadUrl"));
+    String fileId = (String) upload.get("fileId");
+    post(FILES_PATH + "/" + fileId + "/confirm");
+
+    HttpRequest request =
+        requestBuilder(FILES_PATH + "/" + fileId + "/download-url", OTHER_USER_ID).GET().build();
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(response.statusCode(), is(200));
+  }
+
+  @Test
   void deleteFileReturnsNoContentForAnUnknownFile() throws Exception {
     HttpResponse<String> response = delete(FILES_PATH + "/" + UNKNOWN_FILE_ID);
 
@@ -283,9 +330,14 @@ class FileStorageApplicationTests extends AbstractE2ETest {
   }
 
   private HttpRequest.Builder requestBuilder(String path) {
+    return requestBuilder(path, USER_ID);
+  }
+
+  private HttpRequest.Builder requestBuilder(String path, String userId) {
     return HttpRequest.newBuilder()
         .uri(URI.create(baseUrl() + path))
-        .header(REQUEST_UUID_HEADER, REQUEST_UUID);
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .header(USER_ID_HEADER, userId);
   }
 
   private int putBytesToPreSignedUrl(String uploadUrl) throws Exception {

@@ -3,6 +3,7 @@ package com.lynq.filestorage.service;
 import com.lynq.filestorage.controller.request.CreateFileUploadRequest;
 import com.lynq.filestorage.enums.StoredFileStatus;
 import com.lynq.filestorage.exceptions.BadRequestException;
+import com.lynq.filestorage.exceptions.ForbiddenException;
 import com.lynq.filestorage.exceptions.NotFoundException;
 import com.lynq.filestorage.model.StoredFileEntity;
 import com.lynq.filestorage.repository.StoredFileRepository;
@@ -41,6 +42,8 @@ class FileServiceTest {
   private static final String DOWNLOAD_URL = "https://s3.local/download?signature=abc";
   private static final String DETECTED_CONTENT_TYPE = "application/octet-stream";
   private static final long OBJECT_SIZE = 4096L;
+  private static final String OWNER_USER_ID = "11111111-1111-1111-1111-111111111111";
+  private static final String OTHER_USER_ID = "99999999-9999-9999-9999-999999999999";
 
   @Mock
   private StoredFileRepository storedFileRepository;
@@ -62,7 +65,7 @@ class FileServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
     ArgumentCaptor<StoredFileEntity> captor = ArgumentCaptor.forClass(StoredFileEntity.class);
 
-    StoredFileEntity storedFile = fileService.createUpload(buildRequest());
+    StoredFileEntity storedFile = fileService.createUpload(buildRequest(), OWNER_USER_ID);
 
     verify(storedFileRepository).save(captor.capture());
     StoredFileEntity saved = captor.getValue();
@@ -71,6 +74,7 @@ class FileServiceTest {
     assertThat(saved.getContentType(), is(CONTENT_TYPE));
     assertThat(saved.getS3Key(), is(S3_KEY));
     assertThat(saved.getStatus(), is(StoredFileStatus.PENDING));
+    assertThat(saved.getOwnerUserId(), is(OWNER_USER_ID));
     assertThat(storedFile.getId(), is(saved.getId()));
   }
 
@@ -95,7 +99,7 @@ class FileServiceTest {
     when(storedFileRepository.save(any(StoredFileEntity.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    StoredFileEntity confirmed = fileService.confirmUpload(FILE_ID);
+    StoredFileEntity confirmed = fileService.confirmUpload(FILE_ID, OWNER_USER_ID);
 
     assertThat(confirmed.getStatus(), is(StoredFileStatus.AVAILABLE));
     assertThat(confirmed.getContentType(), is(DETECTED_CONTENT_TYPE));
@@ -107,8 +111,48 @@ class FileServiceTest {
     when(storedFileRepository.findById(FILE_ID)).thenReturn(Optional.of(storedFile));
     when(storageService.findObjectMetadata(S3_KEY)).thenReturn(Optional.empty());
 
-    assertThrows(BadRequestException.class, () -> fileService.confirmUpload(FILE_ID));
+    assertThrows(BadRequestException.class, () -> fileService.confirmUpload(FILE_ID, OWNER_USER_ID));
     verify(storedFileRepository, never()).save(any(StoredFileEntity.class));
+  }
+
+  @Test
+  void confirmUploadIsRefusedForAFileRegisteredBySomebodyElse() {
+    StoredFileEntity storedFile = buildStoredFile(StoredFileStatus.PENDING);
+    when(storedFileRepository.findById(FILE_ID)).thenReturn(Optional.of(storedFile));
+
+    assertThrows(ForbiddenException.class, () -> fileService.confirmUpload(FILE_ID, OTHER_USER_ID));
+    verify(storageService, never()).findObjectMetadata(anyString());
+    verify(storedFileRepository, never()).save(any(StoredFileEntity.class));
+  }
+
+  @Test
+  void deleteFileIsRefusedForAFileRegisteredBySomebodyElse() {
+    StoredFileEntity storedFile = buildStoredFile(StoredFileStatus.AVAILABLE);
+    when(storedFileRepository.findById(FILE_ID)).thenReturn(Optional.of(storedFile));
+
+    assertThrows(ForbiddenException.class, () -> fileService.deleteFile(FILE_ID, OTHER_USER_ID));
+    verify(storageService, never()).deleteObject(anyString());
+    verify(storedFileRepository, never()).delete(any(StoredFileEntity.class));
+  }
+
+  @Test
+  void deleteFileIsAllowedForALegacyFileWithNoRecordedOwner() {
+    StoredFileEntity storedFile = buildStoredFile(StoredFileStatus.AVAILABLE, null);
+    when(storedFileRepository.findById(FILE_ID)).thenReturn(Optional.of(storedFile));
+
+    fileService.deleteFile(FILE_ID, OTHER_USER_ID);
+
+    verify(storageService).deleteObject(S3_KEY);
+    verify(storedFileRepository).delete(storedFile);
+  }
+
+  @Test
+  void createDownloadUrlsSignsFilesRegisteredBySomebodyElse() {
+    StoredFileEntity storedFile = buildStoredFile(StoredFileStatus.AVAILABLE, OTHER_USER_ID);
+    when(storedFileRepository.findAllById(Set.of(FILE_ID))).thenReturn(List.of(storedFile));
+    when(storageService.createDownloadPreSignedUrl(S3_KEY)).thenReturn(DOWNLOAD_URL);
+
+    assertThat(fileService.createDownloadUrls(List.of(FILE_ID)).get(FILE_ID), is(DOWNLOAD_URL));
   }
 
   @Test
@@ -150,7 +194,7 @@ class FileServiceTest {
     StoredFileEntity storedFile = buildStoredFile(StoredFileStatus.AVAILABLE);
     when(storedFileRepository.findById(FILE_ID)).thenReturn(Optional.of(storedFile));
 
-    fileService.deleteFile(FILE_ID);
+    fileService.deleteFile(FILE_ID, OWNER_USER_ID);
 
     verify(storageService).deleteObject(S3_KEY);
     verify(storedFileRepository).delete(storedFile);
@@ -160,7 +204,7 @@ class FileServiceTest {
   void deleteFileDoesNothingWhenTheFileIsUnknown() {
     when(storedFileRepository.findById(UNKNOWN_FILE_ID)).thenReturn(Optional.empty());
 
-    fileService.deleteFile(UNKNOWN_FILE_ID);
+    fileService.deleteFile(UNKNOWN_FILE_ID, OWNER_USER_ID);
 
     verify(storageService, never()).deleteObject(anyString());
     verify(storedFileRepository, never()).delete(any(StoredFileEntity.class));
@@ -183,12 +227,17 @@ class FileServiceTest {
   }
 
   private StoredFileEntity buildStoredFile(StoredFileStatus status) {
+    return buildStoredFile(status, OWNER_USER_ID);
+  }
+
+  private StoredFileEntity buildStoredFile(StoredFileStatus status, String ownerUserId) {
     LocalDateTime now = LocalDateTime.now();
     return StoredFileEntity.builder()
         .id(FILE_ID)
         .fileName(FILE_NAME)
         .contentType(CONTENT_TYPE)
         .s3Key(S3_KEY)
+        .ownerUserId(ownerUserId)
         .status(status)
         .createdOn(now)
         .updatedOn(now)

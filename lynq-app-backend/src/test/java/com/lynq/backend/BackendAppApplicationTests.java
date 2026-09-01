@@ -3,7 +3,6 @@ package com.lynq.backend;
 import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
-import com.lynq.backend.controller.request.SkillEnhanceRequest;
 import com.lynq.backend.controller.request.UpdateCompanyRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.enums.JobPostSource;
@@ -56,19 +55,16 @@ import static org.mockserver.model.StringBody.subString;
 class BackendAppApplicationTests extends AbstractE2ETest {
 
   private static final String CONTEXT_PATH = "/lynq-app-backend";
-  private static final String CREATE_USER_PATH = "/user";
-  private static final String GENERATE_UPLOAD_IMAGE_PATH = "/user/generate-upload-image";
-  private static final String CONFIRM_UPLOAD_IMAGE_PATH = "/user/confirm-upload-image";
-  private static final String FILE_STORAGE_UPLOAD_URL_PATH = "/files/upload-url";
-  private static final String FILE_STORAGE_DOWNLOAD_URLS_PATH = "/files/download-urls";
-  private static final String CREATE_COMPANY_PATH = "/company";
-  private static final String CREATE_JOB_PATH = "/job";
-  private static final String RESUME_PATH = "/user/resume";
-  private static final String SKILL_ENHANCE_PROXY_PATH = "/ml/skill-enhance";
-  private static final String ML_SKILL_ENHANCE_PATH = "/skill-enhance";
-  private static final String ML_UPSKILLING_PATH = "/upskilling_suggestion";
-  private static final String ML_CANDIDATE_EXPLANATION_PATH = "/candidate-explanation";
-  private static final String VALIDATE_PATH = "/auth/validate";
+  private static final String CREATE_USER_PATH = "/dmz/user";
+  private static final String GENERATE_UPLOAD_IMAGE_PATH = "/dmz/user/generate-upload-image";
+  private static final String CONFIRM_UPLOAD_IMAGE_PATH = "/dmz/user/confirm-upload-image";
+  private static final String FILE_STORAGE_UPLOAD_URL_PATH = "/dmz/files/upload-url";
+  private static final String FILE_STORAGE_DOWNLOAD_URLS_PATH = "/dmz/files/download-urls";
+  private static final String CREATE_COMPANY_PATH = "/dmz/company";
+  private static final String CREATE_JOB_PATH = "/dmz/job";
+  private static final String RESUME_PATH = "/dmz/user/resume";
+  private static final String ML_UPSKILLING_PATH = "/dmz/upskilling_suggestion";
+  private static final String ML_CANDIDATE_EXPLANATION_PATH = "/dmz/candidate-explanation";
   private static final String USERINFO_PATH = "/auth/user-info";
 
   private static final String AUTHORIZATION_HEADER = "Authorization";
@@ -231,7 +227,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void createUserAuthenticatesAgainstIamPersistsUserAndReturnsCreated() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
 
     HttpResponse<String> response = postCreateUser();
@@ -269,7 +264,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void getUserAuthenticatesAndReturnsFullProfile() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCandidateUser();
 
@@ -296,7 +290,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void getUserReturnsNotFoundWhenUserDoesNotExist() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
 
     HttpResponse<String> response = getUser();
@@ -317,7 +310,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void updateUserProfileAuthenticatesAppliesSuppliedFieldsAndReturnsOk() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCandidateUser();
 
@@ -346,7 +338,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void updateUserProfileReturnsNotFoundWhenUserDoesNotExist() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
 
     UpdateUserProfileRequest updateRequest = new UpdateUserProfileRequest();
@@ -374,7 +365,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void updateCompanyAuthenticatesAppliesSuppliedFieldsPersistsAndReturnsOk() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCompanyOwnerWithCompany();
 
@@ -404,7 +394,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void updateCompanyReturnsNotFoundWhenUserOwnsNoCompany() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCandidateUser();
 
@@ -419,7 +408,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void updateCompanyReturnsBadRequestWhenNewNameIsAlreadyTaken() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCompanyOwnerWithCompany();
     UserEntity otherOwner = seedCompanyUser(OTHER_USER_ID, FULL_NAME, CURRENT_POSITION,
@@ -453,7 +441,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   @SuppressWarnings("unchecked")
   void generateUploadImageUrlRegistersTheFileAndPersistsItsIdAgainstTheUser() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     stubFileStorageCreateUpload();
     stubFileStorageDelete(PROFILE_FILE_ID);
@@ -477,15 +464,16 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     lynqFileStorageMock.verify(request()
         .withMethod("POST")
         .withPath(FILE_STORAGE_UPLOAD_URL_PATH)
+        .withHeader(USER_ID_HEADER, USER_ID)
         .withBody(subString(UPLOAD_FILE_NAME)), VerificationTimes.exactly(1));
     lynqFileStorageMock.verify(request()
         .withMethod("DELETE")
-        .withPath("/files/" + PROFILE_FILE_ID), VerificationTimes.exactly(1));
+        .withPath("/dmz/files/" + PROFILE_FILE_ID)
+        .withHeader(USER_ID_HEADER, USER_ID), VerificationTimes.exactly(1));
   }
 
   @Test
   void confirmUploadImageMarksTheRegisteredFileAsUploaded() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     stubFileStorageConfirm(PROFILE_FILE_ID);
     seedCandidateUser();
@@ -495,19 +483,19 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(response.statusCode(), is(204));
     lynqFileStorageMock.verify(request()
         .withMethod("POST")
-        .withPath("/files/" + PROFILE_FILE_ID + "/confirm"), VerificationTimes.exactly(1));
+        .withPath("/dmz/files/" + PROFILE_FILE_ID + "/confirm")
+        .withHeader(USER_ID_HEADER, USER_ID), VerificationTimes.exactly(1));
   }
 
   @Test
   void confirmUploadImageIsRejectedForAFileTheUserDoesNotOwn() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCandidateUser();
 
     HttpResponse<String> response = postConfirmUploadImage(NEW_FILE_ID);
 
     assertThat(response.statusCode(), is(400));
-    lynqFileStorageMock.verify(request().withMethod("POST").withPath("/files/.*/confirm"),
+    lynqFileStorageMock.verify(request().withMethod("POST").withPath("/dmz/files/.*/confirm"),
         VerificationTimes.exactly(0));
   }
 
@@ -523,7 +511,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void createUserWithCompanyAuthenticatesPersistsOwnerAndCompanyAndReturnsCreated() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
 
     HttpResponse<String> response = postCreateUserWithCompany();
@@ -555,7 +542,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void createUserWithCompanyReturnsBadRequestWhenCompanyNameAlreadyExists() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     companyRepository.save(CompanyEntity.builder()
         .id("22222222-2222-2222-2222-222222222222")
@@ -585,7 +571,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void createJobPersistsJobForCompanyOwnerAndReturnsCreated() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCompanyOwnerWithCompany();
 
@@ -619,7 +604,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void createJobPersistsJobWithSkillsWhenSkillsProvided() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCompanyOwnerWithCompany();
 
@@ -644,7 +628,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void createJobReturnsBadRequestWhenUserIsNotCompanyType() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     userRepository.save(UserEntity.builder()
         .id(USER_ID)
@@ -661,7 +644,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void createJobReturnsBadRequestWhenCompanyOwnerHasNoCompany() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     userRepository.save(UserEntity.builder()
         .id(USER_ID)
@@ -690,7 +672,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   void getJobsReturnsAvailableJobsNewestFirstWithCompanyAndPosterAndSkipsUnavailable()
       throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION,
         PROFILE_FILE_ID);
@@ -741,7 +722,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void getJobsPaginatesResultsNewestFirst() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
     CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
@@ -766,7 +746,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void getJobsFiltersByTitleContainsCaseInsensitive() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
     CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
@@ -783,7 +762,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void getJobsFiltersByDescriptionContainsCaseInsensitive() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
     CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
@@ -800,7 +778,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void getJobsFiltersByWorkType() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
     CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
@@ -817,7 +794,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void getJobsFiltersBySkillCaseInsensitive() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
     CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
@@ -834,7 +810,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void getJobsFiltersByCompanyNameContainsCaseInsensitive() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     UserEntity lynqOwner = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
     CompanyEntity lynq = seedCompany(COMPANY_ID, COMPANY_NAME, lynqOwner);
@@ -853,7 +828,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void getJobsMatchesFilterValueAcrossColumnsWithOr() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     UserEntity poster = seedCompanyUser(USER_ID, POSTER_FULL_NAME, POSTER_CURRENT_POSITION, null);
     CompanyEntity company = seedCompany(COMPANY_ID, COMPANY_NAME, poster);
@@ -1066,15 +1040,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     return objectMapper.readValue(json, Map.class);
   }
 
-  private void stubIamValidateToken() {
-    lynqIamMock.when(request().withMethod("GET").withPath(VALIDATE_PATH))
-        .respond(response()
-            .withStatusCode(200)
-            .withContentType(MediaType.APPLICATION_JSON)
-            .withBody("""
-                {"success": true, "data": true}"""));
-  }
-
   private void stubIamUserInfo() {
     lynqIamMock.when(request().withMethod("GET").withPath(USERINFO_PATH))
         .respond(response()
@@ -1111,9 +1076,9 @@ class BackendAppApplicationTests extends AbstractE2ETest {
                 }""".formatted(PROFILE_FILE_ID, PROFILE_IMAGE_URL,
                 COMPANY_FILE_ID, COMPANY_PROFILE_IMAGE_URL,
                 RESUME_FILE_ID, RESUME_PDF_URL)));
-    lynqFileStorageMock.when(request().withMethod("GET").withPath("/files/" + PROFILE_FILE_ID + "/download-url"))
+    lynqFileStorageMock.when(request().withMethod("GET").withPath("/dmz/files/" + PROFILE_FILE_ID + "/download-url"))
         .respond(downloadUrlResponse(PROFILE_FILE_ID, PROFILE_IMAGE_URL));
-    lynqFileStorageMock.when(request().withMethod("GET").withPath("/files/" + COMPANY_FILE_ID + "/download-url"))
+    lynqFileStorageMock.when(request().withMethod("GET").withPath("/dmz/files/" + COMPANY_FILE_ID + "/download-url"))
         .respond(downloadUrlResponse(COMPANY_FILE_ID, COMPANY_PROFILE_IMAGE_URL));
   }
 
@@ -1149,7 +1114,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   private void stubFileStorageConfirm(String fileId) {
-    lynqFileStorageMock.when(request().withMethod("POST").withPath("/files/" + fileId + "/confirm"))
+    lynqFileStorageMock.when(request().withMethod("POST").withPath("/dmz/files/" + fileId + "/confirm"))
         .respond(response()
             .withStatusCode(200)
             .withContentType(MediaType.APPLICATION_JSON)
@@ -1165,17 +1130,17 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   private void stubFileStorageDelete(String fileId) {
-    lynqFileStorageMock.when(request().withMethod("DELETE").withPath("/files/" + fileId))
+    lynqFileStorageMock.when(request().withMethod("DELETE").withPath("/dmz/files/" + fileId))
         .respond(response().withStatusCode(204));
   }
 
   private void stubIamInvalidToken() {
-    lynqIamMock.when(request().withMethod("GET").withPath(VALIDATE_PATH))
+    lynqIamMock.when(request().withMethod("GET").withPath(USERINFO_PATH))
         .respond(response()
-            .withStatusCode(200)
+            .withStatusCode(401)
             .withContentType(MediaType.APPLICATION_JSON)
             .withBody("""
-                {"success": true, "data": false}"""));
+                {"success": false, "reason": "Invalid or expired access token"}"""));
   }
 
   private HttpResponse<String> postConfirmUploadImage(String fileId) throws Exception {
@@ -1243,107 +1208,12 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   // ---------------------------------------------------------------------------
-  // ML skill-enhance proxy
-  // ---------------------------------------------------------------------------
-
-  @Test
-  void enhanceSkillsAuthenticatesProxiesToMlWithHeadersAndReturnsSkills() throws Exception {
-    stubIamValidateToken();
-    stubIamUserInfo();
-    seedCompanyOwnerWithCompany();
-    stubMlSkillEnhance();
-
-    HttpResponse<String> response = postSkillEnhance();
-
-    assertThat(response.statusCode(), is(200));
-    Map<String, Object> body = parse(response.body());
-    assertThat(body.get("success"), is(true));
-
-    @SuppressWarnings("unchecked")
-    Map<String, Object> data = (Map<String, Object>) body.get("data");
-    @SuppressWarnings("unchecked")
-    List<String> skills = (List<String>) data.get("skills");
-    assertThat(skills, contains(SKILL_JAVA, SKILL_SPRING));
-
-    // the outbound body honours @JsonProperty("work_type") on the ML client DTO:
-    // lynq-ml (pydantic) receives the snake_cased key, not the camelCase field name
-    lynqMlMock.verify(request()
-        .withMethod("POST")
-        .withPath(ML_SKILL_ENHANCE_PATH)
-        .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .withHeader(USER_ID_HEADER, USER_ID)
-        .withHeader(COMPANY_ID_HEADER, COMPANY_ID)
-        .withBody(subString("\"work_type\"")));
-  }
-
-  @Test
-  void enhanceSkillsReturnsUnauthorizedWhenIamRejectsTokenAndDoesNotCallMl() throws Exception {
-    stubIamInvalidToken();
-    seedCompanyOwnerWithCompany();
-    stubMlSkillEnhance();
-
-    HttpResponse<String> response = postSkillEnhance();
-
-    assertThat(response.statusCode(), is(401));
-    lynqMlMock.verify(request().withPath(ML_SKILL_ENHANCE_PATH), VerificationTimes.exactly(0));
-  }
-
-  @Test
-  void enhanceSkillsReturnsForbiddenWhenRequestUuidHeaderMissing() throws Exception {
-    stubIamValidateToken();
-    stubIamUserInfo();
-    seedCompanyOwnerWithCompany();
-    stubMlSkillEnhance();
-
-    HttpRequest httpRequest = HttpRequest.newBuilder()
-        .uri(URI.create(skillEnhanceUrl()))
-        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
-        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
-        .POST(HttpRequest.BodyPublishers.ofString(skillEnhanceRequestBody()))
-        .build();
-    HttpResponse<String> response =
-        httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-
-    assertThat(response.statusCode(), is(403));
-    lynqMlMock.verify(request().withPath(ML_SKILL_ENHANCE_PATH), VerificationTimes.exactly(0));
-  }
-
-  @Test
-  void enhanceSkillsReturnsBadRequestWhenUserIsNotCompanyType() throws Exception {
-    stubIamValidateToken();
-    stubIamUserInfo();
-    seedUser(UserType.CANDIDATE);
-    stubMlSkillEnhance();
-
-    HttpResponse<String> response = postSkillEnhance();
-
-    assertThat(response.statusCode(), is(400));
-    assertThat(parse(response.body()).get("success"), is(false));
-    lynqMlMock.verify(request().withPath(ML_SKILL_ENHANCE_PATH), VerificationTimes.exactly(0));
-  }
-
-  @Test
-  void enhanceSkillsReturnsBadRequestWhenCompanyOwnerHasNoCompany() throws Exception {
-    stubIamValidateToken();
-    stubIamUserInfo();
-    seedUser(UserType.COMPANY);
-    stubMlSkillEnhance();
-
-    HttpResponse<String> response = postSkillEnhance();
-
-    assertThat(response.statusCode(), is(400));
-    assertThat(parse(response.body()).get("success"), is(false));
-    lynqMlMock.verify(request().withPath(ML_SKILL_ENHANCE_PATH), VerificationTimes.exactly(0));
-  }
-
-  // ---------------------------------------------------------------------------
   // Job upskilling-suggestion (authenticated candidate; no ownership required)
   // ---------------------------------------------------------------------------
 
   @Test
   void upskillingSuggestionBuildsRequestFromDbProxiesToMlWithHeadersAndReturnsSuggestions()
       throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCandidateWithSkills(USER_ID, FULL_NAME, CURRENT_POSITION, CANDIDATE_SKILLS);
     seedJobWithCompany(JOB_SKILLS);
@@ -1380,7 +1250,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void upskillingSuggestionForwardsUiLanguageToMlAsOutputLanguageHeader() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCandidateWithSkills(USER_ID, FULL_NAME, CURRENT_POSITION, CANDIDATE_SKILLS);
     seedJobWithCompany(JOB_SKILLS);
@@ -1413,7 +1282,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void upskillingSuggestionReturnsBadRequestWhenUserIsNotCandidate() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedUser(UserType.COMPANY);
     seedJobWithCompany(JOB_SKILLS);
@@ -1428,7 +1296,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void upskillingSuggestionReturnsNotFoundWhenJobDoesNotExist() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCandidateWithSkills(USER_ID, FULL_NAME, CURRENT_POSITION, CANDIDATE_SKILLS);
     stubMlUpskillingSuggestion();
@@ -1447,7 +1314,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   void candidateExplanationBuildsRequestFromDbProxiesToMlWithHeadersAndReturnsRecommendation()
       throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCompanyOwnerWithJob(JOB_SKILLS);
     seedCandidateWithSkills(CANDIDATE_A_ID, CANDIDATE_A_NAME, CANDIDATE_A_POSITION, CANDIDATE_SKILLS);
@@ -1498,7 +1364,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void candidateExplanationReturnsForbiddenWhenCallerDoesNotOwnJob() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCompanyOwnerWithCompany();
     seedJobOwnedBy(seedCompanyOwner(OTHER_USER_ID), JOB_SKILLS);
@@ -1515,7 +1380,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void candidateExplanationReturnsNotFoundWhenCandidateHasNotApplied() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCompanyOwnerWithJob(JOB_SKILLS);
     seedCandidateWithSkills(CANDIDATE_A_ID, CANDIDATE_A_NAME, CANDIDATE_A_POSITION, CANDIDATE_SKILLS);
@@ -1534,7 +1398,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void increaseSeenIncrementsCounterAndReturnsUpdatedValue() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedSingleJob(INITIAL_SEEN);
 
@@ -1550,7 +1413,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void increaseSeenTwiceAddsUpOnPersistedCounter() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedSingleJob(INITIAL_SEEN);
 
@@ -1565,7 +1427,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void increaseSeenReturnsNotFoundWhenJobDoesNotExist() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
 
     HttpResponse<String> response = patchIncreaseSeen(UNKNOWN_JOB_ID);
@@ -1591,7 +1452,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void applyToJobPersistsApplicationAndReturnsCreated() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedUser(UserType.CANDIDATE);
     seedSingleJob(INITIAL_SEEN);
@@ -1612,7 +1472,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void applyToJobTwiceReturnsBadRequestAndDoesNotCreateSecondApplication() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedUser(UserType.CANDIDATE);
     seedSingleJob(INITIAL_SEEN);
@@ -1627,7 +1486,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void applyToJobReturnsNotFoundWhenJobDoesNotExist() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedUser(UserType.CANDIDATE);
 
@@ -1640,7 +1498,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void applyToJobReturnsBadRequestWhenUserIsNotCandidate() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedUser(UserType.COMPANY);
     seedSingleJob(INITIAL_SEEN);
@@ -1659,7 +1516,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   @SuppressWarnings("unchecked")
   void getJobCandidatesReturnsAppliedCandidatesNewestFirst() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedJobOwnedBy(seedCompanyOwner(USER_ID), null);
     seedCandidate(CANDIDATE_A_ID, CANDIDATE_A_NAME, CANDIDATE_A_POSITION);
@@ -1690,7 +1546,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   @SuppressWarnings("unchecked")
   void getJobCandidatesDefaultsPageSizeToTen() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedJobOwnedBy(seedCompanyOwner(USER_ID), null);
     seedCandidate(CANDIDATE_A_ID, CANDIDATE_A_NAME, CANDIDATE_A_POSITION);
@@ -1707,7 +1562,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   @SuppressWarnings("unchecked")
   void getJobCandidatesReturnsEmptyContentWhenNoApplications() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedJobOwnedBy(seedCompanyOwner(USER_ID), null);
 
@@ -1723,7 +1577,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   @SuppressWarnings("unchecked")
   void getJobCandidatesIncludesLynqScoreFromMatchingSkills() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedJobOwnedBy(seedCompanyOwner(USER_ID), List.of(SKILL_JAVA, SKILL_SPRING));
     seedCandidateWithSkills(CANDIDATE_A_ID, CANDIDATE_A_NAME, CANDIDATE_A_POSITION,
@@ -1741,7 +1594,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void getJobCandidatesReturnsForbiddenWhenCallerIsNotTheJobOwner() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCompanyOwner(USER_ID);
     seedJobOwnedBy(seedCompanyOwner(OTHER_USER_ID), null);
@@ -1756,7 +1608,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void getJobCandidatesReturnsNotFoundWhenJobDoesNotExist() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCompanyOwner(USER_ID);
 
@@ -1773,7 +1624,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   @SuppressWarnings("unchecked")
   void getUserResumesReturnsJsonAndPdfLinkForCandidate() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCandidateUser();
     seedResume();
@@ -1800,7 +1650,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   @SuppressWarnings("unchecked")
   void getUserResumesReturnsEmptyWhenCandidateHasNoResumes() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedCandidateUser();
 
@@ -1813,7 +1662,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void getUserResumesReturnsBadRequestWhenUserIsNotCandidate() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
     seedUser(UserType.COMPANY);
     seedResume();
@@ -1826,7 +1674,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void getUserResumesReturnsNotFoundWhenUserDoesNotExist() throws Exception {
-    stubIamValidateToken();
     stubIamUserInfo();
 
     HttpResponse<String> response = getResumes();
@@ -1937,17 +1784,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .build());
   }
 
-  private HttpResponse<String> postSkillEnhance() throws Exception {
-    HttpRequest httpRequest = HttpRequest.newBuilder()
-        .uri(URI.create(skillEnhanceUrl()))
-        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
-        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
-        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .POST(HttpRequest.BodyPublishers.ofString(skillEnhanceRequestBody()))
-        .build();
-    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-  }
-
   private HttpResponse<String> patchIncreaseSeen(String jobId) throws Exception {
     HttpRequest httpRequest = HttpRequest.newBuilder()
         .uri(URI.create(jobSubResourceUrl(jobId, "increase-seen")))
@@ -1999,28 +1835,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .GET()
         .build();
     return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-  }
-
-  private void stubMlSkillEnhance() {
-    lynqMlMock.when(request().withMethod("POST").withPath(ML_SKILL_ENHANCE_PATH))
-        .respond(response()
-            .withStatusCode(200)
-            .withContentType(MediaType.APPLICATION_JSON)
-            .withBody("""
-                {"success": true, "data": {"skills": ["%s", "%s"]}}"""
-                .formatted(SKILL_JAVA, SKILL_SPRING)));
-  }
-
-  private String skillEnhanceRequestBody() {
-    SkillEnhanceRequest request = new SkillEnhanceRequest();
-    request.setTitle(JOB_TITLE);
-    request.setDescription(JOB_DESCRIPTION);
-    request.setWorkType(JOB_WORK_TYPE);
-    return objectMapper.writeValueAsString(request);
-  }
-
-  private String skillEnhanceUrl() {
-    return "http://localhost:" + port + CONTEXT_PATH + SKILL_ENHANCE_PROXY_PATH;
   }
 
   private HttpResponse<String> getUpskillingSuggestion(String jobId) throws Exception {

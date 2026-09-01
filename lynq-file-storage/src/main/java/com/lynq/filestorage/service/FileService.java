@@ -5,6 +5,7 @@ import com.lynq.filestorage.aspect.AuditLog;
 import com.lynq.filestorage.controller.request.CreateFileUploadRequest;
 import com.lynq.filestorage.enums.StoredFileStatus;
 import com.lynq.filestorage.exceptions.BadRequestException;
+import com.lynq.filestorage.exceptions.ForbiddenException;
 import com.lynq.filestorage.exceptions.NotFoundException;
 import com.lynq.filestorage.model.StoredFileEntity;
 import com.lynq.filestorage.repository.StoredFileRepository;
@@ -23,6 +24,7 @@ public class FileService {
   private static final String FILE_NOT_FOUND_MSG = "File '%s' not found";
   private static final String UPLOAD_NOT_COMPLETED_MSG =
       "File '%s' has no object in the bucket yet; complete the upload before confirming it";
+  private static final String NOT_THE_OWNER_MSG = "File '%s' belongs to another user";
 
   private final StoredFileRepository storedFileRepository;
   private final StorageService storageService;
@@ -34,7 +36,7 @@ public class FileService {
 
   @AuditLog
   @Transactional
-  public StoredFileEntity createUpload(CreateFileUploadRequest request) {
+  public StoredFileEntity createUpload(CreateFileUploadRequest request, String ownerUserId) {
     String fileId = Generators.timeBasedEpochGenerator().generate().toString();
     String s3Key = storageService.buildObjectKey(fileId, request.getFileName());
     LocalDateTime now = LocalDateTime.now();
@@ -44,6 +46,7 @@ public class FileService {
         .fileName(request.getFileName())
         .contentType(request.getContentType())
         .s3Key(s3Key)
+        .ownerUserId(ownerUserId)
         .status(StoredFileStatus.PENDING)
         .createdOn(now)
         .updatedOn(now)
@@ -59,8 +62,9 @@ public class FileService {
 
   @AuditLog
   @Transactional
-  public StoredFileEntity confirmUpload(String fileId) {
+  public StoredFileEntity confirmUpload(String fileId, String callerUserId) {
     StoredFileEntity storedFile = findFile(fileId);
+    requireOwner(storedFile, callerUserId);
     HeadObjectResponse metadata = storageService.findObjectMetadata(storedFile.getS3Key())
         .orElseThrow(() -> new BadRequestException(String.format(UPLOAD_NOT_COMPLETED_MSG, fileId)));
 
@@ -80,17 +84,21 @@ public class FileService {
         .orElseThrow(() -> new NotFoundException(String.format(FILE_NOT_FOUND_MSG, fileId)));
   }
 
-  /**
-   * Removes the object from the bucket and forgets its metadata. Deleting an id that is not
-   * stored is a no-op so that callers retrying a delete do not have to special-case it.
-   */
   @AuditLog
   @Transactional
-  public void deleteFile(String fileId) {
+  public void deleteFile(String fileId, String callerUserId) {
     storedFileRepository.findById(fileId).ifPresent(storedFile -> {
+      requireOwner(storedFile, callerUserId);
       storageService.deleteObject(storedFile.getS3Key());
       storedFileRepository.delete(storedFile);
     });
+  }
+
+  private void requireOwner(StoredFileEntity storedFile, String callerUserId) {
+    String owner = storedFile.getOwnerUserId();
+    if (owner != null && !owner.equals(callerUserId)) {
+      throw new ForbiddenException(String.format(NOT_THE_OWNER_MSG, storedFile.getId()));
+    }
   }
 
   @AuditLog

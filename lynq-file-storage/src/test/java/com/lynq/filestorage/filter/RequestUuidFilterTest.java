@@ -39,7 +39,7 @@ class RequestUuidFilterTest {
   private static final boolean EXPECTED_ERROR_SUCCESS_FLAG = false;
   private static final Object NO_DATA = null;
 
-  private static final String NON_WHITELISTED_PATH = "/lynq-file-storage/files";
+  private static final String NON_WHITELISTED_PATH = "/lynq-file-storage/dmz/files";
   private static final String SWAGGER_UI_HTML_PATH = "/swagger-ui.html";
   private static final String SWAGGER_UI_INDEX_PATH = "/swagger-ui/index.html";
   private static final String V3_API_DOCS_PATH = "/v3/api-docs";

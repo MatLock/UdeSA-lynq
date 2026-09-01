@@ -24,15 +24,16 @@ public interface FileController {
       @ApiResponse(responseCode = "403", description = "Missing lynq-request-uuid header")
   })
   ResponseEntity<GlobalRestResponse<CreateFileUploadRestResponse>> createUpload(
-      @Valid CreateFileUploadRequest request);
+      @Valid CreateFileUploadRequest request, String userId);
 
   @Operation(summary = "Confirm a finished upload and mark the file as AVAILABLE")
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "File confirmed"),
       @ApiResponse(responseCode = "400", description = "The object is not in the bucket yet"),
+      @ApiResponse(responseCode = "403", description = "The file belongs to another user"),
       @ApiResponse(responseCode = "404", description = "Unknown file")
   })
-  ResponseEntity<GlobalRestResponse<FileRestResponse>> confirmUpload(String fileId);
+  ResponseEntity<GlobalRestResponse<FileRestResponse>> confirmUpload(String fileId, String userId);
 
   @Operation(summary = "Get a pre-signed download URL for a file")
   @ApiResponses({
@@ -54,8 +55,9 @@ public interface FileController {
       + "deleting an unknown id succeeds without doing anything")
   @ApiResponses({
       @ApiResponse(responseCode = "204", description = "File deleted"),
-      @ApiResponse(responseCode = "403", description = "Missing lynq-request-uuid header")
+      @ApiResponse(responseCode = "403",
+          description = "Missing lynq-request-uuid header, or the file belongs to another user")
   })
-  ResponseEntity<Void> deleteFile(String fileId);
+  ResponseEntity<Void> deleteFile(String fileId, String userId);
 
 }

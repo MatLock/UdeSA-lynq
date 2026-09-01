@@ -45,5 +45,5 @@ jobs:
         # release image is built).
         env:
           LYNQ_IAM_BASE_URL: http://lynq.local/lynq-iam
-          LYNQ_BACKEND_BASE_URL: http://lynq.local/lynq-backend-app
+          LYNQ_BFF_BASE_URL: http://lynq.local/lynq-bff
         run: npm run build
