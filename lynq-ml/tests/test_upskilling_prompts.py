@@ -31,38 +31,38 @@ class RenderUpskillingPromptTests(unittest.TestCase):
         # ollama.jinja embeds llama chat special tokens (sent with raw=True).
         self.assertIn("<|begin_of_text|>", prompt)
 
-    def test_openai_template_contains_input(self) -> None:
-        prompt = render_upskilling_prompt(LLMProvider.OPENAI, input_json=_INPUT_JSON)
+    def test_bedrock_template_contains_input(self) -> None:
+        prompt = render_upskilling_prompt(LLMProvider.BEDROCK, input_json=_INPUT_JSON)
 
         self.assertIn("Backend role", prompt)
         self.assertIn("Junior dev", prompt)
-        # openai.jinja is plain text: no llama chat tokens.
+        # bedrock.jinja is plain text: no llama chat tokens.
         self.assertNotIn("<|begin_of_text|>", prompt)
 
     def test_both_templates_declare_the_same_output_schema(self) -> None:
-        for provider in (LLMProvider.OLLAMA, LLMProvider.OPENAI):
+        for provider in (LLMProvider.OLLAMA, LLMProvider.BEDROCK):
             prompt = render_upskilling_prompt(provider, input_json=_INPUT_JSON)
             self.assertIn('"outcome"', prompt)
             self.assertIn('"reasons"', prompt)
             self.assertIn('"search_queries"', prompt)
 
     def test_language_code_is_resolved_to_name_in_prompt(self) -> None:
-        for provider in (LLMProvider.OLLAMA, LLMProvider.OPENAI):
+        for provider in (LLMProvider.OLLAMA, LLMProvider.BEDROCK):
             prompt = render_upskilling_prompt(
                 provider, input_json=_INPUT_JSON, language="es"
             )
             self.assertIn("Spanish", prompt)
 
     def test_language_defaults_to_english_when_omitted(self) -> None:
-        for provider in (LLMProvider.OLLAMA, LLMProvider.OPENAI):
+        for provider in (LLMProvider.OLLAMA, LLMProvider.BEDROCK):
             prompt = render_upskilling_prompt(provider, input_json=_INPUT_JSON)
             self.assertIn("English", prompt)
 
     def test_provider_selects_distinct_templates(self) -> None:
         ollama = render_upskilling_prompt(LLMProvider.OLLAMA, input_json=_INPUT_JSON)
-        openai = render_upskilling_prompt(LLMProvider.OPENAI, input_json=_INPUT_JSON)
+        bedrock = render_upskilling_prompt(LLMProvider.BEDROCK, input_json=_INPUT_JSON)
 
-        self.assertNotEqual(ollama, openai)
+        self.assertNotEqual(ollama, bedrock)
 
     def test_missing_variable_raises_under_strict_undefined(self) -> None:
         # The environment uses StrictUndefined, so rendering without input_json

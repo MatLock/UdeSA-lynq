@@ -33,6 +33,10 @@ spec:
       containers:
         - name: lynq-bff
           image: {{ .Values.lynq_bff.image }}
+          {{- with .Values.lynq_bff.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           envFrom:
             - configMapRef:
                 name: lynq-bff-config

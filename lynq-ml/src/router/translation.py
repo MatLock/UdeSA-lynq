@@ -6,11 +6,10 @@ import json
 import logging
 from typing import Annotated
 
-import httpx
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import ValidationError
 
-from llm_client import get_llm_client
+from llm_client import LLMError, get_llm_client
 from model.resume_extractor import Resume
 from model.translation import TranslateRequest
 from prompt.translation import render_translation_prompt
@@ -50,7 +49,7 @@ async def translate(
 
     try:
         raw = await client.generate(prompt)
-    except httpx.HTTPError as exc:
+    except LLMError as exc:
         log.error(
             "message= Error when executing translate, LLM request failed, "
             + _LOG_CONTEXT,

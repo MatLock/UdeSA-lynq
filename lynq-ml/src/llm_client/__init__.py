@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import os
 
-from .base import LLMClient, LLMProvider
+from .base import LLMClient, LLMError, LLMProvider
+from .bedrock_client import BedrockClient
 from .ollama_client import OllamaClient
-from .openai_client import OpenAIClient
 
-__all__ = ["LLMClient", "LLMProvider", "get_llm_client"]
+__all__ = ["LLMClient", "LLMError", "LLMProvider", "get_llm_client"]
+
+_DEFAULT_REGION = "us-east-1"
 
 
 def get_llm_client() -> LLMClient:
@@ -18,10 +20,14 @@ def get_llm_client() -> LLMClient:
     environment:
 
     - Ollama: ``OLLAMA_BASE_URL`` (default ``http://localhost:11434``),
-      ``OLLAMA_MODEL`` (default ``llama3``).
-    - OpenAI: ``OPENAI_API_KEY`` (required), ``OPENAI_MODEL``
-      (default ``gpt-4o-mini``), ``OPENAI_BASE_URL``
-      (default ``https://api.openai.com/v1``).
+      ``OLLAMA_MODEL`` (default ``llama3.1``).
+    - Bedrock: ``BEDROCK_MODEL_ID`` (required — any Converse-capable model,
+      e.g. ``anthropic.claude-sonnet-4-5-20250929-v1:0`` or
+      ``amazon.nova-pro-v1:0``), ``BEDROCK_REGION`` (falls back to
+      ``AWS_REGION``, then ``us-east-1``), ``BEDROCK_MAX_TOKENS``
+      (default ``4096``), ``BEDROCK_TEMPERATURE`` (default ``0``),
+      ``BEDROCK_MAX_ATTEMPTS`` (default ``3``). Credentials come from the
+      standard AWS chain — env vars, profile, or the pod's IAM role.
 
     Shared: ``LLM_TIMEOUT`` seconds (default ``60``).
 
@@ -44,12 +50,14 @@ def get_llm_client() -> LLMClient:
             timeout=timeout,
         )
 
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY is required when LLM_PROVIDER=openai")
-    return OpenAIClient(
-        api_key=api_key,
-        model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-        base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+    model = os.getenv("BEDROCK_MODEL_ID")
+    if not model:
+        raise ValueError("BEDROCK_MODEL_ID is required when LLM_PROVIDER=bedrock")
+    return BedrockClient(
+        model=model,
+        region=os.getenv("BEDROCK_REGION") or os.getenv("AWS_REGION") or _DEFAULT_REGION,
         timeout=timeout,
+        max_tokens=int(os.getenv("BEDROCK_MAX_TOKENS", "4096")),
+        temperature=float(os.getenv("BEDROCK_TEMPERATURE", "0")),
+        max_attempts=int(os.getenv("BEDROCK_MAX_ATTEMPTS", "3")),
     )

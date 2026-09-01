@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import httpx
 
-from .base import LLMClient, LLMProvider
+from .base import LLMClient, LLMError, LLMProvider
 
 
 class OllamaClient(LLMClient):
@@ -29,10 +29,15 @@ class OllamaClient(LLMClient):
             "stream": False,
             "format": "json",
         }
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(f"{self.base_url}/api/generate", json=payload)
-            response.raise_for_status()
-            return response.json()["response"]
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    f"{self.base_url}/api/generate", json=payload
+                )
+                response.raise_for_status()
+                return response.json()["response"]
+        except httpx.HTTPError as exc:
+            raise LLMError(f"Ollama request failed: {exc}") from exc
 
     async def health_check(self) -> bool:
         try:

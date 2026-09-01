@@ -10,7 +10,11 @@ class LLMProvider(str, Enum):
     """Supported LLM backends."""
 
     OLLAMA = "ollama"
-    OPENAI = "openai"
+    BEDROCK = "bedrock"
+
+
+class LLMError(RuntimeError):
+    """Raised when the backend is unreachable or answers with an error."""
 
 
 class LLMClient(ABC):
@@ -29,6 +33,9 @@ class LLMClient(ABC):
         Returns:
             The model's raw completion text (expected to be JSON for the
             key-extractor prompts).
+
+        Raises:
+            LLMError: If the backend could not be reached or refused the call.
         """
 
     @abstractmethod

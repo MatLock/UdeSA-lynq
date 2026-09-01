@@ -28,9 +28,9 @@ class RenderKeyExtractorPromptTests(unittest.TestCase):
         # ollama.jinja embeds llama chat special tokens (sent with raw=True).
         self.assertIn("<|begin_of_text|>", prompt)
 
-    def test_openai_template_contains_job_data(self) -> None:
+    def test_bedrock_template_contains_job_data(self) -> None:
         prompt = render_key_extractor_prompt(
-            LLMProvider.OPENAI,
+            LLMProvider.BEDROCK,
             job_title="Frontend Developer",
             work_type="IN_OFFICE",
             job_description="React and TypeScript.",
@@ -45,9 +45,9 @@ class RenderKeyExtractorPromptTests(unittest.TestCase):
             job_title="X", work_type="REMOTE", job_description="Y"
         )
         ollama = render_key_extractor_prompt(LLMProvider.OLLAMA, **kwargs)
-        openai = render_key_extractor_prompt(LLMProvider.OPENAI, **kwargs)
+        bedrock = render_key_extractor_prompt(LLMProvider.BEDROCK, **kwargs)
 
-        self.assertNotEqual(ollama, openai)
+        self.assertNotEqual(ollama, bedrock)
 
     def test_missing_variable_raises_under_strict_undefined(self) -> None:
         # The environment uses StrictUndefined, so rendering the template

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/coverage-ml.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml)
 
-Machine-learning service for the Lynq platform. A FastAPI app that augments the platform with LLM-backed features, served behind the standard `lynq-request-uuid` correlation header and the platform's `GlobalRestResponse` envelope. All features are backed by a pluggable LLM client (a local **Ollama** model by default, or **OpenAI**). It exposes:
+Machine-learning service for the Lynq platform. A FastAPI app that augments the platform with LLM-backed features, served behind the standard `lynq-request-uuid` correlation header and the platform's `GlobalRestResponse` envelope. All features are backed by a pluggable LLM client (a local **Ollama** model by default, or **Amazon Bedrock**). It exposes:
 
 - **Skill enhancement** — extract key technical skills from a job posting.
 - **Resume skill extraction** — consolidate a whole resume's skills into technical/tools/soft buckets.
@@ -39,9 +39,9 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
 | Language          | Python 3.12                                                               |
 | Framework         | FastAPI 0.139 (Starlette), served by Uvicorn 0.50                         |
 | Validation        | Pydantic 2                                                                |
-| LLM backends      | Ollama (`/api/generate`, raw mode) or OpenAI-compatible `/chat/completions` |
+| LLM backends      | Ollama (`/api/generate`, raw mode) or Amazon Bedrock (`converse`, any model) |
 | Prompting         | Jinja2 templates, one variant per provider                                |
-| HTTP client       | httpx (async)                                                             |
+| HTTP client       | httpx (async) for Ollama, boto3 for Bedrock                               |
 | Document parsing  | pypdf + python-docx (resume reader helpers)                               |
 | Logging           | stdlib `logging` + `contextvars` MDC for per-request correlation IDs      |
 | Build             | Dockerfile on `python:3.12-slim`                                          |
@@ -78,8 +78,8 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
               │                                       │
               ▼                                       ▼
         selects provider                    ┌────────────────────┐
-        from LLM_PROVIDER                    │ Ollama  /  OpenAI  │
-                                             │  HTTP API          │
+        from LLM_PROVIDER                    │ Ollama  /  Bedrock │
+                                             │  HTTP / converse   │
                                              └────────────────────┘
 ```
 
@@ -89,8 +89,8 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
 - **Exception handlers** (`exception_handlers.py`) — the `HTTPException`, `RequestValidationError`, and catch-all handlers that render the standard error envelope; `register_exception_handlers(app)` attaches them.
 - **Middleware** (`middleware/`) — `require_request_uuid` enforces the `lynq-request-uuid` header on every non-exempt route and binds it to the logging context.
 - **Feature router** (`skill_enhance/`) — the `POST /dmz/skill-enhance` endpoint plus its request/response models and the Jinja prompt renderer.
-- **LLM clients** (`llm_client/`) — a common `LLMClient` interface with `OllamaClient` and `OpenAIClient` implementations, selected by the `get_llm_client()` factory from environment configuration.
-- **Prompts** (`resources/prompts/`) — provider-specific Jinja templates (`job_post_skill_extraction/ollama.jinja`, `job_post_skill_extraction/openai.jinja`).
+- **LLM clients** (`llm_client/`) — a common `LLMClient` interface with `OllamaClient` and `BedrockClient` implementations, selected by the `get_llm_client()` factory from environment configuration. Both raise `LLMError` on a backend failure, so the routers answer `502` without knowing which provider is configured.
+- **Prompts** (`resources/prompts/`) — provider-specific Jinja templates (`job_post_skill_extraction/ollama.jinja`, `job_post_skill_extraction/bedrock.jinja`).
 - **Response envelopes** (`response/`) — `GlobalRestResponse` / `ErrorRestResponse`, mirroring the Java services.
 - **Logging context** (`logging_context.py`) — the MDC-style request-UUID contextvar and logging filter.
 - **Document helpers** (`file_downloader/`, `file_reader/`) — download a resume from a presigned S3 URL and extract text from PDF/DOCX. Building blocks not yet exposed via an endpoint.
@@ -128,17 +128,17 @@ sequenceDiagram
     participant R as skill_enhance router
     participant F as get_llm_client
     participant P as render_key_extractor_prompt
-    participant L as LLM (Ollama / OpenAI)
+    participant L as LLM (Ollama / Bedrock)
 
     C->>M: POST /lynq-ml/dmz/skill-enhance<br/>headers: lynq-request-uuid, user-id<br/>body: {title, description, work_type}
     M->>R: forward (request UUID bound to logging context)
     R->>F: get_llm_client()  (reads LLM_PROVIDER)
-    F-->>R: LLMClient (Ollama or OpenAI)
+    F-->>R: LLMClient (Ollama or Bedrock)
     R->>P: render prompt for client.provider
     P-->>R: rendered prompt
     R->>L: client.generate(prompt)
     alt transport error
-        L-->>R: httpx.HTTPError
+        L-->>R: LLMError
         R-->>C: 502 "LLM request failed: ..."
     else response returned
         L-->>R: raw completion (JSON)
@@ -523,7 +523,7 @@ curl http://localhost:8084/lynq-ml/health
 **Prerequisites**
 
 - Python 3.12
-- A reachable LLM backend — either a local Ollama server (default) or an OpenAI API key.
+- A reachable LLM backend — either a local Ollama server (default) or AWS credentials allowed to invoke a Bedrock model.
 
 **Steps**
 
@@ -546,12 +546,22 @@ python src/main.py
 
 Service URL: `http://localhost:8084/lynq-ml` (health at `/lynq-ml/health`).
 
-To use OpenAI instead of a local model:
+To use Amazon Bedrock instead of a local model. `BEDROCK_MODEL_ID` is any model
+the Converse API accepts, so the provider is a config choice, not a code change:
 
 ```bash
-LLM_PROVIDER=openai OPENAI_API_KEY=sk-... source ./set_env.sh
+export AWS_PROFILE=lynq            # or AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+LLM_PROVIDER=bedrock \
+  BEDROCK_MODEL_ID=anthropic.claude-sonnet-4-5-20250929-v1:0 \
+  BEDROCK_REGION=us-east-1 \
+  source ./set_env.sh
 python src/main.py
 ```
+
+Swapping the model is only a variable — `amazon.nova-pro-v1:0`,
+`meta.llama3-3-70b-instruct-v1:0` and `mistral.*` need no code change. The model
+must be enabled in that region's Bedrock console, and the caller needs
+`bedrock:InvokeModel` on it.
 
 ---
 
@@ -580,13 +590,15 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 
 | Variable          | Default                     | Used when            | Purpose                                              |
 | ----------------- | --------------------------- | -------------------- | ---------------------------------------------------- |
-| `LLM_PROVIDER`    | `ollama`                    | always               | Selects the LLM backend: `ollama` or `openai`.       |
+| `LLM_PROVIDER`    | `ollama`                    | always               | Selects the LLM backend: `ollama` or `bedrock`.      |
 | `LLM_TIMEOUT`     | `60`                        | always               | LLM request timeout, in seconds.                     |
 | `OLLAMA_BASE_URL` | `http://localhost:11434`    | `LLM_PROVIDER=ollama`| Ollama server base URL.                              |
 | `OLLAMA_MODEL`    | `llama3.1`                  | `LLM_PROVIDER=ollama`| Ollama model name.                                   |
-| `OPENAI_API_KEY`  | — (required)                | `LLM_PROVIDER=openai`| OpenAI API key.                                      |
-| `OPENAI_MODEL`    | `gpt-4o-mini`               | `LLM_PROVIDER=openai`| OpenAI model name.                                   |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | `LLM_PROVIDER=openai`| OpenAI-compatible API base URL.                      |
+| `BEDROCK_MODEL_ID` | — (required)               | `LLM_PROVIDER=bedrock`| Any Converse-capable model id (`anthropic.*`, `amazon.nova-*`, `meta.llama*`, `mistral.*`). |
+| `BEDROCK_REGION`  | `AWS_REGION`, else `us-east-1` | `LLM_PROVIDER=bedrock`| Region whose Bedrock endpoint is called.        |
+| `BEDROCK_MAX_TOKENS` | `4096`                   | `LLM_PROVIDER=bedrock`| `inferenceConfig.maxTokens` per request.          |
+| `BEDROCK_TEMPERATURE` | `0`                     | `LLM_PROVIDER=bedrock`| `inferenceConfig.temperature` per request.        |
+| `BEDROCK_MAX_ATTEMPTS` | `3`                    | `LLM_PROVIDER=bedrock`| botocore retry attempts (standard mode).          |
 | `UDEMY_MAX_COURSES` | `2`                       | `/upskilling_suggestion` | Max courses returned per topic.                   |
 | `UDEMY_BASE_URL`  | `https://www.udemy.com`     | `/upskilling_suggestion` | Udemy base URL (course + search links).          |
 | `COURSE_SEARCH_TIMEOUT` | `15`                  | `/upskilling_suggestion` | Web-search request timeout, in seconds.          |
@@ -616,7 +628,7 @@ python -m unittest discover
 PYTHONPATH=src python -m unittest discover -s tests
 ```
 
-Coverage includes the `skill-enhance` and `health` endpoints, the request-UUID middleware and logging context, the prompt renderer, the `get_llm_client` factory, and the Ollama/OpenAI client HTTP behaviour.
+Coverage includes the `skill-enhance` and `health` endpoints, the request-UUID middleware and logging context, the prompt renderer, the `get_llm_client` factory, and the Ollama (httpx mocked) and Bedrock (boto3 mocked) clients.
 
 ---
 
@@ -656,7 +668,7 @@ lynq-ml/
 │   ├── llm_client/
 │   │   ├── base.py             # LLMClient interface, LLMProvider enum
 │   │   ├── ollama_client.py    # Ollama implementation
-│   │   ├── openai_client.py    # OpenAI implementation
+│   │   ├── bedrock_client.py   # Amazon Bedrock (Converse) implementation
 │   │   └── __init__.py         # get_llm_client() factory
 │   ├── udemy_client/
 │   │   ├── search_client.py    # keyless Udemy course search (+ fallback)
@@ -669,8 +681,8 @@ lynq-ml/
 ├── resources/                  # service config + assets (loaded at runtime)
 │   ├── log_config.json         # logging dictConfig
 │   └── prompts/
-│       ├── job_post_skill_extraction/ # ollama.jinja, openai.jinja
-│       └── upskilling_suggestion/     # ollama.jinja, openai.jinja
+│       ├── job_post_skill_extraction/ # ollama.jinja, bedrock.jinja
+│       └── upskilling_suggestion/     # ollama.jinja, bedrock.jinja
 ├── tests/                      # unittest suite (puts src/ on the path)
 ├── set_env.sh                  # environment defaults
 ├── Dockerfile

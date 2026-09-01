@@ -19,3 +19,4 @@ httpx==0.28.1
 httpcore==1.0.9
 certifi==2026.6.17
 weasyprint==62.3
+boto3==1.43.86

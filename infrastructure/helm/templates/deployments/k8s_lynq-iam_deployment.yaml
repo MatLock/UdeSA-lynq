@@ -30,6 +30,10 @@ spec:
       containers:
         - name: lynq-iam
           image: {{ .Values.lynq_iam.image }}
+          {{- with .Values.lynq_iam.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           envFrom:
             - configMapRef:
                 name: lynq-iam-config

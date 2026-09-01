@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 from fastapi.testclient import TestClient
 
-from llm_client import LLMProvider
+from llm_client import LLMError, LLMProvider
 from main import app
 from udemy_client import Course
 
@@ -152,7 +152,7 @@ class UpskillingRouterTests(unittest.TestCase):
         get_udemy.assert_not_called()
 
     def test_returns_502_when_llm_request_fails(self) -> None:
-        llm = _fake_llm(generate_side_effect=httpx.ConnectError("connection refused"))
+        llm = _fake_llm(generate_side_effect=LLMError("connection refused"))
 
         with patch("router.upskilling_suggestion.get_llm_client", return_value=llm):
             response = self.client.post(_ENDPOINT, json=_BODY, headers=_HEADERS)

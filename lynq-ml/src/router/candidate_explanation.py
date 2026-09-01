@@ -7,10 +7,9 @@ import logging
 import re
 from typing import Annotated
 
-import httpx
 from fastapi import APIRouter, Header, HTTPException
 
-from llm_client import get_llm_client
+from llm_client import LLMError, get_llm_client
 from response import GlobalRestResponse
 
 from model.candidate_explanation import (
@@ -94,7 +93,7 @@ async def candidate_explanation(
 
     try:
         raw = await client.generate(prompt)
-    except httpx.HTTPError as exc:
+    except LLMError as exc:
         log.error(
             "message= Error when executing candidate-explanation, LLM request failed, "
             + _LOG_CONTEXT,

@@ -34,7 +34,7 @@ class HealthEndpointTests(unittest.TestCase):
 
     def test_returns_503_and_down_when_llm_unreachable(self) -> None:
         fake = MagicMock()
-        fake.provider = LLMProvider.OPENAI
+        fake.provider = LLMProvider.BEDROCK
         fake.health_check = AsyncMock(return_value=False)
 
         with patch("router.health.get_llm_client", return_value=fake):
@@ -43,7 +43,7 @@ class HealthEndpointTests(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         body = response.json()
         self.assertEqual(body["status"], "DOWN")
-        self.assertEqual(body["llm"], {"provider": "openai", "status": "DOWN"})
+        self.assertEqual(body["llm"], {"provider": "bedrock", "status": "DOWN"})
 
     def test_returns_503_when_client_misconfigured(self) -> None:
         with patch("router.health.get_llm_client", side_effect=ValueError("bad config")):

@@ -20,6 +20,8 @@ locals {
     "lynq_file_storage.config.DB_URL"          = local.db_url_file_storage
     "lynq_file_storage.config.AWS_BUCKET_NAME" = var.s3_bucket_name
     "lynq_ml.config.OLLAMA_BASE_URL"           = var.ollama_base_url
+    "lynq_ml.config.BEDROCK_MODEL_ID"          = var.bedrock_model_id
+    "lynq_ml.config.BEDROCK_REGION"            = var.bedrock_region
   }
 }
 
@@ -119,6 +121,8 @@ resource "kubernetes_secret" "file_storage" {
   depends_on = [kubernetes_namespace.lynq]
 }
 
+# lynq-ml calls Bedrock, so it gets its own least-privilege access key —
+# scoped to InvokeModel, separate from the S3 one lynq-file-storage uses.
 resource "kubernetes_secret" "ml" {
   metadata {
     name      = "lynq-ml-secret"
@@ -126,7 +130,8 @@ resource "kubernetes_secret" "ml" {
   }
   type = "Opaque"
   data = {
-    OPENAI_API_KEY = var.openai_api_key
+    AWS_ACCESS_KEY_ID     = aws_iam_access_key.ml_bedrock.id
+    AWS_SECRET_ACCESS_KEY = aws_iam_access_key.ml_bedrock.secret
   }
   depends_on = [kubernetes_namespace.lynq]
 }

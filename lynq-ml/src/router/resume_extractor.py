@@ -6,13 +6,12 @@ import json
 import logging
 from typing import Annotated
 
-import httpx
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from pydantic import ValidationError
 
 from file_reader.resume_reader import read_resume
-from llm_client import get_llm_client
+from llm_client import LLMError, get_llm_client
 from response import GlobalRestResponse
 
 from model.resume_extractor import ParseResumeRequest, Resume
@@ -81,7 +80,7 @@ async def parse_resume(
 
     try:
         raw = await client.generate(prompt)
-    except httpx.HTTPError as exc:
+    except LLMError as exc:
         log.error(
             "message= Error when executing parse-resume, LLM request failed, "
             + _LOG_CONTEXT,

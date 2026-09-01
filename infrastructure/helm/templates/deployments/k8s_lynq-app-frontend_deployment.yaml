@@ -21,6 +21,10 @@ spec:
       containers:
         - name: lynq-app-frontend
           image: {{ .Values.lynq_app_frontend.image }}
+          {{- with .Values.lynq_app_frontend.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           # Defaults to the image published per release (local ingress URLs baked
           # in). IfNotPresent so an override to a locally-built/loaded image (e.g.
           # lynq-app-frontend:local via `minikube image load`) is used as-is.

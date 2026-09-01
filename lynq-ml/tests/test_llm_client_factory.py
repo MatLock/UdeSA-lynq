@@ -6,8 +6,8 @@ import unittest
 from unittest.mock import patch
 
 from llm_client import LLMProvider, get_llm_client
+from llm_client.bedrock_client import BedrockClient
 from llm_client.ollama_client import OllamaClient
-from llm_client.openai_client import OpenAIClient
 
 
 class GetLLMClientTests(unittest.TestCase):
@@ -39,28 +39,67 @@ class GetLLMClientTests(unittest.TestCase):
         self.assertEqual(client.model, "mistral")
         self.assertEqual(client.timeout, 30.0)
 
-    def test_openai_requires_api_key(self) -> None:
-        with patch.dict("os.environ", {"LLM_PROVIDER": "openai"}, clear=True):
+    def test_bedrock_requires_model_id(self) -> None:
+        with patch.dict("os.environ", {"LLM_PROVIDER": "bedrock"}, clear=True):
             with self.assertRaises(ValueError) as ctx:
                 get_llm_client()
 
-        self.assertIn("OPENAI_API_KEY", str(ctx.exception))
+        self.assertIn("BEDROCK_MODEL_ID", str(ctx.exception))
 
-    def test_openai_built_with_env_settings(self) -> None:
+    def test_bedrock_built_with_env_settings(self) -> None:
         env = {
-            "LLM_PROVIDER": "openai",
-            "OPENAI_API_KEY": "sk-test",
-            "OPENAI_MODEL": "gpt-4o",
-            "OPENAI_BASE_URL": "https://proxy.example.com/v1/",
+            "LLM_PROVIDER": "bedrock",
+            "BEDROCK_MODEL_ID": "amazon.nova-pro-v1:0",
+            "BEDROCK_REGION": "sa-east-1",
+            "BEDROCK_MAX_TOKENS": "1024",
+            "BEDROCK_TEMPERATURE": "0.3",
+            "BEDROCK_MAX_ATTEMPTS": "5",
+            "LLM_TIMEOUT": "45",
         }
         with patch.dict("os.environ", env, clear=True):
             client = get_llm_client()
 
-        self.assertIsInstance(client, OpenAIClient)
-        self.assertEqual(client.provider, LLMProvider.OPENAI)
-        self.assertEqual(client.api_key, "sk-test")
-        self.assertEqual(client.model, "gpt-4o")
-        self.assertEqual(client.base_url, "https://proxy.example.com/v1")
+        self.assertIsInstance(client, BedrockClient)
+        self.assertEqual(client.provider, LLMProvider.BEDROCK)
+        self.assertEqual(client.model, "amazon.nova-pro-v1:0")
+        self.assertEqual(client.region, "sa-east-1")
+        self.assertEqual(client.max_tokens, 1024)
+        self.assertEqual(client.temperature, 0.3)
+        self.assertEqual(client.max_attempts, 5)
+        self.assertEqual(client.timeout, 45.0)
+
+    def test_bedrock_model_id_is_provider_agnostic(self) -> None:
+        env = {
+            "LLM_PROVIDER": "bedrock",
+            "BEDROCK_MODEL_ID": "anthropic.claude-sonnet-4-5-20250929-v1:0",
+        }
+        with patch.dict("os.environ", env, clear=True):
+            client = get_llm_client()
+
+        self.assertEqual(client.model, "anthropic.claude-sonnet-4-5-20250929-v1:0")
+
+    def test_bedrock_region_falls_back_to_aws_region_then_default(self) -> None:
+        env = {
+            "LLM_PROVIDER": "bedrock",
+            "BEDROCK_MODEL_ID": "amazon.nova-lite-v1:0",
+            "AWS_REGION": "eu-west-1",
+        }
+        with patch.dict("os.environ", env, clear=True):
+            self.assertEqual(get_llm_client().region, "eu-west-1")
+
+        del env["AWS_REGION"]
+        with patch.dict("os.environ", env, clear=True):
+            self.assertEqual(get_llm_client().region, "us-east-1")
+
+    def test_bedrock_defaults(self) -> None:
+        env = {"LLM_PROVIDER": "bedrock", "BEDROCK_MODEL_ID": "amazon.nova-lite-v1:0"}
+        with patch.dict("os.environ", env, clear=True):
+            client = get_llm_client()
+
+        self.assertEqual(client.max_tokens, 4096)
+        self.assertEqual(client.temperature, 0.0)
+        self.assertEqual(client.max_attempts, 3)
+        self.assertEqual(client.timeout, 60.0)
 
     def test_uppercase_provider_is_normalised(self) -> None:
         with patch.dict("os.environ", {"LLM_PROVIDER": "OLLAMA"}, clear=True):
@@ -68,8 +107,8 @@ class GetLLMClientTests(unittest.TestCase):
 
         self.assertIsInstance(client, OllamaClient)
 
-    def test_unknown_provider_raises(self) -> None:
-        with patch.dict("os.environ", {"LLM_PROVIDER": "gemini"}, clear=True):
+    def test_openai_is_no_longer_a_provider(self) -> None:
+        with patch.dict("os.environ", {"LLM_PROVIDER": "openai"}, clear=True):
             with self.assertRaises(ValueError) as ctx:
                 get_llm_client()
 

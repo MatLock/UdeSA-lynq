@@ -6,10 +6,9 @@ import json
 import logging
 from typing import Annotated, Optional
 
-import httpx
 from fastapi import APIRouter, Header, HTTPException
 
-from llm_client import get_llm_client
+from llm_client import LLMError, get_llm_client
 from response import GlobalRestResponse
 
 from model.skill_enhance import SkillEnhanceRequest, SkillEnhanceResponse
@@ -53,7 +52,7 @@ async def skill_enhance(
 
     try:
         raw = await client.generate(prompt)
-    except httpx.HTTPError as exc:
+    except LLMError as exc:
         log.error(
             "message= Error when executing skill-enhance, LLM request failed, "
             + _LOG_CONTEXT,

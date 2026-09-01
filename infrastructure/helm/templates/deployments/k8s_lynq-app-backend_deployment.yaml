@@ -33,6 +33,10 @@ spec:
       containers:
         - name: lynq-app-backend
           image: {{ .Values.lynq_app_backend.image }}
+          {{- with .Values.lynq_app_backend.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           envFrom:
             - configMapRef:
                 name: lynq-app-backend-config

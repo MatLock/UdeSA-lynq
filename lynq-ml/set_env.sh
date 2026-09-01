@@ -8,10 +8,10 @@
 #
 # Override any value beforehand and it is respected, e.g.:
 #
-#   LLM_PROVIDER=openai OPENAI_API_KEY=sk-... source ./set_env.sh
+#   LLM_PROVIDER=bedrock BEDROCK_MODEL_ID=amazon.nova-pro-v1:0 source ./set_env.sh
 
 # ----------------------------------------------------------------------------
-# LLM provider selection: "ollama" (default) or "openai".
+# LLM provider selection: "ollama" (default) or "bedrock".
 # ----------------------------------------------------------------------------
 export LLM_PROVIDER="${LLM_PROVIDER:-ollama}"
 
@@ -25,16 +25,27 @@ export OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://localhost:11434}"
 export OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1}"
 
 # ----------------------------------------------------------------------------
-# OpenAI settings (used when LLM_PROVIDER=openai).
-# OPENAI_API_KEY has no default and MUST be provided when using OpenAI.
+# Amazon Bedrock settings (used when LLM_PROVIDER=bedrock).
+#
+# BEDROCK_MODEL_ID has no default and MUST be provided: it is any model id the
+# Converse API accepts, so the same code serves Claude, Nova, Llama or Mistral.
+#
+#   anthropic.claude-sonnet-4-5-20250929-v1:0
+#   amazon.nova-pro-v1:0
+#   meta.llama3-3-70b-instruct-v1:0
+#
+# Credentials come from the standard AWS chain (env vars, ~/.aws/credentials
+# profile, or the pod's IAM role) — the service never reads a key of its own.
 # ----------------------------------------------------------------------------
-export OPENAI_API_KEY="${OPENAI_API_KEY:-}"
-export OPENAI_MODEL="${OPENAI_MODEL:-gpt-4o-mini}"
-export OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}"
+export BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-}"
+export BEDROCK_REGION="${BEDROCK_REGION:-${AWS_REGION:-us-east-1}}"
+export BEDROCK_MAX_TOKENS="${BEDROCK_MAX_TOKENS:-4096}"
+export BEDROCK_TEMPERATURE="${BEDROCK_TEMPERATURE:-0}"
+export BEDROCK_MAX_ATTEMPTS="${BEDROCK_MAX_ATTEMPTS:-3}"
 
-# Warn early if OpenAI is selected without an API key.
-if [[ "$LLM_PROVIDER" == "openai" ]] && [[ -z "$OPENAI_API_KEY" ]]; then
-  echo "WARNING: LLM_PROVIDER=openai but OPENAI_API_KEY is empty." >&2
+# Warn early if Bedrock is selected without a model id.
+if [[ "$LLM_PROVIDER" == "bedrock" ]] && [[ -z "$BEDROCK_MODEL_ID" ]]; then
+  echo "WARNING: LLM_PROVIDER=bedrock but BEDROCK_MODEL_ID is empty." >&2
 fi
 
 # ----------------------------------------------------------------------------
