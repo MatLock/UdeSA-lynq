@@ -20,13 +20,16 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/files")
+@RequestMapping("/dmz/files")
 @Validated
 public class FileControllerImpl implements com.lynq.filestorage.controller.FileController {
+
+  private static final String USER_ID_HEADER = "user-id";
 
   private final FileService fileService;
 
@@ -38,8 +41,9 @@ public class FileControllerImpl implements com.lynq.filestorage.controller.FileC
   @PostMapping("/upload-url")
   @AuditLog
   public ResponseEntity<GlobalRestResponse<CreateFileUploadRestResponse>> createUpload(
-      @Valid @RequestBody CreateFileUploadRequest request) {
-    StoredFileEntity storedFile = fileService.createUpload(request);
+      @Valid @RequestBody CreateFileUploadRequest request,
+      @RequestHeader(USER_ID_HEADER) String userId) {
+    StoredFileEntity storedFile = fileService.createUpload(request, userId);
     PreSignedUploadUrl preSignedUploadUrl = fileService.createUploadUrl(storedFile);
 
     CreateFileUploadRestResponse response = CreateFileUploadRestResponse.builder()
@@ -56,8 +60,9 @@ public class FileControllerImpl implements com.lynq.filestorage.controller.FileC
   @Override
   @PostMapping("/{fileId}/confirm")
   @AuditLog
-  public ResponseEntity<GlobalRestResponse<FileRestResponse>> confirmUpload(@PathVariable String fileId) {
-    StoredFileEntity storedFile = fileService.confirmUpload(fileId);
+  public ResponseEntity<GlobalRestResponse<FileRestResponse>> confirmUpload(
+      @PathVariable String fileId, @RequestHeader(USER_ID_HEADER) String userId) {
+    StoredFileEntity storedFile = fileService.confirmUpload(fileId, userId);
 
     FileRestResponse response = FileRestResponse.builder()
         .fileId(storedFile.getId())
@@ -101,8 +106,9 @@ public class FileControllerImpl implements com.lynq.filestorage.controller.FileC
   @Override
   @DeleteMapping("/{fileId}")
   @AuditLog
-  public ResponseEntity<Void> deleteFile(@PathVariable String fileId) {
-    fileService.deleteFile(fileId);
+  public ResponseEntity<Void> deleteFile(
+      @PathVariable String fileId, @RequestHeader(USER_ID_HEADER) String userId) {
+    fileService.deleteFile(fileId, userId);
 
     return ResponseEntity.noContent().build();
   }

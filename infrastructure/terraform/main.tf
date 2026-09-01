@@ -74,6 +74,18 @@ resource "kubernetes_secret" "iam" {
   depends_on = [kubernetes_namespace.lynq]
 }
 
+resource "kubernetes_secret" "bff" {
+  metadata {
+    name      = "lynq-bff-secret"
+    namespace = var.namespace
+  }
+  type = "Opaque"
+  data = {
+    JWT_SECRET = var.jwt_secret
+  }
+  depends_on = [kubernetes_namespace.lynq]
+}
+
 # No bucket credentials here: lynq-app-backend delegates all file handling to
 # lynq-file-storage and holds only the file ids it returns.
 resource "kubernetes_secret" "backend" {
@@ -145,6 +157,7 @@ resource "helm_release" "lynq" {
     kubernetes_namespace.lynq,
     kubernetes_secret.dockerhub,
     kubernetes_secret.iam,
+    kubernetes_secret.bff,
     kubernetes_secret.backend,
     kubernetes_secret.file_storage,
     kubernetes_secret.ml,

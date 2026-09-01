@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lynq-bff-config
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-bff
+data:
+{{- range $key, $value := .Values.lynq_bff.config }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}

@@ -53,7 +53,7 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
                         ┌───────────────────────────┐
                         │       Client (HTTP)       │
                         └─────────────┬─────────────┘
-                                      │  lynq-request-uuid, user-id, company-id
+                                      │  lynq-request-uuid, user-id, company-id?
                                       ▼
                 ┌───────────────────────────────────────────┐
                 │            HTTP middleware                │
@@ -63,7 +63,7 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
                               │
                               ▼
                 ┌─────────────────────────────────┐
-                │        skill_enhance router     │  POST /lynq-ml/skill-enhance
+                │        skill_enhance router     │  POST /lynq-ml/dmz/skill-enhance
                 └─────────────┬───────────────────┘
                               │
               ┌───────────────┼────────────────────┐
@@ -86,7 +86,7 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
 - **Entrypoint** (`main.py`) — builds the FastAPI app, registers the request-UUID middleware, wires the standard exception handlers (from `exception_handlers.py`), mounts the `/lynq-ml` router (health + feature routers), and configures logging.
 - **Exception handlers** (`exception_handlers.py`) — the `HTTPException`, `RequestValidationError`, and catch-all handlers that render the standard error envelope; `register_exception_handlers(app)` attaches them.
 - **Middleware** (`middleware/`) — `require_request_uuid` enforces the `lynq-request-uuid` header on every non-exempt route and binds it to the logging context.
-- **Feature router** (`skill_enhance/`) — the `POST /skill-enhance` endpoint plus its request/response models and the Jinja prompt renderer.
+- **Feature router** (`skill_enhance/`) — the `POST /dmz/skill-enhance` endpoint plus its request/response models and the Jinja prompt renderer.
 - **LLM clients** (`llm_client/`) — a common `LLMClient` interface with `OllamaClient` and `OpenAIClient` implementations, selected by the `get_llm_client()` factory from environment configuration.
 - **Prompts** (`resources/prompts/`) — provider-specific Jinja templates (`skill_extractor/ollama.jinja`, `skill_extractor/openai.jinja`).
 - **Response envelopes** (`response/`) — `GlobalRestResponse` / `ErrorRestResponse`, mirroring the Java services.
@@ -128,7 +128,7 @@ sequenceDiagram
     participant P as render_key_extractor_prompt
     participant L as LLM (Ollama / OpenAI)
 
-    C->>M: POST /lynq-ml/skill-enhance<br/>headers: lynq-request-uuid, user-id, company-id<br/>body: {title, description, work_type}
+    C->>M: POST /lynq-ml/dmz/skill-enhance<br/>headers: lynq-request-uuid, user-id<br/>body: {title, description, work_type}
     M->>R: forward (request UUID bound to logging context)
     R->>F: get_llm_client()  (reads LLM_PROVIDER)
     F-->>R: LLMClient (Ollama or OpenAI)
@@ -153,19 +153,34 @@ sequenceDiagram
 
 ## API reference
 
-Base path: `/lynq-ml`. All routes require the `lynq-request-uuid` header **except** `/lynq-ml/health`.
+Base path: `/lynq-ml`. Every business route lives behind the DMZ prefix `/lynq-ml/dmz`, reached only
+from inside the platform — either through **lynq-bff**, the gateway that validates the JWT
+signature, or from **lynq-app-backend** for the evaluations it assembles from its own database.
+`/lynq-ml/health` stays outside the DMZ so infra probes can call it directly.
+
+`user-id` and `company-id` are **log fields only**: neither reaches a prompt or any decision. That is
+why `company-id` is optional on `skill-enhance`, which lynq-bff calls directly and which therefore
+has no company to report.
+
+> `parse-resume` and `resume-template-creation` take a URL (`preSignedUrl`, `profile_url`,
+> `put_resume_url`) and hand it to `urllib.request.urlopen` server-side without validating the
+> scheme or the host. That is safe only because the URLs are minted by lynq-file-storage and the
+> endpoints are not reachable from a browser — lynq-bff refuses to relay them. Validate the URL here
+> before opening either one up.
+
+All routes require the `lynq-request-uuid` header **except** `/lynq-ml/health`.
 
 | Method | Path                       | Extra headers required          | Description                                            |
 | ------ | -------------------------- | ------------------------------- | ------------------------------------------------------ |
-| POST   | `/skill-enhance`           | `user-id`, `company-id`         | Extract 5–15 key technical skills from a job posting.  |
-| POST   | `/upskilling_suggestion`   | `user-id`, `company-id`         | Assess a candidate vs. a job; return a verdict + Udemy courses for each gap. |
-| POST   | `/candidate-explanation`   | `user-id`, `company-id`         | Assess a candidate vs. a job; return a hiring verdict with strengths and concerns. |
-| POST   | `/parse-resume`            | `user-id`                       | Download a resume (PDF/DOCX) from a presigned URL and structure it into JSON. |
-| POST   | `/translate`               | `user-id`                       | Translate every value of a structured resume into a target language. |
-| POST   | `/resume-template-creation`| `user-id`                       | Render a structured resume into a styled PDF and upload it to a presigned URL. |
+| POST   | `/dmz/skill-enhance`           | `user-id` (`company-id` optional) | Extract 5–15 key technical skills from a job posting. Called straight through lynq-bff. |
+| POST   | `/dmz/upskilling_suggestion`   | `user-id`, `company-id`         | Assess a candidate vs. a job; return a verdict + Udemy courses for each gap. |
+| POST   | `/dmz/candidate-explanation`   | `user-id`, `company-id`         | Assess a candidate vs. a job; return a hiring verdict with strengths and concerns. |
+| POST   | `/dmz/parse-resume`            | `user-id`                       | Download a resume (PDF/DOCX) from a presigned URL and structure it into JSON. |
+| POST   | `/dmz/translate`               | `user-id`                       | Translate every value of a structured resume into a target language. |
+| POST   | `/dmz/resume-template-creation`| `user-id`                       | Render a structured resume into a styled PDF and upload it to a presigned URL. |
 | GET    | `/health`                  | —                               | Liveness/readiness probe; reports service + LLM status.|
 
-**`POST /skill-enhance`** request body:
+**`POST /dmz/skill-enhance`** request body:
 
 ```json
 {
@@ -181,7 +196,7 @@ Base path: `/lynq-ml`. All routes require the `lynq-request-uuid` header **excep
 { "success": true, "data": { "skills": ["Java", "Spring", "AWS", "REST", "Docker"] } }
 ```
 
-**`POST /upskilling_suggestion`** request body (the same `{ job, candidate }` structure the prompt consumes):
+**`POST /dmz/upskilling_suggestion`** request body (the same `{ job, candidate }` structure the prompt consumes):
 
 ```json
 {
@@ -219,7 +234,7 @@ A perfect match yields `outcome: "You are perfect for this role."` and an empty 
 
 **Course lookup requires no API key.** Each search query is resolved by a keyless provider that finds real Udemy course links via a public web search and, when that is rate-limited or unavailable, falls back to a deterministic Udemy search deep-link for the topic — so the endpoint always returns useful links. Results are capped at `UDEMY_MAX_COURSES` (default **2**) per topic. (The Udemy Affiliate API is deprecated and is not used.)
 
-**`POST /candidate-explanation`** takes the **same** `{ job, candidate }` payload as `/upskilling_suggestion`, but returns a recruiter-oriented hiring recommendation instead of course links. The response is wrapped in `GlobalRestResponse<CandidateExplanationResponse>`:
+**`POST /dmz/candidate-explanation`** takes the **same** `{ job, candidate }` payload as `/upskilling_suggestion`, but returns a recruiter-oriented hiring recommendation instead of course links. The response is wrapped in `GlobalRestResponse<CandidateExplanationResponse>`:
 
 ```json
 {
@@ -235,7 +250,7 @@ A perfect match yields `outcome: "You are perfect for this role."` and an empty 
 
 `recommendation` is a short verdict label (e.g. `hire`, `no_hire`, `maybe`); `strengths` and `concerns` break the reasoning into points for and against hiring.
 
-**`POST /parse-resume`** downloads a resume document (PDF/DOCX) from a presigned URL, extracts its text, and structures it into JSON via the LLM. Request body (the client sends camelCase; `pre_signed_url` is also accepted):
+**`POST /dmz/parse-resume`** downloads a resume document (PDF/DOCX) from a presigned URL, extracts its text, and structures it into JSON via the LLM. Request body (the client sends camelCase; `pre_signed_url` is also accepted):
 
 ```json
 { "preSignedUrl": "https://s3.amazonaws.com/bucket/cv.pdf?X-Amz-Signature=..." }
@@ -277,7 +292,7 @@ The response is wrapped in `GlobalRestResponse<Resume>`. `Resume` is a rich, ful
 
 Unsupported document types return `400`; download/parse failures and malformed LLM output return `502`.
 
-**`POST /translate`** translates every value of a structured resume into a target language. It reuses the `Resume` model from `/parse-resume`, so it is the natural next step in the pipeline. Request body:
+**`POST /dmz/translate`** translates every value of a structured resume into a target language. It reuses the `Resume` model from `/parse-resume`, so it is the natural next step in the pipeline. Request body:
 
 ```json
 {
@@ -288,7 +303,7 @@ Unsupported document types return `400`; download/parse failures and malformed L
 
 `language` is validated against the `Language` enum — `EN`, `ES`, `FR`, `PR` (mirrors `com.lynq.backend.enums.Language`); any other value fails validation. The response is the translated resume wrapped in `GlobalRestResponse<Resume>`.
 
-**`POST /resume-template-creation`** renders a structured resume into a styled PDF (Jinja + WeasyPrint) and uploads it to a caller-provided presigned S3 PUT URL — the service never holds AWS credentials. Request body:
+**`POST /dmz/resume-template-creation`** renders a structured resume into a styled PDF (Jinja + WeasyPrint) and uploads it to a caller-provided presigned S3 PUT URL — the service never holds AWS credentials. Request body:
 
 ```json
 {
@@ -321,7 +336,7 @@ Returns `201 Created` with an empty `GlobalRestResponse` once the PDF has been g
 **Extract skills**
 
 ```bash
-curl -X POST http://localhost:8084/lynq-ml/skill-enhance \
+curl -X POST http://localhost:8084/lynq-ml/dmz/skill-enhance \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
   -H "user-id: user-1" \
@@ -336,7 +351,7 @@ curl -X POST http://localhost:8084/lynq-ml/skill-enhance \
 **Upskilling suggestion**
 
 ```bash
-curl -X POST http://localhost:8084/lynq-ml/upskilling_suggestion \
+curl -X POST http://localhost:8084/lynq-ml/dmz/upskilling_suggestion \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
   -H "user-id: user-1" \
@@ -356,7 +371,7 @@ curl -X POST http://localhost:8084/lynq-ml/upskilling_suggestion \
 **Candidate explanation**
 
 ```bash
-curl -X POST http://localhost:8084/lynq-ml/candidate-explanation \
+curl -X POST http://localhost:8084/lynq-ml/dmz/candidate-explanation \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
   -H "user-id: user-1" \
@@ -376,7 +391,7 @@ curl -X POST http://localhost:8084/lynq-ml/candidate-explanation \
 **Parse resume**
 
 ```bash
-curl -X POST http://localhost:8084/lynq-ml/parse-resume \
+curl -X POST http://localhost:8084/lynq-ml/dmz/parse-resume \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
   -H "user-id: user-1" \
@@ -386,7 +401,7 @@ curl -X POST http://localhost:8084/lynq-ml/parse-resume \
 **Translate resume**
 
 ```bash
-curl -X POST http://localhost:8084/lynq-ml/translate \
+curl -X POST http://localhost:8084/lynq-ml/dmz/translate \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
   -H "user-id: user-1" \
@@ -399,7 +414,7 @@ curl -X POST http://localhost:8084/lynq-ml/translate \
 **Create resume template (PDF)**
 
 ```bash
-curl -X POST http://localhost:8084/lynq-ml/resume-template-creation \
+curl -X POST http://localhost:8084/lynq-ml/dmz/resume-template-creation \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
   -H "user-id: user-1" \

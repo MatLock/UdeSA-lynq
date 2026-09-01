@@ -80,10 +80,19 @@ lynq_ml:
     UDEMY_BASE_URL: https://www.udemy.com
     COURSE_SEARCH_TIMEOUT: "15"
 
+lynq_bff:
+  replicas: 1
+  image: matlock0o/lynq:lynq-bff-1.0.12-SNAPSHOT
+  path: /lynq-bff
+  config:
+    SPRING_PROFILES_ACTIVE: production
+    LYNQ_BACKEND_URL: http://lynq-app-backend-service:8080/lynq-backend-app
+    LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
+    LYNQ_FILE_STORAGE_URL: http://lynq-file-storage-service:8080/lynq-file-storage
+
 lynq_app_backend:
   replicas: 1
   image: matlock0o/lynq:lynq-app-backend-1.0.12-SNAPSHOT
-  path: /lynq-backend-app
   config:
     SPRING_PROFILES_ACTIVE: production
     DB_URL: "jdbc:mysql://REPLACE_DB_HOST:3306/lynq_backend_db"
@@ -97,7 +106,6 @@ lynq_app_backend:
 lynq_file_storage:
   replicas: 1
   image: matlock0o/lynq:lynq-file-storage-1.0.12-SNAPSHOT
-  path: /lynq-file-storage
   config:
     SPRING_PROFILES_ACTIVE: production
     DB_URL: "jdbc:mysql://REPLACE_DB_HOST:3306/lynq_file_storage_db"

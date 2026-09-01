@@ -5,12 +5,15 @@ import com.lynq.backend.client.LynqFileStorageClient;
 import com.lynq.backend.client.request.CreateFileDownloadBatchRequest;
 import com.lynq.backend.client.request.CreateFileUploadRequest;
 import com.lynq.backend.client.response.CreateFileUploadResponse;
+import com.lynq.backend.security.LynqUserPrincipal;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.slf4j.MDC;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 /**
@@ -40,7 +43,7 @@ public class FileStorageService {
         .build();
 
     CreateFileUploadResponse response =
-        lynqFileStorageClient.createUpload(request, requestUuid()).getData();
+        lynqFileStorageClient.createUpload(request, requestUuid(), authenticatedUserId()).getData();
 
     return new RegisteredUpload(response.getFileId(), response.getUploadUrl());
   }
@@ -51,7 +54,7 @@ public class FileStorageService {
    */
   @AuditLog
   public void confirmUpload(String fileId) {
-    lynqFileStorageClient.confirmUpload(fileId, requestUuid());
+    lynqFileStorageClient.confirmUpload(fileId, requestUuid(), authenticatedUserId());
   }
 
   /**
@@ -96,7 +99,7 @@ public class FileStorageService {
     if (isBlank(fileId)) {
       return;
     }
-    lynqFileStorageClient.deleteFile(fileId, requestUuid());
+    lynqFileStorageClient.deleteFile(fileId, requestUuid(), authenticatedUserId());
   }
 
   private static boolean isBlank(String value) {
@@ -110,6 +113,14 @@ public class FileStorageService {
   private static String requestUuid() {
     String requestUuid = MDC.get(MDC_REQUEST_ID);
     return isBlank(requestUuid) ? UUID.randomUUID().toString() : requestUuid;
+  }
+
+  private static String authenticatedUserId() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication == null || !(authentication.getPrincipal() instanceof LynqUserPrincipal principal)) {
+      throw new IllegalStateException("No authenticated user to attribute the file operation to");
+    }
+    return principal.getId();
   }
 
 }

@@ -2,6 +2,7 @@ package com.lynq.filestorage.controller.handler;
 
 import com.lynq.filestorage.controller.response.ErrorRestResponse;
 import com.lynq.filestorage.exceptions.BadRequestException;
+import com.lynq.filestorage.exceptions.ForbiddenException;
 import com.lynq.filestorage.exceptions.NotFoundException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -29,6 +30,14 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
     log.error("message= Bad request", ex);
     return ResponseEntity
         .status(HttpStatus.BAD_REQUEST)
+        .body(new ErrorRestResponse<>(null, ex.getMessage()));
+  }
+
+  @ExceptionHandler(ForbiddenException.class)
+  public ResponseEntity<ErrorRestResponse<Void>> handleForbidden(ForbiddenException ex) {
+    log.error("message= Forbidden", ex);
+    return ResponseEntity
+        .status(HttpStatus.FORBIDDEN)
         .body(new ErrorRestResponse<>(null, ex.getMessage()));
   }
 

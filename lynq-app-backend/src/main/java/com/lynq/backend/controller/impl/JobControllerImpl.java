@@ -28,7 +28,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/job")
+@RequestMapping("/dmz/job")
 @Validated
 public class JobControllerImpl implements JobController {
 

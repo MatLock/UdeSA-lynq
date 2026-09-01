@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/company")
+@RequestMapping("/dmz/company")
 @Validated
 public class CompanyControllerImpl implements com.lynq.backend.controller.CompanyController {
 

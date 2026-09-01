@@ -68,7 +68,7 @@ class RequestUuidContextIntegrationTests(unittest.TestCase):
         try:
             with patch("router.skill_enhance.get_llm_client", return_value=fake):
                 response = self.client.post(
-                    "/lynq-ml/skill-enhance",
+                    "/lynq-ml/dmz/skill-enhance",
                     json={"title": "t", "description": "d", "work_type": "REMOTE"},
                     headers={
                         "lynq-request-uuid": "req-abc",

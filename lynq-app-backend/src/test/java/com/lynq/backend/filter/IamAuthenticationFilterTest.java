@@ -84,24 +84,8 @@ class IamAuthenticationFilterTest {
   }
 
   @Test
-  void writesUnauthorizedWhenTokenValidationReturnsFalse() throws Exception {
-    stubHeaders();
-    when(lynqIamClient.validateToken(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
-        .thenReturn(new GlobalRestResponse<>(true, Boolean.FALSE));
-    when(response.getWriter()).thenReturn(responseWriter);
-
-    filter.doFilterInternal(request, response, filterChain);
-
-    verify(response).setStatus(UNAUTHORIZED);
-    verify(filterChain, never()).doFilter(any(), any());
-    verify(lynqIamClient, never()).getUserInfo(any(), any());
-  }
-
-  @Test
   void writesUnauthorizedWhenUserInfoIsMissing() throws Exception {
     stubHeaders();
-    when(lynqIamClient.validateToken(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
-        .thenReturn(new GlobalRestResponse<>(true, Boolean.TRUE));
     when(lynqIamClient.getUserInfo(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
         .thenReturn(new GlobalRestResponse<>(true, null));
     when(response.getWriter()).thenReturn(responseWriter);
@@ -115,8 +99,6 @@ class IamAuthenticationFilterTest {
   @Test
   void loadsUserIntoSecurityContextAndDelegatesWhenTokenIsValid() throws Exception {
     stubHeaders();
-    when(lynqIamClient.validateToken(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
-        .thenReturn(new GlobalRestResponse<>(true, Boolean.TRUE));
     when(lynqIamClient.getUserInfo(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
         .thenReturn(new GlobalRestResponse<>(true, new UserInfoResponse(USER_ID, USERNAME, EMAIL)));
 
@@ -141,7 +123,7 @@ class IamAuthenticationFilterTest {
   @Test
   void writesUnauthorizedWhenIamRejectsToken() throws Exception {
     stubHeaders();
-    when(lynqIamClient.validateToken(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
+    when(lynqIamClient.getUserInfo(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
         .thenThrow(unauthorizedFeignException());
     when(response.getWriter()).thenReturn(responseWriter);
 
@@ -155,7 +137,7 @@ class IamAuthenticationFilterTest {
   void writesServiceUnavailableWhenIamCallFails() throws Exception {
     stubHeaders();
     StringWriter responseBody = new StringWriter();
-    when(lynqIamClient.validateToken(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
+    when(lynqIamClient.getUserInfo(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
         .thenThrow(serviceUnavailableFeignException());
     when(response.getWriter()).thenReturn(new PrintWriter(responseBody));
 
@@ -173,16 +155,16 @@ class IamAuthenticationFilterTest {
   }
 
   private static FeignException unauthorizedFeignException() {
-    return FeignException.errorStatus("LynqIamClient#validateToken", dummyResponse(HttpStatus.UNAUTHORIZED.value()));
+    return FeignException.errorStatus("LynqIamClient#getUserInfo", dummyResponse(HttpStatus.UNAUTHORIZED.value()));
   }
 
   private static FeignException serviceUnavailableFeignException() {
-    return FeignException.errorStatus("LynqIamClient#validateToken", dummyResponse(HttpStatus.SERVICE_UNAVAILABLE.value()));
+    return FeignException.errorStatus("LynqIamClient#getUserInfo", dummyResponse(HttpStatus.SERVICE_UNAVAILABLE.value()));
   }
 
   private static feign.Response dummyResponse(int status) {
     Request request = Request.create(
-        Request.HttpMethod.GET, "http://localhost/lynq-iam/auth/validate",
+        Request.HttpMethod.GET, "http://localhost/lynq-iam/auth/user-info",
         Collections.emptyMap(), Request.Body.empty(), null);
     return feign.Response.builder()
         .status(status)

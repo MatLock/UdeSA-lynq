@@ -11,7 +11,7 @@ from llm_client import LLMProvider
 from main import app
 from middleware.request_uuid import REQUEST_UUID_HEADER
 
-_SKILL_ENHANCE = "/lynq-ml/skill-enhance"
+_SKILL_ENHANCE = "/lynq-ml/dmz/skill-enhance"
 
 _BODY = {
     "title": "Backend Developer",

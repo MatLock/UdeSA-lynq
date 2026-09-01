@@ -65,17 +65,36 @@ services:
       lynq-file-storage:
         condition: service_started
 
+  lynq-bff:
+    build: ./lynq-bff
+    ports:
+      - "8087:8080"
+      - "8088:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=production
+      - JWT_SECRET=${JWT_SECRET}
+      - LYNQ_BACKEND_URL=http://lynq-app-backend:8080/lynq-backend-app
+      - LYNQ_ML_URL=http://lynq-ml:8084/lynq-ml
+      - LYNQ_FILE_STORAGE_URL=http://lynq-file-storage:8080/lynq-file-storage
+    depends_on:
+      lynq-app-backend:
+        condition: service_started
+      lynq-file-storage:
+        condition: service_started
+      lynq-ml:
+        condition: service_started
+
   lynq-app-frontend:
     build:
       context: ./lynq-app-frontend
       args:
         - LYNQ_IAM_BASE_URL=${LYNQ_IAM_BASE_URL:-http://localhost:8080/lynq-iam}
-        - LYNQ_BACKEND_BASE_URL=${LYNQ_BACKEND_BASE_URL:-http://localhost:8082/lynq-backend-app}
+        - LYNQ_BFF_BASE_URL=${LYNQ_BFF_BASE_URL:-http://localhost:8087/lynq-bff}
     ports:
       - "3000:8080"
     depends_on:
       - lynq-iam
-      - lynq-app-backend
+      - lynq-bff
 
   ollama:
     image: ollama/ollama:latest

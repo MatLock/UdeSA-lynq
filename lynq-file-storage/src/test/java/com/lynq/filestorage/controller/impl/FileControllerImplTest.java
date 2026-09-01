@@ -24,6 +24,7 @@ import org.springframework.http.ResponseEntity;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,6 +37,8 @@ class FileControllerImplTest {
   private static final String S3_KEY = "lynq/" + FILE_ID + "/" + FILE_NAME;
   private static final String UPLOAD_URL = "https://s3.local/upload?signature=abc";
   private static final String DOWNLOAD_URL = "https://s3.local/download?signature=abc";
+
+  private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
 
   @Mock
   private FileService fileService;
@@ -50,11 +53,12 @@ class FileControllerImplTest {
   @Test
   void createUploadReturnsCreatedWithTheFileIdAndThePreSignedUploadUrl() {
     StoredFileEntity storedFile = buildStoredFile(StoredFileStatus.PENDING);
-    when(fileService.createUpload(any(CreateFileUploadRequest.class))).thenReturn(storedFile);
+    when(fileService.createUpload(any(CreateFileUploadRequest.class), eq(USER_ID)))
+        .thenReturn(storedFile);
     when(fileService.createUploadUrl(storedFile)).thenReturn(new PreSignedUploadUrl(S3_KEY, UPLOAD_URL));
 
     ResponseEntity<GlobalRestResponse<CreateFileUploadRestResponse>> response =
-        fileController.createUpload(buildRequest());
+        fileController.createUpload(buildRequest(), USER_ID);
 
     assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
     assertThat(response.getBody().isSuccess(), is(true));
@@ -65,9 +69,11 @@ class FileControllerImplTest {
 
   @Test
   void confirmUploadReturnsOkWithTheAvailableFileMetadata() {
-    when(fileService.confirmUpload(FILE_ID)).thenReturn(buildStoredFile(StoredFileStatus.AVAILABLE));
+    when(fileService.confirmUpload(FILE_ID, USER_ID))
+        .thenReturn(buildStoredFile(StoredFileStatus.AVAILABLE));
 
-    ResponseEntity<GlobalRestResponse<FileRestResponse>> response = fileController.confirmUpload(FILE_ID);
+    ResponseEntity<GlobalRestResponse<FileRestResponse>> response =
+        fileController.confirmUpload(FILE_ID, USER_ID);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData().getFileId(), is(FILE_ID));
@@ -103,10 +109,10 @@ class FileControllerImplTest {
 
   @Test
   void deleteFileReturnsNoContentAndDelegatesToTheService() {
-    ResponseEntity<Void> response = fileController.deleteFile(FILE_ID);
+    ResponseEntity<Void> response = fileController.deleteFile(FILE_ID, USER_ID);
 
     assertThat(response.getStatusCode(), is(HttpStatus.NO_CONTENT));
-    verify(fileService).deleteFile(FILE_ID);
+    verify(fileService).deleteFile(FILE_ID, USER_ID);
   }
 
   private CreateFileUploadRequest buildRequest() {

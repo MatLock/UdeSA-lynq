@@ -18,9 +18,13 @@ This repository is the umbrella for all modules that make up the platform. Each 
 
 The identity and access management module for Lynq. It handles user accounts and sign-in, keeps sessions secure, and acts as the gatekeeper that lets the rest of the platform know who is making each request.
 
+### lynq-bff &nbsp; [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-bff-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-bff-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/jacoco-bff.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-bff-test-workflow.yaml)
+
+The gateway module for Lynq — the single entry point from the frontend into the platform. It verifies the signature of every access token and then relays the request, unchanged, to whichever service owns it: lynq-app-backend, lynq-ml or lynq-file-storage. Those three expose their APIs behind a `/dmz` prefix and are reached only through here, which is why none of them has to check the token's signature for itself.
+
 ### lynq-app-backend &nbsp; [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-app-backend-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-app-backend-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/jacoco-app-backend.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-app-backend-test-workflow.yaml)
 
-The core application backend for Lynq. It exposes the platform's REST API, enforcing authenticated and audited access on top of the identity provided by lynq-iam, and backs the candidate-facing experience — listings, applications, and tracking — with persistent storage and caching.
+The core application backend for Lynq. It exposes the platform's REST API under a `/dmz` prefix, reached only through lynq-bff, and backs the candidate-facing experience — listings, applications, and tracking — with persistent storage and caching. It resolves the caller's identity from lynq-iam on every request; verifying the token's signature is lynq-bff's job.
 
 ### lynq-file-storage &nbsp; [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-file-storage-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-file-storage-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/jacoco-file-storage.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-file-storage-test-workflow.yaml)
 
@@ -28,7 +32,7 @@ The file service for Lynq. It owns every file the platform stores — profile im
 
 ### lynq-app-frontend
 
-The candidate-facing web app for Lynq, built with React 19 and Vite. It delivers the interactive experience — sign-in, the job feed, profiles, applications, and job creation — talking to lynq-iam for identity and to lynq-app-backend for platform data.
+The candidate-facing web app for Lynq, built with React 19 and Vite. It delivers the interactive experience — sign-in, the job feed, profiles, applications, and job creation — talking to lynq-iam for identity and to lynq-bff for everything else.
 
 ### lynq-ml &nbsp; [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/coverage-ml.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml)
 
@@ -55,4 +59,4 @@ The full platform is orchestrated with Docker Compose. From the repository root:
 docker compose up
 ```
 
-This brings up the application modules (`lynq-iam`, `lynq-app-backend`, `lynq-file-storage`, `lynq-app-frontend`, `lynq-ml`) together with their infrastructure dependencies: MySQL, Redis, LocalStack, and an Ollama model server (pulled on first start). Each module can also be built and run on its own — see the individual module READMEs for details.
+This brings up the application modules (`lynq-iam`, `lynq-bff`, `lynq-app-backend`, `lynq-file-storage`, `lynq-app-frontend`, `lynq-ml`) together with their infrastructure dependencies: MySQL, Redis, LocalStack, and an Ollama model server (pulled on first start). Each module can also be built and run on its own — see the individual module READMEs for details.

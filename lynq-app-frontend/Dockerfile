@@ -4,9 +4,9 @@ WORKDIR /app
 
 # Vite bakes env vars at build time, so they must be present during `vite build`.
 ARG LYNQ_IAM_BASE_URL
-ARG LYNQ_BACKEND_BASE_URL
+ARG LYNQ_BFF_BASE_URL
 ENV LYNQ_IAM_BASE_URL=${LYNQ_IAM_BASE_URL}
-ENV LYNQ_BACKEND_BASE_URL=${LYNQ_BACKEND_BASE_URL}
+ENV LYNQ_BFF_BASE_URL=${LYNQ_BFF_BASE_URL}
 
 COPY package*.json ./
 RUN npm ci --ignore-scripts

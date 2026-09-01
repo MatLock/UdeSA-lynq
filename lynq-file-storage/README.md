@@ -62,7 +62,7 @@ Callers keep only the **file id** it hands back. [`lynq-app-backend`](../lynq-ap
                └────────────────┬────────────────┘
                                 ▼
                ┌─────────────────────────────────┐
-               │        FileControllerImpl       │  @RestController, /files/*
+               │        FileControllerImpl       │  @RestController, /dmz/files/*
                └────────────────┬────────────────┘
                                 ▼
                ┌─────────────────────────────────┐
@@ -121,7 +121,7 @@ sequenceDiagram
     participant St as StorageService
     participant S3 as Bucket
 
-    C->>Ctrl: POST /files/upload-url { fileName, contentType? }
+    C->>Ctrl: POST /dmz/files/upload-url { fileName, contentType? }
     Ctrl->>Svc: createUpload(request)
     Svc->>Svc: fileId = UUIDv7, s3Key = lynq/{fileId}/{fileName}
     Svc->>DB: INSERT stored_files (status = PENDING)
@@ -130,7 +130,7 @@ sequenceDiagram
     Ctrl-->>C: 201 { fileId, s3Key, uploadUrl }
 
     C->>S3: PUT bytes to uploadUrl
-    C->>Ctrl: POST /files/{fileId}/confirm
+    C->>Ctrl: POST /dmz/files/{fileId}/confirm
     Ctrl->>Svc: confirmUpload(fileId)
     Svc->>St: HEAD s3Key
     alt object missing
@@ -160,7 +160,7 @@ sequenceDiagram
     participant DB as MySQL
     participant St as StorageService
 
-    C->>Ctrl: POST /files/download-urls { fileIds: [...] }
+    C->>Ctrl: POST /dmz/files/download-urls { fileIds: [...] }
     Ctrl->>Svc: createDownloadUrls(fileIds)
     Svc->>DB: findAllById(distinct ids)
     loop each known file
@@ -169,11 +169,11 @@ sequenceDiagram
     Ctrl-->>C: 200 { fileId: downloadUrl, … }
 ```
 
-Unknown ids are **omitted** from the batch response rather than failing it, so one stale reference cannot break a whole page. The single-file `GET /files/{fileId}/download-url` does the opposite: an unknown id is a `404`.
+Unknown ids are **omitted** from the batch response rather than failing it, so one stale reference cannot break a whole page. The single-file `GET /dmz/files/{fileId}/download-url` does the opposite: an unknown id is a `404`.
 
 ### 3. Replace or delete a file
 
-There is no update-in-place: replacing a file means registering a new one and deleting the old. `DELETE /files/{fileId}` removes the object from the bucket and forgets the metadata, and is **idempotent** — deleting an id that is not stored succeeds without doing anything, so a retried delete is safe.
+There is no update-in-place: replacing a file means registering a new one and deleting the old. `DELETE /dmz/files/{fileId}` removes the object from the bucket and forgets the metadata, and is **idempotent** — deleting an id that is not stored succeeds without doing anything, so a retried delete is safe.
 
 `lynq-app-backend` drives exactly this when a user picks a new profile picture: it registers the replacement, points the entity at the new id, and deletes the file it replaced.
 
@@ -200,16 +200,37 @@ A `PENDING` row whose upload is never completed leaves metadata with no object b
 
 ## API reference
 
-Base path: `/lynq-file-storage` (Spring `server.servlet.context-path`).
+Base path: `/lynq-file-storage` (Spring `server.servlet.context-path`), with every endpoint behind
+the DMZ prefix `/dmz` — this service is reached only through [`lynq-bff`](../lynq-bff), which
+validates the access token's signature before proxying.
 **Every** request must include the `lynq-request-uuid` header; requests without it are rejected with `403`.
 
-| Method | Path                          | Body / Params                    | Description                                                     |
-| ------ | ----------------------------- | -------------------------------- | --------------------------------------------------------------- |
-| POST   | `/files/upload-url`           | `{fileName, contentType?}`       | Register a file as `PENDING`; returns `{fileId, s3Key, uploadUrl}` (`201`). |
-| POST   | `/files/{fileId}/confirm`     | —                                | Confirm a finished upload; marks the file `AVAILABLE` (`200`).   |
-| GET    | `/files/{fileId}/download-url`| —                                | Pre-signed GET URL for one file (`200`).                        |
-| POST   | `/files/download-urls`        | `{fileIds: [ … ]}` (1–100)       | Pre-signed GET URLs for a batch, keyed by file id (`200`).      |
-| DELETE | `/files/{fileId}`             | —                                | Delete the object and its metadata; idempotent (`204`).         |
+The three endpoints that **change** a file also require a `user-id` header — set by lynq-bff from
+the verified token, or by lynq-app-backend from the authenticated principal. See
+[Ownership](#ownership) below.
+
+| Method | Path                          | `user-id` | Description                                                     |
+| ------ | ----------------------------- | :-------: | --------------------------------------------------------------- |
+| POST   | `/dmz/files/upload-url`           | required | Register a file as `PENDING` and record the caller as its owner; returns `{fileId, s3Key, uploadUrl}` (`201`). Body: `{fileName, contentType?}`. |
+| POST   | `/dmz/files/{fileId}/confirm`     | required | Confirm a finished upload; marks the file `AVAILABLE` (`200`). `403` if the file belongs to someone else. |
+| GET    | `/dmz/files/{fileId}/download-url`| —        | Pre-signed GET URL for one file (`200`). Not owner-scoped.      |
+| POST   | `/dmz/files/download-urls`        | —        | Pre-signed GET URLs for a batch, keyed by file id (`200`). Body: `{fileIds: [ … ]}` (1–100). Not owner-scoped. |
+| DELETE | `/dmz/files/{fileId}`             | required | Delete the object and its metadata; idempotent (`204`). `403` if the file belongs to someone else. |
+
+### Ownership
+
+`stored_files.owner_user_id` records who registered a file, and only that user may **confirm** or
+**delete** it. Anyone else gets a `403`.
+
+Reads are deliberately **not** owner-scoped. Profile images, company logos and candidate résumés are
+meant to be shown to users other than the one who uploaded them, so an owner-only rule on download
+URLs would break the job feed and the candidate list. There the file id is the capability:
+lynq-app-backend only hands out the ids a caller is entitled to see, and the ids themselves are
+never enumerated.
+
+Rows created before `changelog/ddl/02-add-stored-file-owner.sql` have no recorded owner and stay
+mutable — otherwise replacing a profile image uploaded before the migration would start failing.
+Every file registered from then on has one.
 
 OpenAPI / Swagger UI is exposed at `/lynq-file-storage/swagger-ui.html` (springdoc default).
 
@@ -228,6 +249,7 @@ Errors are wrapped in `ErrorRestResponse` (`{ success:false, data, reason }`). M
 | `BadRequestException`                | 400         |
 | bean-validation failure              | 400 (`{ reason: "Invalid Fields Found", data: { field → message } }`) |
 | missing `lynq-request-uuid` header   | 403         |
+| `ForbiddenException` (the file belongs to another user) | 403 |
 | `NotFoundException`                  | 404         |
 | `IllegalArgumentException`           | 409         |
 | any other exception                  | 500         |
@@ -244,14 +266,17 @@ Validation rules on the request bodies:
 
 ## Sample requests
 
-> Substitute `$UUID` with any UUID you generate per request (e.g. `uuidgen`).
+> Substitute `$UUID` with any UUID you generate per request (e.g. `uuidgen`), and `$USER_ID` with
+> the id of the user the call is made on behalf of — normally set by lynq-bff from the verified
+> access token. Only the calls that change a file need it.
 
 **Register an upload and get a pre-signed PUT URL**
 
 ```bash
-curl -X POST http://localhost:8085/lynq-file-storage/files/upload-url \
+curl -X POST http://localhost:8085/lynq-file-storage/dmz/files/upload-url \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
+  -H "user-id: $USER_ID" \
   -d '{ "fileName": "avatar.png", "contentType": "image/png" }'
 ```
 
@@ -273,21 +298,22 @@ Sample response:
 ```bash
 curl -X PUT "$UPLOAD_URL" --upload-file ./avatar.png
 
-curl -X POST "http://localhost:8085/lynq-file-storage/files/$FILE_ID/confirm" \
-  -H "lynq-request-uuid: $UUID"
+curl -X POST "http://localhost:8085/lynq-file-storage/dmz/files/$FILE_ID/confirm" \
+  -H "lynq-request-uuid: $UUID" \
+  -H "user-id: $USER_ID"
 ```
 
 **Get a download URL for one file**
 
 ```bash
-curl "http://localhost:8085/lynq-file-storage/files/$FILE_ID/download-url" \
+curl "http://localhost:8085/lynq-file-storage/dmz/files/$FILE_ID/download-url" \
   -H "lynq-request-uuid: $UUID"
 ```
 
 **Sign a batch of download URLs**
 
 ```bash
-curl -X POST http://localhost:8085/lynq-file-storage/files/download-urls \
+curl -X POST http://localhost:8085/lynq-file-storage/dmz/files/download-urls \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
   -d '{ "fileIds": ["0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41", "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42"] }'
@@ -307,8 +333,9 @@ Sample response (unknown ids are simply absent):
 **Delete a file**
 
 ```bash
-curl -X DELETE "http://localhost:8085/lynq-file-storage/files/$FILE_ID" \
-  -H "lynq-request-uuid: $UUID"
+curl -X DELETE "http://localhost:8085/lynq-file-storage/dmz/files/$FILE_ID" \
+  -H "lynq-request-uuid: $UUID" \
+  -H "user-id: $USER_ID"
 ```
 
 ---
