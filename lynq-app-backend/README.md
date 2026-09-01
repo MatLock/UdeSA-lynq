@@ -4,7 +4,7 @@
 [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/jacoco-app-backend.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-app-backend-test-workflow.yaml)
 [![Version](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/version.svg)](https://github.com/MatLock/UdeSA-lynq/releases)
 
-Core application service for the Lynq platform. It owns the product domain — **user profiles**, **companies**, and **job posts** — and exposes the **job feed** that mixes Lynq-native postings with externally scraped ones, ranked per candidate with a **LyNQ match score**. It also brokers **profile/company image uploads** through the [`lynq-file-storage`](../lynq-file-storage) service and **proxies skill-enhancement requests** to the `lynq-ml` service.
+Core application service for the Lynq platform. It owns the product domain — **user profiles**, **companies**, and **job posts** — and exposes the **job feed** that mixes Lynq-native postings with externally scraped ones, ranked per candidate with a **LyNQ match score**. It also brokers **profile/company image uploads** through the [`lynq-file-storage`](../lynq-file-storage) service and calls `lynq-ml` for the two **candidate evaluations** whose payload it assembles from its own database.
 
 Authentication is **not** handled here. Every protected request is validated against the [`lynq-iam`](../lynq-iam) identity provider, and the resolved user identity is loaded into the security context for the duration of the request.
 
@@ -18,7 +18,7 @@ Authentication is **not** handled here. Every protected request is validated aga
 - [Core flows](#core-flows)
   - [Create a job post](#1-create-a-job-post)
   - [Search the job feed](#2-search-the-job-feed)
-  - [Skill-enhance proxy](#3-skill-enhance-proxy)
+  - [Candidate evaluations via lynq-ml](#3-candidate-evaluations-via-lynq-ml)
   - [Image upload](#4-image-upload-pre-signed-urls)
 - [Data model](#data-model)
 - [API reference](#api-reference)
@@ -64,19 +64,20 @@ Authentication is **not** handled here. Every protected request is validated aga
               │   0. RequestUuidFilter          (all routes)      │
               │   1. AuthHeaderExistenceFilter  (all routes)      │
               │   2. IamAuthenticationFilter    (all routes) ─────┼──► lynq-iam
-              └─────────────┬─────────────────────────────────────┘   (validate + user-info)
+              └─────────────┬─────────────────────────────────────┘   (user-info)
                             │  SecurityContext = LynqUserPrincipal
                             ▼
         ┌──────────────┬──────────────┬───────────────┬──────────────┐
-        │ UserCtrl     │ CompanyCtrl  │ JobCtrl        │ LynqMLProxy  │
-        │ /user        │ /company     │ /job           │ /ml          │
-        └──────┬───────┴──────┬───────┴───────┬────────┴──────┬───────┘
-               ▼              ▼               ▼               ▼
-        ┌────────────┐ ┌────────────┐ ┌────────────┐  ┌──────────────┐
-        │UserService │ │CompanyServ.│ │ JobService │  │LynqMLProxySvc│──► lynq-ml
-        └─────┬──────┘ └─────┬──────┘ └─────┬──────┘  └──────┬───────┘  (skill-enhance)
-              │              │              │                │
-              ▼              ▼              ▼                ▼
+        ┌──────────────┬──────────────┬───────────────┐
+        │ UserCtrl     │ CompanyCtrl  │ JobCtrl        │
+        │ /dmz/user    │ /dmz/company │ /dmz/job       │
+        └──────┬───────┴──────┬───────┴───────┬────────┘
+               ▼              ▼               ▼
+        ┌────────────┐ ┌────────────┐ ┌────────────┐──► lynq-ml
+        │UserService │ │CompanyServ.│ │ JobService │    (candidate-explanation,
+        └─────┬──────┘ └─────┬──────┘ └─────┬──────┘     upskilling_suggestion)
+              │              │              │
+              ▼              ▼              ▼
         ┌───────────────────────────────────────┐  ┌────────────────────┐
         │        Spring Data JPA repositories    │  │ FileStorageService │
         │  users / companies / job_posts / ...   │  │  (file ids only)   │
@@ -91,10 +92,10 @@ Authentication is **not** handled here. Every protected request is validated aga
 **Layers**
 
 - **Controller** (`controller/`) — thin HTTP layer. Each interface (e.g. `JobController`) carries OpenAPI annotations; the `*Impl` maps HTTP verbs to service calls and wraps responses in `GlobalRestResponse<T>`. The authenticated user is injected via `@AuthenticationPrincipal LynqUserPrincipal`.
-- **Service** (`service/`) — business logic. `UserService`, `CompanyService`, and `JobService` own their aggregates; `FileStorageService` is the only door to `lynq-file-storage`, which owns every stored file (this service keeps just the file ids); `LynqMLProxyService` brokers calls to `lynq-ml`.
+- **Service** (`service/`) — business logic. `UserService`, `CompanyService`, and `JobService` own their aggregates; `FileStorageService` is the only door to `lynq-file-storage`, which owns every stored file (this service keeps just the file ids); `JobService` also calls `lynq-ml` for the candidate evaluations.
 - **Client** (`client/`) — Feign clients for the three downstream services (`LynqIamClient`, `LynqMLClient`, `LynqFileStorageClient`) plus their request/response DTOs.
 - **Filters** (`filter/`) — cross-cutting request handling registered via `FilterConfig` with explicit ordering. `PublicPaths` is the single whitelist consulted by the auth filters (only Swagger assets are public).
-- **Security** (`security/`) — `LynqUserPrincipal` is the identity resolved from the IAM token and stored as the Spring Security principal.
+- **Security** (`security/`) — `LynqUserPrincipal` is the identity `lynq-iam` resolves from the access token, stored as the Spring Security principal. The token's signature is verified upstream by `lynq-bff`, not here.
 - **Aspect** (`aspect/`) — the `@AuditLog` annotation + `LogAspect` produce structured entry/exit logs around annotated methods, masking sensitive fields.
 - **Model / Repository** (`model/`, `repository/`) — JPA entities, Spring Data interfaces, and the `JobWithDetailsProjection` used by the feed query.
 - **Exception handling** (`exceptions/`, `controller/handler/`) — domain exceptions mapped to consistent error responses by `ControllerExceptionHandler`.
@@ -110,7 +111,11 @@ Every request passes through an ordered filter chain before reaching a controlle
 | :---: | ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------ |
 | 0     | `RequestUuidFilter`          | `/*`                         | Require the `lynq-request-uuid` header; bind it to SLF4J MDC (`requestId`) and echo it back on the response for cross-service log correlation. `403` if missing. |
 | 1     | `AuthHeaderExistenceFilter`  | `/*` (Swagger paths exempt)  | `401` if the `Authorization` header is missing or blank.                                         |
-| 2     | `IamAuthenticationFilter`    | `/*` (Swagger paths exempt)  | Call `lynq-iam` to validate the token and fetch user info, then load a `LynqUserPrincipal` into the `SecurityContext`. `401` on invalid/expired token, `503` if IAM is unreachable. |
+| 2     | `IamAuthenticationFilter`    | `/*` (Swagger paths exempt)  | Call `lynq-iam` for the token's user info, then load a `LynqUserPrincipal` into the `SecurityContext`. `401` if IAM will not resolve the token, `503` if IAM is unreachable. |
+
+> This service does **not** verify the access token's signature. Every request reaches it through
+> [`lynq-bff`](../lynq-bff) — the single entry point into the DMZ — which validates the signature
+> before proxying, which is also why this service's whole API sits behind the `/dmz` prefix.
 
 Spring Security itself is configured **stateless** and `permitAll` (`SecurityConfig`) — the filter chain above, not Spring Security, is what enforces authentication. CORS is open (`*` origins) and CSRF/form-login/HTTP-basic are disabled. Only Swagger UI / OpenAPI asset paths are public (`PublicPaths`).
 
@@ -135,7 +140,7 @@ sequenceDiagram
     participant Sec as SecurityContext
     participant DB as MySQL
 
-    C->>Ctrl: POST /job<br/>Authorization + lynq-request-uuid<br/>{title, description, workType, salary…, skills}
+    C->>Ctrl: POST /dmz/job<br/>Authorization + lynq-request-uuid<br/>{title, description, workType, salary…, skills}
     Ctrl->>Svc: createJob(...)
     Svc->>Sec: resolve LynqUserPrincipal
     Svc->>DB: findById(userId)
@@ -165,12 +170,12 @@ sequenceDiagram
     participant Repo as JobPostRepository
     participant FS as lynq-file-storage
 
-    C->>Ctrl: GET /job?page=&size=&filterValue=
+    C->>Ctrl: GET /dmz/job?page=&size=&filterValue=
     Ctrl->>Svc: searchAvailableJobs(filter, pageable)
     Svc->>Repo: searchAvailableJobs(filterValue, pageable)
     Note over Repo: WHERE jobStatus = OPEN<br/>filter LIKE title/description/company/workType/skill<br/>ORDER BY createdOn DESC
     Repo-->>Svc: Page<JobWithDetailsProjection>
-    Svc->>FS: POST /files/download-urls (every company + poster file id on the page)
+    Svc->>FS: POST /dmz/files/download-urls (every company + poster file id on the page)
     FS-->>Svc: { fileId: downloadUrl }
     loop each job
         Svc->>Svc: lynqScore = % of job skills the candidate has (CANDIDATE only)
@@ -181,24 +186,35 @@ sequenceDiagram
 
 The **LyNQ score** is the percentage of a job's skills that the authenticated candidate already lists (case-insensitive, trimmed). It is `null` for `COMPANY` users, or when either the job or the user has no skills.
 
-### 3. Skill-enhance proxy
+### 3. Candidate evaluations via lynq-ml
 
-`POST /ml/skill-enhance` forwards a job draft to `lynq-ml`, which extracts the key technical skills. Restricted to `COMPANY` users linked to a company; the `user-id` and `company-id` headers required by `lynq-ml` are derived server-side.
+`JobService` calls `lynq-ml` for two evaluations: `candidate-explanation` (a hiring verdict for one
+applicant) and `upskilling_suggestion` (what a candidate would need to learn for a job). Both build
+their payload from this service's own database — the job post, the application and the candidate —
+after checking that the caller may see them, which is exactly why they cannot be called from the
+browser: nobody outside this service has that payload, and nobody outside it should be trusted to
+supply one.
+
+The **skill-enhance** endpoint used to be proxied here too. It is not any more: its payload is the
+job draft the user is typing into the form, so this service had nothing to add to it. The browser
+now reaches it straight through [`lynq-bff`](../lynq-bff) at `POST /lynq-bff/skill-enhance`.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant C as Client
-    participant Ctrl as LynqMLProxyController
-    participant Svc as LynqMLProxyService
+    participant Ctrl as JobControllerImpl
+    participant Svc as JobService
+    participant DB as MySQL
     participant ML as lynq-ml
 
-    C->>Ctrl: POST /ml/skill-enhance<br/>{title, description, workType}
-    Ctrl->>Svc: enhanceSkills(..., requestUuid)
-    Svc->>Svc: resolve user (must be COMPANY) + company
-    Svc->>ML: POST /skill-enhance<br/>headers: lynq-request-uuid, user-id, company-id
-    ML-->>Svc: { skills: [...] }
-    Svc-->>Ctrl: SkillEnhanceResponse
+    C->>Ctrl: GET /dmz/job/{jobId}/candidate/{candidateId}/candidate-explanation
+    Ctrl->>Svc: explainCandidate(...)
+    Svc->>DB: load application → job post + candidate
+    Svc->>Svc: caller must own the job post
+    Svc->>ML: POST /dmz/candidate-explanation<br/>headers: lynq-request-uuid, user-id, company-id
+    ML-->>Svc: { outcome, strengths, concerns }
+    Svc-->>Ctrl: CandidateExplanationResponse
     Ctrl-->>C: 200 OK
 ```
 
@@ -215,16 +231,16 @@ sequenceDiagram
     participant S3 as Bucket
 
     C->>BE: GET /user/generate-upload-image?file-name=avatar.png
-    BE->>FS: POST /files/upload-url { fileName }
+    BE->>FS: POST /dmz/files/upload-url { fileName }
     FS-->>BE: { fileId, uploadUrl }
     BE->>BE: persist fileId on the user (PENDING)
     opt replacing an image
-        BE->>FS: DELETE /files/{previousFileId}
+        BE->>FS: DELETE /dmz/files/{previousFileId}
     end
     BE-->>C: { preSignedUrl, fileId }
     C->>S3: PUT bytes to preSignedUrl
     C->>BE: POST /user/confirm-upload-image?file-id=…
-    BE->>FS: POST /files/{fileId}/confirm
+    BE->>FS: POST /dmz/files/{fileId}/confirm
     FS->>S3: HEAD object (must exist)
     FS-->>BE: AVAILABLE
     BE-->>C: 204 No Content
@@ -232,9 +248,9 @@ sequenceDiagram
 
 | Upload | Confirm |
 | ------ | ------- |
-| `GET /user/generate-upload-image?file-name=…`    | `POST /user/confirm-upload-image?file-id=…`    |
-| `GET /company/generate-upload-image?file-name=…` | `POST /company/confirm-upload-image?file-id=…` |
-| `GET /user/generate-upload-resume?file-name=…`   | `POST /user/confirm-upload-resume?file-id=…`   |
+| `GET /dmz/user/generate-upload-image?file-name=…`    | `POST /dmz/user/confirm-upload-image?file-id=…`    |
+| `GET /dmz/company/generate-upload-image?file-name=…` | `POST /dmz/company/confirm-upload-image?file-id=…` |
+| `GET /dmz/user/generate-upload-resume?file-name=…`   | `POST /dmz/user/confirm-upload-resume?file-id=…`   |
 
 ---
 
@@ -263,19 +279,18 @@ Base path: `/lynq-backend-app` (Spring `server.servlet.context-path`).
 
 | Method | Path                            | Body / Params                                                        | Description                                              |
 | ------ | ------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------- |
-| GET    | `/user`                         | —                                                                    | Get the authenticated user's profile (+ pre-signed image URL). |
-| POST   | `/user`                         | `{userType, fullName, currentPosition?, about?, githubUrl?, linkedinUrl?, birthDate}` | Create the profile for the authenticated user.           |
-| PATCH  | `/user`                         | Any subset of profile fields                                         | Partially update the profile (non-null fields only).    |
-| GET    | `/user/generate-upload-image`   | `?file-name=`                                                        | Register the profile image in `lynq-file-storage`; returns `{preSignedUrl, fileId}`. |
-| POST   | `/user/confirm-upload-image`    | `?file-id=`                                                          | Mark the uploaded profile image available (204).         |
-| GET    | `/user/generate-upload-resume`  | `?file-name=`                                                        | Register a résumé PDF; returns `{preSignedUrl, fileId}` (`CANDIDATE` only). |
-| POST   | `/user/confirm-upload-resume`   | `?file-id=`                                                          | Mark the uploaded résumé available (204, `CANDIDATE` only). |
-| POST   | `/company`                      | `{fullName, currentPosition, userAbout, birthDate, companyName, companyAbout, companySize?, …}` | Create the authenticated user as a `COMPANY` and its company. |
-| GET    | `/company/generate-upload-image`| `?file-name=`                                                        | Register the company logo in `lynq-file-storage`; returns `{preSignedUrl, fileId}`. |
-| POST   | `/company/confirm-upload-image` | `?file-id=`                                                          | Mark the uploaded logo available (204).                  |
-| POST   | `/job`                          | `{title, description, workType, salaryRangeDown?, salaryRangeTop?, jobPostSource, skills?}` | Create a job post (`COMPANY` users only).                |
-| GET    | `/job`                          | `?page=0&size=20&filterValue=`                                       | Paginated feed of OPEN jobs; free-text filter; LyNQ score per job for candidates. |
-| POST   | `/ml/skill-enhance`             | `{title, description, workType}`                                     | Extract key skills via `lynq-ml` (`COMPANY` users only). |
+| GET    | `/dmz/user`                         | —                                                                    | Get the authenticated user's profile (+ pre-signed image URL). |
+| POST   | `/dmz/user`                         | `{userType, fullName, currentPosition?, about?, githubUrl?, linkedinUrl?, birthDate}` | Create the profile for the authenticated user.           |
+| PATCH  | `/dmz/user`                         | Any subset of profile fields                                         | Partially update the profile (non-null fields only).    |
+| GET    | `/dmz/user/generate-upload-image`   | `?file-name=`                                                        | Register the profile image in `lynq-file-storage`; returns `{preSignedUrl, fileId}`. |
+| POST   | `/dmz/user/confirm-upload-image`    | `?file-id=`                                                          | Mark the uploaded profile image available (204).         |
+| GET    | `/dmz/user/generate-upload-resume`  | `?file-name=`                                                        | Register a résumé PDF; returns `{preSignedUrl, fileId}` (`CANDIDATE` only). |
+| POST   | `/dmz/user/confirm-upload-resume`   | `?file-id=`                                                          | Mark the uploaded résumé available (204, `CANDIDATE` only). |
+| POST   | `/dmz/company`                      | `{fullName, currentPosition, userAbout, birthDate, companyName, companyAbout, companySize?, …}` | Create the authenticated user as a `COMPANY` and its company. |
+| GET    | `/dmz/company/generate-upload-image`| `?file-name=`                                                        | Register the company logo in `lynq-file-storage`; returns `{preSignedUrl, fileId}`. |
+| POST   | `/dmz/company/confirm-upload-image` | `?file-id=`                                                          | Mark the uploaded logo available (204).                  |
+| POST   | `/dmz/job`                          | `{title, description, workType, salaryRangeDown?, salaryRangeTop?, jobPostSource, skills?}` | Create a job post (`COMPANY` users only).                |
+| GET    | `/dmz/job`                          | `?page=0&size=20&filterValue=`                                       | Paginated feed of OPEN jobs; free-text filter; LyNQ score per job for candidates. |
 
 Responses are wrapped in `GlobalRestResponse<T>`:
 
@@ -315,7 +330,7 @@ OpenAPI / Swagger UI is served at `/lynq-backend-app/swagger-ui.html` (enabled i
 **Create your user profile**
 
 ```bash
-curl -X POST http://localhost:8082/lynq-backend-app/user \
+curl -X POST http://localhost:8082/lynq-backend-app/dmz/user \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
   -H "Authorization: Bearer $TOKEN" \
@@ -333,21 +348,21 @@ curl -X POST http://localhost:8082/lynq-backend-app/user \
 **Get a pre-signed URL, upload the image straight to the bucket, then confirm it**
 
 ```bash
-UPLOAD=$(curl -s "http://localhost:8082/lynq-backend-app/user/generate-upload-image?file-name=avatar.png" \
+UPLOAD=$(curl -s "http://localhost:8082/lynq-backend-app/dmz/user/generate-upload-image?file-name=avatar.png" \
   -H "lynq-request-uuid: $UUID" -H "Authorization: Bearer $TOKEN")
 URL=$(echo "$UPLOAD" | jq -r '.data.preSignedUrl')
 FILE_ID=$(echo "$UPLOAD" | jq -r '.data.fileId')
 
 curl -X PUT "$URL" --upload-file ./avatar.png
 
-curl -X POST "http://localhost:8082/lynq-backend-app/user/confirm-upload-image?file-id=$FILE_ID" \
+curl -X POST "http://localhost:8082/lynq-backend-app/dmz/user/confirm-upload-image?file-id=$FILE_ID" \
   -H "lynq-request-uuid: $UUID" -H "Authorization: Bearer $TOKEN"
 ```
 
 **Register as a company**
 
 ```bash
-curl -X POST http://localhost:8082/lynq-backend-app/company \
+curl -X POST http://localhost:8082/lynq-backend-app/dmz/company \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
   -H "Authorization: Bearer $TOKEN" \
@@ -365,7 +380,7 @@ curl -X POST http://localhost:8082/lynq-backend-app/company \
 **Create a job post**
 
 ```bash
-curl -X POST http://localhost:8082/lynq-backend-app/job \
+curl -X POST http://localhost:8082/lynq-backend-app/dmz/job \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
   -H "Authorization: Bearer $TOKEN" \
@@ -383,26 +398,11 @@ curl -X POST http://localhost:8082/lynq-backend-app/job \
 **Search the job feed**
 
 ```bash
-curl "http://localhost:8082/lynq-backend-app/job?page=0&size=20&filterValue=java" \
+curl "http://localhost:8082/lynq-backend-app/dmz/job?page=0&size=20&filterValue=java" \
   -H "lynq-request-uuid: $UUID" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-**Skill-enhance a draft**
-
-```bash
-curl -X POST http://localhost:8082/lynq-backend-app/ml/skill-enhance \
-  -H "Content-Type: application/json" \
-  -H "lynq-request-uuid: $UUID" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{ "title": "Senior Java Engineer", "description": "…", "workType": "REMOTE" }'
-```
-
-Sample response:
-
-```json
-{ "success": true, "data": { "skills": ["Java", "Spring Boot", "Hibernate", "REST"] } }
-```
 
 ---
 
@@ -507,7 +507,7 @@ src/
 │   │   ├── model/         # JPA entities
 │   │   ├── repository/    # Spring Data repositories + JobWithDetailsProjection
 │   │   ├── security/      # LynqUserPrincipal
-│   │   └── service/       # User / Company / Job / Storage / LynqMLProxy services
+│   │   └── service/       # User / Company / Job / FileStorage services
 │   └── resources/
 │       ├── application.yaml
 │       ├── application-production.yaml

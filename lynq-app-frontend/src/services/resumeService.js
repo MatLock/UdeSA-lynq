@@ -116,11 +116,11 @@ const create_resume = async (authFetch, body) => {
 /**
  * Ask the backend to AI-extract the skills implied by a resume.
  *
- * Calls POST /ml/resume/skill-extraction
- * (LynqMLProxyController.extractResumeSkills), which forwards the structured
- * resume to lynq-ml and returns its skills consolidated into three buckets. The
- * model reads the whole resume — experience, education, projects — so the payload
- * is the same JSON shape a resume is stored in, even while it is still a draft.
+ * Calls POST /resume/skill-extraction, which lynq-bff relays to lynq-ml, which
+ * reads the structured resume and returns its skills consolidated into three
+ * buckets. The model reads the whole resume — experience, education, projects —
+ * so the payload is the same JSON shape a resume is stored in, even while it is
+ * still a draft.
  * Candidate-only; nothing is persisted, the caller decides what to keep.
  *
  * Note the response buckets are named `skills`/`tools`/`soft`, where `skills` is
@@ -132,15 +132,15 @@ const create_resume = async (authFetch, body) => {
  * @param {string} [language] - The caller's UI language code (e.g. `es`),
  *   forwarded so lynq-ml writes the soft skills in it. Technical skills and tool
  *   names are never translated. Without it the model infers a language from the
- *   resume text, which need not be the one the candidate is working in; the
- *   backend defaults to English when omitted.
+ *   resume text, which need not be the one the candidate is working in; lynq-ml
+ *   defaults to English when omitted.
  * @returns {Promise<{ skills: string[], tools: string[], soft: string[] }>} The
  *   unwrapped SkillExtractionResponse.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
 const extract_skills = async (authFetch, resume, language) => {
   const query = language ? `?${new URLSearchParams({ language })}` : '';
-  const payload = await authFetch(`/ml/resume/skill-extraction${query}`, {
+  const payload = await authFetch(`/resume/skill-extraction${query}`, {
     method: 'POST',
     body: JSON.stringify(resume),
   });

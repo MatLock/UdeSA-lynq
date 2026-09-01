@@ -1,6 +1,3 @@
-// Job service — talks to the secured app-backend (lynq-backend-app).
-// Spec: lynq-app-backend JobController (GET /job).
-
 /**
  * Fetch a page of available job posts, newest first.
  *
@@ -147,17 +144,6 @@ const update_job = async (
 /**
  * Ask the backend to AI-generate a list of suggested skills for a job.
  *
- * Calls POST /ml/skill-enhance (LynqMLProxyController.enhanceSkills) through
- * `authFetch`, which proxies to the lynq-ml service to extract key technical
- * skills from the job's title, description and work type — the fields the model
- * reasons over. The caller (create-job form) lets the company owner review and
- * edit the returned skills before they are sent with the actual job post, so
- * this endpoint only proposes; it never persists anything.
- *
- * All three fields are required by the backend (SkillEnhanceRequest: title and
- * description are @NotBlank, workType is @NotNull), and the response is the
- * GlobalRestResponse envelope { success, data: { skills: [] } }.
- *
  * @param {(path: string, options?: object) => Promise<object>} authFetch
  * @param {object} job
  * @param {string} job.title
@@ -167,7 +153,7 @@ const update_job = async (
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
 const generate_skills = async (authFetch, { title, description, workType } = {}) => {
-  const payload = await authFetch('/ml/skill-enhance', {
+  const payload = await authFetch('/skill-enhance', {
     method: 'POST',
     body: JSON.stringify({ title, description, workType }),
   });

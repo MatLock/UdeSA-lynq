@@ -21,18 +21,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.Collections;
 
-/**
- * Authenticates incoming requests against the lynq-iam identity provider:
- * <ol>
- *   <li>calls lynq-iam to validate the access token;</li>
- *   <li>calls lynq-iam to obtain the user info from the token;</li>
- *   <li>loads the resolved user into the Spring Security context.</li>
- * </ol>
- * The presence of the {@code Authorization} header is guaranteed upstream by
- * {@link AuthHeaderExistenceFilter}, which runs earlier in the chain.
- * The {@code lynq-request-uuid} header is forwarded on every lynq-iam call so
- * the request can be tracked across services in the logs.
- */
 public class IamAuthenticationFilter extends OncePerRequestFilter {
 
   private static final String AUTHORIZATION_HEADER = "Authorization";
@@ -62,21 +50,12 @@ public class IamAuthenticationFilter extends OncePerRequestFilter {
     String requestUuid = request.getHeader(REQUEST_UUID_HEADER);
 
     try {
-      // 1 - call lynq-iam to validate the token
-      GlobalRestResponse<Boolean> validation = lynqIamClient.validateToken(authHeader, requestUuid);
-      if (validation == null || !Boolean.TRUE.equals(validation.getData())) {
-        writeError(response, HttpStatus.UNAUTHORIZED, INVALID_TOKEN_ERROR);
-        return;
-      }
-
-      // 2 - call lynq-iam to obtain the user info from the token
       GlobalRestResponse<UserInfoResponse> userInfo = lynqIamClient.getUserInfo(authHeader, requestUuid);
       if (userInfo == null || userInfo.getData() == null) {
         writeError(response, HttpStatus.UNAUTHORIZED, INVALID_TOKEN_ERROR);
         return;
       }
 
-      // 3 - load the user info into the security context
       loadSecurityContext(userInfo.getData(), request);
     } catch (FeignException.Unauthorized | FeignException.Forbidden e) {
       writeError(response, HttpStatus.UNAUTHORIZED, INVALID_TOKEN_ERROR);

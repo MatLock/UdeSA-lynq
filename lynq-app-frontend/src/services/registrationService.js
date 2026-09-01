@@ -13,7 +13,7 @@ import authService from './authService';
 import requestUuidUtil from '../utils/requestUuid';
 
 const APP_BASE_URL =
-  import.meta.env.LYNQ_BACKEND_BASE_URL ?? 'http://localhost:8082/lynq-backend-app';
+  import.meta.env.LYNQ_BFF_BASE_URL ?? 'http://localhost:8087/lynq-bff';
 
 /**
  * POST to a secured app-backend endpoint with the bearer token and the required

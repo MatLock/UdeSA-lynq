@@ -15,39 +15,37 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
-/**
- * HTTP client for the lynq-file-storage service, which owns every file the platform stores: it
- * registers the metadata, signs the upload and download URLs and holds the bucket credentials.
- * This service only ever handles the file ids it returns. The {@code lynq-request-uuid} header is
- * forwarded on every call so logs can be correlated across services.
- */
 @FeignClient(name = "lynqFileStorage", url = "${lynq.file-storage.url}")
 public interface LynqFileStorageClient {
 
   String REQUEST_UUID_HEADER = "lynq-request-uuid";
+  String USER_ID_HEADER = "user-id";
 
-  @PostMapping("/files/upload-url")
+  @PostMapping("/dmz/files/upload-url")
   GlobalRestResponse<CreateFileUploadResponse> createUpload(
       @RequestBody CreateFileUploadRequest request,
-      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(USER_ID_HEADER) String userId);
 
-  @PostMapping("/files/{fileId}/confirm")
+  @PostMapping("/dmz/files/{fileId}/confirm")
   GlobalRestResponse<StoredFileResponse> confirmUpload(
       @PathVariable("fileId") String fileId,
-      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(USER_ID_HEADER) String userId);
 
-  @GetMapping("/files/{fileId}/download-url")
+  @GetMapping("/dmz/files/{fileId}/download-url")
   GlobalRestResponse<CreateFileDownloadResponse> createDownloadUrl(
       @PathVariable("fileId") String fileId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
 
-  @PostMapping("/files/download-urls")
+  @PostMapping("/dmz/files/download-urls")
   GlobalRestResponse<Map<String, String>> createDownloadUrls(
       @RequestBody CreateFileDownloadBatchRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
 
-  @DeleteMapping("/files/{fileId}")
+  @DeleteMapping("/dmz/files/{fileId}")
   void deleteFile(
       @PathVariable("fileId") String fileId,
-      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(USER_ID_HEADER) String userId);
 }

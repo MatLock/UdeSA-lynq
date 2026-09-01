@@ -36,6 +36,9 @@ public class StoredFileEntity {
   @Column(name = "s3_key", length = 1024, nullable = false)
   private String s3Key;
 
+  @Column(name = "owner_user_id", length = 36)
+  private String ownerUserId;
+
   @Enumerated(EnumType.STRING)
   @Column(name = "status", length = 20, nullable = false)
   private StoredFileStatus status;

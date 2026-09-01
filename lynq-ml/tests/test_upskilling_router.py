@@ -1,4 +1,4 @@
-"""Tests for the ``POST /lynq-ml/upskilling_suggestion`` endpoint."""
+"""Tests for the ``POST /lynq-ml/dmz/upskilling_suggestion`` endpoint."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from llm_client import LLMProvider
 from main import app
 from udemy_client import Course
 
-_ENDPOINT = "/lynq-ml/upskilling_suggestion"
+_ENDPOINT = "/lynq-ml/dmz/upskilling_suggestion"
 
 _HEADERS = {
     "lynq-request-uuid": "req-123",

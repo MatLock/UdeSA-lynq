@@ -1,23 +1,14 @@
 package com.lynq.backend.client;
 
 import com.lynq.backend.client.request.CandidateEvaluationRequest;
-import com.lynq.backend.client.request.SkillEnhanceRequest;
 import com.lynq.backend.client.response.CandidateExplanationResponse;
-import com.lynq.backend.client.response.SkillEnhanceResponse;
-import com.lynq.backend.client.response.SkillExtractionResponse;
 import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestParam;
 
-/**
- * HTTP client for the lynq-ml service. The {@code lynq-request-uuid} header is
- * forwarded so logs can be correlated across services, and {@code user-id} /
- * {@code company-id} identify who the ML request is being made on behalf of.
- */
 @FeignClient(name = "lynqMl", url = "${lynq.ml.url}")
 public interface LynqMLClient {
 
@@ -25,16 +16,8 @@ public interface LynqMLClient {
   String USER_ID_HEADER = "user-id";
   String COMPANY_ID_HEADER = "company-id";
   String OUTPUT_LANGUAGE_HEADER = "output-language";
-  String LANGUAGE_PARAM = "language";
 
-  @PostMapping("/skill-enhance")
-  GlobalRestResponse<SkillEnhanceResponse> enhanceSkills(
-      @RequestBody SkillEnhanceRequest request,
-      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId,
-      @RequestHeader(COMPANY_ID_HEADER) String companyId);
-
-  @PostMapping("/upskilling_suggestion")
+  @PostMapping("/dmz/upskilling_suggestion")
   GlobalRestResponse<UpskillingSuggestionResponse> upskillingSuggestion(
       @RequestBody CandidateEvaluationRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
@@ -42,17 +25,10 @@ public interface LynqMLClient {
       @RequestHeader(COMPANY_ID_HEADER) String companyId,
       @RequestHeader(OUTPUT_LANGUAGE_HEADER) String outputLanguage);
 
-  @PostMapping("/candidate-explanation")
+  @PostMapping("/dmz/candidate-explanation")
   GlobalRestResponse<CandidateExplanationResponse> candidateExplanation(
       @RequestBody CandidateEvaluationRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
       @RequestHeader(USER_ID_HEADER) String userId,
       @RequestHeader(COMPANY_ID_HEADER) String companyId);
-
-  @PostMapping("/resume/skill-extraction")
-  GlobalRestResponse<SkillExtractionResponse> extractResumeSkills(
-      @RequestBody Object resume,
-      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId,
-      @RequestParam(LANGUAGE_PARAM) String language);
 }

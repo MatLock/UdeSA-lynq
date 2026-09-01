@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Annotated
+from typing import Annotated, Optional
 
 import httpx
 from fastapi import APIRouter, Header, HTTPException
@@ -34,7 +34,7 @@ async def skill_enhance(
     body: SkillEnhanceRequest,
     lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
     user_id: Annotated[str, Header(alias="user-id")],
-    company_id: Annotated[str, Header(alias="company-id")],
+    company_id: Annotated[Optional[str], Header(alias="company-id")] = None,
 ) -> GlobalRestResponse[SkillEnhanceResponse]:
     """Extract 5-15 key technical skills from a job posting."""
     log.info(

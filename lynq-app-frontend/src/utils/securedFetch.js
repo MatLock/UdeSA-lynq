@@ -15,12 +15,8 @@
 import requestUuidUtil from './requestUuid';
 
 const APP_BASE_URL =
-  import.meta.env.LYNQ_BACKEND_BASE_URL ?? 'http://localhost:8082/lynq-backend-app';
+  import.meta.env.LYNQ_BFF_BASE_URL ?? 'http://localhost:8087/lynq-bff';
 
-// Perform one secured request. `path` is resolved against the app-backend base
-// URL unless it is already absolute (e.g. an IAM endpoint), so this primitive
-// serves both services. Extra fetch options are spread through; the auth and
-// correlation headers always win.
 const sendSecured = async (token, path, options = {}, requestUuid = requestUuidUtil.newRequestUuid()) => {
   const url = path.startsWith('http') ? path : `${APP_BASE_URL}${path}`;
 

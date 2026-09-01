@@ -1,4 +1,4 @@
-"""Tests for the ``POST /lynq-ml/translate`` endpoint."""
+"""Tests for the ``POST /lynq-ml/dmz/translate`` endpoint."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from llm_client import LLMProvider
 from main import app
 
-_ENDPOINT = "/lynq-ml/translate"
+_ENDPOINT = "/lynq-ml/dmz/translate"
 
 _HEADERS = {
     "lynq-request-uuid": "req-123",

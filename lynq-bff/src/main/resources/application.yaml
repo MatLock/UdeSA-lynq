@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: lynq-bff
+
+lynq:
+  security:
+    jwt:
+      secret: ${JWT_SECRET:8d2b6d2a9c5e8f4f8f9d1c7a4e3b5f6d8c9a1e2f3a4b5c6d7e8f9a1b2c3d4e5}
+  backend:
+    url: ${LYNQ_BACKEND_URL:http://localhost:8082/lynq-backend-app}
+  ml:
+    url: ${LYNQ_ML_URL:http://localhost:8084/lynq-ml}
+  file-storage:
+    url: ${LYNQ_FILE_STORAGE_URL:http://localhost:8085/lynq-file-storage}
+
+server:
+  port: 8087
+  servlet:
+    context-path: '/lynq-bff'
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+management:
+  server:
+    port: 8088
+  endpoint:
+    health:
+      enabled: true
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: [ health, prometheus ]
+      base-path: /actuator
+
+logging:
+  config: classpath:log4j2-spring.xml
+  level:
+    root: INFO
+    com:
+      lynq:
+        bff: INFO
