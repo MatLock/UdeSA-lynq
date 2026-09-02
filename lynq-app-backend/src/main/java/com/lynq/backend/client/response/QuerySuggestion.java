@@ -7,9 +7,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * One missing competency and the courses lynq-ml found to address it.
- */
 @Getter
 @Setter
 @NoArgsConstructor

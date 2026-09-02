@@ -32,11 +32,6 @@ public class GetJobRestResponse {
   private JobCompanyRestResponse company;
   private JobPostedByRestResponse postedBy;
   private List<String> skills;
-  /**
-   * Generalized capability tags of the post. Not meant to be displayed — they exist so the LyNQ
-   * score can match a candidate with an equivalent technology — but they travel with the job so the
-   * edit form can hand them back unchanged instead of dropping them.
-   */
   private List<String> similarityTags;
   private Integer lynqScore;
   private Long totalCandidatesApplied;

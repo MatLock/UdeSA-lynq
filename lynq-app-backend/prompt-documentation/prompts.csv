@@ -14,7 +14,6 @@ about [string]
 size [integer]
 profile_image_url [string]
 created_on [date. format yyyy-mm-dd]
-
 constraints: 
 id primary key
 name unique
@@ -167,3 +166,6 @@ parameters:
 "02-09-2026","add the POST /user/resume endpoint to store the resume the candidate approved. it takes name, language, resume and the fileId of the pdf that was already generated. CANDIDATE users only"
 "02-09-2026","the same fileId cannot end up linked to two different resumes, validate that on create"
 "02-09-2026","create new endpoint DELETE /dmz/user/resume/{resumeId} to delete a resume previously created"
+"02-09-2026","create a supported_languages table (liquibase changelog + entity + repository) with code and display name, seeded with the resume languages EN, ES, FR and PR. resume languages must come from the database, not from code"
+"02-09-2026","add GET /dmz/user/resume/languages endpoint returning the supported resume languages read from the supported_languages table, wrapped in the GlobalRestResponse envelope, with unit tests"
+"02-09-2026","create a way to assign an alias to a resume: alter the UI, create BFF endpoint to create/override the alias, create backend endpoint to create/override the alias and the migration required"

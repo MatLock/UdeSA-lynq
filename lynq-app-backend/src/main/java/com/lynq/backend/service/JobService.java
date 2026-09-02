@@ -278,7 +278,6 @@ public class JobService {
     Page<JobCandidateProjection> candidates =
         userApplicationJobRepository.findCandidatesByJobId(jobId, pageable);
 
-    // One call to lynq-file-storage signs every candidate picture on the page.
     Map<String, String> profileImageUrls = fileStorageService.obtainDownloadUrls(
         candidates.getContent().stream()
             .map(JobCandidateProjection::userFileStorageId)
@@ -294,9 +293,6 @@ public class JobService {
       String requestUuid) {
     UserEntity owner = getAuthenticatedUser();
 
-    // The candidate must actually have applied to the job: that relationship
-    // lives in the application (intermediate) table, which is the source of both
-    // the job post and the candidate we evaluate.
     UserApplicationJobEntity application = userApplicationJobRepository
         .findByJobIdAndUserId(jobId, candidateId)
         .orElseThrow(() -> new NotFoundException(CANDIDATE_APPLICATION_NOT_FOUND));
@@ -304,7 +300,6 @@ public class JobService {
     JobPostEntity job = application.getJobPost();
     UserEntity candidate = application.getUser();
 
-    // Only the owner of the job post may request the evaluation of its candidates.
     if (job.getCreatedByUser() == null
         || !job.getCreatedByUser().getId().equals(owner.getId())) {
       throw new ForbiddenException(ONLY_JOB_OWNER_CAN_EXPLAIN_CANDIDATES);
@@ -323,9 +318,6 @@ public class JobService {
   @Transactional(readOnly = true)
   public UpskillingSuggestionResponse suggestUpskilling(String jobId, String requestUuid,
       String outputLanguage) {
-    // The upskilling suggestion is for the authenticated candidate against the
-    // job. No job-post ownership check — any CANDIDATE may ask how they would
-    // need to upskill for a job. Both are read straight from the DB.
     UserEntity user = getAuthenticatedUser();
 
     if (user.getType() != UserType.CANDIDATE) {
@@ -335,12 +327,8 @@ public class JobService {
     JobPostEntity job = jobPostRepository.findById(jobId)
         .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
 
-    // company-id is contextual for lynq-ml; scraped jobs may have no company, so
-    // fall back to an empty value rather than omitting the required header.
     String companyId = job.getCompany() != null ? job.getCompany().getId() : "";
 
-    // The candidate's UI language, forwarded so lynq-ml writes the explanation
-    // and reasons in it (defaults to English at the ML layer if blank).
     GlobalRestResponse<UpskillingSuggestionResponse> response = lynqMLClient.upskillingSuggestion(
         toEvaluationRequest(job, user), requestUuid, user.getId(), companyId, outputLanguage);
 
@@ -413,7 +401,6 @@ public class JobService {
         userApplicationJobRepository.countByJobId(jobId));
   }
 
-
   private JobCandidateResponse toCandidateResponse(JobCandidateProjection projection,
       Map<String, String> profileImageUrls) {
     List<String> jobSkills = splitSkills(projection.jobSkills());
@@ -431,11 +418,6 @@ public class JobService {
         .build();
   }
 
-  /**
-   * Signs the company logo and the poster's picture of every given job in a single call to
-   * lynq-file-storage, keyed by file id, so a page of jobs costs one round-trip instead of two per
-   * row.
-   */
   private Map<String, String> signProfileImages(List<JobWithDetailsProjection> projections) {
     return fileStorageService.obtainDownloadUrls(projections.stream()
         .flatMap(projection -> Stream.of(
@@ -444,7 +426,6 @@ public class JobService {
         .toList());
   }
 
-  /** Rows without a file — a scraped job with no company, a user with no picture — get no URL. */
   private static String signedUrl(Map<String, String> downloadUrls, String fileId) {
     return fileId == null ? null : downloadUrls.get(fileId);
   }
@@ -493,12 +474,6 @@ public class JobService {
         .toList();
   }
 
-  /**
-   * Same replace-what-is-there semantics as {@link #updateSkills}, for the capability tags — except
-   * that an absent list means "leave them as they are". The tags are never edited by hand: they
-   * only exist when the AI enhancement produced them, so a client that does not send any is not
-   * asking for them to be cleared.
-   */
   private void updateSimilarityTags(JobPostEntity job, List<String> similarityTags) {
     if (similarityTags == null) {
       return;
@@ -536,7 +511,6 @@ public class JobService {
         .forEach(job.getSimilarityTags()::add);
   }
 
-  /** Trimmed, de-duplicated, blanks dropped — what actually reaches the tables. */
   private static List<String> clean(List<String> values) {
     return values == null ? List.of() : values.stream()
         .filter(Objects::nonNull)

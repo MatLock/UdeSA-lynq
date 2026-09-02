@@ -40,7 +40,6 @@ public class CompanyEntity {
   @Column(name = "size")
   private Integer size;
 
-  /** Id of the company logo in lynq-file-storage, which owns the file itself. */
   @Column(name = "lynq_file_storage_id", length = 36)
   private String lynqFileStorageId;
 

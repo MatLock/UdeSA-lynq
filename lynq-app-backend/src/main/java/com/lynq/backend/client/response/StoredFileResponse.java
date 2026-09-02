@@ -7,11 +7,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * File metadata as lynq-file-storage holds it. {@code status} is its lifecycle state
- * ({@code PENDING} until the upload is confirmed, then {@code AVAILABLE}) and is carried as a
- * string so this service does not have to mirror the enum.
- */
 @Getter
 @Setter
 @NoArgsConstructor

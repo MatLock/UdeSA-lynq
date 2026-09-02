@@ -2,11 +2,6 @@ package com.lynq.backend.filter;
 
 import jakarta.servlet.http.HttpServletRequest;
 
-/**
- * Single source of truth for the request paths that are publicly accessible and
- * therefore exempt from the authentication filters. Both {@link AuthHeaderExistenceFilter}
- * and {@link IamAuthenticationFilter} consult this so the whitelist cannot drift between them.
- */
 final class PublicPaths {
 
   private static final String SWAGGER_UI_HTML = "/swagger-ui.html";

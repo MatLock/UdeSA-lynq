@@ -1,4 +1,4 @@
-package com.lynq.backend.client.request;
+package com.lynq.backend.controller.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -8,12 +8,12 @@ import lombok.Setter;
 
 @Getter
 @Setter
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 @Builder
-public class CreateFileUploadRequest {
+public class GetSupportedLanguageRestResponse {
 
-  private String fileName;
-  private String contentType;
+  private String code;
+  private String name;
 
 }

@@ -7,10 +7,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Asks lynq-file-storage to sign a batch of download URLs in one round-trip. Ids it does not know
- * are omitted from the response instead of failing the batch.
- */
 @Getter
 @Setter
 @NoArgsConstructor

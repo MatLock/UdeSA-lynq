@@ -9,7 +9,9 @@ import com.lynq.backend.enums.Language;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.NotFoundException;
+import com.lynq.backend.controller.response.GetSupportedLanguageRestResponse;
 import com.lynq.backend.model.CompanyEntity;
+import com.lynq.backend.model.SupportedLanguageEntity;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.model.UserResumeEntity;
@@ -23,6 +25,7 @@ import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
 import com.lynq.backend.repository.UserApplicationJobRepository;
 import com.lynq.backend.repository.UserRepository;
+import com.lynq.backend.repository.SupportedLanguageRepository;
 import com.lynq.backend.repository.UserResumeRepository;
 import com.lynq.backend.repository.projection.UserApplicationProjection;
 import org.junit.jupiter.api.BeforeEach;
@@ -88,8 +91,6 @@ class UserServiceTest {
   private static final String RESUME_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42";
   private static final String RESUME_PDF_URL = "https://presigned/cv.pdf";
   private static final Map<String, Object> RESUME_CONTENT = Map.of("summary", "Backend engineer");
-  // A resume as the wizard sends it: the three skill buckets, of which only the technical skills
-  // and the tools describe something a job can ask for.
   private static final Map<String, Object> RESUME_WITH_SKILLS = Map.of(
       "summary", "Backend engineer",
       "skills", Map.of(
@@ -136,6 +137,9 @@ class UserServiceTest {
   private UserApplicationJobRepository userApplicationJobRepository;
 
   @Mock
+  private SupportedLanguageRepository supportedLanguageRepository;
+
+  @Mock
   private UpdateUserProfileRequest updateRequest;
 
   @Mock
@@ -148,7 +152,8 @@ class UserServiceTest {
   @BeforeEach
   void setUp() {
     userService = new UserService(userRepository, userResumeRepository, companyRepository,
-        jobPostRepository, userApplicationJobRepository, fileStorageService, objectMapper);
+        jobPostRepository, userApplicationJobRepository, supportedLanguageRepository,
+        fileStorageService, objectMapper);
   }
 
   @Test
@@ -207,21 +212,16 @@ class UserServiceTest {
 
   @Test
   void obtainProfileImagePreSignedUrlSignsTheStoredFileId() {
-    UserEntity existing = existingUser();
-    existing.setLynqFileStorageId(FILE_ID);
     when(fileStorageService.obtainDownloadUrl(FILE_ID)).thenReturn(PRE_SIGNED_URL);
 
-    String result = userService.obtainProfileImagePreSignedUrl(existing);
+    String result = userService.obtainProfileImagePreSignedUrl(FILE_ID);
 
     assertThat(result, is(PRE_SIGNED_URL));
   }
 
   @Test
   void obtainProfileImagePreSignedUrlReturnsNullWhenImageAbsent() {
-    UserEntity existing = existingUser();
-    existing.setLynqFileStorageId(null);
-
-    String result = userService.obtainProfileImagePreSignedUrl(existing);
+    String result = userService.obtainProfileImagePreSignedUrl(null);
 
     assertThat(result, is(org.hamcrest.Matchers.nullValue()));
   }
@@ -463,8 +463,6 @@ class UserServiceTest {
 
   @Test
   void createResumeFeedsTheCandidateSkillsAndTagsTheLynqScoreMatchesOn() {
-    // The resume is the only place a candidate's skills are ever written down, so creating one has
-    // to project them onto the user — otherwise every LyNQ score stays at 0.
     UserEntity candidate = candidate();
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
     when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
@@ -472,7 +470,6 @@ class UserServiceTest {
 
     userService.createResume(USER_ID, requestWithSkills());
 
-    // Technical skills and tools, never the soft ones: a job requirement is not "Leadership".
     assertThat(candidate.getSkills().stream().map(UserSkillsEntity::getSkill).toList(),
         contains("Java", "RabbitMQ", "Docker"));
     assertThat(candidate.getSimilarityTags().stream().map(UserSimilarityTagEntity::getSimilarityTag).toList(),
@@ -482,8 +479,6 @@ class UserServiceTest {
 
   @Test
   void createResumeAddsToTheSkillsTheCandidateAlreadyHasInsteadOfReplacingThem() {
-    // The same person may hold one resume per language or per role; the skills of the one they are
-    // not looking at right now are no less true. Case-insensitive, so "java" is not added twice.
     UserEntity candidate = candidate();
     candidate.getSkills().add(UserSkillsEntity.builder()
         .id("existing-skill").user(candidate).skill("java").build());
@@ -537,8 +532,6 @@ class UserServiceTest {
 
   @Test
   void deleteResumeRemovesItAndHandsBackThePdfForTheGatewayToDrop() {
-    // The PDF lives in lynq-file-storage, which this service never talks to, so
-    // the file id travels back for lynq-bff to clean up.
     UserResumeEntity resume = resume(RESUME_JSON, RESUME_FILE_ID);
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
     when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of(resume));
@@ -552,9 +545,6 @@ class UserServiceTest {
 
   @Test
   void deleteResumeKeepsTheCandidateSkills() {
-    // They were merged from every resume the person wrote, so there is no way to
-    // tell which came from this one — dropping them would silently lower the
-    // candidate's LyNQ score.
     UserEntity candidate = candidate();
     candidate.getSkills().add(UserSkillsEntity.builder()
         .id("skill-1").user(candidate).skill("Java").build());
@@ -570,8 +560,6 @@ class UserServiceTest {
 
   @Test
   void deleteResumeThrowsNotFoundWhenItBelongsToAnotherCandidate() {
-    // Scoped to the caller's own resumes: someone else's id must not even be
-    // acknowledged as existing.
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
     when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
 
@@ -637,6 +625,28 @@ class UserServiceTest {
     GetUserResumeRestResponse response = userService.getUserResumes(USER_ID).get(0);
 
     assertThat(response.getResume(), is(nullValue()));
+  }
+
+  @Test
+  void getSupportedResumeLanguagesReturnsEveryRowAsCodeAndName() {
+    when(supportedLanguageRepository.findAll()).thenReturn(List.of(
+        SupportedLanguageEntity.builder().code("EN").name("English").build(),
+        SupportedLanguageEntity.builder().code("ES").name("Español").build()));
+
+    List<GetSupportedLanguageRestResponse> languages = userService.getSupportedResumeLanguages();
+
+    assertThat(languages, hasSize(2));
+    assertThat(languages.get(0).getCode(), is("EN"));
+    assertThat(languages.get(0).getName(), is("English"));
+    assertThat(languages.get(1).getCode(), is("ES"));
+    assertThat(languages.get(1).getName(), is("Español"));
+  }
+
+  @Test
+  void getSupportedResumeLanguagesReturnsEmptyWhenTableIsEmpty() {
+    when(supportedLanguageRepository.findAll()).thenReturn(List.of());
+
+    assertThat(userService.getSupportedResumeLanguages(), is(empty()));
   }
 
   @Test
@@ -741,25 +751,23 @@ class UserServiceTest {
 
   @Test
   void obtainOwnedCompanyIdReturnsCompanyIdWhenCompanyOwnerOwnsACompany() {
-    UserEntity owner = companyOwner();
-    CompanyEntity company = CompanyEntity.builder().id(COMPANY_ID).owner(owner).build();
-    when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
+    CompanyEntity company = CompanyEntity.builder().id(COMPANY_ID).build();
+    when(companyRepository.findByOwnerId(USER_ID)).thenReturn(Optional.of(company));
 
-    assertThat(userService.obtainOwnedCompanyId(owner), is(COMPANY_ID));
+    assertThat(userService.obtainOwnedCompanyId(USER_ID, UserType.COMPANY), is(COMPANY_ID));
   }
 
   @Test
   void obtainOwnedCompanyIdReturnsNullWhenCompanyOwnerOwnsNoCompany() {
-    UserEntity owner = companyOwner();
-    when(companyRepository.findByOwner(owner)).thenReturn(Optional.empty());
+    when(companyRepository.findByOwnerId(USER_ID)).thenReturn(Optional.empty());
 
-    assertThat(userService.obtainOwnedCompanyId(owner), is(nullValue()));
+    assertThat(userService.obtainOwnedCompanyId(USER_ID, UserType.COMPANY), is(nullValue()));
   }
 
   @Test
   void obtainOwnedCompanyIdReturnsNullForNonCompanyUserWithoutQueryingCompanies() {
-    assertThat(userService.obtainOwnedCompanyId(candidate()), is(nullValue()));
-    verify(companyRepository, never()).findByOwner(any());
+    assertThat(userService.obtainOwnedCompanyId(USER_ID, UserType.CANDIDATE), is(nullValue()));
+    verify(companyRepository, never()).findByOwnerId(any());
   }
 
   @Test
@@ -797,15 +805,11 @@ class UserServiceTest {
     UserApplicationResponse application =
         userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE).getContent().get(0);
 
-    // Candidate has [java, kotlin]; job requires [Java, Python] -> 1 of 2 skills match.
     assertThat(application.getLynqScore(), is(50));
   }
 
   @Test
   void getUserApplicationsScoresLynqOnTheCapabilityTagsWhenTheyMatchBetterThanTheSkills() {
-    // The point of the tags: the candidate never used Kafka, but they did the same job with
-    // RabbitMQ, and both roll up to "Asynchronous Messaging". Matching only the literal names would
-    // hide them behind a 33%.
     UserEntity candidate = candidate();
     candidate.setSkills(List.of(UserSkillsEntity.builder().skill("Java").build()));
     candidate.setSimilarityTags(List.of(
@@ -822,14 +826,11 @@ class UserServiceTest {
     UserApplicationResponse application =
         userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE).getContent().get(0);
 
-    // 1 of 3 skills literally (33%), but 2 of 2 capability tags — the better reading wins.
     assertThat(application.getLynqScore(), is(100));
   }
 
   @Test
   void getUserApplicationsKeepsTheSkillScoreWhenTheJobCarriesNoTags() {
-    // Older posts have no tags at all; the score must fall back to what it always was rather than
-    // collapsing to zero.
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateWithSkills()));
     when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(applicationProjection(APPLICATION_ID, null)),

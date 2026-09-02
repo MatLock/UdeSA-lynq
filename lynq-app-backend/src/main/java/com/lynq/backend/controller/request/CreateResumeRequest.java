@@ -24,11 +24,6 @@ public class CreateResumeRequest {
   @NotBlank
   private String fileId;
 
-  /**
-   * Generalized capability tags for the candidate, as returned by lynq-ml's skill extraction. Kept
-   * out of the resume document itself — they are matching metadata, not something the CV shows —
-   * and optional: a resume typed without running the extraction simply carries none.
-   */
   private List<String> similarityTags;
 
 }

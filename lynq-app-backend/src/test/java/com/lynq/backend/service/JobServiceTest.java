@@ -219,8 +219,6 @@ class JobServiceTest {
     jobService = new JobService(jobPostRepository, companyRepository, userRepository,
         userApplicationJobRepository, jobPostSkillRepository, jobPostSimilarityTagRepository,
         fileStorageService, lynqMLClient);
-    // Signing the profile images of a page is a single batched call to lynq-file-storage; only the
-    // tests that assert the URLs care about its result, so the default is an empty map.
     lenient().when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
     SecurityContextHolder.setContext(securityContext);
   }
@@ -242,7 +240,6 @@ class JobServiceTest {
         JOB_POST_TYPE, NO_SKILLS, List.of("Backend Development", "  ", "Backend Development"));
 
     verify(jobPostRepository).save(jobCaptor.capture());
-    // Blanks and duplicates never reach the table, same as the skills.
     assertThat(jobCaptor.getValue().getSimilarityTags().stream().map(JobPostSimilarityTagEntity::getSimilarityTag).toList(),
         contains("Backend Development"));
   }
@@ -485,8 +482,6 @@ class JobServiceTest {
 
   @Test
   void searchAvailableJobsScoresLynqOnTheCapabilityTagsWhenTheyMatchBetterThanTheSkills() {
-    // The candidate never used Spring, but both sides agree at the capability level — which is the
-    // whole reason the tags exist.
     stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA), List.of("Backend Development")));
     stubSingleJob(JOB_SKILLS_CONCATENATED, "Backend Development");
 
@@ -495,8 +490,6 @@ class JobServiceTest {
 
   @Test
   void searchAvailableJobsKeepsTheSkillScoreWhenTheTagsMatchWorse() {
-    // Tags widen the match, they never narrow it: a job tag the candidate does not carry must not
-    // drag a good literal-skill match down.
     stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA, SKILL_SPRING), List.of()));
     stubSingleJob(JOB_SKILLS_CONCATENATED, "Container Orchestration");
 
@@ -1325,7 +1318,7 @@ class JobServiceTest {
   @Test
   void suggestUpskillingUsesEmptyCompanyIdWhenJobHasNoCompany() {
     stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA)));
-    JobPostEntity job = ownedJob(companyUser(), List.of(SKILL_JAVA)); // no company set
+    JobPostEntity job = ownedJob(companyUser(), List.of(SKILL_JAVA));
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
     when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(""),
         eq(OUTPUT_LANGUAGE)))

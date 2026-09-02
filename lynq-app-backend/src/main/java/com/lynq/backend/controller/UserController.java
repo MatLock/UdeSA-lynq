@@ -3,11 +3,13 @@ package com.lynq.backend.controller;
 import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.controller.request.CreateResumeRequest;
 import com.lynq.backend.controller.request.CreateUserRequest;
+import com.lynq.backend.controller.request.UpdateResumeAliasRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadResumeRestResponse;
 import com.lynq.backend.controller.response.DeleteResumeRestResponse;
+import com.lynq.backend.controller.response.GetSupportedLanguageRestResponse;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
@@ -659,6 +661,34 @@ public interface UserController {
       @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
+      summary = "List the languages a resume can be written in",
+      description = "Returns every language the platform supports for resumes, read from the "
+          + "supported_languages table rather than hardcoded, so clients always offer the current "
+          + "set. The resume translation dialog uses it as the target-language choices, minus the "
+          + "languages the candidate already holds a resume in.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Supported languages retrieved successfully",
+          content = @Content(
+              schema = @Schema(implementation = GetSupportedLanguageRestResponse.class),
+              examples = @ExampleObject(
+                  name = "Languages",
+                  value = """
+                      {
+                        "success": true,
+                        "data": [
+                          { "code": "EN", "name": "English" },
+                          { "code": "ES", "name": "Español" },
+                          { "code": "FR", "name": "Français" },
+                          { "code": "PR", "name": "Português" }
+                        ]
+                      }""")))
+  })
+  ResponseEntity<GlobalRestResponse<List<GetSupportedLanguageRestResponse>>> getSupportedResumeLanguages();
+
+  @Operation(
       summary = "Create a resume the candidate approved",
       description = "Stores the resume the candidate accepted in the preview step, together with "
           + "the fileId of the PDF that lynq-bff's POST /resume/preview flow rendered and stored. "
@@ -701,6 +731,78 @@ public interface UserController {
   })
   ResponseEntity<GlobalRestResponse<GetUserResumeRestResponse>> createUserResume(
       @Valid CreateResumeRequest request,
+      @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
+      summary = "Assign or replace the alias of one of the candidate's resumes",
+      description = "Sets the alias the candidate uses to tell this resume apart from the others. "
+          + "Calling it again simply overrides the previous alias — assigning and renaming are the "
+          + "same operation. The resume must belong to the authenticated candidate; another "
+          + "user's resume answers 404 rather than 403, so a resume the caller does not own is "
+          + "never acknowledged as existing. Only users of type CANDIDATE can access resumes; any "
+          + "other type is rejected with 400.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Alias saved successfully",
+          content = @Content(
+              schema = @Schema(implementation = GetUserResumeRestResponse.class),
+              examples = @ExampleObject(
+                  name = "Resume with alias",
+                  value = """
+                      {
+                        "success": true,
+                        "data": {
+                          "id": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60",
+                          "name": "Jane Doe",
+                          "alias": "Backend roles",
+                          "language": "EN",
+                          "createdOn": "2026-09-02",
+                          "resume": { "personal_info": { "full_name": "Jane Doe" } },
+                          "pdfUrl": "https://lynq-bucket.s3.amazonaws.com/lynq/0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41/resume.pdf?X-Amz-Signature=..."
+                        }
+                      }"""))),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The authenticated user is not a candidate, or the alias is blank or "
+              + "longer than 100 characters",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Invalid alias",
+                  value = """
+                      {
+                        "success": false,
+                        "data": {
+                          "alias": "must not be blank"
+                        },
+                        "reason": "Invalid Fields Found"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "404",
+          description = "No such resume belongs to the authenticated candidate",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Unknown resume",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Resume '018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60' not found"
+                      }""")))
+  })
+  ResponseEntity<GlobalRestResponse<GetUserResumeRestResponse>> updateResumeAlias(
+      String resumeId,
+      @io.swagger.v3.oas.annotations.parameters.RequestBody(
+          description = "The alias to assign, replacing any previous one.",
+          required = true,
+          content = @Content(examples = @ExampleObject(
+              name = "Alias",
+              value = """
+                  {
+                    "alias": "Backend roles"
+                  }""")))
+      @Valid UpdateResumeAliasRequest request,
       @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(

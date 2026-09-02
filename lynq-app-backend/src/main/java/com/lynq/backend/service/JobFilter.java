@@ -1,10 +1,5 @@
 package com.lynq.backend.service;
 
-/**
- * Single free-text criterion for listing available jobs. The value is matched (case-insensitive,
- * contains) against every filterable column: title, description, company name, work type and skill.
- * Blank text is normalised to {@code null} so an empty query parameter behaves as "no filter".
- */
 public record JobFilter(String filterValue) {
 
   public JobFilter {

@@ -12,4 +12,6 @@ public interface CompanyRepository extends JpaRepository<CompanyEntity, String> 
   boolean existsByName(String name);
 
   Optional<CompanyEntity> findByOwner(UserEntity owner);
+
+  Optional<CompanyEntity> findByOwnerId(String ownerId);
 }

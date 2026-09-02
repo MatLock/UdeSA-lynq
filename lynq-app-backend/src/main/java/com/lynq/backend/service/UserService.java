@@ -7,6 +7,7 @@ import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.controller.request.CreateResumeRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.DeleteResumeRestResponse;
+import com.lynq.backend.controller.response.GetSupportedLanguageRestResponse;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
@@ -26,6 +27,7 @@ import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
 import com.lynq.backend.repository.UserApplicationJobRepository;
 import com.lynq.backend.repository.UserRepository;
+import com.lynq.backend.repository.SupportedLanguageRepository;
 import com.lynq.backend.repository.UserResumeRepository;
 import com.lynq.backend.repository.projection.UserApplicationProjection;
 import java.time.LocalDate;
@@ -65,18 +67,21 @@ public class UserService {
   private final CompanyRepository companyRepository;
   private final JobPostRepository jobPostRepository;
   private final UserApplicationJobRepository userApplicationJobRepository;
+  private final SupportedLanguageRepository supportedLanguageRepository;
   private final FileStorageService fileStorageService;
   private final ObjectMapper objectMapper;
 
   public UserService(UserRepository userRepository, UserResumeRepository userResumeRepository,
       CompanyRepository companyRepository, JobPostRepository jobPostRepository,
       UserApplicationJobRepository userApplicationJobRepository,
+      SupportedLanguageRepository supportedLanguageRepository,
       FileStorageService fileStorageService, ObjectMapper objectMapper){
     this.userRepository = userRepository;
     this.userResumeRepository = userResumeRepository;
     this.companyRepository = companyRepository;
     this.jobPostRepository = jobPostRepository;
     this.userApplicationJobRepository = userApplicationJobRepository;
+    this.supportedLanguageRepository = supportedLanguageRepository;
     this.fileStorageService = fileStorageService;
     this.objectMapper = objectMapper;
   }
@@ -109,11 +114,11 @@ public class UserService {
 
   @AuditLog
   @Transactional(readOnly = true)
-  public String obtainOwnedCompanyId(UserEntity user) {
-    if (user.getType() != UserType.COMPANY) {
+  public String obtainOwnedCompanyId(String userId, UserType userType) {
+    if (userType != UserType.COMPANY) {
       return null;
     }
-    return companyRepository.findByOwner(user)
+    return companyRepository.findByOwnerId(userId)
         .map(CompanyEntity::getId)
         .orElse(null);
   }
@@ -127,7 +132,7 @@ public class UserService {
     GetUserProfileRestResponse.GetUserProfileRestResponseBuilder response =
         GetUserProfileRestResponse.builder()
             .fullName(user.getFullName())
-            .profileImageUrl(obtainProfileImagePreSignedUrl(user))
+            .profileImageUrl(obtainProfileImagePreSignedUrl(user.getLynqFileStorageId()))
             .currentPosition(user.getCurrentPosition())
             .about(user.getAbout())
             .githubUrl(user.getGithubUrl())
@@ -188,11 +193,6 @@ public class UserService {
     return userRepository.save(user);
   }
 
-  /**
-   * Registers the new profile image in lynq-file-storage, points the user at it and drops the file
-   * it replaces. The returned upload URL is short-lived and the file only becomes readable once the
-   * browser has PUT the bytes and called {@link #confirmProfileImageUpload(String, String)}.
-   */
   @AuditLog
   @Transactional
   public RegisteredUpload generateProfileImageUploadUrl(String userId, String fileName) {
@@ -239,11 +239,6 @@ public class UserService {
     return fileStorageService.registerUpload(fileName);
   }
 
-  /**
-   * Resume rows are written by the ingestion pipeline, not here, so the file id cannot be looked up
-   * from the database: the caller confirms the id it got from
-   * {@link #generateResumeUploadUrl(String, String)}.
-   */
   @AuditLog
   @Transactional(readOnly = true)
   public void confirmResumeUpload(String userId, String fileId) {
@@ -259,8 +254,17 @@ public class UserService {
 
   @AuditLog
   @Transactional(readOnly = true)
-  public String obtainProfileImagePreSignedUrl(UserEntity user) {
-    return fileStorageService.obtainDownloadUrl(user.getLynqFileStorageId());
+  public String obtainProfileImagePreSignedUrl(String lynqFileStorageId) {
+    return fileStorageService.obtainDownloadUrl(lynqFileStorageId);
+  }
+
+  public List<GetSupportedLanguageRestResponse> getSupportedResumeLanguages() {
+    return supportedLanguageRepository.findAll().stream()
+        .map(language -> GetSupportedLanguageRestResponse.builder()
+            .code(language.getCode())
+            .name(language.getName())
+            .build())
+        .toList();
   }
 
   @AuditLog
@@ -275,7 +279,6 @@ public class UserService {
 
     List<UserResumeEntity> resumes = userResumeRepository.findByUserId(userId);
 
-    // As with the applications page, every resume PDF is signed in one call.
     Map<String, String> pdfUrls = fileStorageService.obtainDownloadUrls(resumes.stream()
         .map(UserResumeEntity::getLynqFileStorageId)
         .toList());
@@ -316,20 +319,6 @@ public class UserService {
     return toResponse(resume, fileStorageService.obtainDownloadUrl(request.getFileId()));
   }
 
-  /**
-   * Feed the candidate's LyNQ score from the resume they just created.
-   *
-   * <p>The score matches a job's requirements against what the candidate has, and this is the only
-   * place in the product where a candidate's skills are ever written down: they come out of the
-   * resume (typed in the wizard, or extracted from an uploaded document by lynq-ml). The technical
-   * skills and the tools are taken — a soft skill never matches a job requirement — together with
-   * the generalized capability tags, which is what lets a candidate who used RabbitMQ match a post
-   * asking for Kafka.
-   *
-   * <p>New entries are added to what the candidate already has rather than replacing it: the same
-   * person may hold several resumes (one per language, or one per role they apply for), and the
-   * skills of the one they are not looking at right now are no less true.
-   */
   private void syncCandidateSkills(UserEntity user, CreateResumeRequest request) {
     Map<String, Object> skills = resumeSkills(request.getResume());
 
@@ -368,11 +357,6 @@ public class UserService {
         .forEach(user.getSimilarityTags()::add);
   }
 
-  /**
-   * The {@code skills} object of a resume payload. The resume arrives as free-form JSON (the wizard
-   * and the parser both produce it), so a draft that carries no skills block is normal and yields an
-   * empty map rather than an error.
-   */
   @SuppressWarnings("unchecked")
   private Map<String, Object> resumeSkills(Object resume) {
     if (!(resume instanceof Map<?, ?> fields)) {
@@ -382,7 +366,6 @@ public class UserService {
     return skills instanceof Map<?, ?> ? (Map<String, Object>) skills : Map.of();
   }
 
-  /** One bucket of the resume's skills object, ignoring anything that isn't a list of text. */
   private static List<String> listOf(Object value) {
     if (!(value instanceof List<?> items)) {
       return List.of();
@@ -393,7 +376,6 @@ public class UserService {
         .toList();
   }
 
-  /** Trimmed, de-duplicated, blanks dropped — what actually reaches the tables. */
   private static List<String> clean(List<String> values) {
     return values == null ? List.of() : values.stream()
         .filter(Objects::nonNull)
@@ -403,21 +385,27 @@ public class UserService {
         .toList();
   }
 
-  /**
-   * Delete one of the authenticated candidate's resumes.
-   *
-   * <p>Scoped to the caller on purpose: the resume is looked up among the ones that belong to this
-   * user, so another candidate's id resolves to "not found" rather than to a forbidden — a resume
-   * the caller does not own should not even be acknowledged as existing.
-   *
-   * <p>The candidate's skills are deliberately left alone. They were merged from every resume the
-   * person has written (see {@link #syncCandidateSkills}), so there is no way to tell which of them
-   * came from this one, and dropping a skill the candidate still has elsewhere would silently lower
-   * their LyNQ score.
-   *
-   * @return the deleted resume's id together with the file id of its PDF, which lynq-bff uses to
-   *     drop the file from lynq-file-storage.
-   */
+  @AuditLog
+  @Transactional
+  public GetUserResumeRestResponse updateResumeAlias(String userId, String resumeId, String alias) {
+    UserEntity user = userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
+
+    if (user.getType() != UserType.CANDIDATE) {
+      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES);
+    }
+
+    UserResumeEntity resume = userResumeRepository.findByUserId(userId).stream()
+        .filter(owned -> owned.getId().equals(resumeId))
+        .findFirst()
+        .orElseThrow(() -> new NotFoundException(String.format(RESUME_NOT_FOUND, resumeId)));
+
+    resume.setAlias(alias.trim());
+    userResumeRepository.save(resume);
+
+    return toResponse(resume, fileStorageService.obtainDownloadUrl(resume.getLynqFileStorageId()));
+  }
+
   @AuditLog
   @Transactional
   public DeleteResumeRestResponse deleteResume(String userId, String resumeId) {
@@ -457,9 +445,6 @@ public class UserService {
       throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_VIEW_APPLICATIONS);
     }
 
-    // The candidate is the same for every application, so their skills and capability tags are
-    // read once here rather than pulled per-row by the query, and reused to score each job the
-    // candidate applied to.
     List<String> candidateSkills = user.getSkills() == null ? List.of() : user.getSkills().stream()
         .map(UserSkillsEntity::getSkill)
         .toList();
@@ -471,8 +456,6 @@ public class UserService {
     Page<UserApplicationProjection> applications =
         userApplicationJobRepository.findApplicationsByUserId(userId, pageable);
 
-    // Every company logo on the page is signed in a single call to lynq-file-storage rather than
-    // one call per row.
     Map<String, String> logoUrls = fileStorageService.obtainDownloadUrls(
         applications.getContent().stream()
             .map(UserApplicationProjection::companyFileStorageId)
@@ -499,7 +482,6 @@ public class UserService {
         .build();
   }
 
-  /** Rows without a file — a scraped job with no company, a resume with no PDF — get no URL. */
   private static String signedUrl(Map<String, String> downloadUrls, String fileId) {
     return fileId == null ? null : downloadUrls.get(fileId);
   }
@@ -522,6 +504,7 @@ public class UserService {
     return GetUserResumeRestResponse.builder()
         .id(resume.getId())
         .name(resume.getName())
+        .alias(resume.getAlias())
         .language(resume.getLanguage())
         .createdOn(resume.getCreatedOn())
         .resume(parseResume(resume.getResume()))

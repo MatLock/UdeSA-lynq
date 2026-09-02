@@ -17,6 +17,7 @@ public class GetUserResumeRestResponse {
 
   private String id;
   private String name;
+  private String alias;
   private Language language;
   private LocalDate createdOn;
   private Object resume;

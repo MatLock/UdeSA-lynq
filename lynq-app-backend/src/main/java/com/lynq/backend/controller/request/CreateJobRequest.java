@@ -28,6 +28,5 @@ public class CreateJobRequest {
   @NotNull
   private JobPostSource jobPostSource;
   private List<String> skills;
-  /** Generalized capability tags from lynq-ml's skill enhancement; used for the LyNQ score only. */
   private List<String> similarityTags;
 }

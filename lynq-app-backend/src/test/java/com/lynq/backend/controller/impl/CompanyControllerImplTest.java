@@ -63,8 +63,6 @@ class CompanyControllerImplTest {
   void setUp() {
     companyController = new CompanyControllerImpl(companyService);
     lenient().when(principal.getId()).thenReturn(USER_ID);
-    // Used by the create tests only; lenient so the logo-upload tests don't trip
-    // strict stubbing.
     lenient().when(companyService.createUserWithCompany(USER_ID, request))
         .thenReturn(savedCompany());
   }

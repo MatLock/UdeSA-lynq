@@ -5,11 +5,13 @@ import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.controller.UserController;
 import com.lynq.backend.controller.request.CreateResumeRequest;
 import com.lynq.backend.controller.request.CreateUserRequest;
+import com.lynq.backend.controller.request.UpdateResumeAliasRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadResumeRestResponse;
 import com.lynq.backend.controller.response.DeleteResumeRestResponse;
+import com.lynq.backend.controller.response.GetSupportedLanguageRestResponse;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
@@ -34,6 +36,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -61,8 +64,8 @@ public class UserControllerImpl implements UserController {
   @AuditLog
   public ResponseEntity<GlobalRestResponse<GetUserRestResponse>> getUser(@AuthenticationPrincipal LynqUserPrincipal principal) {
     UserEntity user = userService.getUser(principal.getId());
-    String profileImageUrl = userService.obtainProfileImagePreSignedUrl(user);
-    String companyId = userService.obtainOwnedCompanyId(user);
+    String profileImageUrl = userService.obtainProfileImagePreSignedUrl(user.getLynqFileStorageId());
+    String companyId = userService.obtainOwnedCompanyId(user.getId(), user.getType());
 
     GetUserRestResponse response = GetUserRestResponse.builder()
         .id(user.getId())
@@ -97,7 +100,7 @@ public class UserControllerImpl implements UserController {
         request.getLinkedinUrl(),
         request.getBirthDate());
 
-    String profileImageUrl = userService.obtainProfileImagePreSignedUrl(user);
+    String profileImageUrl = userService.obtainProfileImagePreSignedUrl(user.getLynqFileStorageId());
 
     CreateUserRestResponse response = CreateUserRestResponse.builder()
         .id(user.getId())
@@ -127,7 +130,7 @@ public class UserControllerImpl implements UserController {
         .id(user.getId())
         .userType(user.getType())
         .fullName(user.getFullName())
-        .userProfileImageUrl(userService.obtainProfileImagePreSignedUrl(user))
+        .userProfileImageUrl(userService.obtainProfileImagePreSignedUrl(user.getLynqFileStorageId()))
         .currentPosition(user.getCurrentPosition())
         .about(user.getAbout())
         .githubUrl(user.getGithubUrl())
@@ -208,6 +211,17 @@ public class UserControllerImpl implements UserController {
   }
 
   @Override
+  @GetMapping("/resume/languages")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<List<GetSupportedLanguageRestResponse>>> getSupportedResumeLanguages() {
+    List<GetSupportedLanguageRestResponse> languages = userService.getSupportedResumeLanguages();
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, languages));
+  }
+
+  @Override
   @PostMapping("/resume")
   @AuditLog
   public ResponseEntity<GlobalRestResponse<GetUserResumeRestResponse>> createUserResume(
@@ -217,6 +231,21 @@ public class UserControllerImpl implements UserController {
 
     return ResponseEntity
         .status(HttpStatus.CREATED)
+        .body(new GlobalRestResponse<>(true, resume));
+  }
+
+  @Override
+  @PutMapping("/resume/{resumeId}/alias")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<GetUserResumeRestResponse>> updateResumeAlias(
+      @PathVariable String resumeId,
+      @Valid @RequestBody UpdateResumeAliasRequest request,
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
+    GetUserResumeRestResponse resume =
+        userService.updateResumeAlias(principal.getId(), resumeId, request.getAlias());
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, resume));
   }
 

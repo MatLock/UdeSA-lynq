@@ -2,19 +2,6 @@ package com.lynq.backend.repository.projection;
 
 import java.time.LocalDate;
 
-/**
- * Flat projection populated directly by a single JPQL constructor-expression query. It carries the
- * application id together with the applicant's public profile fields and the date the application
- * was submitted, so listing the candidates of a job never triggers lazy-loaded iterations inside a
- * transactional method. {@code userFileStorageId} holds the lynq-file-storage id of the profile
- * image; the service exchanges it for a pre-signed URL before it reaches the response, signing the
- * whole page in one call. {@code jobSkills} and {@code userSkills} carry
- * the comma-separated skill names (or {@code null} when there are none), each pulled in the same
- * query via a correlated {@code group_concat} subquery, so the service can compute the LyNQ score
- * of every candidate against the job without extra round-trips. {@code jobSimilarityTags} and
- * {@code userSimilarityTags} carry the generalized capability tags the same score also matches on, pulled the
- * same way.
- */
 public record JobCandidateProjection(
     String id,
     String userId,

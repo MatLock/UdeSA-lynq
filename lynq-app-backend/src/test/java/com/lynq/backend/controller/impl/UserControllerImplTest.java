@@ -9,6 +9,7 @@ import com.lynq.backend.controller.response.GenerateUploadResumeRestResponse;
 import com.lynq.backend.controller.response.DeleteResumeRestResponse;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
+import com.lynq.backend.controller.response.GetSupportedLanguageRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
@@ -122,8 +123,8 @@ class UserControllerImplTest {
   void getUserMapsEntityIntoResponseData() {
     UserEntity user = savedUser();
     when(userService.getUser(USER_ID)).thenReturn(user);
-    when(userService.obtainProfileImagePreSignedUrl(user)).thenReturn(PRE_SIGNED_URL);
-    when(userService.obtainOwnedCompanyId(user)).thenReturn(COMPANY_ID);
+    when(userService.obtainProfileImagePreSignedUrl(FILE_ID)).thenReturn(PRE_SIGNED_URL);
+    when(userService.obtainOwnedCompanyId(USER_ID, USER_TYPE)).thenReturn(COMPANY_ID);
 
     ResponseEntity<GlobalRestResponse<GetUserRestResponse>> response =
         userController.getUser(principal);
@@ -189,7 +190,7 @@ class UserControllerImplTest {
     UserEntity user = savedUser();
     when(userService.saveNewUser(USER_ID, USER_TYPE, FULL_NAME, CURRENT_POSITION, ABOUT,
         GITHUB_URL, LINKEDIN_URL, BIRTH_DATE)).thenReturn(user);
-    when(userService.obtainProfileImagePreSignedUrl(user)).thenReturn(PRE_SIGNED_URL);
+    when(userService.obtainProfileImagePreSignedUrl(FILE_ID)).thenReturn(PRE_SIGNED_URL);
 
     ResponseEntity<GlobalRestResponse<CreateUserRestResponse>> response =
         userController.createUser(request, principal);
@@ -230,8 +231,7 @@ class UserControllerImplTest {
   void updateUserProfileMapsUpdatedEntityIntoResponseData() {
     UserEntity updated = savedUser();
     when(userService.updateUserProfile(USER_ID, updateRequest)).thenReturn(updated);
-    // The stored value is a lynq-file-storage id; the response carries the signed URL for it.
-    when(userService.obtainProfileImagePreSignedUrl(updated)).thenReturn(PROFILE_IMAGE_URL);
+    when(userService.obtainProfileImagePreSignedUrl(FILE_ID)).thenReturn(PROFILE_IMAGE_URL);
 
     ResponseEntity<GlobalRestResponse<UpdateUserProfileRestResponse>> response =
         userController.updateUserProfile(updateRequest, principal);
@@ -325,6 +325,34 @@ class UserControllerImplTest {
     assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
     assertThat(body.isSuccess(), is(true));
     assertThat(body.getData().getPreSignedUrl(), is(PRE_SIGNED_URL));
+  }
+
+  @Test
+  void getSupportedResumeLanguagesRespondsWithOkStatus() {
+    when(userService.getSupportedResumeLanguages()).thenReturn(List.of());
+
+    ResponseEntity<GlobalRestResponse<List<GetSupportedLanguageRestResponse>>> response =
+        userController.getSupportedResumeLanguages();
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void getSupportedResumeLanguagesWrapsServiceResultInSuccessfulEnvelope() {
+    GetSupportedLanguageRestResponse language = GetSupportedLanguageRestResponse.builder()
+        .code("EN")
+        .name("English")
+        .build();
+    when(userService.getSupportedResumeLanguages()).thenReturn(List.of(language));
+
+    ResponseEntity<GlobalRestResponse<List<GetSupportedLanguageRestResponse>>> response =
+        userController.getSupportedResumeLanguages();
+
+    GlobalRestResponse<List<GetSupportedLanguageRestResponse>> body = response.getBody();
+    assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData(), is(org.hamcrest.Matchers.hasSize(1)));
+    assertThat(body.getData().get(0).getCode(), is("EN"));
   }
 
   @Test
