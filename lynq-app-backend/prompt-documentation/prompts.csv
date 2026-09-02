@@ -169,3 +169,4 @@ parameters:
 "02-09-2026","create a supported_languages table (liquibase changelog + entity + repository) with code and display name, seeded with the resume languages EN, ES, FR and PR. resume languages must come from the database, not from code"
 "02-09-2026","add GET /dmz/user/resume/languages endpoint returning the supported resume languages read from the supported_languages table, wrapped in the GlobalRestResponse envelope, with unit tests"
 "02-09-2026","create a way to assign an alias to a resume: alter the UI, create BFF endpoint to create/override the alias, create backend endpoint to create/override the alias and the migration required"
+"02-09-2026","sonar failed for the release. fix it https://sonarcloud.io/summary/new_code?id=MatLock_UdeSA-lynq"

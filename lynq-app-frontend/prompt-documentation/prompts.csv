@@ -130,3 +130,4 @@ date,prompt
 "02-09-2026","create a modal in the resume translate button with a spinner saying that the action is running, very similar to how the skill enhance works"
 "02-09-2026","create a way to assign an alias to a resume: alter the UI, create BFF endpoint to create/override the alias, create backend endpoint to create/override the alias and the migration required"
 "02-09-2026","the frontend CICD failed. https://github.com/MatLock/UdeSA-lynq/actions/runs/33692863876/job/100455292113?pr=15"
+"02-09-2026","sonar failed for the release. fix it https://sonarcloud.io/summary/new_code?id=MatLock_UdeSA-lynq"

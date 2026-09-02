@@ -394,23 +394,23 @@ class UserControllerImplTest {
 
   @Test
   void createUserResumeDelegatesToServiceWithPrincipalId() {
-    CreateResumeRequest request = new CreateResumeRequest();
-    when(userService.createResume(USER_ID, request))
+    CreateResumeRequest resumeRequest = new CreateResumeRequest();
+    when(userService.createResume(USER_ID, resumeRequest))
         .thenReturn(GetUserResumeRestResponse.builder().build());
 
-    userController.createUserResume(request, principal);
+    userController.createUserResume(resumeRequest, principal);
 
-    verify(userService).createResume(USER_ID, request);
+    verify(userService).createResume(USER_ID, resumeRequest);
   }
 
   @Test
   void createUserResumeRespondsWithCreatedStatusAndTheStoredResume() {
-    CreateResumeRequest request = new CreateResumeRequest();
+    CreateResumeRequest resumeRequest = new CreateResumeRequest();
     GetUserResumeRestResponse resume = GetUserResumeRestResponse.builder().id(RESUME_ID).build();
-    when(userService.createResume(USER_ID, request)).thenReturn(resume);
+    when(userService.createResume(USER_ID, resumeRequest)).thenReturn(resume);
 
     ResponseEntity<GlobalRestResponse<GetUserResumeRestResponse>> response =
-        userController.createUserResume(request, principal);
+        userController.createUserResume(resumeRequest, principal);
 
     assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
     GlobalRestResponse<GetUserResumeRestResponse> body = response.getBody();

@@ -174,30 +174,34 @@ class BedrockClientTests(unittest.IsolatedAsyncioTestCase):
     async def test_generate_raises_llm_error_on_client_error(self) -> None:
         patcher, _ = _fake_boto(converse_raises=_client_error("ThrottlingException"))
         with patcher:
+            client = self._client()
             with self.assertRaises(LLMError) as ctx:
-                await self._client().generate("P")
+                await client.generate("P")
 
         self.assertIn("Bedrock converse failed", str(ctx.exception))
 
     async def test_generate_raises_llm_error_without_credentials(self) -> None:
         patcher, _ = _fake_boto(converse_raises=NoCredentialsError())
         with patcher:
+            client = self._client()
             with self.assertRaises(LLMError):
-                await self._client().generate("P")
+                await client.generate("P")
 
     async def test_generate_raises_llm_error_on_unexpected_shape(self) -> None:
         patcher, _ = _fake_boto(converse={"output": {}})
         with patcher:
+            client = self._client()
             with self.assertRaises(LLMError) as ctx:
-                await self._client().generate("P")
+                await client.generate("P")
 
         self.assertIn("Unexpected Bedrock response shape", str(ctx.exception))
 
     async def test_generate_raises_llm_error_on_empty_completion(self) -> None:
         patcher, _ = _fake_boto(converse=_converse_response("   "))
         with patcher:
+            client = self._client()
             with self.assertRaises(LLMError) as ctx:
-                await self._client().generate("P")
+                await client.generate("P")
 
         self.assertIn("empty completion", str(ctx.exception))
 
