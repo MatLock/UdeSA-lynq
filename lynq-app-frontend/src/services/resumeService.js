@@ -9,6 +9,9 @@
 // Language codes the backend stores a resume under (com.lynq.backend.enums.Language).
 const LANGUAGES = ['EN', 'ES', 'FR', 'PR'];
 
+// Templates a resume PDF can be rendered with (com.lynq.bff.enums.ResumeTemplate).
+const TEMPLATES = ['MODERN', 'CLASSIC'];
+
 /**
  * Fetch every resume of the authenticated candidate.
  *
@@ -162,6 +165,89 @@ const create_resume = async (authFetch, body) => {
 };
 
 /**
+ * Assign (or replace — same operation) the alias of one of the candidate's
+ * stored resumes.
+ *
+ * Calls PUT /resume/{resumeId}/alias on lynq-bff, which validates the alias and
+ * relays to the app-backend, where the resume row lives and ownership is
+ * enforced — a resume that is not the caller's is never acknowledged as
+ * existing. The alias is the label the candidate tells their resumes apart by
+ * in the switcher; it never appears on the document itself.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
+ * @param {string} resumeId - Id of the stored resume the alias is assigned to.
+ * @param {string} alias - The alias to assign, replacing any previous one.
+ * @returns {Promise<object>} The updated resume (unwrapped
+ *   GetUserResumeRestResponse, now carrying `alias`).
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const assign_alias = async (authFetch, resumeId, alias) => {
+  const payload = await authFetch(
+    `/resume/${encodeURIComponent(resumeId)}/alias`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ alias }),
+    },
+  );
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
+  return payload?.data;
+};
+
+/**
+ * Fetch the languages a resume can be stored in.
+ *
+ * Calls GET /user/resume/languages (UserController.getSupportedResumeLanguages).
+ * The list comes from the backend's supported_languages table — the source of
+ * truth for which languages the product offers — so the translation dialog
+ * never has to hardcode {@link LANGUAGES}.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
+ * @returns {Promise<Array<{ code: string, name: string }>>} The unwrapped list
+ *   of supported languages (e.g. `{ code: 'EN', name: 'English' }`).
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const get_supported_languages = async (authFetch) => {
+  const payload = await authFetch('/user/resume/languages', { method: 'GET' });
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
+  return payload?.data ?? [];
+};
+
+/**
+ * Translate one of the candidate's stored resumes into another language.
+ *
+ * Calls POST /resume/{resumeId}/translate on lynq-bff, which reads the source
+ * resume from the app-backend, has lynq-ml translate the structured JSON, and
+ * returns that JSON — nothing is rendered or stored. The candidate continues
+ * the flow themselves: they pick a template and render a preview through
+ * {@link preview_resume}, and confirming stores the resume through
+ * {@link create_resume} with the previewed fileId. The target language must be
+ * one the backend supports (see {@link get_supported_languages}) and one the
+ * candidate does not already hold a resume in — the backend rejects both
+ * with 400.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
+ * @param {string} resumeId - Id of the stored resume to translate.
+ * @param {string} language - Target language code (e.g. `FR`).
+ * @returns {Promise<object>} The translated resume JSON, ready for the
+ *   template/preview step.
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const translate_resume = async (authFetch, resumeId, language) => {
+  const payload = await authFetch(
+    `/resume/${encodeURIComponent(resumeId)}/translate`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ language }),
+    },
+  );
+  // Unwrap the GlobalRestResponse envelope ({ success, data }).
+  return payload?.data;
+};
+
+/**
  * Ask the backend to AI-extract the skills implied by a resume.
  *
  * Calls POST /resume/skill-extraction, which lynq-bff relays to lynq-ml, which
@@ -198,6 +284,7 @@ const extract_skills = async (authFetch, resume, language) => {
 
 export default {
   LANGUAGES,
+  TEMPLATES,
   get_resumes,
   generate_resume_upload_url,
   upload_resume,
@@ -205,6 +292,9 @@ export default {
   preview_resume,
   create_resume,
   delete_resume,
+  assign_alias,
+  get_supported_languages,
+  translate_resume,
   delete_resume_preview,
   extract_skills,
 };

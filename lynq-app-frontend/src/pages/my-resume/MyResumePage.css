@@ -83,6 +83,16 @@
   opacity: 0.92;
 }
 
+/* Secondary pill action: translate — visually below the primary, same row. */
+.resume-page-action--ghost {
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+}
+
+.resume-page-action--ghost:hover {
+  opacity: 0.85;
+}
+
 /* ── Resume switcher (only with more than one resume) ────────────────────── */
 
 .resume-page-tabs {
@@ -177,18 +187,6 @@
   color: var(--text);
 }
 
-/* Also the only place the language shows when the candidate has a single resume
-   and the switcher is therefore hidden. Same chip as the switcher's. */
-.resume-page-doc-language {
-  flex: none;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--brand-purple-dark);
-  background: var(--accent-bg);
-}
-
 .resume-page-doc-actions {
   display: flex;
   align-items: center;
@@ -217,18 +215,44 @@
   border-color: transparent;
 }
 
-/* Rare and irreversible, so it reads as a glyph until you reach for it. */
+/* Assign/replace the alias: a labeled pill in the brand accent, same shape as
+   the download next to it, tinted so it reads as its own action at a glance. */
+.resume-page-doc-rename {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.resume-page-doc-rename:hover {
+  color: #fff;
+  background: var(--brand-gradient);
+  border-color: transparent;
+}
+
+/* Rare and irreversible: the same labeled pill as its neighbors, but it stays
+   quiet until hover answers with the danger tint. */
 .resume-page-doc-delete {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 1px solid transparent;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
   border-radius: 999px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text);
-  background: none;
+  background: #fff;
   cursor: pointer;
   transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }

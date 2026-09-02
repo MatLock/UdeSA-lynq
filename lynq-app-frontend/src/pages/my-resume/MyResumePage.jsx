@@ -3,14 +3,20 @@ import { Navigate } from 'react-router-dom'
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
+import DriveFileRenameOutlineRoundedIcon from '@mui/icons-material/DriveFileRenameOutlineRounded'
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
+import TranslateRoundedIcon from '@mui/icons-material/TranslateRounded'
 import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog.jsx'
+import LoadingOverlay from '../../components/LoadingOverlay/LoadingOverlay.jsx'
+import ResumeAliasModal from '../../components/ResumeAliasModal/ResumeAliasModal.jsx'
 import ResumeCreation from '../../components/ResumeCreation/ResumeCreation.jsx'
 import ResumeDocument from '../../components/ResumeDocument/ResumeDocument.jsx'
 import ResumeSectionNav from '../../components/ResumeSectionNav/ResumeSectionNav.jsx'
 import Spinner from '../../components/Spinner/Spinner.jsx'
 import LynqTitle from '../../components/LynqTitle/LynqTitle.jsx'
 import Toast from '../../components/Toast/Toast.jsx'
+import TranslateResumeModal from '../../components/TranslateResumeModal/TranslateResumeModal.jsx'
+import TranslateTemplateModal from '../../components/TranslateTemplateModal/TranslateTemplateModal.jsx'
 import ResumeWizardProvider from '../../context/ResumeWizardContext.jsx'
 import useApi from '../../hooks/useApi'
 import useAuth from '../../hooks/useAuth'
@@ -44,7 +50,7 @@ const formatCreatedOn = (isoDate) => {
 // one, rather than pretending the section is empty.
 const MyResumePage = () => {
   const t = strings.pages.resume
-  const { authFetch } = useApi()
+  const { authFetch, freshAuthFetch } = useApi()
   const { user } = useAuth()
 
   const [resumes, setResumes] = useState([])
@@ -62,6 +68,22 @@ const MyResumePage = () => {
   // dialog. `deleting` keeps it open with the buttons disabled while it runs.
   const [pendingDeletion, setPendingDeletion] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  // The resume whose alias is being assigned or replaced; null closes the
+  // dialog. `aliasBusy` keeps it open with the controls disabled while it runs.
+  const [aliasTarget, setAliasTarget] = useState(null)
+  const [aliasBusy, setAliasBusy] = useState(false)
+  // The translation dialog: whether it is open, whether the flow is mid-flight,
+  // and the supported languages it offers — fetched lazily the first time the
+  // dialog opens (they come from the backend's supported_languages table, not
+  // from code) and kept for later openings.
+  const [translating, setTranslating] = useState(false)
+  const [translateBusy, setTranslateBusy] = useState(false)
+  const [languages, setLanguages] = useState([])
+  const [languagesLoading, setLanguagesLoading] = useState(false)
+  // The finished translation, waiting for the candidate to pick a template,
+  // preview it and confirm: { source, language, resume }. Null when no
+  // translation is mid-flow.
+  const [translationDraft, setTranslationDraft] = useState(null)
 
   // Bumped to re-run the fetch (retry, post-creation reload, manual refresh).
   const [reloadToken, setReloadToken] = useState(0)
@@ -94,6 +116,10 @@ const MyResumePage = () => {
 
   const reload = () => setReloadToken((previous) => previous + 1)
 
+  // What a resume is called everywhere on this page: the alias the candidate
+  // assigned wins, falling back to the document's own name.
+  const displayNameOf = (resume) => resume?.alias || resume?.name || t.untitled
+
   // The resume the viewer shows: the user's explicit pick, else the one written in
   // the UI language, else whatever the candidate has.
   const preferredLanguage = activeLocale.toUpperCase()
@@ -110,6 +136,73 @@ const MyResumePage = () => {
   const startCreating = () => {
     setWizardRun((previous) => previous + 1)
     setCreating(true)
+  }
+
+  const startTranslating = async () => {
+    setTranslating(true)
+    if (languages.length > 0) return
+
+    setLanguagesLoading(true)
+    try {
+      const result = await resumeService.get_supported_languages(authFetch)
+      setLanguages(Array.isArray(result) ? result : [])
+    } catch (error) {
+      // Without the language list the dialog has nothing to offer — close it
+      // and surface the failure the same way every other action does.
+      setTranslating(false)
+      setToast({
+        type: 'error',
+        message: error.reason ?? error.message ?? t.translate.error,
+      })
+    } finally {
+      setLanguagesLoading(false)
+    }
+  }
+
+  // First half of the flow: run the translation itself. The picker closes
+  // right away and a full-screen LoadingOverlay takes over while it runs —
+  // same pattern as the skill enhancement in the wizard (SkillsField). Nothing
+  // is stored yet: the translated JSON opens the template/preview dialog,
+  // where the candidate confirms (or walks away and nothing happened).
+  //
+  // freshAuthFetch, not authFetch: the gateway forwards this token across
+  // services for as long as the model takes, so the flow must leave with a
+  // token that has its whole lifetime ahead — one mid-life would expire
+  // downstream, after the expensive translation already ran.
+  const handleTranslate = async (sourceId, language) => {
+    if (translateBusy) return
+
+    setTranslating(false)
+    setTranslateBusy(true)
+    try {
+      const translated = await resumeService.translate_resume(
+        freshAuthFetch,
+        sourceId,
+        language,
+      )
+      setTranslationDraft({
+        source: resumes.find((resume) => resume.id === sourceId) ?? null,
+        language,
+        resume: translated,
+      })
+    } catch (error) {
+      setToast({
+        type: 'error',
+        message: error.reason ?? error.message ?? t.translate.error,
+      })
+    } finally {
+      setTranslateBusy(false)
+    }
+  }
+
+  // Second half: the candidate confirmed the previewed template, the resume is
+  // stored. Reload and pin the selection to the new id so the viewer lands on
+  // the translation when the list comes back.
+  const handleTranslationStored = (created) => {
+    setTranslationDraft(null)
+    if (created?.id) setSelectedId(created.id)
+    setToast({ type: 'success', message: t.translate.success })
+    reload()
   }
 
   // Drop the resume, then reload: the viewer picks the next one on its own (the
@@ -134,6 +227,29 @@ const MyResumePage = () => {
       })
     } finally {
       setDeleting(false)
+    }
+  }
+
+  // Save the alias (assigning and replacing are the same call), then reload so
+  // every list shows the new label. The selection is pinned to the same resume
+  // so the viewer doesn't jump.
+  const handleAliasSave = async (alias) => {
+    if (!aliasTarget || aliasBusy) return
+
+    setAliasBusy(true)
+    try {
+      await resumeService.assign_alias(authFetch, aliasTarget.id, alias)
+      setSelectedId(aliasTarget.id)
+      setAliasTarget(null)
+      setToast({ type: 'success', message: t.alias.success })
+      reload()
+    } catch (error) {
+      setToast({
+        type: 'error',
+        message: error.reason ?? error.message ?? t.alias.error,
+      })
+    } finally {
+      setAliasBusy(false)
     }
   }
 
@@ -176,6 +292,14 @@ const MyResumePage = () => {
             actions that operate on a single resume live on its own toolbar,
             down at the document. */}
         <div className="resume-page-actions">
+          <button
+            type="button"
+            className="resume-page-action resume-page-action--ghost"
+            onClick={startTranslating}
+          >
+            <TranslateRoundedIcon sx={{ fontSize: 17 }} />
+            {t.translateResume}
+          </button>
           <button type="button" className="resume-page-action" onClick={startCreating}>
             <AddRoundedIcon sx={{ fontSize: 17 }} />
             {t.newResume}
@@ -198,7 +322,7 @@ const MyResumePage = () => {
                 onClick={() => setSelectedId(resume.id)}
               >
                 <PictureAsPdfOutlinedIcon sx={{ fontSize: 15 }} />
-                <span className="resume-page-tab-name">{resume.name || t.untitled}</span>
+                <span className="resume-page-tab-name">{displayNameOf(resume)}</span>
                 <span className="resume-page-tab-language">{resume.language}</span>
               </button>
             )
@@ -215,18 +339,13 @@ const MyResumePage = () => {
 
         <div className="resume-page-doc-column">
           {/* Pinned to the top edge of the paper: what this document is on the
-              left, what you can do to it on the right. The language badge also
-              covers the single-resume case, where there are no tabs to show it. */}
+              left, what you can do to it on the right. */}
           <div className="resume-page-doc-bar">
             {selected?.createdOn && (
               <span className="resume-page-doc-date">
                 {t.createdOn.replace('{date}', formatCreatedOn(selected.createdOn))}
               </span>
             )}
-            {selected?.language && (
-              <span className="resume-page-doc-language">{selected.language}</span>
-            )}
-
             <div className="resume-page-doc-actions">
               {selected?.pdfUrl && (
                 <a
@@ -239,17 +358,32 @@ const MyResumePage = () => {
                   {t.downloadPdf}
                 </a>
               )}
-              {/* Rare and irreversible: a quiet glyph that only turns red on
-                  hover, one click from the confirmation. */}
+              {/* The two pills that manage the resume itself sit together,
+                  after the download. Assigning or replacing the alias is a
+                  labeled pill, not a bare glyph: the feature is invisible
+                  until the first alias exists, so the button has to say what
+                  it does on its own. */}
+              {selected && (
+                <button
+                  type="button"
+                  className="resume-page-doc-rename"
+                  onClick={() => setAliasTarget(selected)}
+                >
+                  <DriveFileRenameOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                  {selected.alias ? t.alias.editAction : t.alias.action}
+                </button>
+              )}
+              {/* Rare and irreversible: a labeled pill like its neighbors, but
+                  quiet until hover turns it red — one click from the
+                  confirmation. */}
               {selected && (
                 <button
                   type="button"
                   className="resume-page-doc-delete"
-                  aria-label={t.deleteResume}
-                  title={t.deleteResume}
                   onClick={() => setPendingDeletion(selected)}
                 >
-                  <DeleteOutlineRoundedIcon sx={{ fontSize: 17 }} />
+                  <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                  {t.deleteResume}
                 </button>
               )}
             </div>
@@ -317,15 +451,44 @@ const MyResumePage = () => {
       />
       {renderContent()}
 
+      {translating && (
+        <TranslateResumeModal
+          resumes={resumes}
+          languages={languages}
+          loading={languagesLoading}
+          initialSourceId={selected?.id}
+          onConfirm={handleTranslate}
+          onCancel={() => setTranslating(false)}
+        />
+      )}
+
+      {translateBusy && <LoadingOverlay label={t.translate.busy} />}
+
+      {translationDraft && (
+        <TranslateTemplateModal
+          source={translationDraft.source}
+          language={translationDraft.language}
+          resume={translationDraft.resume}
+          onCompleted={handleTranslationStored}
+          onCancel={() => setTranslationDraft(null)}
+        />
+      )}
+
+      {aliasTarget && (
+        <ResumeAliasModal
+          resume={aliasTarget}
+          busy={aliasBusy}
+          onConfirm={handleAliasSave}
+          onCancel={() => setAliasTarget(null)}
+        />
+      )}
+
       {pendingDeletion && (
         <ConfirmDialog
           destructive
           busy={deleting}
           title={t.deleteTitle}
-          message={t.deleteMessage.replace(
-            '{name}',
-            pendingDeletion.name || t.untitled,
-          )}
+          message={t.deleteMessage.replace('{name}', displayNameOf(pendingDeletion))}
           confirmLabel={t.deleteConfirm}
           busyLabel={t.deleting}
           cancelLabel={t.create.cancel}

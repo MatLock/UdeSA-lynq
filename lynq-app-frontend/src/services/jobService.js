@@ -166,8 +166,11 @@ const update_job = async (
  * candidate who solved the same problem with a different technology — and travel
  * with the job post.
  *
- * lynq-ml is a Python service, so it answers in snake_case; the app-backend that
- * stores them is Java and expects camelCase. The conversion happens here.
+ * lynq-ml is a Python service, so it speaks snake_case in both directions — the
+ * request goes out as work_type and the answer comes back as similarity_tags —
+ * while the app-backend that stores them is Java and expects camelCase. The
+ * conversion happens here. (The BFF relays this call verbatim, so nothing
+ * re-cases it in between.)
  *
  * @returns {Promise<{ skills: string[], similarityTags: string[] }>} The suggestion.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
@@ -175,7 +178,7 @@ const update_job = async (
 const generate_skills = async (authFetch, { title, description, workType } = {}) => {
   const payload = await authFetch('/skill-enhance', {
     method: 'POST',
-    body: JSON.stringify({ title, description, workType }),
+    body: JSON.stringify({ title, description, work_type: workType }),
   });
   return {
     skills: payload?.data?.skills ?? [],

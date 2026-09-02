@@ -57,7 +57,34 @@ const useApi = () => {
     [refreshSession, logout],
   )
 
-  return { authFetch }
+  // Like authFetch, but refreshes the session BEFORE sending, so the request
+  // leaves with an access token that has its full lifetime ahead of it. For
+  // long-running gateway flows (e.g. translating a resume, where the token is
+  // forwarded across services for minutes): with authFetch the token only has
+  // whatever life it happens to have left, and if it expires mid-flow the
+  // failure lands downstream — after the expensive work — where no retry here
+  // can help. Not for ordinary calls: it costs a round trip to the IAM on
+  // every send.
+  const freshAuthFetch = useCallback(
+    async (path, options = {}) => {
+      const { requestUuid: pinnedUuid, ...fetchOptions } = options
+      const requestUuid = pinnedUuid ?? requestUuidUtil.newRequestUuid()
+
+      let freshToken
+      try {
+        freshToken = await refreshSession()
+      } catch {
+        logout()
+        const sessionError = new Error('Session expired. Please log in again.')
+        sessionError.status = 401
+        throw sessionError
+      }
+      return securedFetch.sendSecured(freshToken, path, fetchOptions, requestUuid)
+    },
+    [refreshSession, logout],
+  )
+
+  return { authFetch, freshAuthFetch }
 }
 
 export default useApi

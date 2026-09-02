@@ -1,0 +1,127 @@
+/* ResumeAliasModal — assign or replace the alias of one stored resume. A
+   native modal <dialog> portaled to <body>; the browser paints the dim via
+   ::backdrop. Mirrors ConfirmDialog's visual language; brand tokens from
+   index.css. */
+
+.resume-alias-dialog {
+  width: min(420px, calc(100vw - 48px));
+  max-width: none;
+  margin: auto;
+  padding: 0;
+  color: inherit;
+  background: #fff;
+  border: none;
+  border-radius: 16px;
+  box-shadow: var(--shadow-dialog);
+}
+
+.resume-alias-dialog::backdrop {
+  background: var(--scrim);
+  backdrop-filter: blur(2px);
+}
+
+.resume-alias-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  text-align: left;
+}
+
+.resume-alias-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.resume-alias-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+}
+
+.resume-alias-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.resume-alias-subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.resume-alias-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resume-alias-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.resume-alias-input {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: #fff;
+}
+
+.resume-alias-input:focus {
+  outline: none;
+  border-color: var(--brand-purple-light);
+}
+
+.resume-alias-input:disabled {
+  opacity: 0.6;
+}
+
+.resume-alias-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.resume-alias-button {
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-gradient);
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.resume-alias-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.resume-alias-button--ghost {
+  color: var(--text);
+  background: none;
+  border-color: var(--border);
+}
+
+.resume-alias-button--ghost:hover:not(:disabled) {
+  border-color: var(--brand-purple-light);
+  color: var(--brand-purple-dark);
+}
