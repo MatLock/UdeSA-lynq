@@ -23,21 +23,22 @@ _INPUT_JSON = json.dumps(
 class RenderUpskillingPromptTests(unittest.TestCase):
     """The renderer injects the input JSON into the provider template."""
 
-    def test_ollama_template_contains_input_and_chat_tokens(self) -> None:
+    def test_ollama_template_contains_input_without_chat_tokens(self) -> None:
         prompt = render_upskilling_prompt(LLMProvider.OLLAMA, input_json=_INPUT_JSON)
 
         self.assertIn("Backend role", prompt)
         self.assertIn("Junior dev", prompt)
-        # ollama.jinja embeds llama chat special tokens (sent with raw=True).
-        self.assertIn("<|begin_of_text|>", prompt)
+        # Plain text, no model-specific chat tokens: Ollama applies the
+        # chat template of whichever model is configured.
+        self.assertNotIn("<|", prompt)
 
     def test_bedrock_template_contains_input(self) -> None:
         prompt = render_upskilling_prompt(LLMProvider.BEDROCK, input_json=_INPUT_JSON)
 
         self.assertIn("Backend role", prompt)
         self.assertIn("Junior dev", prompt)
-        # bedrock.jinja is plain text: no llama chat tokens.
-        self.assertNotIn("<|begin_of_text|>", prompt)
+        # bedrock.jinja is plain text too: no chat special tokens.
+        self.assertNotIn("<|", prompt)
 
     def test_both_templates_declare_the_same_output_schema(self) -> None:
         for provider in (LLMProvider.OLLAMA, LLMProvider.BEDROCK):

@@ -20,7 +20,7 @@ def get_llm_client() -> LLMClient:
     environment:
 
     - Ollama: ``OLLAMA_BASE_URL`` (default ``http://localhost:11434``),
-      ``OLLAMA_MODEL`` (default ``llama3.1``).
+      ``OLLAMA_MODEL`` (default ``qwen2.5:7b``).
     - Bedrock: ``BEDROCK_MODEL_ID`` (required — any Converse-capable model,
       e.g. ``anthropic.claude-sonnet-4-5-20250929-v1:0`` or
       ``amazon.nova-pro-v1:0``), ``BEDROCK_REGION`` (falls back to
@@ -29,7 +29,8 @@ def get_llm_client() -> LLMClient:
       ``BEDROCK_MAX_ATTEMPTS`` (default ``3``). Credentials come from the
       standard AWS chain — env vars, profile, or the pod's IAM role.
 
-    Shared: ``LLM_TIMEOUT`` seconds (default ``60``).
+    Shared: ``LLM_TIMEOUT`` seconds (default ``300`` — sized for the longest
+    generation, translating a whole resume on a local Ollama model).
 
     Raises:
         ValueError: If ``LLM_PROVIDER`` is unknown, or required settings for
@@ -41,12 +42,12 @@ def get_llm_client() -> LLMClient:
     except ValueError as exc:
         raise ValueError(f"Unsupported LLM_PROVIDER: {raw_provider!r}") from exc
 
-    timeout = float(os.getenv("LLM_TIMEOUT", "60"))
+    timeout = float(os.getenv("LLM_TIMEOUT", "300"))
 
     if provider is LLMProvider.OLLAMA:
         return OllamaClient(
             base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-            model=os.getenv("OLLAMA_MODEL", "llama3.1"),
+            model=os.getenv("OLLAMA_MODEL", "qwen2.5:7b"),
             timeout=timeout,
         )
 

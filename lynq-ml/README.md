@@ -39,7 +39,7 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
 | Language          | Python 3.12                                                               |
 | Framework         | FastAPI 0.139 (Starlette), served by Uvicorn 0.50                         |
 | Validation        | Pydantic 2                                                                |
-| LLM backends      | Ollama (`/api/generate`, raw mode) or Amazon Bedrock (`converse`, any model) |
+| LLM backends      | Ollama (`/api/chat`, any model) or Amazon Bedrock (`converse`, any model) |
 | Prompting         | Jinja2 templates, one variant per provider                                |
 | HTTP client       | httpx (async) for Ollama, boto3 for Bedrock                               |
 | Document parsing  | pypdf + python-docx (resume reader helpers)                               |
@@ -90,7 +90,7 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
 - **Middleware** (`middleware/`) — `require_request_uuid` enforces the `lynq-request-uuid` header on every non-exempt route and binds it to the logging context.
 - **Feature router** (`skill_enhance/`) — the `POST /dmz/skill-enhance` endpoint plus its request/response models and the Jinja prompt renderer.
 - **LLM clients** (`llm_client/`) — a common `LLMClient` interface with `OllamaClient` and `BedrockClient` implementations, selected by the `get_llm_client()` factory from environment configuration. Both raise `LLMError` on a backend failure, so the routers answer `502` without knowing which provider is configured.
-- **Prompts** (`resources/prompts/`) — provider-specific Jinja templates (`job_post_skill_extraction/ollama.jinja`, `job_post_skill_extraction/bedrock.jinja`).
+- **Prompts** (`resources/prompts/`) — provider-specific Jinja templates (`job_post_skill_extraction/ollama.jinja`, `job_post_skill_extraction/bedrock.jinja`). They are plain text and carry no chat special tokens: each client sends the rendered prompt as a single user turn and the provider applies the chat template of the configured model. Switching `OLLAMA_MODEL` between Qwen, Llama or Mistral — or `BEDROCK_MODEL_ID` between Claude and Nova — therefore needs no prompt change. A test enforces this (`TemplatesAreModelAgnosticTests`).
 - **Response envelopes** (`response/`) — `GlobalRestResponse` / `ErrorRestResponse`, mirroring the Java services.
 - **Logging context** (`logging_context.py`) — the MDC-style request-UUID contextvar and logging filter.
 - **Document helpers** (`file_downloader/`, `file_reader/`) — download a resume from a presigned S3 URL and extract text from PDF/DOCX. Building blocks not yet exposed via an endpoint.
@@ -611,7 +611,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 2. Start an LLM backend. Easiest: the Ollama services from the repo-root compose file,
-#    which expose Ollama on localhost:11434 and pull llama3.1:
+#    which expose Ollama on localhost:11434 and pull qwen2.5:7b:
 docker compose -f ../docker-compose.yaml up -d ollama ollama-pull
 
 # 3. Export the service environment (defaults to Ollama on localhost)
@@ -670,7 +670,7 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 | `LLM_PROVIDER`    | `ollama`                    | always               | Selects the LLM backend: `ollama` or `bedrock`.      |
 | `LLM_TIMEOUT`     | `60`                        | always               | LLM request timeout, in seconds.                     |
 | `OLLAMA_BASE_URL` | `http://localhost:11434`    | `LLM_PROVIDER=ollama`| Ollama server base URL.                              |
-| `OLLAMA_MODEL`    | `llama3.1`                  | `LLM_PROVIDER=ollama`| Ollama model name.                                   |
+| `OLLAMA_MODEL`    | `qwen2.5:7b`                | `LLM_PROVIDER=ollama`| Any model pulled into Ollama; no prompt change needed.|
 | `BEDROCK_MODEL_ID` | — (required)               | `LLM_PROVIDER=bedrock`| Any Converse-capable model id (`anthropic.*`, `amazon.nova-*`, `meta.llama*`, `mistral.*`). |
 | `BEDROCK_REGION`  | `AWS_REGION`, else `us-east-1` | `LLM_PROVIDER=bedrock`| Region whose Bedrock endpoint is called.        |
 | `BEDROCK_MAX_TOKENS` | `4096`                   | `LLM_PROVIDER=bedrock`| `inferenceConfig.maxTokens` per request.          |

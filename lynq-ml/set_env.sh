@@ -15,14 +15,18 @@
 # ----------------------------------------------------------------------------
 export LLM_PROVIDER="${LLM_PROVIDER:-ollama}"
 
-# Shared request timeout for LLM calls, in seconds.
-export LLM_TIMEOUT="${LLM_TIMEOUT:-60}"
+# Shared request timeout for LLM calls, in seconds. Sized for the longest
+# generation the service runs (translating a whole resume), which on a local
+# Ollama model comfortably exceeds a minute.
+export LLM_TIMEOUT="${LLM_TIMEOUT:-300}"
 
 # ----------------------------------------------------------------------------
 # Ollama settings (used when LLM_PROVIDER=ollama).
 # ----------------------------------------------------------------------------
 export OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://localhost:11434}"
-export OLLAMA_MODEL="${OLLAMA_MODEL:-llama3.1}"
+# Any model pulled into Ollama works: the prompts are plain text and Ollama
+# applies the chat template of the model named here.
+export OLLAMA_MODEL="${OLLAMA_MODEL:-qwen2.5:7b}"
 
 # ----------------------------------------------------------------------------
 # Amazon Bedrock settings (used when LLM_PROVIDER=bedrock).

@@ -33,8 +33,6 @@ def _build_logging_config() -> dict:
 
 
 def _read_version() -> str:
-  # The release workflow writes the GitHub tag into VERSION; fall back to a
-  # sentinel when the file is missing (e.g. local checkouts before a release).
   try:
     with open(_VERSION_PATH, "r", encoding="utf-8") as f:
       return f.read().strip() or "0.0.0"
@@ -47,11 +45,6 @@ logging.config.dictConfig(LOGGING_CONFIG)
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-  # WeasyPrint's native libraries are not Python packages, so pip cannot install
-  # them and a machine missing them looks perfectly healthy until someone asks
-  # for a resume PDF. Probe once at boot so the error is in the startup log
-  # rather than in a 500 half an hour later. The probe itself logs the fix; the
-  # service still starts, since only one of the eight endpoints needs it.
   pdf_renderer_available()
   yield
 

@@ -20,8 +20,8 @@ class GetLLMClientTests(unittest.TestCase):
         self.assertIsInstance(client, OllamaClient)
         self.assertEqual(client.provider, LLMProvider.OLLAMA)
         self.assertEqual(client.base_url, "http://localhost:11434")
-        self.assertEqual(client.model, "llama3.1")
-        self.assertEqual(client.timeout, 60.0)
+        self.assertEqual(client.model, "qwen2.5:7b")
+        self.assertEqual(client.timeout, 300.0)
 
     def test_ollama_reads_overrides_from_env(self) -> None:
         env = {
@@ -99,7 +99,7 @@ class GetLLMClientTests(unittest.TestCase):
         self.assertEqual(client.max_tokens, 4096)
         self.assertEqual(client.temperature, 0.0)
         self.assertEqual(client.max_attempts, 3)
-        self.assertEqual(client.timeout, 60.0)
+        self.assertEqual(client.timeout, 300.0)
 
     def test_uppercase_provider_is_normalised(self) -> None:
         with patch.dict("os.environ", {"LLM_PROVIDER": "OLLAMA"}, clear=True):

@@ -54,12 +54,14 @@ def _error_response():
 
 
 class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
-    """Ollama talks to ``/api/generate`` and ``/api/version``."""
+    """Ollama talks to ``/api/chat`` and ``/api/version``."""
 
-    async def test_generate_posts_raw_prompt_and_returns_response_field(self) -> None:
-        client = OllamaClient(base_url="http://ollama:11434", model="llama3.1")
+    async def test_generate_posts_user_message_and_returns_message_content(self) -> None:
+        client = OllamaClient(base_url="http://ollama:11434", model="qwen2.5:7b")
         factory, session = _fake_async_client(
-            response=_ok_response({"response": '{"skills": ["Java"]}'})
+            response=_ok_response(
+                {"message": {"role": "assistant", "content": '{"skills": ["Java"]}'}}
+            )
         )
 
         with patch("llm_client.ollama_client.httpx.AsyncClient", factory):
@@ -67,15 +69,18 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, '{"skills": ["Java"]}')
         url, kwargs = session.post.await_args.args, session.post.await_args.kwargs
-        self.assertEqual(url[0], "http://ollama:11434/api/generate")
+        self.assertEqual(url[0], "http://ollama:11434/api/chat")
         payload = kwargs["json"]
-        self.assertEqual(payload["prompt"], "PROMPT")
-        self.assertTrue(payload["raw"])
+        self.assertEqual(payload["messages"], [{"role": "user", "content": "PROMPT"}])
         self.assertFalse(payload["stream"])
-        self.assertEqual(payload["model"], "llama3.1")
+        self.assertEqual(payload["format"], "json")
+        self.assertEqual(payload["model"], "qwen2.5:7b")
+        # No raw mode: Ollama applies the model's own chat template.
+        self.assertNotIn("raw", payload)
+        self.assertNotIn("prompt", payload)
 
     async def test_health_check_true_when_version_ok(self) -> None:
-        client = OllamaClient(base_url="http://ollama:11434", model="llama3.1")
+        client = OllamaClient(base_url="http://ollama:11434", model="qwen2.5:7b")
         factory, session = _fake_async_client(response=_ok_response({"version": "1"}))
 
         with patch("llm_client.ollama_client.httpx.AsyncClient", factory):
@@ -84,14 +89,14 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(session.get.await_args.args[0], "http://ollama:11434/api/version")
 
     async def test_health_check_false_on_transport_error(self) -> None:
-        client = OllamaClient(base_url="http://ollama:11434", model="llama3.1")
+        client = OllamaClient(base_url="http://ollama:11434", model="qwen2.5:7b")
         factory, _ = _fake_async_client(raises=httpx.ConnectError("down"))
 
         with patch("llm_client.ollama_client.httpx.AsyncClient", factory):
             self.assertFalse(await client.health_check())
 
     async def test_health_check_false_on_error_status(self) -> None:
-        client = OllamaClient(base_url="http://ollama:11434", model="llama3.1")
+        client = OllamaClient(base_url="http://ollama:11434", model="qwen2.5:7b")
         factory, _ = _fake_async_client(response=_error_response())
 
         with patch("llm_client.ollama_client.httpx.AsyncClient", factory):
