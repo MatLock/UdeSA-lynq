@@ -773,11 +773,12 @@ const createDriver = async () => {
 }
 
 const run = async () => {
+  const delayLabel = ACTION_DELAY > 0 ? `${ACTION_DELAY}ms per action` : 'none'
   console.log('═══════════════════════════════════════════════════════════')
   console.log('  LYNQ — E2E test: registration, publication and application')
   console.log(`  Base URL : ${BASE_URL}`)
   console.log(`  Headless : ${HEADLESS ? 'yes' : 'no'}`)
-  console.log(`  Delay    : ${ACTION_DELAY > 0 ? `${ACTION_DELAY}ms per action` : 'none'}`)
+  console.log(`  Delay    : ${delayLabel}`)
   console.log(`  Suffix   : ${SUFFIX}`)
   console.log('═══════════════════════════════════════════════════════════')
 
@@ -833,4 +834,4 @@ const run = async () => {
   }
 }
 
-run()
+await run()

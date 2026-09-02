@@ -139,13 +139,15 @@ const survey = async (connection, emailPattern) => {
 
   // 3. Jobs published by those accounts or by their companies (a test company
   //    could hold posts created by somebody else).
+  const companyClause = companyIds.length ? 'OR company_id IN (?)' : ''
+  const jobParams = companyIds.length ? [userIds, companyIds] : [userIds]
   const [jobs] = userIds.length
     ? await connection.query(
         `SELECT id, title
            FROM ${BACKEND_DB}.job_posts
           WHERE created_by_user_id IN (?)
-             ${companyIds.length ? 'OR company_id IN (?)' : ''}`,
-        companyIds.length ? [userIds, companyIds] : [userIds],
+             ${companyClause}`,
+        jobParams,
       )
     : [[]]
   const jobIds = idsOf(jobs)
@@ -496,10 +498,12 @@ const run = async () => {
   }
 }
 
-run().catch((error) => {
+try {
+  await run()
+} catch (error) {
   console.error('\n═══════════════════════════════════════════════════════════')
   console.error('  ❌ CLEANUP FAILED')
   console.error(`  ${error.message}`)
   console.error('═══════════════════════════════════════════════════════════')
   process.exitCode = 1
-})
+}
