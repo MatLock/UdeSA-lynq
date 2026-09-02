@@ -2,18 +2,23 @@ package com.lynq.bff.controller.impl;
 
 import com.lynq.bff.controller.ResumeController;
 import com.lynq.bff.controller.request.PreviewResumeRequest;
+import com.lynq.bff.controller.request.TranslateResumeRestRequest;
+import com.lynq.bff.controller.request.UpdateResumeAliasRestRequest;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
 import com.lynq.bff.filter.JwtSignatureFilter;
 import com.lynq.bff.service.Caller;
+import com.lynq.bff.service.ResumeAliasService;
 import com.lynq.bff.service.ResumeDeletionService;
 import com.lynq.bff.service.ResumeImportService;
+import com.lynq.bff.service.ResumeTranslationService;
 import com.lynq.bff.service.ResumePreviewService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -31,13 +36,19 @@ public class ResumeControllerImpl implements ResumeController {
   private final ResumePreviewService resumePreviewService;
   private final ResumeImportService resumeImportService;
   private final ResumeDeletionService resumeDeletionService;
+  private final ResumeTranslationService resumeTranslationService;
+  private final ResumeAliasService resumeAliasService;
 
   public ResumeControllerImpl(ResumePreviewService resumePreviewService,
                               ResumeImportService resumeImportService,
-                              ResumeDeletionService resumeDeletionService) {
+                              ResumeDeletionService resumeDeletionService,
+                              ResumeTranslationService resumeTranslationService,
+                              ResumeAliasService resumeAliasService) {
     this.resumePreviewService = resumePreviewService;
     this.resumeImportService = resumeImportService;
     this.resumeDeletionService = resumeDeletionService;
+    this.resumeTranslationService = resumeTranslationService;
+    this.resumeAliasService = resumeAliasService;
   }
 
   @Override
@@ -72,6 +83,22 @@ public class ResumeControllerImpl implements ResumeController {
   }
 
   @Override
+  @PostMapping("/{resumeId}/translate")
+  public ResponseEntity<GlobalRestResponse<Object>> translateResume(
+      @PathVariable String resumeId,
+      @RequestBody TranslateResumeRestRequest request,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
+      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+    Object translated = resumeTranslationService.translate(resumeId, request.getLanguage(),
+        new Caller(userId, requestUuid, authorization));
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, translated));
+  }
+
+  @Override
   @DeleteMapping("/preview/{fileId}")
   public ResponseEntity<Void> discardResumePreview(
       @PathVariable String fileId,
@@ -80,6 +107,22 @@ public class ResumeControllerImpl implements ResumeController {
     resumePreviewService.discard(fileId, new Caller(userId, requestUuid, null));
 
     return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  @PutMapping("/{resumeId}/alias")
+  public ResponseEntity<GlobalRestResponse<Object>> updateResumeAlias(
+      @PathVariable String resumeId,
+      @RequestBody UpdateResumeAliasRestRequest request,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
+      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+    Object resume = resumeAliasService.assign(resumeId, request.getAlias(),
+        new Caller(userId, requestUuid, authorization));
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, resume));
   }
 
   @Override

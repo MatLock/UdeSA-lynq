@@ -10,12 +10,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.lynq.bff.controller.request.PreviewResumeRequest;
+import com.lynq.bff.controller.request.TranslateResumeRestRequest;
+import com.lynq.bff.controller.request.UpdateResumeAliasRestRequest;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
 import com.lynq.bff.enums.ResumeTemplate;
 import com.lynq.bff.service.Caller;
+import com.lynq.bff.service.ResumeAliasService;
 import com.lynq.bff.service.ResumeDeletionService;
 import com.lynq.bff.service.ResumeImportService;
+import com.lynq.bff.service.ResumeTranslationService;
 import com.lynq.bff.service.ResumePreviewService;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,12 +50,76 @@ class ResumeControllerImplTest {
   @Mock
   private ResumeDeletionService resumeDeletionService;
 
+  @Mock
+  private ResumeTranslationService resumeTranslationService;
+
+  @Mock
+  private ResumeAliasService resumeAliasService;
+
   private ResumeControllerImpl resumeController;
 
   @BeforeEach
   void setUp() {
     resumeController = new ResumeControllerImpl(
-        resumePreviewService, resumeImportService, resumeDeletionService);
+        resumePreviewService, resumeImportService, resumeDeletionService,
+        resumeTranslationService, resumeAliasService);
+  }
+
+  @Test
+  void updateResumeAliasRespondsWithOkAndTheUpdatedResume() {
+    UpdateResumeAliasRestRequest request = new UpdateResumeAliasRestRequest("Backend roles");
+    Object updated = Map.of("id", RESUME_ID, "alias", "Backend roles");
+    when(resumeAliasService.assign(RESUME_ID, "Backend roles",
+        new Caller(USER_ID, REQUEST_UUID, AUTHORIZATION))).thenReturn(updated);
+
+    ResponseEntity<GlobalRestResponse<Object>> response = resumeController.updateResumeAlias(
+        RESUME_ID, request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+    assertThat(response.getBody(), is(notNullValue()));
+    assertThat(response.getBody().isSuccess(), is(true));
+    assertThat(response.getBody().getData(), is(updated));
+  }
+
+  @Test
+  void updateResumeAliasDelegatesToTheServiceWithTheCaller() {
+    UpdateResumeAliasRestRequest request = new UpdateResumeAliasRestRequest("Backend roles");
+
+    resumeController.updateResumeAlias(RESUME_ID, request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+
+    ArgumentCaptor<Caller> caller = ArgumentCaptor.forClass(Caller.class);
+    verify(resumeAliasService).assign(eq(RESUME_ID), eq("Backend roles"), caller.capture());
+    assertThat(caller.getValue().userId(), is(USER_ID));
+    assertThat(caller.getValue().requestUuid(), is(REQUEST_UUID));
+    // The alias lives in the app-backend, which authenticates by bearer token.
+    assertThat(caller.getValue().authorization(), is(AUTHORIZATION));
+  }
+
+  @Test
+  void translateResumeRespondsWithOkAndTheTranslatedJson() {
+    TranslateResumeRestRequest request = new TranslateResumeRestRequest("FR");
+    Object translated = Map.of("summary", "Ingénieur backend");
+    when(resumeTranslationService.translate("resume-1", "FR",
+        new Caller(USER_ID, REQUEST_UUID, AUTHORIZATION))).thenReturn(translated);
+
+    ResponseEntity<GlobalRestResponse<Object>> response = resumeController.translateResume(
+        "resume-1", request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+
+    // Nothing is created here: the translated JSON goes back for the preview step.
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+    assertThat(response.getBody(), is(notNullValue()));
+    assertThat(response.getBody().isSuccess(), is(true));
+    assertThat(response.getBody().getData(), is(translated));
+  }
+
+  @Test
+  void translateResumeDelegatesToTheServiceWithTheCaller() {
+    TranslateResumeRestRequest request = new TranslateResumeRestRequest("FR");
+
+    resumeController.translateResume("resume-1", request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+
+    verify(resumeTranslationService).translate("resume-1", "FR",
+        new Caller(USER_ID, REQUEST_UUID, AUTHORIZATION));
   }
 
   @Test

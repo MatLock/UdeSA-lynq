@@ -3,6 +3,7 @@ package com.lynq.bff.client;
 import com.lynq.bff.client.request.LanguageDetectionRequest;
 import com.lynq.bff.client.request.ParseResumeRequest;
 import com.lynq.bff.client.request.ResumeTemplateCreationRequest;
+import com.lynq.bff.client.request.TranslateResumeRequest;
 import com.lynq.bff.client.response.LanguageDetectionResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -25,6 +26,12 @@ public interface LynqMlClient {
   @PostMapping("/dmz/parse-resume")
   GlobalRestResponse<Object> parseResume(
       @RequestBody ParseResumeRequest request,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(USER_ID_HEADER) String userId);
+
+  @PostMapping("/dmz/translate")
+  GlobalRestResponse<Object> translateResume(
+      @RequestBody TranslateResumeRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
       @RequestHeader(USER_ID_HEADER) String userId);
 

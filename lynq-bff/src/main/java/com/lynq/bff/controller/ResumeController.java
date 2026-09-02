@@ -1,6 +1,8 @@
 package com.lynq.bff.controller;
 
 import com.lynq.bff.controller.request.PreviewResumeRequest;
+import com.lynq.bff.controller.request.TranslateResumeRestRequest;
+import com.lynq.bff.controller.request.UpdateResumeAliasRestRequest;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -117,6 +119,54 @@ public interface ResumeController {
       @Parameter(hidden = true) String userId);
 
   @Operation(
+      summary = "Translate a stored resume into another language",
+      description = "Translates one of the candidate's stored resumes and returns the translated "
+          + "structured JSON — nothing is rendered or stored here. The candidate continues the "
+          + "flow themselves: they pick a template and render a preview through "
+          + "POST /resume/preview, and confirming that preview stores the resume through "
+          + "lynq-app-backend's POST /user/resume with the previewed fileId. The target language "
+          + "must be one lynq-app-backend's supported_languages table offers, and one the "
+          + "candidate does not already hold a resume in — translating into the source's own "
+          + "language is therefore rejected too.")
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Resume translated; the structured JSON is returned for the preview step.",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Translated resume JSON",
+                  value = """
+                      {
+                        "success": true,
+                        "data": {
+                          "personal_info": { "full_name": "Jane Doe" },
+                          "summary": "Ingénieure backend spécialisée en systèmes distribués."
+                        }
+                      }"""))),
+      @ApiResponse(responseCode = "400", description = "The target language is missing or not "
+          + "supported, the candidate already holds a resume in it, or no such resume belongs to "
+          + "the caller."),
+      @ApiResponse(responseCode = "401", description = "The Authorization header is missing, or the "
+          + "access token's signature is invalid or expired."),
+      @ApiResponse(responseCode = "403", description = "The lynq-request-uuid header is missing, or "
+          + "the caller is not a CANDIDATE."),
+      @ApiResponse(responseCode = "502", description = "A service the translation depends on "
+          + "failed; nothing was changed.")
+  })
+  ResponseEntity<GlobalRestResponse<Object>> translateResume(
+      @Parameter(
+          name = "resumeId",
+          in = ParameterIn.PATH,
+          required = true,
+          description = "Id of the stored resume to translate.",
+          example = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60")
+      String resumeId,
+      TranslateResumeRestRequest request,
+      @Parameter(hidden = true) String requestUuid,
+      @Parameter(hidden = true) String authorization,
+      @Parameter(hidden = true) String userId);
+
+  @Operation(
       summary = "Discard a previewed resume PDF",
       description = "Deletes a PDF this gateway rendered that the candidate did not accept — they "
           + "went back to change the resume, or left the creation flow. lynq-file-storage only "
@@ -139,6 +189,56 @@ public interface ResumeController {
           example = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41")
       String fileId,
       @Parameter(hidden = true) String requestUuid,
+      @Parameter(hidden = true) String userId);
+
+  @Operation(
+      summary = "Assign or replace the alias of a stored resume",
+      description = "Sets the alias the candidate uses to tell one of their resumes apart from "
+          + "the others — assigning for the first time and renaming are the same operation, the "
+          + "new alias simply overrides the previous one. The gateway validates the alias, checks "
+          + "the caller is a CANDIDATE, and relays to lynq-app-backend's "
+          + "PUT /user/resume/{resumeId}/alias, which enforces that the resume belongs to the "
+          + "caller.")
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Alias saved; the updated resume is returned.",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Resume with alias",
+                  value = """
+                      {
+                        "success": true,
+                        "data": {
+                          "id": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60",
+                          "name": "Jane Doe",
+                          "alias": "Backend roles",
+                          "language": "EN",
+                          "createdOn": "2026-09-02",
+                          "resume": { "personal_info": { "full_name": "Jane Doe" } },
+                          "pdfUrl": "https://lynq-bucket.s3.amazonaws.com/lynq/0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41/resume.pdf?X-Amz-Signature=..."
+                        }
+                      }"""))),
+      @ApiResponse(responseCode = "400", description = "The alias is missing, blank, or longer "
+          + "than 100 characters."),
+      @ApiResponse(responseCode = "401", description = "The Authorization header is missing, or the "
+          + "access token's signature is invalid or expired."),
+      @ApiResponse(responseCode = "403", description = "The lynq-request-uuid header is missing, or "
+          + "the caller is not a CANDIDATE."),
+      @ApiResponse(responseCode = "502", description = "lynq-app-backend could not be reached, or "
+          + "no such resume belongs to the caller.")
+  })
+  ResponseEntity<GlobalRestResponse<Object>> updateResumeAlias(
+      @Parameter(
+          name = "resumeId",
+          in = ParameterIn.PATH,
+          required = true,
+          description = "Id of the stored resume the alias is assigned to.",
+          example = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60")
+      String resumeId,
+      UpdateResumeAliasRestRequest request,
+      @Parameter(hidden = true) String requestUuid,
+      @Parameter(hidden = true) String authorization,
       @Parameter(hidden = true) String userId);
 
   @Operation(

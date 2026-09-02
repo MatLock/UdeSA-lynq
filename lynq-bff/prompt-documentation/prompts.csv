@@ -7,3 +7,7 @@ date,prompt
 "02-09-2026","review the generate-upload-resume + confirm-upload-resume + parse-resume flow and build it as a bff flow: confirm the document, ask ml to parse it, detect the language and store it in the backend"
 "02-09-2026","move the check that the user is a CANDIDATE into a shared collaborator, both resume flows use it"
 "02-09-2026","create endpoint DELETE /resume/{resumeId} to delete a resume by its id"
+"02-09-2026","extend the feign clients: add POST /dmz/translate to the lynq-ml client and GET /dmz/user/resume plus GET /dmz/user/resume/languages to the lynq-app-backend client, with their request/response classes"
+"02-09-2026","build a resume translation flow: read the source resume from the backend, validate the target language is supported and the candidate has no resume in it yet, translate the json with lynq-ml, render and store the pdf through lynq-file-storage and save it as a new resume"
+"02-09-2026","create endpoint POST /resume/{resumeId}/translate taking the target language and an optional template, returning the stored translated resume, with unit tests"
+"02-09-2026","raise the feign read timeout of the lynqMl client to 310s so the gateway does not cut long LLM generations (resume translation) before lynq-ml's own LLM_TIMEOUT does"
