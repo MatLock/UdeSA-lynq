@@ -18,7 +18,20 @@
   backdrop-filter: blur(2px);
 }
 
+/* Full-size, invisible button under the card: clicking outside cancels. */
+.translate-template-scrim {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
 .translate-template-content {
+  /* Positioned so it paints above the scrim button. */
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 14px;

@@ -180,11 +180,17 @@ const TranslateTemplateModal = ({ source, language, resume, onCompleted, onCance
       role="dialog"
       aria-modal="true"
       aria-labelledby="translate-template-title"
-      onClick={(event) => {
-        // A click on the scrim cancels; clicks on the card land on children.
-        if (event.target === event.currentTarget) cancel()
-      }}
     >
+      {/* The scrim is a real button instead of a click handler on the overlay,
+          so cancelling by clicking outside the card is reachable from the
+          keyboard too. The card is layered above it, so clicks on the card
+          never reach the scrim. */}
+      <button
+        type="button"
+        className="translate-template-scrim"
+        aria-label={strings.pages.resume.translate.cancel}
+        onClick={cancel}
+      />
       {rendering && <LoadingOverlay label={renderingPhrase} />}
       {saving && <LoadingOverlay label={t.saving} />}
 
