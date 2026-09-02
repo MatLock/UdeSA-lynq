@@ -98,7 +98,7 @@ lynq_ml:
     # Desktop's Kubernetes use http://host.docker.internal:11434 instead.
     # If you set ollamaInCluster=true, change this to http://ollama:11434.
     OLLAMA_BASE_URL: http://host.minikube.internal:11434
-    OLLAMA_MODEL: llama3.1
+    OLLAMA_MODEL: qwen2.5:7b
     # Only read when LLM_PROVIDER=bedrock; any Converse-capable model id works
     # (anthropic.*, amazon.nova-*, meta.llama*, mistral.*).
     BEDROCK_MODEL_ID: ""

@@ -64,7 +64,7 @@ Prerequisites: a running minikube cluster, `helm`, and (by default) an Ollama se
 
    ```bash
    OLLAMA_HOST=0.0.0.0 ollama serve   # in a dedicated terminal
-   ollama pull llama3.1
+   ollama pull qwen2.5:7b
    ```
 
    > For Docker Desktop's Kubernetes, set `OLLAMA_BASE_URL` to `http://host.docker.internal:11434` in the values.
