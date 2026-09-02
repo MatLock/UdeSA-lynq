@@ -68,12 +68,6 @@ public class CompanyService {
     return companyRepository.save(company);
   }
 
-
-  /**
-   * Registers the new logo in lynq-file-storage, points the company at it and drops the file it
-   * replaces. The logo only becomes readable once the browser has PUT the bytes and called
-   * {@link #confirmCompanyImageUpload(String, String)}.
-   */
   @AuditLog
   @Transactional
   public RegisteredUpload generateCompanyImageUploadUrl(String userId, String fileName) {
@@ -123,7 +117,6 @@ public class CompanyService {
             .toList())
         .build();
   }
-
 
   @AuditLog
   @Transactional

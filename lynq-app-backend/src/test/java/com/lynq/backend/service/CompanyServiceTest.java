@@ -120,7 +120,6 @@ class CompanyServiceTest {
     assertThat(saved.getName(), is(COMPANY_NAME));
     assertThat(saved.getAbout(), is(COMPANY_ABOUT));
     assertThat(saved.getSize(), is(COMPANY_SIZE));
-    // The logo is uploaded afterwards through lynq-file-storage, so a new company has no file id.
     assertThat(saved.getLynqFileStorageId(), is(org.hamcrest.Matchers.nullValue()));
     assertThat(saved.getCreatedOn(), is(LocalDate.now(ZoneOffset.UTC)));
     assertThat(saved.getOwner(), is(sameInstance(owner)));

@@ -1,0 +1,13 @@
+/* LynqTitle — the mark + the word "LYNQ" as a single unbreakable lockup inside a
+   heading. Kept inline (rather than inline-flex) on purpose: several of the
+   headings using this are gradient-clipped text, and an inline box keeps the
+   word on the same baseline as the rest of the title. */
+
+.lynq-title-brand {
+  white-space: nowrap;
+}
+
+.lynq-title-brand .lynq-logo,
+.lynq-title-lead {
+  margin-right: 0.24em;
+}

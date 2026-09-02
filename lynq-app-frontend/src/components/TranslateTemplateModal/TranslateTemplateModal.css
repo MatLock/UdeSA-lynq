@@ -1,0 +1,165 @@
+/* TranslateTemplateModal — pick the template of a freshly translated resume,
+   look at its live preview, and confirm. Deliberately NOT a native <dialog>:
+   pdf.js leaves its canvas blank inside one (react-pdf #225/#1005), so the
+   scrim and the centered card are plain fixed elements instead. Wider than the
+   other dialogs because it holds the PDF. Mirrors ConfirmDialog's visual
+   language; brand tokens from index.css. */
+
+/* Below the LoadingOverlay (z-index 1000) so the busy scrims cover the card. */
+.translate-template-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--scrim);
+  backdrop-filter: blur(2px);
+}
+
+.translate-template-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  width: min(760px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  padding: 22px;
+  text-align: left;
+  color: inherit;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: var(--shadow-dialog);
+}
+
+.translate-template-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.translate-template-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+}
+
+.translate-template-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.translate-template-subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* The preview lives in its own scrollable pane so a multi-page PDF never
+   pushes the actions off screen. */
+.translate-template-frame {
+  overflow-y: auto;
+  max-height: 46vh;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--accent-bg);
+}
+
+.translate-template-column {
+  width: 100%;
+}
+
+.translate-template-page {
+  margin: 0 auto 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+}
+
+.translate-template-page:last-child {
+  margin-bottom: 0;
+}
+
+/* Shown inside the frame until a preview was generated. */
+.translate-template-empty {
+  margin: 0;
+  padding: 26px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  text-align: center;
+}
+
+.translate-template-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.translate-template-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-purple-dark);
+  text-decoration: none;
+}
+
+.translate-template-open:hover {
+  text-decoration: underline;
+}
+
+.translate-template-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger-ink);
+}
+
+.translate-template-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.translate-template-button {
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-gradient);
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.translate-template-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.translate-template-button--ghost {
+  color: var(--text);
+  background: none;
+  border-color: var(--border);
+}
+
+.translate-template-button--ghost:hover:not(:disabled) {
+  border-color: var(--brand-purple-light);
+  color: var(--brand-purple-dark);
+}

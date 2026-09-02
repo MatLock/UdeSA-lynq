@@ -102,7 +102,16 @@ const get_my_jobs = async (authFetch, { page = 0, size = 20 } = {}) => {
 const update_job = async (
   authFetch,
   jobId,
-  { title, description, workType, status, salaryRangeDown, salaryRangeTop, skills } = {},
+  {
+    title,
+    description,
+    workType,
+    status,
+    salaryRangeDown,
+    salaryRangeTop,
+    skills,
+    similarityTags,
+  } = {},
 ) => {
   const body = { title, description, workType, status };
   if (salaryRangeDown != null && String(salaryRangeDown) !== '') {
@@ -112,6 +121,8 @@ const update_job = async (
     body.salaryRangeTop = Number(salaryRangeTop);
   }
   body.skills = skills ?? [];
+  // Similarity tags are replaced wholesale, exactly like the skills.
+  body.similarityTags = similarityTags ?? [];
 
   const payload = await authFetch(`/job/${jobId}`, {
     method: 'PATCH',
@@ -149,15 +160,30 @@ const update_job = async (
  * @param {string} job.title
  * @param {string} job.description
  * @param {'REMOTE' | 'IN_OFFICE'} job.workType
- * @returns {Promise<string[]>} The suggested skills.
+ * Alongside the skills the model returns similarity tags: the same requirements
+ * generalized into transferable capabilities ("Asynchronous Messaging" rather than
+ * Kafka). They are never shown — they exist so the LyNQ score can also match a
+ * candidate who solved the same problem with a different technology — and travel
+ * with the job post.
+ *
+ * lynq-ml is a Python service, so it speaks snake_case in both directions — the
+ * request goes out as work_type and the answer comes back as similarity_tags —
+ * while the app-backend that stores them is Java and expects camelCase. The
+ * conversion happens here. (The BFF relays this call verbatim, so nothing
+ * re-cases it in between.)
+ *
+ * @returns {Promise<{ skills: string[], similarityTags: string[] }>} The suggestion.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
 const generate_skills = async (authFetch, { title, description, workType } = {}) => {
   const payload = await authFetch('/skill-enhance', {
     method: 'POST',
-    body: JSON.stringify({ title, description, workType }),
+    body: JSON.stringify({ title, description, work_type: workType }),
   });
-  return payload?.data?.skills ?? [];
+  return {
+    skills: payload?.data?.skills ?? [],
+    similarityTags: payload?.data?.similarity_tags ?? [],
+  };
 };
 
 /**
@@ -262,7 +288,7 @@ const refresh_job = async (authFetch, jobId) => {
 
 const create_job = async (
   authFetch,
-  { title, description, workType, salaryRangeDown, salaryRangeTop, skills } = {},
+  { title, description, workType, salaryRangeDown, salaryRangeTop, skills, similarityTags } = {},
 ) => {
   const body = {
     title,
@@ -278,6 +304,9 @@ const create_job = async (
   }
   if (skills?.length) {
     body.skills = skills;
+  }
+  if (similarityTags?.length) {
+    body.similarityTags = similarityTags;
   }
 
   const payload = await authFetch('/job', {

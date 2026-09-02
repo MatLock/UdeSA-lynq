@@ -7,9 +7,16 @@ namespace    = "lynq-prod-namespace"
 
 # Networking for the self-managed MySQL + Redis EC2 (same VPC as EKS so pods can
 # reach it over the internal network).
-vpc_id        = "REPLACE_VPC_ID"
-subnet_id     = "REPLACE_SUBNET_ID"
-internal_cidr = "10.0.0.0/16" # the VPC CIDR that EKS nodes/pods live in
+vpc_id    = "REPLACE_VPC_ID"
+subnet_id = "REPLACE_SUBNET_ID"
+
+# EKS control plane + EC2 worker nodes. At least two subnets in different AZs,
+# in the VPC above. Sized for the 6 services plus the system pods.
+eks_subnet_ids         = ["REPLACE_SUBNET_ID_AZ_A", "REPLACE_SUBNET_ID_AZ_B"]
+eks_node_instance_type = "t3.medium"
+eks_node_capacity_type = "ON_DEMAND"
+eks_node_desired_size  = 2
+internal_cidr          = "10.0.0.0/16" # the VPC CIDR that EKS nodes/pods live in
 # ssh_allowed_cidr is set at apply time (your current IP), e.g.:
 #   terraform apply -var="ssh_allowed_cidr=$(curl -s ifconfig.me)/32" ...
 # ec2_instance_type = "t3.small"
@@ -28,6 +35,11 @@ cloudflare_zone_id = "REPLACE_CF_ZONE_ID"
 s3_bucket_name  = "REPLACE_BUCKET_NAME"
 ollama_base_url = "REPLACE_OLLAMA_BASE_URL"
 
+# lynq-ml runs on Bedrock in prod (LLM_PROVIDER=bedrock in k8s_values-prod.yaml).
+# The model must be enabled in this region's Bedrock console.
+bedrock_model_id = "amazon.nova-lite-v1:0"
+bedrock_region   = "us-east-1"
+
 # Restrict CORS to the real frontend origin (Cloudflare domain).
 # s3_cors_allowed_origins = ["https://www.lynqoficial.com"]
 
@@ -44,7 +56,6 @@ ollama_base_url = "REPLACE_OLLAMA_BASE_URL"
 #   TF_VAR_jwt_secret
 #   TF_VAR_redis_username        (only if Redis requires auth)
 #   TF_VAR_redis_password        (only if Redis requires auth)
-#   TF_VAR_openai_api_key        (only if LLM_PROVIDER=openai)
 #
 # The backend's AWS S3 access key is created by Terraform (least-privilege IAM
 # user scoped to the bucket) and wired into its Secret automatically — you do

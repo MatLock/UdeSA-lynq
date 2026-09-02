@@ -1,12 +1,15 @@
 package com.lynq.backend.controller.impl;
 
+import com.lynq.backend.controller.request.CreateResumeRequest;
 import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadResumeRestResponse;
+import com.lynq.backend.controller.response.DeleteResumeRestResponse;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
+import com.lynq.backend.controller.response.GetSupportedLanguageRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
@@ -57,6 +60,7 @@ class UserControllerImplTest {
   private static final String PRE_SIGNED_URL =
       "https://lynq-bucket.s3.amazonaws.com/lynq/users/" + USER_ID + "/profile/" + FILE_NAME + "?X-Amz-Signature=abc";
   private static final String RESUME_ID = "resume-1";
+  private static final String RESUME_FILE_ID = "resume-file-1";
   private static final String RESUME_NAME = "Jane Doe - Backend";
   private static final String COMPANY_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
 
@@ -119,8 +123,8 @@ class UserControllerImplTest {
   void getUserMapsEntityIntoResponseData() {
     UserEntity user = savedUser();
     when(userService.getUser(USER_ID)).thenReturn(user);
-    when(userService.obtainProfileImagePreSignedUrl(user)).thenReturn(PRE_SIGNED_URL);
-    when(userService.obtainOwnedCompanyId(user)).thenReturn(COMPANY_ID);
+    when(userService.obtainProfileImagePreSignedUrl(FILE_ID)).thenReturn(PRE_SIGNED_URL);
+    when(userService.obtainOwnedCompanyId(USER_ID, USER_TYPE)).thenReturn(COMPANY_ID);
 
     ResponseEntity<GlobalRestResponse<GetUserRestResponse>> response =
         userController.getUser(principal);
@@ -186,7 +190,7 @@ class UserControllerImplTest {
     UserEntity user = savedUser();
     when(userService.saveNewUser(USER_ID, USER_TYPE, FULL_NAME, CURRENT_POSITION, ABOUT,
         GITHUB_URL, LINKEDIN_URL, BIRTH_DATE)).thenReturn(user);
-    when(userService.obtainProfileImagePreSignedUrl(user)).thenReturn(PRE_SIGNED_URL);
+    when(userService.obtainProfileImagePreSignedUrl(FILE_ID)).thenReturn(PRE_SIGNED_URL);
 
     ResponseEntity<GlobalRestResponse<CreateUserRestResponse>> response =
         userController.createUser(request, principal);
@@ -227,8 +231,7 @@ class UserControllerImplTest {
   void updateUserProfileMapsUpdatedEntityIntoResponseData() {
     UserEntity updated = savedUser();
     when(userService.updateUserProfile(USER_ID, updateRequest)).thenReturn(updated);
-    // The stored value is a lynq-file-storage id; the response carries the signed URL for it.
-    when(userService.obtainProfileImagePreSignedUrl(updated)).thenReturn(PROFILE_IMAGE_URL);
+    when(userService.obtainProfileImagePreSignedUrl(FILE_ID)).thenReturn(PROFILE_IMAGE_URL);
 
     ResponseEntity<GlobalRestResponse<UpdateUserProfileRestResponse>> response =
         userController.updateUserProfile(updateRequest, principal);
@@ -325,6 +328,34 @@ class UserControllerImplTest {
   }
 
   @Test
+  void getSupportedResumeLanguagesRespondsWithOkStatus() {
+    when(userService.getSupportedResumeLanguages()).thenReturn(List.of());
+
+    ResponseEntity<GlobalRestResponse<List<GetSupportedLanguageRestResponse>>> response =
+        userController.getSupportedResumeLanguages();
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+  }
+
+  @Test
+  void getSupportedResumeLanguagesWrapsServiceResultInSuccessfulEnvelope() {
+    GetSupportedLanguageRestResponse language = GetSupportedLanguageRestResponse.builder()
+        .code("EN")
+        .name("English")
+        .build();
+    when(userService.getSupportedResumeLanguages()).thenReturn(List.of(language));
+
+    ResponseEntity<GlobalRestResponse<List<GetSupportedLanguageRestResponse>>> response =
+        userController.getSupportedResumeLanguages();
+
+    GlobalRestResponse<List<GetSupportedLanguageRestResponse>> body = response.getBody();
+    assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData(), is(org.hamcrest.Matchers.hasSize(1)));
+    assertThat(body.getData().get(0).getCode(), is("EN"));
+  }
+
+  @Test
   void getUserResumesDelegatesToServiceWithPrincipalId() {
     when(userService.getUserResumes(USER_ID)).thenReturn(List.of());
 
@@ -359,6 +390,61 @@ class UserControllerImplTest {
     assertThat(body.isSuccess(), is(true));
     assertThat(body.getData(), is(org.hamcrest.Matchers.hasSize(1)));
     assertThat(body.getData().get(0).getId(), is(RESUME_ID));
+  }
+
+  @Test
+  void createUserResumeDelegatesToServiceWithPrincipalId() {
+    CreateResumeRequest request = new CreateResumeRequest();
+    when(userService.createResume(USER_ID, request))
+        .thenReturn(GetUserResumeRestResponse.builder().build());
+
+    userController.createUserResume(request, principal);
+
+    verify(userService).createResume(USER_ID, request);
+  }
+
+  @Test
+  void createUserResumeRespondsWithCreatedStatusAndTheStoredResume() {
+    CreateResumeRequest request = new CreateResumeRequest();
+    GetUserResumeRestResponse resume = GetUserResumeRestResponse.builder().id(RESUME_ID).build();
+    when(userService.createResume(USER_ID, request)).thenReturn(resume);
+
+    ResponseEntity<GlobalRestResponse<GetUserResumeRestResponse>> response =
+        userController.createUserResume(request, principal);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
+    GlobalRestResponse<GetUserResumeRestResponse> body = response.getBody();
+    assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData(), is(sameInstance(resume)));
+  }
+
+  @Test
+  void deleteUserResumeDelegatesToServiceWithPrincipalId() {
+    when(userService.deleteResume(USER_ID, RESUME_ID))
+        .thenReturn(DeleteResumeRestResponse.builder().build());
+
+    userController.deleteUserResume(RESUME_ID, principal);
+
+    verify(userService).deleteResume(USER_ID, RESUME_ID);
+  }
+
+  @Test
+  void deleteUserResumeRespondsWithOkAndTheDeletedResumeFileId() {
+    DeleteResumeRestResponse deleted = DeleteResumeRestResponse.builder()
+        .id(RESUME_ID)
+        .fileId(RESUME_FILE_ID)
+        .build();
+    when(userService.deleteResume(USER_ID, RESUME_ID)).thenReturn(deleted);
+
+    ResponseEntity<GlobalRestResponse<DeleteResumeRestResponse>> response =
+        userController.deleteUserResume(RESUME_ID, principal);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+    GlobalRestResponse<DeleteResumeRestResponse> body = response.getBody();
+    assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData(), is(sameInstance(deleted)));
   }
 
   @Test

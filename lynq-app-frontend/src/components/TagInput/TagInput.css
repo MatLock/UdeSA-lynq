@@ -1,0 +1,91 @@
+/* TagInput — chip list + entry input for the resume wizard's string arrays. The
+   input itself inherits ResumeField.css styling; chips are defined here. */
+
+.tag-input {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tag-input-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tag-input-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px 3px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.tag-input-chips.tone-blue .tag-input-chip {
+  color: var(--brand-blue-dark);
+  background: var(--accent-blue-bg);
+  border: 1px solid var(--accent-blue-border);
+}
+
+.tag-input-chips.tone-purple .tag-input-chip {
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+}
+
+/* Entry row: the text field plus its explicit "Add" button. */
+.tag-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.tag-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Same outlined-accent treatment as the create-job skills adder. */
+.tag-input-add {
+  flex: none;
+  padding: 6px 14px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.tag-input-add:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.tag-input-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tag-input-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.tag-input-remove:hover {
+  opacity: 1;
+}

@@ -1,0 +1,75 @@
+/* ResumeMethodStep — step 1 of the resume wizard: form vs. upload. The option
+   cards themselves come from ResumeOptionCards.css (shared with the template
+   step); only the upload panel is specific to this step. */
+
+.resume-method-step {
+  align-items: center;
+}
+
+/* ── Upload panel, revealed once "upload" is the chosen method ───────────── */
+
+.resume-method-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 18px;
+  box-sizing: border-box;
+  border: 1px dashed var(--accent-border);
+  border-radius: 14px;
+  background: var(--accent-bg);
+}
+
+/* The real <input type=file> is triggered via the button, not shown. */
+.resume-method-file-input {
+  display: none;
+}
+
+.resume-method-file-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand-gradient);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.resume-method-file-button:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.resume-method-file-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.resume-method-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand-purple-dark);
+  overflow-wrap: anywhere;
+}
+
+.resume-method-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.resume-method-error {
+  margin: 0;
+  font-size: 11px;
+  color: var(--danger);
+}

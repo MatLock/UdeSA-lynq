@@ -24,7 +24,8 @@ k8s_namespace: prod
 #     AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   (omit if using IRSA)
 #
 #   lynq-ml-secret              (Opaque)
-#     OPENAI_API_KEY             (only if LLM_PROVIDER=openai)
+#     AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   (only if LLM_PROVIDER=bedrock;
+#                                                 omit if using IRSA)
 manageSecrets: false
 
 # Terraform creates the namespace (so the external Secrets can be placed in it
@@ -67,15 +68,24 @@ ingress:
 lynq_ml:
   replicas: 1
   image: matlock0o/lynq:lynq-ml-1.0.12-SNAPSHOT
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      memory: 768Mi
   config:
     PORT: "8084"
     HOST: "0.0.0.0"
-    LLM_PROVIDER: ollama
+    LLM_PROVIDER: bedrock
     LLM_TIMEOUT: "60"
     OLLAMA_BASE_URL: "REPLACE_OLLAMA_BASE_URL"
-    OLLAMA_MODEL: llama3.1
-    OPENAI_MODEL: gpt-4o-mini
-    OPENAI_BASE_URL: https://api.openai.com/v1
+    OLLAMA_MODEL: qwen2.5:7b
+    BEDROCK_MODEL_ID: "REPLACE_BEDROCK_MODEL_ID"
+    BEDROCK_REGION: "REPLACE_BEDROCK_REGION"
+    BEDROCK_MAX_TOKENS: "4096"
+    BEDROCK_TEMPERATURE: "0"
+    BEDROCK_MAX_ATTEMPTS: "3"
     UDEMY_MAX_COURSES: "2"
     UDEMY_BASE_URL: https://www.udemy.com
     COURSE_SEARCH_TIMEOUT: "15"
@@ -83,6 +93,12 @@ lynq_ml:
 lynq_bff:
   replicas: 1
   image: matlock0o/lynq:lynq-bff-1.0.12-SNAPSHOT
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
   path: /lynq-bff
   config:
     SPRING_PROFILES_ACTIVE: production
@@ -93,6 +109,12 @@ lynq_bff:
 lynq_app_backend:
   replicas: 1
   image: matlock0o/lynq:lynq-app-backend-1.0.12-SNAPSHOT
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
   config:
     SPRING_PROFILES_ACTIVE: production
     DB_URL: "jdbc:mysql://REPLACE_DB_HOST:3306/lynq_backend_db"
@@ -106,6 +128,12 @@ lynq_app_backend:
 lynq_file_storage:
   replicas: 1
   image: matlock0o/lynq:lynq-file-storage-1.0.12-SNAPSHOT
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
   config:
     SPRING_PROFILES_ACTIVE: production
     DB_URL: "jdbc:mysql://REPLACE_DB_HOST:3306/lynq_file_storage_db"
@@ -117,6 +145,12 @@ lynq_file_storage:
 lynq_iam:
   replicas: 1
   image: matlock0o/lynq:lynq-iam-1.0.12-SNAPSHOT
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
   path: /lynq-iam
   config:
     SPRING_PROFILES_ACTIVE: production

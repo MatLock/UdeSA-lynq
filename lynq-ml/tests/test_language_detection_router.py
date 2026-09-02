@@ -6,10 +6,9 @@ import json
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 from fastapi.testclient import TestClient
 
-from llm_client import LLMProvider
+from llm_client import LLMError, LLMProvider
 from main import app
 
 _ENDPOINT = "/lynq-ml/dmz/detect-language"
@@ -71,7 +70,7 @@ class DetectLanguageRouterTests(unittest.TestCase):
 
     def test_returns_502_when_llm_request_fails(self) -> None:
         fake = _fake_client(
-            generate_side_effect=httpx.ConnectError("connection refused")
+            generate_side_effect=LLMError("connection refused")
         )
 
         with patch("router.language_detection.get_llm_client", return_value=fake):

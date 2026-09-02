@@ -86,4 +86,8 @@ public class JobPostEntity {
   @Builder.Default
   private List<JobPostSkillEntity> skills = new ArrayList<>();
 
+  @OneToMany(mappedBy = "jobPost", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+  @Builder.Default
+  private List<JobPostSimilarityTagEntity> similarityTags = new ArrayList<>();
+
 }

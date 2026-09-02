@@ -25,7 +25,7 @@ Dockerfile
 .dockerignore
 
 # Secrets and local env
-openai_key.txt
+aws_credentials.txt
 .env
 *.env
 

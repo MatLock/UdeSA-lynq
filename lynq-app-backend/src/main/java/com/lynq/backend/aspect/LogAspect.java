@@ -77,6 +77,8 @@ public class LogAspect {
       maskSensitiveFields(node);
       return objectMapper.writeValueAsString(node);
     } catch (Exception e) {
+      log.debug("message= Could not serialize parameter of type '{}', falling back to toString",
+          obj.getClass().getName(), e);
       return String.valueOf(obj);
     }
   }

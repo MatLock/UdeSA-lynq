@@ -23,10 +23,13 @@ import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSkillEntity;
 import com.lynq.backend.model.UserApplicationJobEntity;
 import com.lynq.backend.model.UserEntity;
+import com.lynq.backend.model.JobPostSimilarityTagEntity;
 import com.lynq.backend.model.UserSkillsEntity;
+import com.lynq.backend.model.UserSimilarityTagEntity;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
 import com.lynq.backend.repository.JobPostSkillRepository;
+import com.lynq.backend.repository.JobPostSimilarityTagRepository;
 import com.lynq.backend.repository.UserApplicationJobRepository;
 import com.lynq.backend.repository.UserRepository;
 import com.lynq.backend.repository.projection.JobCandidateProjection;
@@ -87,6 +90,7 @@ class JobServiceTest {
   private static final Integer SALARY_RANGE_TOP = 120000;
   private static final JobPostSource JOB_POST_TYPE = JobPostSource.LYNQ;
 
+  private static final List<String> TAGS = List.of("Backend Development");
   private static final String SKILL_JAVA = "Java";
   private static final String SKILL_SPRING = "Spring";
   private static final String SKILL_POSTGRES = "PostgreSQL";
@@ -203,6 +207,9 @@ class JobServiceTest {
   private SecurityContext securityContext;
 
   @Mock
+  private JobPostSimilarityTagRepository jobPostSimilarityTagRepository;
+
+  @Mock
   private Authentication authentication;
 
   private JobService jobService;
@@ -210,9 +217,8 @@ class JobServiceTest {
   @BeforeEach
   void setUp() {
     jobService = new JobService(jobPostRepository, companyRepository, userRepository,
-        userApplicationJobRepository, jobPostSkillRepository, fileStorageService, lynqMLClient);
-    // Signing the profile images of a page is a single batched call to lynq-file-storage; only the
-    // tests that assert the URLs care about its result, so the default is an empty map.
+        userApplicationJobRepository, jobPostSkillRepository, jobPostSimilarityTagRepository,
+        fileStorageService, lynqMLClient);
     lenient().when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
     SecurityContextHolder.setContext(securityContext);
   }
@@ -220,6 +226,22 @@ class JobServiceTest {
   @AfterEach
   void tearDown() {
     SecurityContextHolder.clearContext();
+  }
+
+  @Test
+  void createJobPersistsTheCapabilityTags() {
+    UserEntity user = companyUser();
+    stubAuthenticatedCompanyUserWithCompany(user);
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    ArgumentCaptor<JobPostEntity> jobCaptor = ArgumentCaptor.forClass(JobPostEntity.class);
+
+    jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_POST_TYPE, NO_SKILLS, List.of("Backend Development", "  ", "Backend Development"));
+
+    verify(jobPostRepository).save(jobCaptor.capture());
+    assertThat(jobCaptor.getValue().getSimilarityTags().stream().map(JobPostSimilarityTagEntity::getSimilarityTag).toList(),
+        contains("Backend Development"));
   }
 
   @Test
@@ -231,7 +253,7 @@ class JobServiceTest {
     ArgumentCaptor<JobPostEntity> jobCaptor = ArgumentCaptor.forClass(JobPostEntity.class);
 
     jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
-        JOB_POST_TYPE, NO_SKILLS);
+        JOB_POST_TYPE, NO_SKILLS, TAGS);
 
     verify(jobPostRepository).save(jobCaptor.capture());
     JobPostEntity saved = jobCaptor.getValue();
@@ -256,7 +278,7 @@ class JobServiceTest {
     ArgumentCaptor<JobPostEntity> jobCaptor = ArgumentCaptor.forClass(JobPostEntity.class);
 
     jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
-        JOB_POST_TYPE, SKILLS);
+        JOB_POST_TYPE, SKILLS, TAGS);
 
     verify(jobPostRepository).save(jobCaptor.capture());
     JobPostEntity saved = jobCaptor.getValue();
@@ -277,7 +299,7 @@ class JobServiceTest {
     ArgumentCaptor<JobPostEntity> jobCaptor = ArgumentCaptor.forClass(JobPostEntity.class);
 
     jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
-        JOB_POST_TYPE, SKILLS_WITH_DUPLICATE);
+        JOB_POST_TYPE, SKILLS_WITH_DUPLICATE, TAGS);
 
     verify(jobPostRepository).save(jobCaptor.capture());
     assertThat(jobCaptor.getValue().getSkills().stream().map(JobPostSkillEntity::getSkill).toList(),
@@ -292,7 +314,7 @@ class JobServiceTest {
     ArgumentCaptor<JobPostEntity> jobCaptor = ArgumentCaptor.forClass(JobPostEntity.class);
 
     jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
-        JOB_POST_TYPE, NO_SKILLS);
+        JOB_POST_TYPE, NO_SKILLS, TAGS);
 
     verify(jobPostRepository).save(jobCaptor.capture());
     assertThat(UUID.fromString(jobCaptor.getValue().getId()), is(notNullValue()));
@@ -305,7 +327,7 @@ class JobServiceTest {
     when(jobPostRepository.save(any(JobPostEntity.class))).thenReturn(persisted);
 
     JobPostEntity result = jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
-        SALARY_RANGE_TOP, JOB_POST_TYPE, NO_SKILLS);
+        SALARY_RANGE_TOP, JOB_POST_TYPE, NO_SKILLS, TAGS);
 
     assertThat(result, is(sameInstance(persisted)));
   }
@@ -317,7 +339,7 @@ class JobServiceTest {
 
     BadRequestException exception = assertThrows(BadRequestException.class,
         () -> jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
-            SALARY_RANGE_TOP, JOB_POST_TYPE, NO_SKILLS));
+            SALARY_RANGE_TOP, JOB_POST_TYPE, NO_SKILLS, TAGS));
     assertThat(exception.getMessage(), is(AUTHENTICATED_USER_NOT_FOUND));
     verify(jobPostRepository, never()).save(any());
   }
@@ -330,7 +352,7 @@ class JobServiceTest {
 
     BadRequestException exception = assertThrows(BadRequestException.class,
         () -> jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
-            SALARY_RANGE_TOP, JOB_POST_TYPE, NO_SKILLS));
+            SALARY_RANGE_TOP, JOB_POST_TYPE, NO_SKILLS, TAGS));
     assertThat(exception.getMessage(), is(ONLY_COMPANY_USERS_CAN_CREATE_JOBS));
     verify(jobPostRepository, never()).save(any());
   }
@@ -344,7 +366,7 @@ class JobServiceTest {
 
     BadRequestException exception = assertThrows(BadRequestException.class,
         () -> jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
-            SALARY_RANGE_TOP, JOB_POST_TYPE, NO_SKILLS));
+            SALARY_RANGE_TOP, JOB_POST_TYPE, NO_SKILLS, TAGS));
     assertThat(exception.getMessage(), is(USER_NOT_LINKED_TO_COMPANY));
     verify(jobPostRepository, never()).save(any());
   }
@@ -359,7 +381,8 @@ class JobServiceTest {
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
-        JOB_SKILLS_CONCATENATED);
+        JOB_SKILLS_CONCATENATED,
+        null);
     when(jobPostRepository.searchAvailableJobs(null, pageable))
         .thenReturn(new PageImpl<>(List.of(projection), pageable, 1));
     when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of(
@@ -458,6 +481,22 @@ class JobServiceTest {
   }
 
   @Test
+  void searchAvailableJobsScoresLynqOnTheCapabilityTagsWhenTheyMatchBetterThanTheSkills() {
+    stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA), List.of("Backend Development")));
+    stubSingleJob(JOB_SKILLS_CONCATENATED, "Backend Development");
+
+    assertThat(searchSingleJobLynqScore(), is(100));
+  }
+
+  @Test
+  void searchAvailableJobsKeepsTheSkillScoreWhenTheTagsMatchWorse() {
+    stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA, SKILL_SPRING), List.of()));
+    stubSingleJob(JOB_SKILLS_CONCATENATED, "Container Orchestration");
+
+    assertThat(searchSingleJobLynqScore(), is(100));
+  }
+
+  @Test
   void searchAvailableJobsDoesNotScoreLynqWhenUserIsCompany() {
     stubAuthenticatedUser(companyUser());
     stubSingleJob(JOB_SKILLS_CONCATENATED);
@@ -490,7 +529,8 @@ class JobServiceTest {
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.CLOSE,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
-        JOB_SKILLS_CONCATENATED);
+        JOB_SKILLS_CONCATENATED,
+        null);
     when(jobPostRepository.searchJobsOwnedByUser(USER_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
     when(userApplicationJobRepository.countByJobId(JOB_ID)).thenReturn(TOTAL_CANDIDATES_APPLIED);
@@ -560,7 +600,8 @@ class JobServiceTest {
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
-        JOB_SKILLS_CONCATENATED);
+        JOB_SKILLS_CONCATENATED,
+        null);
     when(jobPostRepository.findJobDetailsById(JOB_ID)).thenReturn(Optional.of(projection));
     when(userApplicationJobRepository.countByJobId(JOB_ID)).thenReturn(TOTAL_CANDIDATES_APPLIED);
     when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of(
@@ -838,7 +879,7 @@ class JobServiceTest {
 
     JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
         UPDATED_WORK_TYPE, UPDATED_STATUS, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
-        SKILLS);
+        SKILLS, TAGS);
 
     assertThat(result, is(sameInstance(job)));
     assertThat(result.getTitle(), is(UPDATED_TITLE));
@@ -860,7 +901,7 @@ class JobServiceTest {
 
     JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
         UPDATED_WORK_TYPE, JobStatus.CLOSE, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
-        SKILLS);
+        SKILLS, TAGS);
 
     assertThat(result.getJobStatus(), is(JobStatus.CLOSE));
     assertThat(result.getClosedOn(), is(LocalDate.now(ZoneOffset.UTC)));
@@ -879,7 +920,7 @@ class JobServiceTest {
 
     JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
         UPDATED_WORK_TYPE, JobStatus.OPEN, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
-        SKILLS);
+        SKILLS, TAGS);
 
     assertThat(result.getJobStatus(), is(JobStatus.OPEN));
     assertThat(result.getClosedOn(), is(nullValue()));
@@ -899,7 +940,7 @@ class JobServiceTest {
 
     JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
         UPDATED_WORK_TYPE, JobStatus.CLOSE, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
-        SKILLS);
+        SKILLS, TAGS);
 
     assertThat(result.getJobStatus(), is(JobStatus.CLOSE));
     assertThat(result.getClosedOn(), is(closedOn));
@@ -917,7 +958,7 @@ class JobServiceTest {
 
     jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
         UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
-        List.of(SKILL_JAVA, SKILL_POSTGRES));
+        List.of(SKILL_JAVA, SKILL_POSTGRES), TAGS);
 
     verify(jobPostSkillRepository).deleteAll(removedCaptor.capture());
     assertThat(removedCaptor.getValue().stream().map(JobPostSkillEntity::getSkill).toList(),
@@ -937,7 +978,7 @@ class JobServiceTest {
 
     jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
         UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
-        Arrays.asList("  Java  ", "Java", "  ", SKILL_SPRING));
+        Arrays.asList("  Java  ", "Java", "  ", SKILL_SPRING), TAGS);
 
     assertThat(job.getSkills().stream().map(JobPostSkillEntity::getSkill).toList(),
         contains(SKILL_JAVA, SKILL_SPRING));
@@ -953,7 +994,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
-        UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, NO_SKILLS);
+        UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, NO_SKILLS, TAGS);
 
     assertThat(job.getSkills(), is(empty()));
   }
@@ -965,7 +1006,7 @@ class JobServiceTest {
 
     NotFoundException exception = assertThrows(NotFoundException.class,
         () -> jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
-            UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS));
+            UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS, TAGS));
     assertThat(exception.getMessage(), is(JOB_POST_NOT_FOUND));
     verify(jobPostRepository, never()).save(any());
   }
@@ -979,7 +1020,7 @@ class JobServiceTest {
 
     ForbiddenException exception = assertThrows(ForbiddenException.class,
         () -> jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
-            UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS));
+            UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS, TAGS));
     assertThat(exception.getMessage(), is(ONLY_JOB_OWNER_CAN_UPDATE));
     verify(jobPostRepository, never()).save(any());
     verify(jobPostSkillRepository, never()).deleteAll(any());
@@ -1014,7 +1055,7 @@ class JobServiceTest {
     stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
         JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
-        CANDIDATE_JOB_SKILLS, CANDIDATE_JOB_SKILLS);
+        CANDIDATE_JOB_SKILLS, CANDIDATE_JOB_SKILLS, null, null);
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
@@ -1029,7 +1070,7 @@ class JobServiceTest {
     stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
         JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
-        CANDIDATE_JOB_SKILLS, null);
+        CANDIDATE_JOB_SKILLS, null, null, null);
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
@@ -1044,7 +1085,7 @@ class JobServiceTest {
     stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
         JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
-        null, CANDIDATE_MATCHING_SKILLS);
+        null, CANDIDATE_MATCHING_SKILLS, null, null);
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
@@ -1059,7 +1100,7 @@ class JobServiceTest {
     stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
         JOB_ID, CANDIDATE_FULL_NAME, null, CANDIDATE_CURRENT_POSITION, APPLIED_ON,
-        CANDIDATE_JOB_SKILLS, CANDIDATE_MATCHING_SKILLS);
+        CANDIDATE_JOB_SKILLS, CANDIDATE_MATCHING_SKILLS, null, null);
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
@@ -1130,7 +1171,7 @@ class JobServiceTest {
   private JobCandidateProjection candidateProjection(String applicationId) {
     return new JobCandidateProjection(applicationId, CANDIDATE_ID, JOB_ID, CANDIDATE_FULL_NAME,
         CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, APPLIED_ON, CANDIDATE_JOB_SKILLS,
-        CANDIDATE_MATCHING_SKILLS);
+        CANDIDATE_MATCHING_SKILLS, null, null);
   }
 
   private JobWithDetailsProjection projectionWithId(String jobId) {
@@ -1138,7 +1179,8 @@ class JobServiceTest {
         jobId, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         null, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID,
-        POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION, null);
+        POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION, null,
+        null);
   }
 
   @Test
@@ -1276,7 +1318,7 @@ class JobServiceTest {
   @Test
   void suggestUpskillingUsesEmptyCompanyIdWhenJobHasNoCompany() {
     stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA)));
-    JobPostEntity job = ownedJob(companyUser(), List.of(SKILL_JAVA)); // no company set
+    JobPostEntity job = ownedJob(companyUser(), List.of(SKILL_JAVA));
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
     when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(""),
         eq(OUTPUT_LANGUAGE)))
@@ -1428,9 +1470,29 @@ class JobServiceTest {
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, null,
-        POSTER_ID, POSTER_FULL_NAME, null, POSTER_CURRENT_POSITION, concatenatedSkills);
+        POSTER_ID, POSTER_FULL_NAME, null, POSTER_CURRENT_POSITION, concatenatedSkills,
+        null);
     when(jobPostRepository.searchAvailableJobs(null, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
+  }
+
+  private void stubSingleJob(String concatenatedSkills, String concatenatedTags) {
+    JobWithDetailsProjection projection = new JobWithDetailsProjection(
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, null,
+        POSTER_ID, POSTER_FULL_NAME, null, POSTER_CURRENT_POSITION, concatenatedSkills,
+        concatenatedTags);
+    when(jobPostRepository.searchAvailableJobs(null, DEFAULT_PAGEABLE))
+        .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
+  }
+
+  private UserEntity candidateUser(List<String> skillNames, List<String> tagNames) {
+    UserEntity user = candidateUser(skillNames);
+    user.setSimilarityTags(tagNames.stream()
+        .map(name -> UserSimilarityTagEntity.builder().similarityTag(name).user(user).build())
+        .collect(Collectors.toList()));
+    return user;
   }
 
   private Integer searchSingleJobLynqScore() {

@@ -12,11 +12,6 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @NoArgsConstructor
-/**
- * Owner profile and company created together at registration. Neither carries an image: the profile
- * picture and the company logo are uploaded afterwards through the lynq-file-storage pre-signed URL
- * flow, which needs the user and the company to already exist.
- */
 public class CreateUserWithCompanyRequest {
 
   @NotBlank

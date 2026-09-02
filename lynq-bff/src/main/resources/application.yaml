@@ -1,6 +1,17 @@
 spring:
   application:
     name: lynq-bff
+  cloud:
+    openfeign:
+      client:
+        config:
+          # lynq-ml runs LLM generations; translating a whole resume is its
+          # longest one and can far exceed OpenFeign's 60s default read
+          # timeout (especially on a local Ollama model). Kept above lynq-ml's
+          # own LLM_TIMEOUT so the model, not this gateway, decides the cutoff.
+          lynqMl:
+            connectTimeout: 10000
+            readTimeout: 310000
 
 lynq:
   security:

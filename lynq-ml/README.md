@@ -2,13 +2,15 @@
 
 [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/coverage-ml.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml)
 
-Machine-learning service for the Lynq platform. A FastAPI app that augments the platform with LLM-backed features, served behind the standard `lynq-request-uuid` correlation header and the platform's `GlobalRestResponse` envelope. All features are backed by a pluggable LLM client (a local **Ollama** model by default, or **OpenAI**). It exposes:
+Machine-learning service for the Lynq platform. A FastAPI app that augments the platform with LLM-backed features, served behind the standard `lynq-request-uuid` correlation header and the platform's `GlobalRestResponse` envelope. All features are backed by a pluggable LLM client (a local **Ollama** model by default, or **Amazon Bedrock**). It exposes:
 
-- **Skill enhancement** — extract key technical skills from a job posting.
+- **Skill enhancement** — extract key skills from a job posting, plus generalized similarity tags.
+- **Resume skill extraction** — consolidate a whole resume's skills into technical/tools/soft buckets, plus generalized similarity tags.
 - **Upskilling suggestion** — assess a candidate against a job and return the skill gaps with real Udemy courses.
 - **Candidate explanation** — turn the same candidate/job assessment into a recruiter hiring verdict with strengths and concerns.
 - **Resume parsing** — download a resume (PDF/DOCX) and structure it into rich JSON.
 - **Resume translation** — translate a structured resume into another language.
+- **Language detection** — detect the main language of a text, ready to feed into translation.
 - **Resume template** — render a structured resume into a styled PDF and upload it to S3.
 
 ---
@@ -37,9 +39,9 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
 | Language          | Python 3.12                                                               |
 | Framework         | FastAPI 0.139 (Starlette), served by Uvicorn 0.50                         |
 | Validation        | Pydantic 2                                                                |
-| LLM backends      | Ollama (`/api/generate`, raw mode) or OpenAI-compatible `/chat/completions` |
+| LLM backends      | Ollama (`/api/chat`, any model) or Amazon Bedrock (`converse`, any model) |
 | Prompting         | Jinja2 templates, one variant per provider                                |
-| HTTP client       | httpx (async)                                                             |
+| HTTP client       | httpx (async) for Ollama, boto3 for Bedrock                               |
 | Document parsing  | pypdf + python-docx (resume reader helpers)                               |
 | Logging           | stdlib `logging` + `contextvars` MDC for per-request correlation IDs      |
 | Build             | Dockerfile on `python:3.12-slim`                                          |
@@ -76,8 +78,8 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
               │                                       │
               ▼                                       ▼
         selects provider                    ┌────────────────────┐
-        from LLM_PROVIDER                    │ Ollama  /  OpenAI  │
-                                             │  HTTP API          │
+        from LLM_PROVIDER                    │ Ollama  /  Bedrock │
+                                             │  HTTP / converse   │
                                              └────────────────────┘
 ```
 
@@ -87,8 +89,8 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
 - **Exception handlers** (`exception_handlers.py`) — the `HTTPException`, `RequestValidationError`, and catch-all handlers that render the standard error envelope; `register_exception_handlers(app)` attaches them.
 - **Middleware** (`middleware/`) — `require_request_uuid` enforces the `lynq-request-uuid` header on every non-exempt route and binds it to the logging context.
 - **Feature router** (`skill_enhance/`) — the `POST /dmz/skill-enhance` endpoint plus its request/response models and the Jinja prompt renderer.
-- **LLM clients** (`llm_client/`) — a common `LLMClient` interface with `OllamaClient` and `OpenAIClient` implementations, selected by the `get_llm_client()` factory from environment configuration.
-- **Prompts** (`resources/prompts/`) — provider-specific Jinja templates (`skill_extractor/ollama.jinja`, `skill_extractor/openai.jinja`).
+- **LLM clients** (`llm_client/`) — a common `LLMClient` interface with `OllamaClient` and `BedrockClient` implementations, selected by the `get_llm_client()` factory from environment configuration. Both raise `LLMError` on a backend failure, so the routers answer `502` without knowing which provider is configured.
+- **Prompts** (`resources/prompts/`) — provider-specific Jinja templates (`job_post_skill_extraction/ollama.jinja`, `job_post_skill_extraction/bedrock.jinja`). They are plain text and carry no chat special tokens: each client sends the rendered prompt as a single user turn and the provider applies the chat template of the configured model. Switching `OLLAMA_MODEL` between Qwen, Llama or Mistral — or `BEDROCK_MODEL_ID` between Claude and Nova — therefore needs no prompt change. A test enforces this (`TemplatesAreModelAgnosticTests`).
 - **Response envelopes** (`response/`) — `GlobalRestResponse` / `ErrorRestResponse`, mirroring the Java services.
 - **Logging context** (`logging_context.py`) — the MDC-style request-UUID contextvar and logging filter.
 - **Document helpers** (`file_downloader/`, `file_reader/`) — download a resume from a presigned S3 URL and extract text from PDF/DOCX. Building blocks not yet exposed via an endpoint.
@@ -126,25 +128,25 @@ sequenceDiagram
     participant R as skill_enhance router
     participant F as get_llm_client
     participant P as render_key_extractor_prompt
-    participant L as LLM (Ollama / OpenAI)
+    participant L as LLM (Ollama / Bedrock)
 
     C->>M: POST /lynq-ml/dmz/skill-enhance<br/>headers: lynq-request-uuid, user-id<br/>body: {title, description, work_type}
     M->>R: forward (request UUID bound to logging context)
     R->>F: get_llm_client()  (reads LLM_PROVIDER)
-    F-->>R: LLMClient (Ollama or OpenAI)
+    F-->>R: LLMClient (Ollama or Bedrock)
     R->>P: render prompt for client.provider
     P-->>R: rendered prompt
     R->>L: client.generate(prompt)
     alt transport error
-        L-->>R: httpx.HTTPError
+        L-->>R: LLMError
         R-->>C: 502 "LLM request failed: ..."
     else response returned
         L-->>R: raw completion (JSON)
-        R->>R: parse {"skills": [...]}, validate list of strings
+        R->>R: parse {"skills": [...], "similarity_tags": [...]}, validate lists of strings
         alt malformed output
             R-->>C: 502 "LLM returned malformed output"
         else valid
-            R-->>C: 200 { success:true, data:{ skills:[...] } }
+            R-->>C: 200 { success:true, data:{ skills:[...], similarity_tags:[...] } }
         end
     end
 ```
@@ -172,11 +174,13 @@ All routes require the `lynq-request-uuid` header **except** `/lynq-ml/health`.
 
 | Method | Path                       | Extra headers required          | Description                                            |
 | ------ | -------------------------- | ------------------------------- | ------------------------------------------------------ |
-| POST   | `/dmz/skill-enhance`           | `user-id` (`company-id` optional) | Extract 5–15 key technical skills from a job posting. Called straight through lynq-bff. |
+| POST   | `/dmz/skill-enhance`           | `user-id` (`company-id` optional) | Extract 5–15 key skills from a job posting plus 5–12 similarity tags. Called straight through lynq-bff. |
+| POST   | `/dmz/resume/skill-extraction` | `user-id`                       | Consolidate a whole resume's skills into technical/tools/soft buckets plus similarity tags. Called straight through lynq-bff. |
 | POST   | `/dmz/upskilling_suggestion`   | `user-id`, `company-id`         | Assess a candidate vs. a job; return a verdict + Udemy courses for each gap. |
 | POST   | `/dmz/candidate-explanation`   | `user-id`, `company-id`         | Assess a candidate vs. a job; return a hiring verdict with strengths and concerns. |
 | POST   | `/dmz/parse-resume`            | `user-id`                       | Download a resume (PDF/DOCX) from a presigned URL and structure it into JSON. |
 | POST   | `/dmz/translate`               | `user-id`                       | Translate every value of a structured resume into a target language. |
+| POST   | `/dmz/detect-language`         | `user-id`                       | Detect the main language of a text; feeds straight into `/translate`. |
 | POST   | `/dmz/resume-template-creation`| `user-id`                       | Render a structured resume into a styled PDF and upload it to a presigned URL. |
 | GET    | `/health`                  | —                               | Liveness/readiness probe; reports service + LLM status.|
 
@@ -193,8 +197,95 @@ All routes require the `lynq-request-uuid` header **except** `/lynq-ml/health`.
 `work_type` is an enum: `REMOTE` or `IN_OFFICE`. The response is wrapped in `GlobalRestResponse<SkillEnhanceResponse>`:
 
 ```json
-{ "success": true, "data": { "skills": ["Java", "Spring", "AWS", "REST", "Docker"] } }
+{
+  "success": true,
+  "data": {
+    "skills": ["Java", "Spring", "AWS", "REST", "Docker"],
+    "similarity_tags": ["Backend Development", "Asynchronous Messaging", "Cloud Infrastructure", "Containerization"]
+  }
+}
 ```
+
+- `skills`: the concrete skills the posting asks for, written in the posting's own language.
+- `similarity_tags`: the same requirements generalized into transferable capabilities — see
+  [Similarity tags](#similarity-tags) below. Best-effort: a model that omits them, or returns them
+  in the wrong shape, yields `[]` rather than a `502`.
+
+**`POST /dmz/resume/skill-extraction`**`?language=es` reads a whole structured resume and returns
+its skills consolidated into three buckets plus a list of similarity tags. The request body is the `Resume` schema below (the same
+one `/parse-resume` returns), so it chains straight off the parser — and since every field is
+defaulted, a draft resume the candidate is still filling in validates too:
+
+```json
+{
+  "personal_info": { "full_name": "Ada Lovelace" },
+  "summary": "Backend engineer with 5 years building Java services.",
+  "work_experience": [{ "company": "Acme", "position": "Backend Engineer", "technologies": ["Java", "Spring"] }]
+}
+```
+
+The model reads the *whole* resume — `summary`, `work_experience.technologies`, `.description`,
+`.achievements`, `projects`, `certifications` — not just the `skills` field, then deduplicates every
+skill into exactly one bucket. The response is wrapped in `GlobalRestResponse<SkillExtractionResponse>`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "skills": ["Java", "Spring", "AWS"],
+    "tools": ["Docker", "Git"],
+    "soft": ["Liderazgo", "Comunicación"],
+    "similarity_tags": ["Backend Development", "Asynchronous Messaging", "Cloud Infrastructure", "Team Leadership"]
+  }
+}
+```
+
+- `skills`: technical or domain skills — languages, frameworks, databases, cloud platforms,
+  architecture concepts; for a non-technical resume, the equivalent domain skills.
+- `tools`: concrete tools, software and platforms (Docker, Git, Jira, QuickBooks, Photoshop).
+- `soft`: soft/interpersonal skills.
+- `similarity_tags`: 8–20 generalized capabilities derived from the three buckets *and* from what
+  the candidate actually did in `work_experience` / `projects`. Always English — see
+  [Similarity tags](#similarity-tags) below.
+- `language` *(optional query param)*: the caller's UI language code (`en`, `es`; a region suffix
+  like `es-AR` is accepted). Only `soft` is written in it — technical and tool names are proper
+  nouns and are copied verbatim. Unknown or omitted codes fall back to English, so a resume drafted
+  in one language never forces the soft skills into it.
+
+Nothing is persisted: the caller decides which of the returned skills to keep. Malformed LLM output
+returns `502`.
+
+### Similarity tags
+
+Matching a candidate on the literal spelling of a skill is too strict. A posting asking for **Kafka**
+never surfaces a candidate who only used **RabbitMQ**, even though both are ways of doing
+event-driven communication and that experience transfers. Both the job-posting and the resume
+prompts therefore return a `similarity_tags` list next to the concrete skills: the *capability*
+behind the skill, at the level of abstraction where two substitutes become interchangeable.
+
+The similarity tags are the join key between the two endpoints, which is why they are constrained:
+
+- **Always English**, whatever the language of the posting or of the resume — and, for
+  `/resume/skill-extraction`, whatever the `language` query param says. A Spanish posting and an
+  English resume have to meet on the same vocabulary, so unlike `soft` they are never translated.
+- **Title Case**, a noun phrase of 2–4 words, 40 characters or fewer.
+- **One or two levels above the concrete skill**: never a vendor, product or version name
+  (`Kafka`, `QuickBooks`, `Java 21`), never an industry (`Technology`, `Healthcare`).
+- **Substitutes share a tag** — that is the whole point of the list.
+
+This is not a software-only idea; the prompts carry examples from every field:
+
+| Concrete skills                     | Similarity tag                             |
+| ----------------------------------- | ------------------------------------------ |
+| Kafka, RabbitMQ, SQS, Pub/Sub       | `Asynchronous Messaging`, `Event Streaming` |
+| PostgreSQL, MySQL, Oracle           | `Relational Databases`                     |
+| Docker, Kubernetes, ECS             | `Containerization`, `Container Orchestration` |
+| QuickBooks, SAP FI, Xero            | `Accounting Software`                      |
+| IFRS, US GAAP                       | `Financial Reporting Standards`            |
+| Photoshop, Illustrator, Figma       | `Digital Design Tools`                     |
+| Triage, ACLS, ICU care              | `Emergency Patient Care`                   |
+| Litigation, arbitration, mediation  | `Dispute Resolution`                       |
+| Forklift licence, pallet jack       | `Warehouse Operations`                     |
 
 **`POST /dmz/upskilling_suggestion`** request body (the same `{ job, candidate }` structure the prompt consumes):
 
@@ -303,6 +394,24 @@ Unsupported document types return `400`; download/parse failures and malformed L
 
 `language` is validated against the `Language` enum — `EN`, `ES`, `FR`, `PR` (mirrors `com.lynq.backend.enums.Language`); any other value fails validation. The response is the translated resume wrapped in `GlobalRestResponse<Resume>`.
 
+**`POST /dmz/detect-language`** detects the main language of a free-form text (typically a resume's,
+before offering to translate it). Request body:
+
+```json
+{ "text": "Ingeniero backend con 5 años construyendo servicios en Java." }
+```
+
+The response is wrapped in `GlobalRestResponse<LanguageDetectionResponse>`, whose `language` is
+constrained to the same `Language` enum `/translate` accepts — so a detected language can be fed
+straight back into it:
+
+```json
+{ "success": true, "data": { "language": "ES" } }
+```
+
+The model is instructed to pick the closest supported language rather than answer with an
+unsupported one; output that is not a valid enum value returns `502`.
+
 **`POST /dmz/resume-template-creation`** renders a structured resume into a styled PDF (Jinja + WeasyPrint) and uploads it to a caller-provided presigned S3 PUT URL — the service never holds AWS credentials. Request body:
 
 ```json
@@ -324,8 +433,18 @@ Returns `201 Created` with an empty `GlobalRestResponse` once the PDF has been g
 **`GET /health`** returns `200` when the configured LLM is reachable, `503` otherwise (this route is *not* wrapped in `GlobalRestResponse`):
 
 ```json
-{ "status": "UP", "llm": { "provider": "ollama", "status": "UP" } }
+{
+  "status": "UP",
+  "llm": { "provider": "ollama", "status": "UP" },
+  "renderer": { "status": "UP" }
+}
 ```
+
+`status` (and the HTTP code) follow the LLM alone. `renderer` reports whether
+WeasyPrint could load its native libraries — see
+[Running locally](#running-locally) — and is deliberately kept out of the status
+code: only `/resume-template-creation` renders anything, so a missing Pango is
+surfaced rather than pulling the whole service out of rotation.
 
 ---
 
@@ -345,6 +464,20 @@ curl -X POST http://localhost:8084/lynq-ml/dmz/skill-enhance \
     "title": "Senior Backend Java Developer",
     "description": "Building scalable services with Java, Spring and AWS.",
     "work_type": "REMOTE"
+  }'
+```
+
+**Extract a resume's skills**
+
+```bash
+curl -X POST "http://localhost:8084/lynq-ml/dmz/resume/skill-extraction?language=es" \
+  -H "Content-Type: application/json" \
+  -H "lynq-request-uuid: $UUID" \
+  -H "user-id: user-1" \
+  -d '{
+    "personal_info": { "full_name": "Ada Lovelace" },
+    "summary": "Backend engineer with 5 years building Java services.",
+    "skills": { "technical": ["Java", "Spring"], "tools": ["Docker"], "soft": ["Leadership"] }
   }'
 ```
 
@@ -411,6 +544,16 @@ curl -X POST http://localhost:8084/lynq-ml/dmz/translate \
   }'
 ```
 
+**Detect a language**
+
+```bash
+curl -X POST http://localhost:8084/lynq-ml/dmz/detect-language \
+  -H "Content-Type: application/json" \
+  -H "lynq-request-uuid: $UUID" \
+  -H "user-id: user-1" \
+  -d '{ "text": "Ingeniero backend con 5 años construyendo servicios en Java." }'
+```
+
 **Create resume template (PDF)**
 
 ```bash
@@ -438,7 +581,26 @@ curl http://localhost:8084/lynq-ml/health
 **Prerequisites**
 
 - Python 3.12
-- A reachable LLM backend — either a local Ollama server (default) or an OpenAI API key.
+- A reachable LLM backend — either a local Ollama server (default) or AWS credentials allowed to invoke a Bedrock model.
+- **Native libraries for WeasyPrint** (Pango/Cairo). These are C libraries, not
+  Python packages: pip cannot install them and `requirements.txt` cannot pin
+  them, so they have to be installed with the system package manager. Without
+  them the service still starts and every endpoint works *except*
+  `/resume-template-creation`, which fails with
+  `OSError: cannot load library 'pango-1.0-0'`.
+
+  ```bash
+  # macOS (pulls cairo, glib, harfbuzz and fontconfig as dependencies)
+  brew install pango
+
+  # Debian / Ubuntu — the same set the Dockerfile installs
+  sudo apt-get install -y libcairo2 libpango-1.0-0 libpangocairo-1.0-0 \
+                          libgdk-pixbuf-2.0-0 libffi8 fonts-dejavu-core
+  ```
+
+  Docker needs none of this: the [Dockerfile](Dockerfile) installs them in the
+  image. To check an already-running service, `GET /lynq-ml/health` reports
+  `renderer.status`, and the same probe runs at startup and logs the fix.
 
 **Steps**
 
@@ -449,7 +611,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # 2. Start an LLM backend. Easiest: the Ollama services from the repo-root compose file,
-#    which expose Ollama on localhost:11434 and pull llama3.1:
+#    which expose Ollama on localhost:11434 and pull qwen2.5:7b:
 docker compose -f ../docker-compose.yaml up -d ollama ollama-pull
 
 # 3. Export the service environment (defaults to Ollama on localhost)
@@ -461,12 +623,22 @@ python src/main.py
 
 Service URL: `http://localhost:8084/lynq-ml` (health at `/lynq-ml/health`).
 
-To use OpenAI instead of a local model:
+To use Amazon Bedrock instead of a local model. `BEDROCK_MODEL_ID` is any model
+the Converse API accepts, so the provider is a config choice, not a code change:
 
 ```bash
-LLM_PROVIDER=openai OPENAI_API_KEY=sk-... source ./set_env.sh
+export AWS_PROFILE=lynq            # or AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+LLM_PROVIDER=bedrock \
+  BEDROCK_MODEL_ID=anthropic.claude-sonnet-4-5-20250929-v1:0 \
+  BEDROCK_REGION=us-east-1 \
+  source ./set_env.sh
 python src/main.py
 ```
+
+Swapping the model is only a variable — `amazon.nova-pro-v1:0`,
+`meta.llama3-3-70b-instruct-v1:0` and `mistral.*` need no code change. The model
+must be enabled in that region's Bedrock console, and the caller needs
+`bedrock:InvokeModel` on it.
 
 ---
 
@@ -495,13 +667,15 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 
 | Variable          | Default                     | Used when            | Purpose                                              |
 | ----------------- | --------------------------- | -------------------- | ---------------------------------------------------- |
-| `LLM_PROVIDER`    | `ollama`                    | always               | Selects the LLM backend: `ollama` or `openai`.       |
+| `LLM_PROVIDER`    | `ollama`                    | always               | Selects the LLM backend: `ollama` or `bedrock`.      |
 | `LLM_TIMEOUT`     | `60`                        | always               | LLM request timeout, in seconds.                     |
 | `OLLAMA_BASE_URL` | `http://localhost:11434`    | `LLM_PROVIDER=ollama`| Ollama server base URL.                              |
-| `OLLAMA_MODEL`    | `llama3.1`                  | `LLM_PROVIDER=ollama`| Ollama model name.                                   |
-| `OPENAI_API_KEY`  | — (required)                | `LLM_PROVIDER=openai`| OpenAI API key.                                      |
-| `OPENAI_MODEL`    | `gpt-4o-mini`               | `LLM_PROVIDER=openai`| OpenAI model name.                                   |
-| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | `LLM_PROVIDER=openai`| OpenAI-compatible API base URL.                      |
+| `OLLAMA_MODEL`    | `qwen2.5:7b`                | `LLM_PROVIDER=ollama`| Any model pulled into Ollama; no prompt change needed.|
+| `BEDROCK_MODEL_ID` | — (required)               | `LLM_PROVIDER=bedrock`| Any Converse-capable model id (`anthropic.*`, `amazon.nova-*`, `meta.llama*`, `mistral.*`). |
+| `BEDROCK_REGION`  | `AWS_REGION`, else `us-east-1` | `LLM_PROVIDER=bedrock`| Region whose Bedrock endpoint is called.        |
+| `BEDROCK_MAX_TOKENS` | `4096`                   | `LLM_PROVIDER=bedrock`| `inferenceConfig.maxTokens` per request.          |
+| `BEDROCK_TEMPERATURE` | `0`                     | `LLM_PROVIDER=bedrock`| `inferenceConfig.temperature` per request.        |
+| `BEDROCK_MAX_ATTEMPTS` | `3`                    | `LLM_PROVIDER=bedrock`| botocore retry attempts (standard mode).          |
 | `UDEMY_MAX_COURSES` | `2`                       | `/upskilling_suggestion` | Max courses returned per topic.                   |
 | `UDEMY_BASE_URL`  | `https://www.udemy.com`     | `/upskilling_suggestion` | Udemy base URL (course + search links).          |
 | `COURSE_SEARCH_TIMEOUT` | `15`                  | `/upskilling_suggestion` | Web-search request timeout, in seconds.          |
@@ -531,7 +705,7 @@ python -m unittest discover
 PYTHONPATH=src python -m unittest discover -s tests
 ```
 
-Coverage includes the `skill-enhance` and `health` endpoints, the request-UUID middleware and logging context, the prompt renderer, the `get_llm_client` factory, and the Ollama/OpenAI client HTTP behaviour.
+Coverage includes the `skill-enhance` and `health` endpoints, the request-UUID middleware and logging context, the prompt renderer, the `get_llm_client` factory, and the Ollama (httpx mocked) and Bedrock (boto3 mocked) clients.
 
 ---
 
@@ -571,7 +745,7 @@ lynq-ml/
 │   ├── llm_client/
 │   │   ├── base.py             # LLMClient interface, LLMProvider enum
 │   │   ├── ollama_client.py    # Ollama implementation
-│   │   ├── openai_client.py    # OpenAI implementation
+│   │   ├── bedrock_client.py   # Amazon Bedrock (Converse) implementation
 │   │   └── __init__.py         # get_llm_client() factory
 │   ├── udemy_client/
 │   │   ├── search_client.py    # keyless Udemy course search (+ fallback)
@@ -584,8 +758,8 @@ lynq-ml/
 ├── resources/                  # service config + assets (loaded at runtime)
 │   ├── log_config.json         # logging dictConfig
 │   └── prompts/
-│       ├── skill_extractor/       # ollama.jinja, openai.jinja
-│       └── upskilling_suggestion/ # ollama.jinja, openai.jinja
+│       ├── job_post_skill_extraction/ # ollama.jinja, bedrock.jinja
+│       └── upskilling_suggestion/     # ollama.jinja, bedrock.jinja
 ├── tests/                      # unittest suite (puts src/ on the path)
 ├── set_env.sh                  # environment defaults
 ├── Dockerfile

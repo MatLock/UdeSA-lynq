@@ -1,6 +1,10 @@
 /* RegisterFooter — static action bar below the carousel. Tokens from index.css. */
 
+/* Scaled with the wizard steps (same token, set on the card): the actions belong
+   to the form, so leaving them at full size would make them tower over the
+   fields they submit. No JS measures this subtree, so the zoom sits on the root. */
 .register-footer {
+  zoom: var(--register-form-scale, 1);
   display: flex;
   flex-direction: column;
   align-items: center;

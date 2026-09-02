@@ -6,9 +6,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * A single course suggested by lynq-ml to close a candidate's skill gap.
- */
 @Getter
 @Setter
 @NoArgsConstructor

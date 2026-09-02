@@ -8,6 +8,8 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoes
 
 from llm_client import LLMProvider
 
+from prompt.language import language_name
+
 # src/prompt/upskilling_suggestion.py -> parents[2] is the repo root;
 # templates live under resources/prompts/.
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "resources" / "prompts"
@@ -23,28 +25,6 @@ _env = Environment(
     ),
     keep_trailing_newline=True,
 )
-
-# Human-readable names for the language codes the UI sends, so the prompt can
-# instruct the model in plain terms ("Respond in Spanish."). An unknown code
-# falls back to English rather than leaking a raw code into the prompt.
-_LANGUAGE_NAMES = {
-    "en": "English",
-    "es": "Spanish",
-}
-_DEFAULT_LANGUAGE = "English"
-
-
-def language_name(language: str | None) -> str:
-    """Resolve a UI language code (e.g. ``"es"``) to its English name.
-
-    Matching is case-insensitive and ignores any region suffix (``"es-AR"`` ->
-    ``"Spanish"``). Unknown or missing codes fall back to English.
-    """
-    if not language:
-        return _DEFAULT_LANGUAGE
-    code = language.strip().lower().split("-")[0]
-    return _LANGUAGE_NAMES.get(code, _DEFAULT_LANGUAGE)
-
 
 def render_upskilling_prompt(
     provider: LLMProvider, *, input_json: str, language: str | None = None

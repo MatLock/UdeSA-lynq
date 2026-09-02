@@ -14,10 +14,7 @@
   padding: 32px;
   gap: 24px;
   text-align: initial;
-  background:
-    radial-gradient(ellipse at top left, #efeafc 0%, transparent 45%),
-    radial-gradient(ellipse at bottom right, #e8f1fc 0%, transparent 45%),
-    #f7f6fb;
+  background: var(--page-bg);
 }
 
 .job-candidates-hero {
@@ -93,7 +90,7 @@
 }
 
 .job-candidates-error {
-  color: #ef4444;
+  color: var(--danger-ink);
 }
 
 .job-candidates-pagination {
@@ -110,7 +107,7 @@
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  box-shadow: var(--shadow-hairline);
 }
 
 .candidate-avatar {

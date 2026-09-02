@@ -1,0 +1,69 @@
+/* ResumeField — the labelled control used by every resume-wizard step. Field
+   styling lives here once (inputs, textareas, selects); tokens from index.css. */
+
+.resume-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Spans both columns of the step grid (long text: summary, description…). */
+.resume-field--full {
+  grid-column: 1 / -1;
+}
+
+.resume-field > label {
+  color: var(--text-h);
+  font-size: 11px;
+}
+
+.resume-field input,
+.resume-field textarea,
+.resume-field select {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text-h);
+  outline: none;
+}
+
+.resume-field textarea {
+  resize: vertical;
+  min-height: 76px;
+  line-height: 1.5;
+}
+
+.resume-field input:focus,
+.resume-field textarea:focus,
+.resume-field select:focus {
+  border-color: var(--brand-purple);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+
+.resume-field input[aria-invalid='true'],
+.resume-field textarea[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.resume-field input[aria-invalid='true']:focus,
+.resume-field textarea[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px var(--danger-ring);
+}
+
+.resume-field-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.resume-field-error {
+  margin: 0;
+  font-size: 11px;
+  color: var(--danger);
+}

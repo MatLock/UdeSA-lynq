@@ -28,4 +28,5 @@ public class UpdateJobRequest {
   @Positive
   private Integer salaryRangeTop;
   private List<String> skills;
+  private List<String> similarityTags;
 }

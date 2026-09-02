@@ -52,3 +52,23 @@ output "file_storage_s3_access_key_id" {
   description = "Access key id of the S3-only IAM user consumed by lynq-file-storage (the secret lives only in state / the k8s Secret)."
   value       = aws_iam_access_key.backend_s3.id
 }
+
+output "ml_bedrock_access_key_id" {
+  description = "Access key id of the Bedrock-only IAM user consumed by lynq-ml (the secret lives only in state / the k8s Secret)."
+  value       = aws_iam_access_key.ml_bedrock.id
+}
+
+output "eks_cluster_name" {
+  description = "EKS cluster name. Feed it to: aws eks update-kubeconfig --name <this> --region <aws_region>."
+  value       = aws_eks_cluster.lynq.name
+}
+
+output "eks_cluster_endpoint" {
+  description = "Kubernetes API endpoint of the EKS cluster."
+  value       = aws_eks_cluster.lynq.endpoint
+}
+
+output "eks_oidc_provider_arn" {
+  description = "OIDC provider ARN of the cluster. Use it to grant IRSA roles to ServiceAccounts (replaces the static access keys)."
+  value       = aws_iam_openid_connect_provider.eks.arn
+}

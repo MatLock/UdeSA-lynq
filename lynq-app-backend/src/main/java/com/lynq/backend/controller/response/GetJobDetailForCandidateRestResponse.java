@@ -29,6 +29,7 @@ public class GetJobDetailForCandidateRestResponse extends GetJobRestResponse {
         .company(source.getCompany())
         .postedBy(source.getPostedBy())
         .skills(source.getSkills())
+        .similarityTags(source.getSimilarityTags())
         .lynqScore(source.getLynqScore())
         .totalCandidatesApplied(totalCandidatesApplied)
         .build();

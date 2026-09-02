@@ -39,7 +39,6 @@ public class UserEntity {
   @Column(name = "type", nullable = false)
   private UserType type;
 
-  /** Id of the profile image in lynq-file-storage, which owns the file itself. */
   @Column(name = "lynq_file_storage_id", length = 36)
   private String lynqFileStorageId;
 
@@ -64,6 +63,10 @@ public class UserEntity {
   @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
   @Builder.Default
   private List<UserSkillsEntity> skills = new ArrayList<>();
+
+  @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+  @Builder.Default
+  private List<UserSimilarityTagEntity> similarityTags = new ArrayList<>();
 
   @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
   @Builder.Default

@@ -13,11 +13,11 @@
   background: #fff;
   border: none;
   border-radius: 16px;
-  box-shadow: 0 24px 48px rgba(16, 24, 40, 0.24);
+  box-shadow: var(--shadow-dialog);
 }
 
 .candidate-modal::backdrop {
-  background: rgba(16, 24, 40, 0.45);
+  background: var(--scrim);
   backdrop-filter: blur(2px);
 }
 

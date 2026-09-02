@@ -10,6 +10,13 @@
  *   3. The recruiter publishes a job, letting the "Generar habilidades"
  *      (generate skills with AI) button fill in the skills, and logs out.
  *   4. The candidate logs back in, finds the job and applies to it.
+ *   5. The candidate creates a resume by uploading a PDF (./files) — parsed by
+ *      the ML service — then assigns an alias to it and overrides that alias,
+ *      proving both writes stick.
+ *   6. The candidate creates a second resume through the translation flow:
+ *      runs the translation, picks a template, generates the live preview
+ *      (asserting the PDF canvas actually draws content), and confirms —
+ *      which stores the translated resume and adds it to the switcher.
  *
  * Every value typed into the app is in Spanish, since that is the language the
  * UI runs in. Profile pictures come from ./images.
@@ -47,6 +54,9 @@ const TIMEOUT = Number(process.env.TIMEOUT_MS ?? 20000)
 // Long wait: anything that round-trips to the backend (registration, image
 // upload, publishing the job, applying).
 const LONG_TIMEOUT = Number(process.env.LONG_TIMEOUT_MS ?? 60000)
+// Extra-long wait: flows where an LLM reads a document server-side (the resume
+// import). The gateway itself allows those calls up to ~5 minutes.
+const EXTRA_LONG_TIMEOUT = Number(process.env.EXTRA_LONG_TIMEOUT_MS ?? 300000)
 // The register carousel animates for 0.35s (see RegisterWizard.css); waiting a
 // bit longer keeps us from acting on a slide that is still moving.
 const WIZARD_TRANSITION = 700
@@ -59,6 +69,9 @@ const ACTION_DELAY = Number(readArgument('delay') ?? process.env.ACTION_DELAY_MS
 const IMAGES_DIR = path.join(__dirname, 'images')
 const CANDIDATE_IMAGE = path.join(IMAGES_DIR, 'candidate_mock.jpeg')
 const RECRUITER_IMAGE = path.join(IMAGES_DIR, 'recruiter_mock.jpeg')
+
+const FILES_DIR = path.join(__dirname, 'files')
+const RESUME_PDF = path.join(FILES_DIR, 'resume_mock.pdf')
 
 // Unique suffix per run, so the test can be executed repeatedly without
 // colliding with data already in the database. IAM usernames are capped at 20
@@ -115,6 +128,14 @@ const RECRUITER = {
       'Trabajamos con modalidad remota en toda Latinoamérica.',
     size: '180',
   },
+}
+
+const RESUME = {
+  file: RESUME_PDF,
+  // Assigned first, then overridden — assigning and renaming are the same
+  // endpoint, so the test proves both writes stick.
+  alias: 'CV principal',
+  aliasOverride: `Perfil backend ${SUFFIX}`,
 }
 
 const JOB = {
@@ -567,6 +588,166 @@ const applyToJob = async (driver, title) => {
 }
 
 // ---------------------------------------------------------------------------
+// Resume creation and alias
+// ---------------------------------------------------------------------------
+
+// Creates the candidate's first resume through the upload path of the wizard:
+// with no resume on file, /my-resume opens straight into the method step, where
+// "Subí un PDF o Word" registers the file, PUTs it to storage and has the ML
+// service read it into a structured resume. The import runs an LLM server-side,
+// hence the extra-long wait for the viewer to appear.
+const createResumeByUpload = async (driver, resume) => {
+  log('Creating a resume by uploading a PDF')
+  await navigate(driver, `${BASE_URL}/my-resume`)
+
+  // No resume yet → the creation wizard is the whole page.
+  await waitVisible(driver, By.css('.resume-method-step'), LONG_TIMEOUT)
+  await click(
+    driver,
+    By.xpath(`//label[contains(@class,'resume-option-card')][.//input[@value='upload']]`),
+  )
+
+  await uploadFile(driver, By.css('.resume-method-file-input'), resume.file)
+  detail(`document picked: ${path.basename(resume.file)}`)
+
+  // The footer's primary button reads "Subir CV" on this path and is the
+  // terminal action: upload, import, and land on the viewer.
+  await click(driver, By.css('.resume-footer-next'))
+
+  const renameButton = await waitVisible(
+    driver,
+    By.css('.resume-page-doc-rename'),
+    EXTRA_LONG_TIMEOUT,
+  )
+  detail('resume imported, the viewer is showing it')
+
+  // No alias exists yet, so the button must offer to assign one.
+  const label = await renameButton.getText()
+  assert(
+    label.includes('Asignar alias'),
+    `the alias button should read "Asignar alias" before one exists, but reads «${label}»`,
+  )
+}
+
+// Opens the alias dialog, saves the given alias, and waits for the save to be
+// acknowledged (success toast) and reflected (the button now offers to edit).
+const saveAlias = async (driver, alias) => {
+  await click(driver, By.css('.resume-page-doc-rename'))
+  await waitVisible(driver, By.css('.resume-alias-input'))
+
+  const input = await type(driver, By.css('.resume-alias-input'), alias)
+  await click(driver, By.css('.resume-alias-actions button[type="submit"]'))
+
+  const message = await waitForToast(driver, 'success')
+  detail(`alias saved: «${message}»`)
+
+  // The dialog closes and the list reloads; once an alias exists the button
+  // reads "Editar alias".
+  await driver.wait(until.stalenessOf(input), LONG_TIMEOUT)
+  await driver.wait(async () => {
+    const buttons = await driver.findElements(By.css('.resume-page-doc-rename'))
+    if (buttons.length === 0) return false
+    try {
+      return (await buttons[0].getText()).includes('Editar alias')
+    } catch {
+      return false // re-rendered mid-read; keep polling
+    }
+  }, LONG_TIMEOUT)
+}
+
+// Reopens the dialog and asserts it comes prefilled with the alias on file —
+// the read path of the feature — then closes it without saving.
+const assertAliasPrefilled = async (driver, alias) => {
+  await click(driver, By.css('.resume-page-doc-rename'))
+  const input = await waitVisible(driver, By.css('.resume-alias-input'))
+  const value = await input.getAttribute('value')
+  assert(
+    value === alias,
+    `the alias dialog should be prefilled with «${alias}» but holds «${value}»`,
+  )
+  await click(driver, By.css('.resume-alias-actions button[type="button"]'))
+  await driver.wait(until.stalenessOf(input), TIMEOUT)
+}
+
+// Assigns an alias to the freshly imported resume and then overrides it —
+// create and rename are the same endpoint, so both writes are exercised.
+const assignAndOverrideAlias = async (driver, resume) => {
+  log('Assigning an alias to the resume')
+  await saveAlias(driver, resume.alias)
+  await assertAliasPrefilled(driver, resume.alias)
+  detail(`alias assigned: «${resume.alias}»`)
+
+  log('Overriding the alias')
+  await saveAlias(driver, resume.aliasOverride)
+  await assertAliasPrefilled(driver, resume.aliasOverride)
+  detail(`alias overridden: «${resume.aliasOverride}»`)
+}
+
+// ---------------------------------------------------------------------------
+// Translation: translate → template → preview → confirm
+// ---------------------------------------------------------------------------
+
+// Creates a second resume by translating the uploaded one. The flow is split on
+// purpose (mirroring the UI): the translation runs first, then the candidate
+// picks a template over a live preview, and only the confirmation stores the
+// resume. Source and target language keep the dialog's defaults — the only
+// resume, and the first language the candidate holds no resume in.
+const translateResume = async (driver) => {
+  log('Translating the resume (LLM — can take a while)')
+  await click(driver, By.css('.resume-page-action--ghost'))
+  await waitVisible(driver, By.css('.translate-resume-dialog'))
+  await click(driver, By.css('.translate-resume-dialog button[type="submit"]'))
+
+  await waitVisible(driver, By.css('.translate-template-overlay'), EXTRA_LONG_TIMEOUT)
+  detail('translation finished, the template dialog is open')
+
+  log('Generating the template preview')
+  await click(driver, By.xpath(
+    `//button[contains(@class,'translate-template-button')][normalize-space(.)='Generar vista previa']`))
+  await driver.wait(async () => {
+    const canvases = await driver.findElements(By.css('.translate-template-column canvas'))
+    return canvases.length > 0
+  }, EXTRA_LONG_TIMEOUT)
+  // The canvas exists as soon as react-pdf mounts it; give the paint a moment.
+  await sleep(2000)
+
+  // The preview must actually draw the document: measure the fraction of
+  // non-white pixels on the first page. A rendered resume (text, headers, the
+  // MODERN sidebar) sits far above a blank canvas's ~0.
+  const stats = await driver.executeScript(`
+    const canvas = document.querySelector('.translate-template-column canvas');
+    if (!canvas) return { error: 'no canvas' };
+    const { width, height } = canvas;
+    const data = canvas.getContext('2d').getImageData(0, 0, width, height).data;
+    let nonWhite = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] > 0 && (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245)) {
+        nonWhite += 1;
+      }
+    }
+    return { nonWhite, total: data.length / 4, ratio: nonWhite / (data.length / 4) };
+  `)
+  assert(
+    !stats.error && stats.ratio > 0.02,
+    `the preview canvas looks blank (non-white ratio: ${stats.error ?? stats.ratio})`,
+  )
+  detail(`preview draws content: ${(stats.ratio * 100).toFixed(1)}% non-white pixels`)
+
+  log('Confirming the template (stores the translated resume)')
+  await click(driver, By.xpath(
+    `//button[contains(@class,'translate-template-button')][normalize-space(.)='Usar esta plantilla']`))
+  const message = await waitForToast(driver, 'success')
+  detail(`translation stored: «${message}»`)
+
+  // With two resumes on file the viewer shows the switcher, one tab each.
+  await driver.wait(async () => {
+    const tabs = await driver.findElements(By.css('.resume-page-tab'))
+    return tabs.length >= 2
+  }, LONG_TIMEOUT)
+  detail('the switcher now offers both resumes')
+}
+
+// ---------------------------------------------------------------------------
 // Orchestration
 // ---------------------------------------------------------------------------
 
@@ -600,9 +781,9 @@ const run = async () => {
   console.log(`  Suffix   : ${SUFFIX}`)
   console.log('═══════════════════════════════════════════════════════════')
 
-  for (const image of [CANDIDATE_IMAGE, RECRUITER_IMAGE]) {
-    if (!fs.existsSync(image)) {
-      throw new Error(`Missing mock image: ${image}`)
+  for (const fixture of [CANDIDATE_IMAGE, RECRUITER_IMAGE, RESUME_PDF]) {
+    if (!fs.existsSync(fixture)) {
+      throw new Error(`Missing mock fixture: ${fixture}`)
     }
   }
 
@@ -626,12 +807,20 @@ const run = async () => {
     await login(driver, CANDIDATE.username, CANDIDATE.password)
     await applyToJob(driver, JOB.title)
 
+    // 5. The candidate creates a resume and manages its alias.
+    await createResumeByUpload(driver, RESUME)
+    await assignAndOverrideAlias(driver, RESUME)
+
+    // 6. The candidate creates a second resume through the translation flow.
+    await translateResume(driver)
+
     console.log('\n═══════════════════════════════════════════════════════════')
     console.log('  ✅ TEST PASSED')
     console.log(`  Candidate : ${CANDIDATE.username} / ${CANDIDATE.email}`)
     console.log(`  Recruiter : ${RECRUITER.username} / ${RECRUITER.email}`)
     console.log(`  Password  : ${PASSWORD}`)
     console.log(`  Job       : ${JOB.title}`)
+    console.log(`  Alias     : ${RESUME.aliasOverride}`)
     console.log('═══════════════════════════════════════════════════════════')
   } catch (error) {
     console.error('\n═══════════════════════════════════════════════════════════')

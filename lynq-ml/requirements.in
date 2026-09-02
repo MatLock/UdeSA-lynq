@@ -19,3 +19,10 @@ httpx==0.28.1
 httpcore==1.0.9
 certifi==2026.6.17
 weasyprint==62.3
+# Transitive (WeasyPrint), pinned on purpose: WeasyPrint 62.3 asks for
+# "pydyf>=0.10.0" with no upper bound, but pydyf 0.12 dropped Stream.transform,
+# which weasyprint/pdf/stream.py still calls. Left to float, the resolver picks
+# 0.12.x and every PDF render dies with
+# "AttributeError: 'super' object has no attribute 'transform'".
+pydyf==0.11.0
+boto3==1.43.86

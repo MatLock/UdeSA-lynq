@@ -51,7 +51,8 @@ public class JobControllerImpl implements JobController {
         request.getSalaryRangeDown(),
         request.getSalaryRangeTop(),
         request.getJobPostSource(),
-        request.getSkills());
+        request.getSkills(),
+        request.getSimilarityTags());
 
     CreateJobRestResponse response = CreateJobRestResponse.builder()
         .jobId(job.getId())
@@ -87,7 +88,8 @@ public class JobControllerImpl implements JobController {
         request.getStatus(),
         request.getSalaryRangeDown(),
         request.getSalaryRangeTop(),
-        request.getSkills());
+        request.getSkills(),
+        request.getSimilarityTags());
 
     UpdateJobRestResponse response = UpdateJobRestResponse.builder()
         .jobId(job.getId())

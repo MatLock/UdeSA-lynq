@@ -1,0 +1,17 @@
+.claude/settings.json
+.claude/settings.local.json
+
+# Terraform state — repo-wide net. The state records the AWS secret access keys
+# Terraform generates for lynq-file-storage (S3) and lynq-ml (Bedrock) in plain
+# text, so it must never be committed from any directory.
+*.tfstate
+*.tfstate.*
+.terraform/
+crash.log
+crash.*.log
+
+# AWS credentials dropped next to a service (see lynq-ml/.dockerignore).
+aws_credentials.txt
+.aws/
+credentials
+.DS_Store

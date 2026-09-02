@@ -70,7 +70,6 @@ class IamAuthenticationFilterTest {
   private IamAuthenticationFilter filter;
   private ObjectMapper objectMapper;
 
-
   @BeforeEach
   void setUp() {
     objectMapper = new ObjectMapper();
@@ -116,7 +115,6 @@ class IamAuthenticationFilterTest {
     assertThat(principalDuringChain[0].getId(), is(USER_ID));
     assertThat(principalDuringChain[0].getUsername(), is(USERNAME));
     assertThat(principalDuringChain[0].getEmail(), is(EMAIL));
-    // context is cleared once the request completes
     assertThat(SecurityContextHolder.getContext().getAuthentication(), is(nullValue()));
   }
 

@@ -32,6 +32,7 @@ public class GetJobRestResponse {
   private JobCompanyRestResponse company;
   private JobPostedByRestResponse postedBy;
   private List<String> skills;
+  private List<String> similarityTags;
   private Integer lynqScore;
   private Long totalCandidatesApplied;
 

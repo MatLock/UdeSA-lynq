@@ -10,7 +10,7 @@ from typing import Annotated
 import httpx
 from fastapi import APIRouter, Header, HTTPException
 
-from llm_client import get_llm_client
+from llm_client import LLMError, get_llm_client
 from response import GlobalRestResponse
 from udemy_client import get_course_provider
 
@@ -68,7 +68,7 @@ async def upskilling_suggestion(
 
     try:
         raw = await client.generate(prompt)
-    except httpx.HTTPError as exc:
+    except LLMError as exc:
         log.error(
             "message= Error when executing upskilling-suggestion, LLM request failed, "
             + _LOG_CONTEXT,

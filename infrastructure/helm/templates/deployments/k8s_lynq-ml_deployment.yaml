@@ -27,6 +27,10 @@ spec:
       containers:
         - name: lynq-ml
           image: {{ .Values.lynq_ml.image }}
+          {{- with .Values.lynq_ml.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           envFrom:
             - configMapRef:
                 name: lynq-ml-config

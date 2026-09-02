@@ -162,6 +162,8 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final int RESUME_YEARS = 8;
   private static final String RESUME_JSON =
       "{\"summary\":\"" + RESUME_SUMMARY + "\",\"years\":" + RESUME_YEARS + "}";
+  private static final String RESUME_ALIAS = "Backend roles";
+  private static final String RESUME_ALIAS_OVERRIDE = "CV para fintech";
   private static final String RESUME_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42";
   private static final String RESUME_PDF_URL =
       "https://lynq-bucket.s3.amazonaws.com/lynq/" + RESUME_FILE_ID
@@ -278,7 +280,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(data.get("id"), is(USER_ID));
     assertThat(data.get("userType"), is(UserType.CANDIDATE.name()));
     assertThat(data.get("fullName"), is(FULL_NAME));
-    // the stored file id is exchanged with lynq-file-storage for a pre-signed download URL
     assertThat(data.get("userProfileImageUrl"), is(PROFILE_IMAGE_URL));
     assertThat(data.get("currentPosition"), is(CURRENT_POSITION));
     assertThat(data.get("about"), is(ABOUT));
@@ -452,13 +453,10 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     Map<String, Object> body = parse(response.body());
     assertThat(body.get("success"), is(true));
 
-    // the URL the browser PUTs the bytes to, and the file id it confirms afterwards, both come
-    // straight from lynq-file-storage
     Map<String, Object> data = (Map<String, Object>) body.get("data");
     assertThat(data.get("preSignedUrl"), is(NEW_UPLOAD_URL));
     assertThat(data.get("fileId"), is(NEW_FILE_ID));
 
-    // the file id replaces the one the user had, and the file it replaced is deleted
     assertThat(userRepository.findById(USER_ID).orElseThrow().getLynqFileStorageId(),
         is(NEW_FILE_ID));
     lynqFileStorageMock.verify(request()
@@ -553,7 +551,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
     assertThat(response.statusCode(), is(400));
     assertThat(parse(response.body()).get("success"), is(false));
-    // the owner must not be persisted when the company name is rejected
     assertThat(userRepository.findById(USER_ID).isPresent(), is(false));
     assertThat(companyRepository.count(), is(1L));
   }
@@ -704,7 +701,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(companyData.get("name"), is(COMPANY_NAME));
     assertThat(companyData.get("about"), is(COMPANY_ABOUT));
     assertThat(companyData.get("size"), is(COMPANY_SIZE));
-    // the stored company file id is exchanged with lynq-file-storage for a pre-signed URL
     assertThat(companyData.get("profileImageUrl"), is(COMPANY_PROFILE_IMAGE_URL));
 
     @SuppressWarnings("unchecked")
@@ -712,7 +708,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(postedBy.get("id"), is(USER_ID));
     assertThat(postedBy.get("fullName"), is(POSTER_FULL_NAME));
     assertThat(postedBy.get("currentPosition"), is(POSTER_CURRENT_POSITION));
-    // and so is the poster's, in the same batched call
     assertThat(postedBy.get("profileImageUrl"), is(PROFILE_IMAGE_URL));
 
     @SuppressWarnings("unchecked")
@@ -1056,10 +1051,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
                 }""".formatted(USER_ID, USERNAME, EMAIL)));
   }
 
-  /**
-   * lynq-file-storage signs a batch of download URLs in one call; this covers every file the suite
-   * seeds, so any endpoint that renders images or resumes gets a URL back.
-   */
   private void stubFileStorageDownloadUrls() {
     lynqFileStorageMock.when(request().withMethod("POST").withPath(FILE_STORAGE_DOWNLOAD_URLS_PATH))
         .respond(response()
@@ -1080,6 +1071,8 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .respond(downloadUrlResponse(PROFILE_FILE_ID, PROFILE_IMAGE_URL));
     lynqFileStorageMock.when(request().withMethod("GET").withPath("/dmz/files/" + COMPANY_FILE_ID + "/download-url"))
         .respond(downloadUrlResponse(COMPANY_FILE_ID, COMPANY_PROFILE_IMAGE_URL));
+    lynqFileStorageMock.when(request().withMethod("GET").withPath("/dmz/files/" + RESUME_FILE_ID + "/download-url"))
+        .respond(downloadUrlResponse(RESUME_FILE_ID, RESUME_PDF_URL));
   }
 
   private org.mockserver.model.HttpResponse downloadUrlResponse(String fileId, String downloadUrl) {
@@ -1207,10 +1200,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     return request;
   }
 
-  // ---------------------------------------------------------------------------
-  // Job upskilling-suggestion (authenticated candidate; no ownership required)
-  // ---------------------------------------------------------------------------
-
   @Test
   void upskillingSuggestionBuildsRequestFromDbProxiesToMlWithHeadersAndReturnsSuggestions()
       throws Exception {
@@ -1235,15 +1224,12 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     List<Map<String, Object>> suggestions = (List<Map<String, Object>>) data.get("suggestions");
     assertThat(suggestions.get(0).get("query"), is(UPSKILLING_QUERY));
 
-    // the authenticated candidate + the job's company are forwarded as identity
-    // headers, and the payload is built from the DB (job + user)
     lynqMlMock.verify(request()
         .withMethod("POST")
         .withPath(ML_UPSKILLING_PATH)
         .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID)
         .withHeader(USER_ID_HEADER, USER_ID)
         .withHeader(COMPANY_ID_HEADER, COMPANY_ID)
-        // no ?language on the request → the endpoint defaults the header to "en"
         .withHeader(OUTPUT_LANGUAGE_HEADER, "en")
         .withBody(subString("\"candidate\"")));
   }
@@ -1258,8 +1244,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     HttpResponse<String> response = getUpskillingSuggestion(JOB_ID, "es");
 
     assertThat(response.statusCode(), is(200));
-    // the ?language=es query param is forwarded to lynq-ml as the output-language
-    // header so the explanation and reasons come back in the caller's UI language
     lynqMlMock.verify(request()
         .withMethod("POST")
         .withPath(ML_UPSKILLING_PATH)
@@ -1307,10 +1291,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     lynqMlMock.verify(request().withPath(ML_UPSKILLING_PATH), VerificationTimes.exactly(0));
   }
 
-  // ---------------------------------------------------------------------------
-  // Job candidate-explanation (AI evaluation)
-  // ---------------------------------------------------------------------------
-
   @Test
   void candidateExplanationBuildsRequestFromDbProxiesToMlWithHeadersAndReturnsRecommendation()
       throws Exception {
@@ -1337,7 +1317,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(strengths, contains(CANDIDATE_STRENGTH));
     assertThat(concerns, contains(CANDIDATE_CONCERN));
 
-    // the backend fills the lynq-ml payload from the DB (job + candidate) and forwards identity
     lynqMlMock.verify(request()
         .withMethod("POST")
         .withPath(ML_CANDIDATE_EXPLANATION_PATH)
@@ -1392,10 +1371,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     lynqMlMock.verify(request().withPath(ML_CANDIDATE_EXPLANATION_PATH), VerificationTimes.exactly(0));
   }
 
-  // ---------------------------------------------------------------------------
-  // Job increase-seen
-  // ---------------------------------------------------------------------------
-
   @Test
   void increaseSeenIncrementsCounterAndReturnsUpdatedValue() throws Exception {
     stubIamUserInfo();
@@ -1445,10 +1420,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(response.statusCode(), is(401));
     assertThat(jobPostRepository.findById(JOB_ID).orElseThrow().getTotalSeen(), is(INITIAL_SEEN));
   }
-
-  // ---------------------------------------------------------------------------
-  // Job apply
-  // ---------------------------------------------------------------------------
 
   @Test
   void applyToJobPersistsApplicationAndReturnsCreated() throws Exception {
@@ -1508,10 +1479,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(parse(response.body()).get("success"), is(false));
     assertThat(userApplicationJobRepository.count(), is(0L));
   }
-
-  // ---------------------------------------------------------------------------
-  // Job candidates
-  // ---------------------------------------------------------------------------
 
   @Test
   @SuppressWarnings("unchecked")
@@ -1617,10 +1584,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(parse(response.body()).get("success"), is(false));
   }
 
-  // ---------------------------------------------------------------------------
-  // User resumes
-  // ---------------------------------------------------------------------------
-
   @Test
   @SuppressWarnings("unchecked")
   void getUserResumesReturnsJsonAndPdfLinkForCandidate() throws Exception {
@@ -1682,9 +1645,87 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(parse(response.body()).get("success"), is(false));
   }
 
-  // ---------------------------------------------------------------------------
-  // Helpers for the merged endpoints
-  // ---------------------------------------------------------------------------
+  @Test
+  @SuppressWarnings("unchecked")
+  void updateResumeAliasAssignsAliasAndReturnsUpdatedResume() throws Exception {
+    stubIamUserInfo();
+    seedCandidateUser();
+    seedResume();
+
+    HttpResponse<String> response = putResumeAlias(RESUME_ID, RESUME_ALIAS);
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> body = parse(response.body());
+    assertThat(body.get("success"), is(true));
+
+    Map<String, Object> data = (Map<String, Object>) body.get("data");
+    assertThat(data.get("id"), is(RESUME_ID));
+    assertThat(data.get("alias"), is(RESUME_ALIAS));
+    assertThat(data.get("name"), is(RESUME_NAME));
+    assertThat(data.get("pdfUrl"), is(RESUME_PDF_URL));
+
+    UserResumeEntity persisted = userResumeRepository.findById(RESUME_ID).orElseThrow();
+    assertThat(persisted.getAlias(), is(RESUME_ALIAS));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void updateResumeAliasOverridesThePreviousAlias() throws Exception {
+    stubIamUserInfo();
+    seedCandidateUser();
+    seedResume();
+    putResumeAlias(RESUME_ID, RESUME_ALIAS);
+
+    HttpResponse<String> response = putResumeAlias(RESUME_ID, RESUME_ALIAS_OVERRIDE);
+
+    assertThat(response.statusCode(), is(200));
+    Map<String, Object> data = (Map<String, Object>) parse(response.body()).get("data");
+    assertThat(data.get("alias"), is(RESUME_ALIAS_OVERRIDE));
+
+    UserResumeEntity persisted = userResumeRepository.findById(RESUME_ID).orElseThrow();
+    assertThat(persisted.getAlias(), is(RESUME_ALIAS_OVERRIDE));
+  }
+
+  @Test
+  void updateResumeAliasReturnsBadRequestWhenAliasIsBlank() throws Exception {
+    stubIamUserInfo();
+    seedCandidateUser();
+    seedResume();
+
+    HttpResponse<String> response = putResumeAlias(RESUME_ID, "   ");
+
+    assertThat(response.statusCode(), is(400));
+    assertThat(parse(response.body()).get("success"), is(false));
+    UserResumeEntity persisted = userResumeRepository.findById(RESUME_ID).orElseThrow();
+    assertThat(persisted.getAlias(), is(nullValue()));
+  }
+
+  @Test
+  void updateResumeAliasReturnsBadRequestWhenUserIsNotCandidate() throws Exception {
+    stubIamUserInfo();
+    seedUser(UserType.COMPANY);
+    seedResume();
+
+    HttpResponse<String> response = putResumeAlias(RESUME_ID, RESUME_ALIAS);
+
+    assertThat(response.statusCode(), is(400));
+    assertThat(parse(response.body()).get("success"), is(false));
+  }
+
+  @Test
+  void updateResumeAliasReturnsNotFoundWhenResumeBelongsToAnotherUser() throws Exception {
+    stubIamUserInfo();
+    seedCandidateUser();
+    seedCandidate(OTHER_USER_ID, CANDIDATE_A_NAME, CANDIDATE_A_POSITION);
+    seedResumeFor(OTHER_USER_ID);
+
+    HttpResponse<String> response = putResumeAlias(RESUME_ID, RESUME_ALIAS);
+
+    assertThat(response.statusCode(), is(404));
+    assertThat(parse(response.body()).get("success"), is(false));
+    UserResumeEntity persisted = userResumeRepository.findById(RESUME_ID).orElseThrow();
+    assertThat(persisted.getAlias(), is(nullValue()));
+  }
 
   private void seedUser(UserType type) {
     userRepository.save(UserEntity.builder()
@@ -1772,7 +1813,11 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   private void seedResume() {
-    UserEntity user = userRepository.findById(USER_ID).orElseThrow();
+    seedResumeFor(USER_ID);
+  }
+
+  private void seedResumeFor(String userId) {
+    UserEntity user = userRepository.findById(userId).orElseThrow();
     userResumeRepository.save(UserResumeEntity.builder()
         .id(RESUME_ID)
         .name(RESUME_NAME)
@@ -1823,6 +1868,19 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
         .header(REQUEST_UUID_HEADER, REQUEST_UUID)
         .GET()
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> putResumeAlias(String resumeId, String alias) throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create("http://localhost:" + port + CONTEXT_PATH + RESUME_PATH + "/" + resumeId
+            + "/alias"))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .method("PUT", HttpRequest.BodyPublishers.ofString(
+            "{\"alias\": \"%s\"}".formatted(alias)))
         .build();
     return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
   }
@@ -1946,8 +2004,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private void seedCompanyOwnerWithJob(List<String> skills) {
     seedCompanyOwnerWithCompany();
     seedJobOwnedBy(userRepository.findById(USER_ID).orElseThrow(), skills);
-    // Link the seeded job to the owner's company so its company id is available
-    // (the upskilling endpoint forwards the job's company id to lynq-ml).
     JobPostEntity job = jobPostRepository.findById(JOB_ID).orElseThrow();
     job.setCompany(companyRepository.findById(COMPANY_ID).orElseThrow());
     jobPostRepository.save(job);

@@ -176,9 +176,86 @@ variable "jwt_secret" {
   default     = ""
 }
 
-variable "openai_api_key" {
-  description = "OpenAI API key for lynq-ml (only if LLM_PROVIDER=openai)."
+variable "bedrock_model_id" {
+  description = <<-EOT
+    Bedrock model id lynq-ml calls through the Converse API (only if
+    LLM_PROVIDER=bedrock). Any Converse-capable model works, e.g.
+    anthropic.claude-sonnet-4-5-20250929-v1:0, amazon.nova-pro-v1:0 or
+    meta.llama3-3-70b-instruct-v1:0.
+  EOT
   type        = string
-  sensitive   = true
-  default     = ""
+  default     = "amazon.nova-pro-v1:0"
+}
+
+variable "bedrock_region" {
+  description = "Region whose Bedrock endpoint lynq-ml calls (the model must be enabled there)."
+  type        = string
+  default     = "us-east-1"
+}
+
+# ---------------------------------------------------------------------------
+# EKS cluster and EC2 worker nodes (eks.tf).
+# ---------------------------------------------------------------------------
+variable "eks_cluster_name" {
+  description = "Name of the EKS cluster (also prefixes its IAM roles and node group)."
+  type        = string
+  default     = "lynq-eks"
+}
+
+variable "eks_kubernetes_version" {
+  description = "Kubernetes minor version for the control plane. Check it is still supported before applying."
+  type        = string
+  default     = "1.32"
+}
+
+variable "eks_subnet_ids" {
+  description = "Subnets for the control plane ENIs and the worker nodes. At least two, in different AZs, in the same VPC as vpc_id."
+  type        = list(string)
+}
+
+variable "eks_public_access_cidrs" {
+  description = "CIDRs allowed to reach the public Kubernetes API endpoint. Narrow this to your IP for a private setup."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "eks_node_instance_type" {
+  description = "EC2 instance type for the worker nodes. t3.medium fits the 6 services plus the system pods (17-pod ENI ceiling)."
+  type        = string
+  default     = "t3.medium"
+}
+
+variable "eks_node_capacity_type" {
+  description = "ON_DEMAND or SPOT. SPOT is ~70% cheaper but AWS can reclaim the node with two minutes' notice."
+  type        = string
+  default     = "ON_DEMAND"
+
+  validation {
+    condition     = contains(["ON_DEMAND", "SPOT"], var.eks_node_capacity_type)
+    error_message = "eks_node_capacity_type must be ON_DEMAND or SPOT."
+  }
+}
+
+variable "eks_node_disk_size" {
+  description = "EBS volume size (GiB) per worker node."
+  type        = number
+  default     = 20
+}
+
+variable "eks_node_desired_size" {
+  description = "Worker nodes to run. Two keeps CoreDNS and the ALB controller on separate nodes."
+  type        = number
+  default     = 2
+}
+
+variable "eks_node_min_size" {
+  description = "Minimum worker nodes."
+  type        = number
+  default     = 2
+}
+
+variable "eks_node_max_size" {
+  description = "Maximum worker nodes the group may scale to."
+  type        = number
+  default     = 3
 }

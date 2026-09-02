@@ -1,6 +1,7 @@
 package com.lynq.backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lynq.backend.controller.request.CreateResumeRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.enums.JobStatus;
@@ -8,11 +9,15 @@ import com.lynq.backend.enums.Language;
 import com.lynq.backend.enums.UserType;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.NotFoundException;
+import com.lynq.backend.controller.response.GetSupportedLanguageRestResponse;
 import com.lynq.backend.model.CompanyEntity;
+import com.lynq.backend.model.SupportedLanguageEntity;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.model.UserResumeEntity;
+import com.lynq.backend.controller.response.DeleteResumeRestResponse;
 import com.lynq.backend.model.UserSkillsEntity;
+import com.lynq.backend.model.UserSimilarityTagEntity;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.controller.response.UserApplicationResponse;
@@ -20,6 +25,7 @@ import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
 import com.lynq.backend.repository.UserApplicationJobRepository;
 import com.lynq.backend.repository.UserRepository;
+import com.lynq.backend.repository.SupportedLanguageRepository;
 import com.lynq.backend.repository.UserResumeRepository;
 import com.lynq.backend.repository.projection.UserApplicationProjection;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,6 +51,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -83,6 +90,15 @@ class UserServiceTest {
   private static final String RESUME_JSON = "{\"summary\":\"Backend engineer\",\"years\":8}";
   private static final String RESUME_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42";
   private static final String RESUME_PDF_URL = "https://presigned/cv.pdf";
+  private static final Map<String, Object> RESUME_CONTENT = Map.of("summary", "Backend engineer");
+  private static final Map<String, Object> RESUME_WITH_SKILLS = Map.of(
+      "summary", "Backend engineer",
+      "skills", Map.of(
+          "technical", List.of("Java", "RabbitMQ"),
+          "tools", List.of("Docker"),
+          "soft", List.of("Leadership")));
+  private static final List<String> RESUME_TAGS =
+      List.of("Backend Development", "Asynchronous Messaging");
 
   private static final String COMPANY_ID = "company-1";
   private static final String COMPANY_NAME = "Lynq";
@@ -121,6 +137,9 @@ class UserServiceTest {
   private UserApplicationJobRepository userApplicationJobRepository;
 
   @Mock
+  private SupportedLanguageRepository supportedLanguageRepository;
+
+  @Mock
   private UpdateUserProfileRequest updateRequest;
 
   @Mock
@@ -133,7 +152,8 @@ class UserServiceTest {
   @BeforeEach
   void setUp() {
     userService = new UserService(userRepository, userResumeRepository, companyRepository,
-        jobPostRepository, userApplicationJobRepository, fileStorageService, objectMapper);
+        jobPostRepository, userApplicationJobRepository, supportedLanguageRepository,
+        fileStorageService, objectMapper);
   }
 
   @Test
@@ -192,21 +212,16 @@ class UserServiceTest {
 
   @Test
   void obtainProfileImagePreSignedUrlSignsTheStoredFileId() {
-    UserEntity existing = existingUser();
-    existing.setLynqFileStorageId(FILE_ID);
     when(fileStorageService.obtainDownloadUrl(FILE_ID)).thenReturn(PRE_SIGNED_URL);
 
-    String result = userService.obtainProfileImagePreSignedUrl(existing);
+    String result = userService.obtainProfileImagePreSignedUrl(FILE_ID);
 
     assertThat(result, is(PRE_SIGNED_URL));
   }
 
   @Test
   void obtainProfileImagePreSignedUrlReturnsNullWhenImageAbsent() {
-    UserEntity existing = existingUser();
-    existing.setLynqFileStorageId(null);
-
-    String result = userService.obtainProfileImagePreSignedUrl(existing);
+    String result = userService.obtainProfileImagePreSignedUrl(null);
 
     assertThat(result, is(org.hamcrest.Matchers.nullValue()));
   }
@@ -420,6 +435,151 @@ class UserServiceTest {
   }
 
   @Test
+  void createResumePersistsTheResumePointingAtThePreviewedPdf() {
+    UserEntity candidate = candidate();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
+    when(fileStorageService.obtainDownloadUrl(RESUME_FILE_ID)).thenReturn(RESUME_PDF_URL);
+
+    GetUserResumeRestResponse result = userService.createResume(USER_ID, createRequest());
+
+    ArgumentCaptor<UserResumeEntity> captor = ArgumentCaptor.forClass(UserResumeEntity.class);
+    verify(userResumeRepository).save(captor.capture());
+    UserResumeEntity saved = captor.getValue();
+    assertThat(saved.getId(), is(notNullValue()));
+    assertThat(saved.getName(), is(RESUME_NAME));
+    assertThat(saved.getLanguage(), is(RESUME_LANGUAGE));
+    assertThat(saved.getCreatedOn(), is(LocalDate.now(ZoneOffset.UTC)));
+    assertThat(saved.getLynqFileStorageId(), is(RESUME_FILE_ID));
+    assertThat(saved.getUser(), is(sameInstance(candidate)));
+    assertThat(saved.getResume(), is("{\"summary\":\"Backend engineer\"}"));
+
+    assertThat(result.getName(), is(RESUME_NAME));
+    assertThat(result.getPdfUrl(), is(RESUME_PDF_URL));
+    @SuppressWarnings("unchecked")
+    Map<String, Object> resumeJson = (Map<String, Object>) result.getResume();
+    assertThat(resumeJson.get("summary"), is("Backend engineer"));
+  }
+
+  @Test
+  void createResumeFeedsTheCandidateSkillsAndTagsTheLynqScoreMatchesOn() {
+    UserEntity candidate = candidate();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
+    when(fileStorageService.obtainDownloadUrl(RESUME_FILE_ID)).thenReturn(RESUME_PDF_URL);
+
+    userService.createResume(USER_ID, requestWithSkills());
+
+    assertThat(candidate.getSkills().stream().map(UserSkillsEntity::getSkill).toList(),
+        contains("Java", "RabbitMQ", "Docker"));
+    assertThat(candidate.getSimilarityTags().stream().map(UserSimilarityTagEntity::getSimilarityTag).toList(),
+        contains("Backend Development", "Asynchronous Messaging"));
+    verify(userRepository).save(candidate);
+  }
+
+  @Test
+  void createResumeAddsToTheSkillsTheCandidateAlreadyHasInsteadOfReplacingThem() {
+    UserEntity candidate = candidate();
+    candidate.getSkills().add(UserSkillsEntity.builder()
+        .id("existing-skill").user(candidate).skill("java").build());
+    candidate.getSimilarityTags().add(UserSimilarityTagEntity.builder()
+        .id("existing-tag").user(candidate).similarityTag("Backend Development").build());
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
+    when(fileStorageService.obtainDownloadUrl(RESUME_FILE_ID)).thenReturn(RESUME_PDF_URL);
+
+    userService.createResume(USER_ID, requestWithSkills());
+
+    assertThat(candidate.getSkills().stream().map(UserSkillsEntity::getSkill).toList(),
+        contains("java", "RabbitMQ", "Docker"));
+    assertThat(candidate.getSimilarityTags().stream().map(UserSimilarityTagEntity::getSimilarityTag).toList(),
+        contains("Backend Development", "Asynchronous Messaging"));
+  }
+
+  @Test
+  void createResumeLeavesTheCandidateSkillsAloneWhenTheResumeCarriesNone() {
+    UserEntity candidate = candidate();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
+    when(fileStorageService.obtainDownloadUrl(RESUME_FILE_ID)).thenReturn(RESUME_PDF_URL);
+
+    userService.createResume(USER_ID, createRequest());
+
+    assertThat(candidate.getSkills(), is(empty()));
+    assertThat(candidate.getSimilarityTags(), is(empty()));
+  }
+
+  @Test
+  void createResumeThrowsBadRequestWhenThePdfAlreadyBacksAnotherResume() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
+    when(userResumeRepository.findByUserId(USER_ID))
+        .thenReturn(List.of(resume(RESUME_JSON, RESUME_FILE_ID)));
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> userService.createResume(USER_ID, createRequest()));
+    assertThat(exception.getMessage(),
+        is("File '" + RESUME_FILE_ID + "' already backs one of the user's resumes"));
+    verify(userResumeRepository, never()).save(any());
+  }
+
+  @Test
+  void createResumeThrowsBadRequestWhenUserIsNotCandidate() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(companyOwner()));
+
+    assertThrows(BadRequestException.class, () -> userService.createResume(USER_ID, createRequest()));
+    verify(userResumeRepository, never()).save(any());
+  }
+
+  @Test
+  void deleteResumeRemovesItAndHandsBackThePdfForTheGatewayToDrop() {
+    UserResumeEntity resume = resume(RESUME_JSON, RESUME_FILE_ID);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of(resume));
+
+    DeleteResumeRestResponse deleted = userService.deleteResume(USER_ID, resume.getId());
+
+    verify(userResumeRepository).delete(resume);
+    assertThat(deleted.getId(), is(resume.getId()));
+    assertThat(deleted.getFileId(), is(RESUME_FILE_ID));
+  }
+
+  @Test
+  void deleteResumeKeepsTheCandidateSkills() {
+    UserEntity candidate = candidate();
+    candidate.getSkills().add(UserSkillsEntity.builder()
+        .id("skill-1").user(candidate).skill("Java").build());
+    UserResumeEntity resume = resume(RESUME_JSON, RESUME_FILE_ID);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of(resume));
+
+    userService.deleteResume(USER_ID, resume.getId());
+
+    assertThat(candidate.getSkills().stream().map(UserSkillsEntity::getSkill).toList(),
+        contains("Java"));
+  }
+
+  @Test
+  void deleteResumeThrowsNotFoundWhenItBelongsToAnotherCandidate() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> userService.deleteResume(USER_ID, "someone-elses-resume"));
+
+    assertThat(exception.getMessage(), is("Resume 'someone-elses-resume' not found"));
+    verify(userResumeRepository, never()).delete(any());
+  }
+
+  @Test
+  void deleteResumeThrowsBadRequestWhenUserIsNotCandidate() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(companyOwner()));
+
+    assertThrows(BadRequestException.class,
+        () -> userService.deleteResume(USER_ID, "any-resume"));
+    verify(userResumeRepository, never()).delete(any());
+  }
+
+  @Test
   void getUserResumesMapsEntitiesWithParsedJsonAndPresignedPdfUrl() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
     when(userResumeRepository.findByUserId(USER_ID))
@@ -465,6 +625,28 @@ class UserServiceTest {
     GetUserResumeRestResponse response = userService.getUserResumes(USER_ID).get(0);
 
     assertThat(response.getResume(), is(nullValue()));
+  }
+
+  @Test
+  void getSupportedResumeLanguagesReturnsEveryRowAsCodeAndName() {
+    when(supportedLanguageRepository.findAll()).thenReturn(List.of(
+        SupportedLanguageEntity.builder().code("EN").name("English").build(),
+        SupportedLanguageEntity.builder().code("ES").name("Español").build()));
+
+    List<GetSupportedLanguageRestResponse> languages = userService.getSupportedResumeLanguages();
+
+    assertThat(languages, hasSize(2));
+    assertThat(languages.get(0).getCode(), is("EN"));
+    assertThat(languages.get(0).getName(), is("English"));
+    assertThat(languages.get(1).getCode(), is("ES"));
+    assertThat(languages.get(1).getName(), is("Español"));
+  }
+
+  @Test
+  void getSupportedResumeLanguagesReturnsEmptyWhenTableIsEmpty() {
+    when(supportedLanguageRepository.findAll()).thenReturn(List.of());
+
+    assertThat(userService.getSupportedResumeLanguages(), is(empty()));
   }
 
   @Test
@@ -569,25 +751,23 @@ class UserServiceTest {
 
   @Test
   void obtainOwnedCompanyIdReturnsCompanyIdWhenCompanyOwnerOwnsACompany() {
-    UserEntity owner = companyOwner();
-    CompanyEntity company = CompanyEntity.builder().id(COMPANY_ID).owner(owner).build();
-    when(companyRepository.findByOwner(owner)).thenReturn(Optional.of(company));
+    CompanyEntity company = CompanyEntity.builder().id(COMPANY_ID).build();
+    when(companyRepository.findByOwnerId(USER_ID)).thenReturn(Optional.of(company));
 
-    assertThat(userService.obtainOwnedCompanyId(owner), is(COMPANY_ID));
+    assertThat(userService.obtainOwnedCompanyId(USER_ID, UserType.COMPANY), is(COMPANY_ID));
   }
 
   @Test
   void obtainOwnedCompanyIdReturnsNullWhenCompanyOwnerOwnsNoCompany() {
-    UserEntity owner = companyOwner();
-    when(companyRepository.findByOwner(owner)).thenReturn(Optional.empty());
+    when(companyRepository.findByOwnerId(USER_ID)).thenReturn(Optional.empty());
 
-    assertThat(userService.obtainOwnedCompanyId(owner), is(nullValue()));
+    assertThat(userService.obtainOwnedCompanyId(USER_ID, UserType.COMPANY), is(nullValue()));
   }
 
   @Test
   void obtainOwnedCompanyIdReturnsNullForNonCompanyUserWithoutQueryingCompanies() {
-    assertThat(userService.obtainOwnedCompanyId(candidate()), is(nullValue()));
-    verify(companyRepository, never()).findByOwner(any());
+    assertThat(userService.obtainOwnedCompanyId(USER_ID, UserType.CANDIDATE), is(nullValue()));
+    verify(companyRepository, never()).findByOwnerId(any());
   }
 
   @Test
@@ -625,7 +805,41 @@ class UserServiceTest {
     UserApplicationResponse application =
         userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE).getContent().get(0);
 
-    // Candidate has [java, kotlin]; job requires [Java, Python] -> 1 of 2 skills match.
+    assertThat(application.getLynqScore(), is(50));
+  }
+
+  @Test
+  void getUserApplicationsScoresLynqOnTheCapabilityTagsWhenTheyMatchBetterThanTheSkills() {
+    UserEntity candidate = candidate();
+    candidate.setSkills(List.of(UserSkillsEntity.builder().skill("Java").build()));
+    candidate.setSimilarityTags(List.of(
+        UserSimilarityTagEntity.builder().similarityTag("Backend Development").build(),
+        UserSimilarityTagEntity.builder().similarityTag("Asynchronous Messaging").build()));
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
+    when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
+        .thenReturn(new PageImpl<>(List.of(new UserApplicationProjection(
+            APPLICATION_ID, JOB_ID, JOB_TITLE, JOB_DESCRIPTION, COMPANY_ID, COMPANY_NAME, null,
+            APPLIED_ON, "Java,Kafka,Terraform",
+            "Backend Development,Asynchronous Messaging")), DEFAULT_PAGEABLE, 1));
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
+
+    UserApplicationResponse application =
+        userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE).getContent().get(0);
+
+    assertThat(application.getLynqScore(), is(100));
+  }
+
+  @Test
+  void getUserApplicationsKeepsTheSkillScoreWhenTheJobCarriesNoTags() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateWithSkills()));
+    when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
+        .thenReturn(new PageImpl<>(List.of(applicationProjection(APPLICATION_ID, null)),
+            DEFAULT_PAGEABLE, 1));
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
+
+    UserApplicationResponse application =
+        userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE).getContent().get(0);
+
     assertThat(application.getLynqScore(), is(50));
   }
 
@@ -717,7 +931,7 @@ class UserServiceTest {
 
   private UserApplicationProjection applicationProjection(String id, String companyImagePath) {
     return new UserApplicationProjection(id, JOB_ID, JOB_TITLE, JOB_DESCRIPTION, COMPANY_ID,
-        COMPANY_NAME, companyImagePath, APPLIED_ON, JOB_SKILLS_CSV);
+        COMPANY_NAME, companyImagePath, APPLIED_ON, JOB_SKILLS_CSV, null);
   }
 
   private UserEntity candidateWithSkills() {
@@ -726,6 +940,22 @@ class UserServiceTest {
         UserSkillsEntity.builder().skill("java").build(),
         UserSkillsEntity.builder().skill("kotlin").build()));
     return candidate;
+  }
+
+  private CreateResumeRequest requestWithSkills() {
+    CreateResumeRequest request = createRequest();
+    request.setResume(RESUME_WITH_SKILLS);
+    request.setSimilarityTags(RESUME_TAGS);
+    return request;
+  }
+
+  private CreateResumeRequest createRequest() {
+    CreateResumeRequest request = new CreateResumeRequest();
+    request.setName(RESUME_NAME);
+    request.setLanguage(RESUME_LANGUAGE);
+    request.setResume(RESUME_CONTENT);
+    request.setFileId(RESUME_FILE_ID);
+    return request;
   }
 
   private UserEntity candidate() {

@@ -14,10 +14,7 @@
   padding: 32px;
   gap: 28px;
   text-align: initial;
-  background:
-    radial-gradient(ellipse at top left, #efeafc 0%, transparent 45%),
-    radial-gradient(ellipse at bottom right, #e8f1fc 0%, transparent 45%),
-    #f7f6fb;
+  background: var(--page-bg);
 }
 
 /* Centered LYNQ banner + search. */
@@ -28,7 +25,13 @@
   gap: 20px;
 }
 
+/* Mark + wordmark as one lockup (LynqTitle inline placement), same as the
+   register card's. The mark is set above the cap height so it reads as the brand
+   rather than as a letter, and background-clip:text paints the gradient only
+   into the glyphs — the mark is a child element, so it keeps its own logo colors
+   instead of being erased by `color: transparent`. */
 .home-banner {
+  --lynq-logo-size: 1.25em;
   margin: 0;
   font-size: 35px;
   font-weight: 800;
@@ -38,6 +41,12 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* The 2px tracking above opens up the wordmark's letters; on the mark it would
+   only push it off the L. */
+.home-banner .lynq-logo {
+  letter-spacing: normal;
 }
 
 .home-search {
@@ -58,7 +67,7 @@
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 999px;
-  box-shadow: 0 6px 18px rgba(80, 60, 150, 0.06);
+  box-shadow: var(--shadow-sm);
   transition: border-color 0.15s ease;
 }
 
@@ -119,7 +128,7 @@
   border: 1px solid var(--accent-border);
   border-radius: 999px;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(80, 60, 150, 0.06);
+  box-shadow: var(--shadow-sm);
   transition:
     background 0.15s ease,
     opacity 0.15s ease;

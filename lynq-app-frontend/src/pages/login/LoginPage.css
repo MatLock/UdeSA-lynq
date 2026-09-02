@@ -8,10 +8,7 @@
   justify-content: center;
   padding: 24px;
   overflow: auto;
-  background:
-    radial-gradient(ellipse at top left, #efeafc 0%, transparent 45%),
-    radial-gradient(ellipse at bottom right, #e8f1fc 0%, transparent 45%),
-    #f7f6fb;
+  background: var(--page-bg);
 }
 
 /* Soft brand blobs in opposite corners. */
@@ -28,7 +25,7 @@
   left: -140px;
   width: 380px;
   height: 380px;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.18), transparent 70%);
+  background: radial-gradient(circle, rgb(var(--brand-violet-rgb) / 0.18), transparent 70%);
 }
 
 .login-bg::after {
@@ -36,7 +33,7 @@
   right: -140px;
   width: 400px;
   height: 400px;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.18), transparent 70%);
+  background: radial-gradient(circle, rgb(var(--brand-teal-rgb) / 0.22), transparent 70%);
 }
 
 /* Dotted grids, top-left and bottom-right. */
@@ -47,7 +44,7 @@
   pointer-events: none;
   background-image: radial-gradient(
     circle,
-    rgba(56, 189, 248, 0.45) 1.5px,
+    rgb(var(--brand-teal-rgb) / 0.5) 1.5px,
     transparent 1.5px
   );
   background-size: 16px 16px;
@@ -75,11 +72,17 @@
   padding: 32px;
   background: #fff;
   border-radius: 20px;
-  box-shadow: 0 20px 60px rgba(80, 60, 150, 0.12);
+  box-shadow: var(--shadow-modal);
   text-align: center;
 }
 
+/* The brand mark leads this line (LynqTitle placement="leading"), so it is
+   sized a touch above the cap height to read as the anchor of the heading
+   rather than as a character in it. background-clip:text only paints the
+   gradient into the glyphs — the mark is a child element, so it keeps its own
+   logo colors instead of being clipped away by `color: transparent`. */
 .login-title {
+  --lynq-logo-size: 1.2em;
   background: var(--brand-gradient);
   -webkit-background-clip: text;
   background-clip: text;
@@ -127,12 +130,12 @@
 }
 
 .tone-blue {
-  background: rgba(56, 189, 248, 0.12);
+  background: rgb(var(--brand-teal-rgb) / 0.16);
   color: var(--brand-blue-dark);
 }
 
 .tone-purple {
-  background: rgba(168, 85, 247, 0.12);
+  background: rgb(var(--brand-violet-rgb) / 0.1);
   color: var(--brand-purple);
 }
 
@@ -178,11 +181,11 @@
 }
 
 .login-form input[aria-invalid='true'] {
-  border-color: #ef4444;
+  border-color: var(--danger);
 }
 
 .login-form input[aria-invalid='true']:focus {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+  box-shadow: 0 0 0 3px var(--danger-ring);
 }
 
 .login-eye {
@@ -203,7 +206,7 @@
 }
 
 .login-error {
-  color: #ef4444;
+  color: var(--danger-ink);
   font-size: 12px;
   margin: 0;
 }

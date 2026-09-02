@@ -6,9 +6,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * A short-lived pre-signed URL issued by lynq-file-storage for reading a single stored file.
- */
 @Getter
 @Setter
 @NoArgsConstructor

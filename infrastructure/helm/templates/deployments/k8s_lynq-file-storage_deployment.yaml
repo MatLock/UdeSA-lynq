@@ -32,6 +32,10 @@ spec:
       containers:
         - name: lynq-file-storage
           image: {{ .Values.lynq_file_storage.image }}
+          {{- with .Values.lynq_file_storage.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           envFrom:
             - configMapRef:
                 name: lynq-file-storage-config

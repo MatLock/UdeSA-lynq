@@ -16,18 +16,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-/**
- * Every file the platform stores lives in lynq-file-storage: it owns the bucket, the object keys
- * and the metadata, and this service only keeps the file ids it hands back. Nothing here talks to
- * S3 directly.
- */
 @Service
 public class FileStorageService {
 
-  /** Set by {@code RequestUuidFilter} from the incoming {@code lynq-request-uuid} header. */
   private static final String MDC_REQUEST_ID = "requestId";
 
-  /** lynq-file-storage signs at most this many download URLs per call. */
   private static final int DOWNLOAD_BATCH_SIZE = 100;
 
   private final LynqFileStorageClient lynqFileStorageClient;
@@ -48,19 +41,11 @@ public class FileStorageService {
     return new RegisteredUpload(response.getFileId(), response.getUploadUrl());
   }
 
-  /**
-   * Promotes a file to AVAILABLE once the browser has finished the pre-signed PUT. lynq-file-storage
-   * rejects the call while the object is still missing from the bucket.
-   */
   @AuditLog
   public void confirmUpload(String fileId) {
     lynqFileStorageClient.confirmUpload(fileId, requestUuid(), authenticatedUserId());
   }
 
-  /**
-   * Signs a read URL for a stored file, or returns {@code null} when the owning record has no file
-   * attached, which is the common case for users and companies without a profile image.
-   */
   @AuditLog
   public String obtainDownloadUrl(String fileId) {
     if (isBlank(fileId)) {
@@ -71,11 +56,6 @@ public class FileStorageService {
         .getDownloadUrl();
   }
 
-  /**
-   * Signs read URLs for a whole page of records in as few round-trips as possible, keyed by file
-   * id. Blank ids are dropped before the call and ids lynq-file-storage does not know are simply
-   * absent from the result, so callers get {@code null} for them.
-   */
   @AuditLog
   public Map<String, String> obtainDownloadUrls(Collection<String> fileIds) {
     List<String> distinctIds = fileIds.stream()
@@ -106,10 +86,6 @@ public class FileStorageService {
     return value == null || value.isBlank();
   }
 
-  /**
-   * Forwards the uuid of the request being served so lynq-file-storage logs land under the same
-   * correlation id. Calls made outside a request (tests, scheduled work) get a fresh one.
-   */
   private static String requestUuid() {
     String requestUuid = MDC.get(MDC_REQUEST_ID);
     return isBlank(requestUuid) ? UUID.randomUUID().toString() : requestUuid;

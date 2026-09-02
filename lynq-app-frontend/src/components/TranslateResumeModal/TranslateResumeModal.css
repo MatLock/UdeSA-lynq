@@ -1,0 +1,138 @@
+/* TranslateResumeModal — pick a stored resume and the language its copy is
+   written in. A native modal <dialog> portaled to <body>; the browser paints
+   the dim via ::backdrop. Mirrors ConfirmDialog's visual language; brand
+   tokens from index.css. */
+
+.translate-resume-dialog {
+  width: min(440px, calc(100vw - 48px));
+  max-width: none;
+  margin: auto;
+  padding: 0;
+  color: inherit;
+  background: #fff;
+  border: none;
+  border-radius: 16px;
+  box-shadow: var(--shadow-dialog);
+}
+
+.translate-resume-dialog::backdrop {
+  background: var(--scrim);
+  backdrop-filter: blur(2px);
+}
+
+.translate-resume-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  text-align: left;
+}
+
+.translate-resume-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.translate-resume-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+}
+
+.translate-resume-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.translate-resume-subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.translate-resume-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.translate-resume-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.translate-resume-select {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: #fff;
+}
+
+.translate-resume-select:focus {
+  outline: none;
+  border-color: var(--brand-purple-light);
+}
+
+/* Shown instead of the selects while the languages load, or when the
+   candidate already holds a resume in every supported language. */
+.translate-resume-state {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0;
+}
+
+.translate-resume-empty {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.translate-resume-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.translate-resume-button {
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-gradient);
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.translate-resume-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.translate-resume-button--ghost {
+  color: var(--text);
+  background: none;
+  border-color: var(--border);
+}
+
+.translate-resume-button--ghost:hover:not(:disabled) {
+  border-color: var(--brand-purple-light);
+  color: var(--brand-purple-dark);
+}

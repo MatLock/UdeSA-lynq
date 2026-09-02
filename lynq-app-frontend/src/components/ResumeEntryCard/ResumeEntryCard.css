@@ -1,0 +1,129 @@
+/* ResumeEntryCard — one repeatable entry inside a wizard group. The two-column
+   field grid it wraps is defined here so every entry type lays out the same. */
+
+.resume-entry-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+  transition: border-color 0.15s ease;
+}
+
+.resume-entry-card:focus-within {
+  border-color: var(--brand-purple-light);
+}
+
+/* A collapsed card is just its header, so it loses the body's breathing room. */
+.resume-entry-card--collapsed {
+  padding: 8px 10px 8px 8px;
+}
+
+/* An entry that failed validation while shut — the error itself is inside. The
+   focus-within rule above must not paint over it. */
+.resume-entry-card--invalid,
+.resume-entry-card--invalid:focus-within {
+  border-color: var(--danger);
+}
+
+.resume-entry-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* The whole header is the accordion control: a wide, obvious hit area rather
+   than a chevron the user has to aim at. */
+.resume-entry-card-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.resume-entry-card-toggle:hover {
+  background: var(--accent-bg);
+}
+
+/* Points down when the card is open, right when it is shut. */
+.resume-entry-card-chevron {
+  flex: none;
+  color: var(--brand-purple-dark);
+  transition: transform 0.15s ease;
+}
+
+.resume-entry-card--collapsed .resume-entry-card-chevron {
+  transform: rotate(-90deg);
+}
+
+.resume-entry-card-title {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--brand-purple-dark);
+}
+
+/* One-line recap of a collapsed entry; truncated rather than wrapped so every
+   shut card stays exactly one row tall. */
+.resume-entry-card-summary {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resume-entry-card-warning {
+  flex: none;
+  color: var(--danger);
+}
+
+.resume-entry-card-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.resume-entry-card-remove:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Two columns on desktop; the fields that need the full width opt in with
+   .resume-field--full (see ResumeField.css). */
+.resume-entry-card-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+@media (max-width: 700px) {
+  .resume-entry-card-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -14,12 +14,10 @@ about [string]
 size [integer]
 profile_image_url [string]
 created_on [date. format yyyy-mm-dd]
-
 constraints: 
 id primary key
 name unique
 add search index by name"
-"24-06-2026","I removed both indexes then"
 "24-06-2026","create job_posts table. columns: id [string], title [string], description [text], remote [boolean], work_type [enum, REMOTE|IN_OFFICE], salary_range_lower, salary_range_top, job_url, job_post_type [enum, LYNQ|LINKEDIN|COMPUTRABAJO|BUMERAN], created_on [date, format 'yyyy-mm-dd']"
 "24-06-2026","add new foreign key for job_posts. columns: created_by_user_id -> users.id, company_id -> companies.id"
 "24-06-2026","add job_post_skills table. columns: id [string], job_id [string], skill [string]. job_id -> job_posts[id]"
@@ -104,13 +102,9 @@ parameters:
 "30-06-2026","create S3Client bean in AppConfig.java. aws keys should be pass through application.yml and these will come via env vars. update docker for backend and docker-compose"
 "30-06-2026","create S3Client bean in AppConfig.java. aws keys should be pass through application.yml and these will come via env vars. update docker for backend and docker-compose"
 "30-06-2026","add a new property in application.yaml called aws.bucket-name"
-"30-06-2026","add a new property in application.yaml called aws.bucket-name"
 "30-06-2026","create method `createUserProfilePreSignedUrl` that takes the userEntity and a fileName as parameters. creates a s3 path and a pre-signed url so the frontend can upload the profile image"
-"30-06-2026","create method createUserProfilePreSignedUrl that takes the userEntity and a fileName as parameters. creates a s3 path and a pre-signed url so the frontend can upload the profile image"
-"30-06-2026","create method obtainUserProfilePreSignedUrl that given the userEntity. it takes the userProfileLink from userEntity and creates a pre-signed Url so the front end can use the file on the react profile image component"
 "30-06-2026","create method obtainUserProfilePreSignedUrl that given the userEntity. it takes the userProfileLink from userEntity and creates a pre-signed Url so the front end can use the file on the react profile image component"
 "30-06-2026","create endpoint in UserController ""GET /user/generate-upload-image?file-name={file_name}"" that taking the file name. generates ""profile_image_url"" with the file name. save it in the database and returns a preSignedUrl so the front-end can push the binary of the file into the s3. Also take into account that this file can be replaced in any moment in time"
-"30-06-2026","create endpoint in UserController GET /user/generate-upload-image?file-name={file_name} that taking the file name. generates profile_image_url with the file name. save it in the database and returns a preSignedUrl so the front-end can push the binary of the file into the s3. Also take into account that this file can be replaced in any moment in time"
 "30-06-2026","delete the old s3 object on replacement"
 "30-06-2026","add integration test for s3 push and obtain using testcontainer + localstack"
 "30-06-2026","remove getUserProfileImageUrl from `CreateUserRequest` in `createUser` endpoint implementation"
@@ -161,10 +155,17 @@ parameters:
 "24-07-2026","remove the user skills, add lynq-score calculation, add the job description as well"
 "26-07-2026","create new endpoint in UserController. GET ""/user/generate-upload-resume"" that given a fileName passed as a request parameter it generates an upload pre-signed url. This can only happen to user of type CANDIDATE"
 "26-07-2026","create endpoint in UserController GET ""/user/upskilling-suggestion/${job_post_id}"" that will get the jobPost application id, the userid from the auth context and will call ML endpoint /ml/upskilling-suggestion"
-"26-07-2026","instead of showing ""You are not perfect for this role"" I would like to show reasons of why. modify backend and ml endpoint if you need it""26-07-2026","commit the work done here. commit must start with preffix [lynq-app-backend]: . do not record this promtp and do not mention claude"
+"26-07-2026","instead of showing ""You are not perfect for this role"" I would like to show reasons of why. modify backend and ml endpoint if you need it"
 "27-07-2026","build passes. read the report from the last release and fix all the code smell,bug and vulneravility"
+"28-07-2026","create endpoint in MLProxyController POST "/ml/resume/skill-extraction" that takes a resumePayload and sent it over to ML service for skill extraction. It has to return the same json payload"
+"28-07-2026","change the backend feign client. language should be passed as request param. not header. also update implementation in the python ml service."
 "07-08-2026","integrate lynq-app-backend with lynq-file-storage. remove all s3 dependencies and test from lynq-app-backend. modify db migration files replace s3 key column with new column ""lynq_file_storage_id"" because all file management is handled by lynq-file-storage"
 "07-08-2026","add CI/Sonar workflow for lynq-file-storage. and include it also in the release workflow"
 "07-08-2026","add README.md for lynq-file-storage follow the same pattern as lynq-iam and lynq-app-backend"
 "07-08-2026","add a short description about lynq-file-storage in root readme and include the badges there as well."
-"07-08-2026","are k8s, helm and terraform files updated"
+"02-09-2026","add the POST /user/resume endpoint to store the resume the candidate approved. it takes name, language, resume and the fileId of the pdf that was already generated. CANDIDATE users only"
+"02-09-2026","the same fileId cannot end up linked to two different resumes, validate that on create"
+"02-09-2026","create new endpoint DELETE /dmz/user/resume/{resumeId} to delete a resume previously created"
+"02-09-2026","create a supported_languages table (liquibase changelog + entity + repository) with code and display name, seeded with the resume languages EN, ES, FR and PR. resume languages must come from the database, not from code"
+"02-09-2026","add GET /dmz/user/resume/languages endpoint returning the supported resume languages read from the supported_languages table, wrapped in the GlobalRestResponse envelope, with unit tests"
+"02-09-2026","create a way to assign an alias to a resume: alter the UI, create BFF endpoint to create/override the alias, create backend endpoint to create/override the alias and the migration required"

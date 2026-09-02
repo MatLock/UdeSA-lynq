@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
+import static org.mockserver.model.JsonBody.json;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -31,6 +32,19 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
   private static final String USER_BODY = """
       {"success": true, "data": {"id": "11111111-1111-1111-1111-111111111111"}}""";
+
+  private static final String CANDIDATE_BODY = """
+      {"success": true, "data": {"id": "11111111-1111-1111-1111-111111111111", "userType": "CANDIDATE"}}""";
+
+  private static final String COMPANY_BODY = """
+      {"success": true, "data": {"id": "11111111-1111-1111-1111-111111111111", "userType": "COMPANY"}}""";
+
+  private static final String RESUME_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
+  private static final String RESUME_ALIAS_PATH = "/dmz/user/resume/" + RESUME_ID + "/alias";
+  private static final String RESUME_ALIAS_BODY = """
+      {"alias": "Backend roles"}""";
+  private static final String RESUME_WITH_ALIAS_BODY = """
+      {"success": true, "data": {"id": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60", "alias": "Backend roles"}}""";
 
   private static final String USER_ID_HEADER = "user-id";
   private static final String COMPANY_ID_HEADER = "company-id";
@@ -192,6 +206,27 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
+  void relaysResumeSkillExtractionKeepingTheMultiSegmentPathAndLanguageParam() throws Exception {
+    String mlBody = """
+        {"success": true, "data": {"skills": ["Java"], "tools": [], "soft": []}}""";
+    lynqMlMock.when(request().withMethod("POST").withPath("/dmz/resume/skill-extraction"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(mlBody));
+
+    HttpResponse<String> response =
+        send("POST", CONTEXT_PATH + "/resume/skill-extraction?language=es", "{}");
+
+    assertThat(response.statusCode(), is(200));
+    assertThat(response.body(), is(mlBody));
+    lynqMlMock.verify(request()
+        .withPath("/dmz/resume/skill-extraction")
+        .withQueryStringParameter(Parameter.param("language", "es"))
+        .withHeader(USER_ID_HEADER, TOKEN_SUBJECT), VerificationTimes.once());
+    lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
+  }
+
+  @Test
   void refusesTheLynqMlEvaluationsThatLynqBackendOwns() throws Exception {
     for (String endpoint : new String[] {"upskilling_suggestion", "candidate-explanation"}) {
       HttpResponse<String> response = send("POST", CONTEXT_PATH + "/" + endpoint, "{}");
@@ -211,6 +246,75 @@ class LynqBffApplicationTests extends AbstractE2ETest {
       assertThat(response.body(), containsString("caller-supplied URL"));
     }
     lynqMlMock.verify(request(), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void relaysTheResumeAliasAssignmentToLynqBackend() throws Exception {
+    lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/user"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(CANDIDATE_BODY));
+    lynqBackendMock.when(request().withMethod("PUT").withPath(RESUME_ALIAS_PATH))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(RESUME_WITH_ALIAS_BODY));
+
+    HttpResponse<String> response = send(
+        "PUT", CONTEXT_PATH + "/resume/" + RESUME_ID + "/alias", RESUME_ALIAS_BODY);
+
+    assertThat(response.statusCode(), is(200));
+    assertThat(response.body(), containsString("\"alias\":\"Backend roles\""));
+    lynqBackendMock.verify(request()
+        .withMethod("PUT")
+        .withPath(RESUME_ALIAS_PATH)
+        .withHeader(AUTHORIZATION_HEADER, "Bearer " + accessToken)
+        .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .withBody(json(RESUME_ALIAS_BODY)), VerificationTimes.once());
+  }
+
+  @Test
+  void refusesTheResumeAliasWhenTheCallerIsNotACandidate() throws Exception {
+    lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/user"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(COMPANY_BODY));
+
+    HttpResponse<String> response = send(
+        "PUT", CONTEXT_PATH + "/resume/" + RESUME_ID + "/alias", RESUME_ALIAS_BODY);
+
+    assertThat(response.statusCode(), is(403));
+    assertThat(response.body(), containsString("CANDIDATE"));
+    lynqBackendMock.verify(request().withMethod("PUT").withPath(RESUME_ALIAS_PATH),
+        VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void rejectsABlankResumeAliasWithoutCallingLynqBackend() throws Exception {
+    HttpResponse<String> response = send(
+        "PUT", CONTEXT_PATH + "/resume/" + RESUME_ID + "/alias", """
+            {"alias": "   "}""");
+
+    assertThat(response.statusCode(), is(400));
+    assertThat(response.body(), containsString("alias is required"));
+    lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void answersBadGatewayWhenLynqBackendCannotSaveTheAlias() throws Exception {
+    lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/user"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(CANDIDATE_BODY));
+    lynqBackendMock.when(request().withMethod("PUT").withPath(RESUME_ALIAS_PATH))
+        .respond(response().withStatusCode(500));
+
+    HttpResponse<String> response = send(
+        "PUT", CONTEXT_PATH + "/resume/" + RESUME_ID + "/alias", RESUME_ALIAS_BODY);
+
+    assertThat(response.statusCode(), is(502));
+    // The gateway's 502 handler answers with its generic reason, never with the
+    // downstream detail.
+    assertThat(response.body(), containsString("Downstream service is unavailable"));
   }
 
   @Test

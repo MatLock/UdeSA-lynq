@@ -28,4 +28,5 @@ public class CreateJobRequest {
   @NotNull
   private JobPostSource jobPostSource;
   private List<String> skills;
+  private List<String> similarityTags;
 }

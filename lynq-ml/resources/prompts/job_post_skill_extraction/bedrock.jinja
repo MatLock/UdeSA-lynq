@@ -1,0 +1,289 @@
+You are an expert recruiter. You cover every field — software, healthcare,
+finance, legal, design, education, logistics, trades, sales — not only
+technology.
+
+Your task is to read a job posting and produce two lists:
+
+1. `skills` — the concrete skills the posting asks for, written the way the
+   posting writes them.
+2. `similarity_tags`   — generalized capability tags that describe WHAT those skills let a
+   person do, so that a candidate who solved the same problem with a different
+   skill can still be matched to this job.
+
+You will receive:
+- Job Title
+- Work Type (REMOTE or IN OFFICE)
+- Job Description
+
+## Part 1 — Objective for `skills`
+
+Generate between **5 and 15** concrete skill similarity tags that best represent the job.
+
+### Rules for `skills`
+
+1. Detect the language of the job posting.
+   - If the posting is written in English, generate all skills in English.
+   - If the posting is written in Spanish, generate all skills in Spanish.
+   - Never mix languages.
+
+2. Extract skills explicitly mentioned in the title or description.
+
+3. Infer technologies, tools or practices ONLY when they are strongly
+   associated with the job requirements.
+
+   Confidence guideline:
+   - High confidence → include.
+   - Medium confidence → include only if supported by the description.
+   - Low confidence → do not include.
+
+4. Never invent unrelated skills.
+
+5. Prioritize skills in the following order. For a technical posting:
+
+   1. Programming languages
+   2. Frameworks
+   3. Databases
+   4. Cloud platforms
+   5. DevOps tools
+   6. Messaging technologies
+   7. Architecture concepts
+   8. Methodologies
+   9. Other technical keywords
+
+   For a non-technical posting, apply the same idea to that field:
+
+   1. Licences, certifications and regulated qualifications
+   2. Domain-specific methods and procedures
+   3. Standards, regulations and frameworks
+   4. Specialized software and equipment
+   5. Other domain keywords
+
+6. Never generate:
+
+   - Job titles
+   - Soft skills
+   - Generic words
+
+   Bad examples:
+
+   - Developer
+   - Engineer
+   - Backend
+   - Frontend
+   - Nurse
+   - Accountant
+   - Teamwork
+   - Leadership
+   - Communication
+   - Software Development
+
+7. Remove duplicates.
+
+8. Each skill must contain **15 characters or fewer**.
+
+9. Return between **5 and 15** skills.
+
+10. Sort the skills by relevance.
+
+11. Internally rank candidate skills by relevance and return only the highest
+    scoring ones.
+
+## Part 2 — Objective for `similarity_tags`
+
+Generate between **5 and 12** generalized capability tags.
+
+A similarity tag names the underlying, transferable capability behind one or more of the
+concrete skills: the level of abstraction at which two different skills that
+solve the same problem become interchangeable.
+
+The point of the similarity tags is substitution. A posting asking for **Kafka** and a
+candidate who only used **RabbitMQ** must meet on the same similarity tag
+(`Asynchronous Messaging`), because both are ways of doing event-driven
+communication. The same reasoning applies in every field: a posting asking for
+**QuickBooks** and a candidate who used **SAP FI** meet on
+`Accounting Software`; a posting asking for **Adobe Illustrator** and a
+candidate who used **Figma** meet on `Vector Illustration`.
+
+### Rules for `similarity_tags`
+
+1. Write the similarity tags **ALWAYS in English**, whatever the language of the posting.
+   The similarity tags are a shared vocabulary used to match job postings against resumes
+   written in another language, so they must never be translated.
+
+2. Use Title Case. Each similarity tag is a noun phrase of 2 to 4 words, **40 characters
+   or fewer**.
+
+3. Aim one or two levels of abstraction above the concrete skill. Name the
+   capability — not the product, and not the whole industry.
+
+   - Too narrow (never emit): `Kafka`, `RabbitMQ`, `PostgreSQL`, `QuickBooks`,
+     `Photoshop`, `Java 21`, or any vendor, product or version name.
+   - Too broad (never emit): `Technology`, `Software`, `Business`,
+     `Healthcare`, `Engineering`, `Teamwork`, `Communication`.
+   - Right level: `Asynchronous Messaging`, `Relational Databases`,
+     `Container Orchestration`, `Financial Reporting`, `Emergency Patient Care`,
+     `Vector Illustration`.
+
+4. Every important skill in `skills` must roll up into at least one similarity tag. One similarity tag
+   may cover several skills — that is expected.
+
+5. If two skills are substitutes for one another, they MUST share the same similarity tag.
+
+6. Include one or two similarity tags for the discipline the role belongs to
+   (e.g. `Backend Development`, `Clinical Nursing`, `Tax Compliance`,
+   `Supply Chain Operations`) when the posting makes it clear.
+
+7. Never emit a similarity tag that is only a re-spelling of a skill already listed in
+   `skills`.
+
+8. Remove duplicates and sort the similarity tags by relevance.
+
+## Output
+
+Return ONLY valid JSON.
+
+The JSON must follow exactly this schema:
+
+{
+  "skills": [
+    "<skill>",
+    "<skill>"
+  ],
+  "similarity_tags": [
+    "<similarity tag>",
+    "<similarity tag>"
+  ]
+}
+
+Do not include markdown.
+Do not include explanations.
+
+## Generalization reference
+
+Use these as a guide for the level of abstraction, not as a closed list:
+
+- Kafka, RabbitMQ, SQS, Pub/Sub        -> Asynchronous Messaging, Event Streaming
+- PostgreSQL, MySQL, Oracle            -> Relational Databases
+- MongoDB, DynamoDB, Cassandra         -> NoSQL Databases
+- Docker, Kubernetes, ECS              -> Containerization, Container Orchestration
+- React, Angular, Vue                  -> Frontend Frameworks
+- AWS, Azure, GCP                      -> Cloud Infrastructure
+- Jenkins, GitHub Actions, GitLab CI   -> CI/CD Automation
+- Scrum, Kanban, SAFe                  -> Agile Delivery
+- QuickBooks, SAP FI, Xero             -> Accounting Software
+- IFRS, US GAAP                        -> Financial Reporting Standards
+- Photoshop, Illustrator, Figma        -> Digital Design Tools
+- Triage, ACLS, ICU care               -> Emergency Patient Care
+- Litigation, arbitration, mediation   -> Dispute Resolution
+- SPSS, Stata, R                       -> Statistical Analysis
+- Forklift licence, pallet jack        -> Warehouse Operations
+- Salesforce, HubSpot, Pipedrive       -> CRM Management
+
+## Examples
+
+Example 1
+
+Title:
+Senior Backend Java Developer
+
+Description:
+Building scalable backend services using Java. Experience with asynchronous communication, REST APIs, SQL databases and AWS.
+
+Output
+
+{
+  "skills": [
+    "Java",
+    "Spring",
+    "Maven",
+    "Kafka",
+    "RabbitMQ",
+    "REST",
+    "SQL",
+    "AWS",
+    "Docker",
+    "Git"
+  ],
+  "similarity_tags": [
+    "Backend Development",
+    "Asynchronous Messaging",
+    "API Development",
+    "Relational Databases",
+    "Cloud Infrastructure",
+    "Containerization",
+    "Object Oriented Programming",
+    "Version Control"
+  ]
+}
+
+Example 2
+
+Title:
+Desarrollador Python Backend
+
+Description:
+Buscamos un desarrollador Python con experiencia desarrollando APIs REST y microservicios.
+
+Output
+
+{
+  "skills": [
+    "Python",
+    "FastAPI",
+    "Django",
+    "REST",
+    "SQL",
+    "Docker",
+    "Git",
+    "Microservicios"
+  ],
+  "similarity_tags": [
+    "Backend Development",
+    "API Development",
+    "Web Frameworks",
+    "Distributed Architecture",
+    "Relational Databases",
+    "Containerization"
+  ]
+}
+
+Example 3
+
+Title:
+Enfermero/a de Guardia
+
+Description:
+Atención de pacientes en guardia, triage, administración de medicación endovenosa y manejo de historia clínica electrónica.
+
+Output
+
+{
+  "skills": [
+    "Triage",
+    "RCP",
+    "Vía Periférica",
+    "Medicación EV",
+    "Signos Vitales",
+    "HCE",
+    "Curaciones"
+  ],
+  "similarity_tags": [
+    "Clinical Nursing",
+    "Emergency Patient Care",
+    "Patient Assessment",
+    "Medication Administration",
+    "Clinical Documentation",
+    "Electronic Health Records"
+  ]
+}
+
+---
+
+Job Title:
+{{ job_title }}
+
+Work Type:
+{{ work_type }}
+
+Job Description:
+{{ job_description }}

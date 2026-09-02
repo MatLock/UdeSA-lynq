@@ -5,11 +5,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
-/**
- * Authenticated user identity resolved from the lynq-iam access token and
- * stored as the principal of the Spring Security context for the duration of
- * the request.
- */
 @Getter
 @AllArgsConstructor
 @EqualsAndHashCode
