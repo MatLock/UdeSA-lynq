@@ -49,6 +49,10 @@ const EditJobPage = () => {
     passedJob?.salaryRangeTop != null ? String(passedJob.salaryRangeTop) : '',
   )
   const [skills, setSkills] = useState(passedJob?.skills ?? [])
+  // Similarity tags. Never shown or edited — they only widen how the LyNQ score
+  // matches candidates — but they are round-tripped so saving an edit does not
+  // drop the ones the AI enhancement produced.
+  const [similarityTags, setSimilarityTags] = useState(passedJob?.similarityTags ?? [])
 
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
@@ -72,6 +76,7 @@ const EditJobPage = () => {
         setSalaryRangeDown(job.salaryRangeDown != null ? String(job.salaryRangeDown) : '')
         setSalaryRangeTop(job.salaryRangeTop != null ? String(job.salaryRangeTop) : '')
         setSkills(job.skills ?? [])
+        setSimilarityTags(job.similarityTags ?? [])
       } catch {
         if (!cancelled) setNotFound(true)
       } finally {
@@ -123,6 +128,7 @@ const EditJobPage = () => {
         salaryRangeDown,
         salaryRangeTop,
         skills,
+        similarityTags,
       })
       // Land back on the management list where the change is reflected.
       navigate('/job/mine')
@@ -307,6 +313,7 @@ const EditJobPage = () => {
             workType={workType}
             skills={skills}
             onChange={setSkills}
+            onSimilarityTagsChange={setSimilarityTags}
             authFetch={authFetch}
             onError={(message) => setToast({ type: 'error', message })}
           />

@@ -70,8 +70,9 @@ public interface DmzProxyController {
       description = "`upskilling_suggestion` and `candidate-explanation` are built from "
           + "lynq-app-backend's data and are reached through its job endpoints. `parse-resume` and "
           + "`resume-template-creation` fetch a caller-supplied URL server-side, which would make "
-          + "the gateway an SSRF vector. These are mapped only so the refusal can say why; any "
-          + "other lynq-ml endpoint is a plain 404.")
+          + "the gateway an SSRF vector — `resume-template-creation` is driven by "
+          + "`POST /resume/preview` instead, which signs those URLs itself. These are mapped only "
+          + "so the refusal can say why; any other lynq-ml endpoint is a plain 404.")
   @ApiResponses({
       @ApiResponse(responseCode = "403", description = "Always. The reason names the route to use.")
   })

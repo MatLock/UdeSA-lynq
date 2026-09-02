@@ -7,37 +7,25 @@ import StepIndicator from '../StepIndicator/StepIndicator'
 import Toast from '../Toast/Toast'
 import useApi from '../../hooks/useApi'
 import useResumeWizard from '../../hooks/useResumeWizard'
+import useRotatingPhrase from '../../hooks/useRotatingPhrase'
 import resumeService from '../../services/resumeService'
 import resumeDraft from '../../utils/resumeDraft'
-import strings, { activeLocale } from '../../i18n'
+import strings from '../../i18n'
 import './ResumeTemplateStep.css'
 
-// Templates lynq-ml can render (model/resume_template.py Template enum), whose
-// default is MODERN — so that is what this step opens on.
 const DEFAULT_TEMPLATE = 'MODERN'
 
-// The language the resume content is written in is the language the candidate
-// filled the form in — i.e. the configured UI locale. Anything the backend does
-// not store (Language enum) falls back to English.
-const resumeLanguage = () => {
-  const code = activeLocale.toUpperCase()
-  return resumeService.LANGUAGES.includes(code) ? code : 'EN'
-}
-
-// Last step of the resume wizard: which visual template the PDF is built with.
-//
-// Being the final step it also owns the submit — it merges everything the earlier
-// steps stashed in the wizard context, converts that draft into the resume JSON,
-// and sends it with the chosen template as one create call.
-const ResumeTemplateStep = ({ active, stepNumber, totalSteps, onCompleted }) => {
+const ResumeTemplateStep = ({ active, stepNumber, totalSteps }) => {
   const t = strings.pages.resume.create
   const tt = t.template
   const { authFetch } = useApi()
-  const { data, updateData, back, setFooter } = useResumeWizard()
+  const { data, updateData, back, next, setFooter } = useResumeWizard()
 
   const [template, setTemplate] = useState(data.template ?? DEFAULT_TEMPLATE)
-  const [saving, setSaving] = useState(false)
+  const [rendering, setRendering] = useState(false)
   const [toast, setToast] = useState(null)
+
+  const renderingPhrase = useRotatingPhrase(tt.rendering, rendering)
 
   const options = [
     {
@@ -56,53 +44,49 @@ const ResumeTemplateStep = ({ active, stepNumber, totalSteps, onCompleted }) => 
     },
   ]
 
-  const submit = async () => {
-    if (saving) return
+  const render = async () => {
+    if (rendering) return
 
-    const draft = { ...data, template }
-    const resume = resumeDraft.toResumePayload(draft)
+    const resume = resumeDraft.toResumePayload({ ...data, template })
 
-    setSaving(true)
+    setRendering(true)
     try {
-      await resumeService.create_resume(authFetch, {
-        name: resume.personal_info.full_name ?? strings.pages.resume.untitled,
-        language: resumeLanguage(),
+      const preview = await resumeService.preview_resume(authFetch, { resume, template })
+
+      updateData({
         template,
-        resume,
+        previewResume: resume,
+        previewFileId: preview.fileId,
+        previewPdfUrl: preview.pdfUrl,
       })
-      // Keep the choice in context so a failed retry doesn't lose it; the parent
-      // unmounts the wizard on success anyway.
-      updateData({ template })
-      onCompleted?.('form')
+      next()
     } catch (error) {
-      setToast({ type: 'error', message: error.reason ?? error.message ?? t.error })
+      setToast({ type: 'error', message: error.reason ?? error.message ?? tt.renderError })
     } finally {
-      setSaving(false)
+      setRendering(false)
     }
   }
 
-  // Keep a live reference so the footer button (registered once below) always runs
-  // the latest closure with the current selection.
-  const primaryActionRef = useRef(submit)
+  const primaryActionRef = useRef(render)
   useEffect(() => {
-    primaryActionRef.current = submit
+    primaryActionRef.current = render
   })
 
   useEffect(() => {
     if (!active) return
     setFooter({
-      secondary: { label: t.back, onClick: back, disabled: saving },
+      secondary: { label: t.back, onClick: back, disabled: rendering },
       primary: {
-        label: t.finish,
-        disabled: saving,
+        label: t.next,
+        disabled: rendering,
         onClick: () => primaryActionRef.current(),
       },
     })
-  }, [active, saving, back, setFooter, t.back, t.finish])
+  }, [active, rendering, back, setFooter, t.back, t.next])
 
   return (
     <div className="resume-step resume-template-step">
-      {saving && <LoadingOverlay label={t.saving} />}
+      {rendering && <LoadingOverlay label={renderingPhrase} />}
 
       <div className="resume-step-intro">
         <p className="resume-step-question">{tt.question}</p>

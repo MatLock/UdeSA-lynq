@@ -4,6 +4,7 @@ import ResumeEntryCard from '../ResumeEntryCard/ResumeEntryCard'
 import ResumeStepGroup from '../ResumeStepGroup/ResumeStepGroup'
 import MonthYearField from '../MonthYearField/MonthYearField'
 import StepIndicator from '../StepIndicator/StepIndicator'
+import useResumeEntryList, { expandFirstInvalid } from '../../hooks/useResumeEntryList'
 import useResumeWizard from '../../hooks/useResumeWizard'
 import {
   EMPTY_CERTIFICATION,
@@ -14,7 +15,7 @@ import resumeDraft from '../../utils/resumeDraft'
 import strings from '../../i18n'
 import './ResumeEducationStep.css'
 
-const { isBlankEntry } = resumeDraft
+const { isBlankEntry, summarize } = resumeDraft
 
 // Step 3 of the resume wizard: everything the candidate studied or was awarded —
 // education entries, spoken languages and certifications. Grouping the three here
@@ -24,33 +25,26 @@ const { isBlankEntry } = resumeDraft
 // All three lists are repeatable and start empty except education, which opens
 // with one card so the step is never a bare "add" button. Entries the user adds
 // and leaves untouched are dropped instead of failing validation.
+//
+// Each list is an accordion (see useResumeEntryList): only the entry being
+// written stays open, so a candidate with four degrees loaded doesn't have to
+// scroll past four full forms to reach the one they just added.
 const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
   const t = strings.pages.resume.create
   const te = t.education
   const { data, updateData, next, back, setFooter } = useResumeWizard()
 
-  const [education, setEducation] = useState(
-    () => data.education ?? [{ ...EMPTY_EDUCATION }],
+  const education = useResumeEntryList(
+    data.education ?? [{ ...EMPTY_EDUCATION }],
+    EMPTY_EDUCATION,
   )
-  const [languages, setLanguages] = useState(() => data.languages ?? [])
-  const [certifications, setCertifications] = useState(() => data.certifications ?? [])
+  const languages = useResumeEntryList(data.languages ?? [], EMPTY_LANGUAGE)
+  const certifications = useResumeEntryList(
+    data.certifications ?? [],
+    EMPTY_CERTIFICATION,
+  )
   // Per-list validation errors, keyed by entry index: { education: {0: {…}}, … }
   const [errors, setErrors] = useState({})
-
-  // Immutably patch one entry of one list.
-  const patch = (setList) => (index, key, value) =>
-    setList((prev) =>
-      prev.map((entry, position) =>
-        position === index ? { ...entry, [key]: value } : entry,
-      ),
-    )
-
-  const patchEducation = patch(setEducation)
-  const patchLanguage = patch(setLanguages)
-  const patchCertification = patch(setCertifications)
-
-  const removeAt = (setList) => (index) =>
-    setList((prev) => prev.filter((_, position) => position !== index))
 
   // Require the one field that identifies an entry, but only for entries the user
   // actually started filling in.
@@ -67,18 +61,35 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
 
   const runPrimary = () => {
     const found = {
-      education: validateList(education, 'institution', te.errors.institutionRequired),
-      languages: validateList(languages, 'language', te.errors.languageRequired),
+      education: validateList(
+        education.entries,
+        'institution',
+        te.errors.institutionRequired,
+      ),
+      languages: validateList(
+        languages.entries,
+        'language',
+        te.errors.languageRequired,
+      ),
       certifications: validateList(
-        certifications,
+        certifications.entries,
         'name',
         te.errors.certificationRequired,
       ),
     }
     setErrors(found)
+    // A message inside a collapsed card is invisible, so each list opens its
+    // first offending entry before the step refuses to advance.
+    expandFirstInvalid(education, found.education)
+    expandFirstInvalid(languages, found.languages)
+    expandFirstInvalid(certifications, found.certifications)
     if (Object.values(found).some((list) => Object.keys(list).length > 0)) return
 
-    updateData({ education, languages, certifications })
+    updateData({
+      education: education.entries,
+      languages: languages.entries,
+      certifications: certifications.entries,
+    })
     next()
   }
 
@@ -146,19 +157,25 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
       <ResumeStepGroup
         title={te.studiesHeading}
         addLabel={te.addEducation}
-        onAdd={() => setEducation((prev) => [...prev, { ...EMPTY_EDUCATION }])}
+        onAdd={education.add}
         emptyLabel={te.educationEmpty}
-        isEmpty={education.length === 0}
+        isEmpty={education.entries.length === 0}
       >
         <div className="resume-step-entries">
-          {education.map((entry, index) => (
+          {education.entries.map((entry, index) => (
             <ResumeEntryCard
               // Index-keyed on purpose: these rows have no stable id and are only
               // ever appended to or removed, so React's reconciliation is correct.
               key={`education-${index}`}
               title={t.entry.replace('{index}', index + 1)}
+              summary={summarize(entry.institution, entry.degree, entry.field_of_study)}
               removeLabel={t.remove}
-              onRemove={() => removeAt(setEducation)(index)}
+              toggleLabel={t.toggleEntry}
+              invalidLabel={t.entryIncomplete}
+              expanded={education.expanded === index}
+              invalid={Boolean(errors.education?.[index])}
+              onToggle={() => education.toggle(index)}
+              onRemove={() => education.remove(index)}
             >
               <ResumeField
                 id={`resume-institution-${index}`}
@@ -172,7 +189,7 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
                   value={entry.institution}
                   aria-invalid={Boolean(errors.education?.[index]?.institution)}
                   onChange={(event) =>
-                    patchEducation(index, 'institution', event.target.value)
+                    education.patch(index, 'institution', event.target.value)
                   }
                 />
               </ResumeField>
@@ -182,7 +199,7 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
                   id={`resume-degree-${index}`}
                   placeholder={te.degreePlaceholder}
                   value={entry.degree}
-                  onChange={(event) => patchEducation(index, 'degree', event.target.value)}
+                  onChange={(event) => education.patch(index, 'degree', event.target.value)}
                 />
               </ResumeField>
 
@@ -192,12 +209,12 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
                   placeholder={te.fieldPlaceholder}
                   value={entry.field_of_study}
                   onChange={(event) =>
-                    patchEducation(index, 'field_of_study', event.target.value)
+                    education.patch(index, 'field_of_study', event.target.value)
                   }
                 />
               </ResumeField>
 
-              {renderDates(entry, index, patchEducation)}
+              {renderDates(entry, index, education.patch)}
 
               <ResumeField
                 id={`resume-study-description-${index}`}
@@ -210,7 +227,7 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
                   placeholder={te.descriptionPlaceholder}
                   value={entry.description}
                   onChange={(event) =>
-                    patchEducation(index, 'description', event.target.value)
+                    education.patch(index, 'description', event.target.value)
                   }
                 />
               </ResumeField>
@@ -222,17 +239,23 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
       <ResumeStepGroup
         title={te.languagesHeading}
         addLabel={te.addLanguage}
-        onAdd={() => setLanguages((prev) => [...prev, { ...EMPTY_LANGUAGE }])}
+        onAdd={languages.add}
         emptyLabel={te.languagesEmpty}
-        isEmpty={languages.length === 0}
+        isEmpty={languages.entries.length === 0}
       >
         <div className="resume-step-entries">
-          {languages.map((entry, index) => (
+          {languages.entries.map((entry, index) => (
             <ResumeEntryCard
               key={`language-${index}`}
               title={t.entry.replace('{index}', index + 1)}
+              summary={summarize(entry.language, entry.proficiency)}
               removeLabel={t.remove}
-              onRemove={() => removeAt(setLanguages)(index)}
+              toggleLabel={t.toggleEntry}
+              invalidLabel={t.entryIncomplete}
+              expanded={languages.expanded === index}
+              invalid={Boolean(errors.languages?.[index])}
+              onToggle={() => languages.toggle(index)}
+              onRemove={() => languages.remove(index)}
             >
               <ResumeField
                 id={`resume-language-${index}`}
@@ -245,7 +268,7 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
                   value={entry.language}
                   aria-invalid={Boolean(errors.languages?.[index]?.language)}
                   onChange={(event) =>
-                    patchLanguage(index, 'language', event.target.value)
+                    languages.patch(index, 'language', event.target.value)
                   }
                 />
               </ResumeField>
@@ -256,7 +279,7 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
                   placeholder={te.proficiencyPlaceholder}
                   value={entry.proficiency}
                   onChange={(event) =>
-                    patchLanguage(index, 'proficiency', event.target.value)
+                    languages.patch(index, 'proficiency', event.target.value)
                   }
                 />
               </ResumeField>
@@ -268,17 +291,23 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
       <ResumeStepGroup
         title={te.certificationsHeading}
         addLabel={te.addCertification}
-        onAdd={() => setCertifications((prev) => [...prev, { ...EMPTY_CERTIFICATION }])}
+        onAdd={certifications.add}
         emptyLabel={te.certificationsEmpty}
-        isEmpty={certifications.length === 0}
+        isEmpty={certifications.entries.length === 0}
       >
         <div className="resume-step-entries">
-          {certifications.map((entry, index) => (
+          {certifications.entries.map((entry, index) => (
             <ResumeEntryCard
               key={`certification-${index}`}
               title={t.entry.replace('{index}', index + 1)}
+              summary={summarize(entry.name, entry.issuer)}
               removeLabel={t.remove}
-              onRemove={() => removeAt(setCertifications)(index)}
+              toggleLabel={t.toggleEntry}
+              invalidLabel={t.entryIncomplete}
+              expanded={certifications.expanded === index}
+              invalid={Boolean(errors.certifications?.[index])}
+              onToggle={() => certifications.toggle(index)}
+              onRemove={() => certifications.remove(index)}
             >
               <ResumeField
                 id={`resume-certification-${index}`}
@@ -292,7 +321,7 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
                   value={entry.name}
                   aria-invalid={Boolean(errors.certifications?.[index]?.name)}
                   onChange={(event) =>
-                    patchCertification(index, 'name', event.target.value)
+                    certifications.patch(index, 'name', event.target.value)
                   }
                 />
               </ResumeField>
@@ -303,7 +332,7 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
                   placeholder={te.issuerPlaceholder}
                   value={entry.issuer}
                   onChange={(event) =>
-                    patchCertification(index, 'issuer', event.target.value)
+                    certifications.patch(index, 'issuer', event.target.value)
                   }
                 />
               </ResumeField>
@@ -312,7 +341,7 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
                 <MonthYearField
                   id={`resume-issue-date-${index}`}
                   value={entry.issue_date}
-                  onChange={(value) => patchCertification(index, 'issue_date', value)}
+                  onChange={(value) => certifications.patch(index, 'issue_date', value)}
                 />
               </ResumeField>
 
@@ -325,7 +354,7 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
                   placeholder={te.credentialIdPlaceholder}
                   value={entry.credential_id}
                   onChange={(event) =>
-                    patchCertification(index, 'credential_id', event.target.value)
+                    certifications.patch(index, 'credential_id', event.target.value)
                   }
                 />
               </ResumeField>

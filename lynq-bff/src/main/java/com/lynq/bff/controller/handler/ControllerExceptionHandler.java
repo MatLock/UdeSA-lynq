@@ -2,6 +2,7 @@ package com.lynq.bff.controller.handler;
 
 import com.lynq.bff.controller.response.ErrorRestResponse;
 import com.lynq.bff.exceptions.BadGatewayException;
+import com.lynq.bff.exceptions.BadRequestException;
 import com.lynq.bff.exceptions.ForbiddenException;
 import com.lynq.bff.exceptions.MethodNotAllowedException;
 import lombok.extern.log4j.Log4j2;
@@ -24,6 +25,14 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
     return ResponseEntity
         .status(HttpStatus.BAD_GATEWAY)
         .body(new ErrorRestResponse<>(null, DMZ_UNAVAILABLE_ERROR));
+  }
+
+  @ExceptionHandler(BadRequestException.class)
+  public ResponseEntity<ErrorRestResponse<Void>> handleBadRequest(BadRequestException ex) {
+    log.warn("message= Request cannot be served, reason={}", ex.getMessage());
+    return ResponseEntity
+        .status(HttpStatus.BAD_REQUEST)
+        .body(new ErrorRestResponse<>(null, ex.getMessage()));
   }
 
   @ExceptionHandler(ForbiddenException.class)

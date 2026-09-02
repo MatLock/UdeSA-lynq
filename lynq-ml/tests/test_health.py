@@ -54,6 +54,37 @@ class HealthEndpointTests(unittest.TestCase):
         self.assertEqual(body["status"], "DOWN")
         self.assertEqual(body["llm"], {"provider": None, "status": "DOWN"})
 
+    def test_reports_the_pdf_renderer_as_up_when_weasyprint_loads(self) -> None:
+        fake = MagicMock()
+        fake.provider = LLMProvider.OLLAMA
+        fake.health_check = AsyncMock(return_value=True)
+
+        with patch("router.health.get_llm_client", return_value=fake), patch(
+            "router.health.pdf_renderer_available", return_value=True
+        ):
+            response = self.client.get(_ENDPOINT)
+
+        self.assertEqual(response.json()["renderer"], {"status": "UP"})
+
+    def test_missing_native_libraries_are_reported_without_failing_the_probe(
+        self,
+    ) -> None:
+        # Only resume-template-creation needs WeasyPrint, so a missing Pango must
+        # not take the pod out of rotation — it is reported, not fatal.
+        fake = MagicMock()
+        fake.provider = LLMProvider.OLLAMA
+        fake.health_check = AsyncMock(return_value=True)
+
+        with patch("router.health.get_llm_client", return_value=fake), patch(
+            "router.health.pdf_renderer_available", return_value=False
+        ):
+            response = self.client.get(_ENDPOINT)
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "UP")
+        self.assertEqual(body["renderer"], {"status": "DOWN"})
+
     def test_health_is_exempt_from_request_uuid_header(self) -> None:
         fake = MagicMock()
         fake.provider = LLMProvider.OLLAMA

@@ -24,7 +24,8 @@ public class DmzProxyControllerImpl implements com.lynq.bff.controller.DmzProxyC
 
   private static final String URL_TAKING_ENDPOINT_NOT_RELAYED =
       "This lynq-ml endpoint fetches a caller-supplied URL server-side and is not reachable "
-          + "through the gateway";
+          + "through the gateway; the resume preview is driven by POST /resume/preview, which "
+          + "signs those URLs itself";
 
   private final DmzProxyService dmzProxyService;
   private final LynqBackendDmzClient lynqBackendDmzClient;

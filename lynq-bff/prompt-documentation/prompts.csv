@@ -1,0 +1,9 @@
+date,prompt
+"02-09-2026","all orchestration must go through the BFF. when i saw the BFF you implemented i did not like it because it is too generic and the only thing it does is pass the urls straight through"
+"02-09-2026","orchestrate the resume preview here: register the file in file-storage, ask ml for the render with the presigned PUT url, confirm the upload and give me back the fileId plus a presigned url to view it"
+"02-09-2026","if the render or the confirmation fails, delete the file you registered before returning the error, i do not want orphan files in the bucket"
+"02-09-2026","add the endpoint to discard the preview, the back button of the wizard has to be able to delete the pdf"
+"02-09-2026","the feign encoder is declared as a global bean and only handles byte[], so the typed clients would send an empty body. fix it"
+"02-09-2026","review the generate-upload-resume + confirm-upload-resume + parse-resume flow and build it as a bff flow: confirm the document, ask ml to parse it, detect the language and store it in the backend"
+"02-09-2026","move the check that the user is a CANDIDATE into a shared collaborator, both resume flows use it"
+"02-09-2026","create endpoint DELETE /resume/{resumeId} to delete a resume by its id"

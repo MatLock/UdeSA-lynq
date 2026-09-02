@@ -9,6 +9,7 @@ import StepIndicator from '../StepIndicator/StepIndicator'
 import LoadingOverlay from '../LoadingOverlay/LoadingOverlay'
 import Toast from '../Toast/Toast'
 import useApi from '../../hooks/useApi'
+import useResumeEntryList, { expandFirstInvalid } from '../../hooks/useResumeEntryList'
 import useResumeWizard from '../../hooks/useResumeWizard'
 import useRotatingPhrase from '../../hooks/useRotatingPhrase'
 import { EMPTY_EXPERIENCE, EMPTY_PROJECT } from '../../context/ResumeWizardContext'
@@ -17,7 +18,7 @@ import resumeDraft from '../../utils/resumeDraft'
 import strings, { activeLocale } from '../../i18n'
 import './ResumeEmploymentStep.css'
 
-const { cleanList, isBlankEntry, pruneEntries, toResumePayload } = resumeDraft
+const { cleanList, isBlankEntry, pruneEntries, summarize, toResumePayload } = resumeDraft
 
 const SKILL_GROUPS = ['technical', 'tools', 'soft']
 
@@ -31,50 +32,52 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
   const { authFetch } = useApi()
   const { data, updateData, next, back, setFooter } = useResumeWizard()
 
-  const [experience, setExperience] = useState(
-    () => data.experience ?? [{ ...EMPTY_EXPERIENCE }],
+  // Both repeatable lists are accordions: only the entry being written stays
+  // open, so adding the sixth job doesn't push it below five long forms.
+  const jobs = useResumeEntryList(
+    data.experience ?? [{ ...EMPTY_EXPERIENCE }],
+    EMPTY_EXPERIENCE,
   )
+  const projects = useResumeEntryList(data.projects ?? [], EMPTY_PROJECT)
   const [skills, setSkills] = useState(
     () => data.skills ?? { technical: [], tools: [], soft: [] },
   )
-  const [projects, setProjects] = useState(() => data.projects ?? [])
+  // Similarity tags the extraction returns alongside the buckets ("Asynchronous
+  // Messaging" for a candidate who used RabbitMQ). They are never shown — the
+  // resume does not display them — but they ship with it so the LyNQ score can
+  // match this candidate against a job asking for an equivalent technology.
+  // lynq-ml is Python, hence the snake_case field on the way in.
+  const [similarityTags, setSimilarityTags] = useState(() => data.similarityTags ?? [])
   const [errors, setErrors] = useState({})
   const [generating, setGenerating] = useState(false)
   const [toast, setToast] = useState(null)
 
-  const patch = (setList) => (index, key, value) =>
-    setList((prev) =>
-      prev.map((entry, position) =>
-        position === index ? { ...entry, [key]: value } : entry,
-      ),
-    )
-
-  const patchExperience = patch(setExperience)
-  const patchProject = patch(setProjects)
-
-  const removeAt = (setList) => (index) =>
-    setList((prev) => prev.filter((_, position) => position !== index))
-
   // Company and position both identify a job, so a started-but-incomplete entry
   // is reported rather than silently dropped. Untouched entries are ignored.
   const validate = () => {
-    const jobs = {}
-    experience.forEach((entry, index) => {
+    const jobErrors = {}
+    jobs.entries.forEach((entry, index) => {
       if (isBlankEntry(entry)) return
       const found = {}
       if (!entry.company.trim()) found.company = tw.errors.companyRequired
       if (!entry.position.trim()) found.position = tw.errors.positionRequired
-      if (Object.keys(found).length > 0) jobs[index] = found
+      if (Object.keys(found).length > 0) jobErrors[index] = found
     })
 
-    const items = {}
-    projects.forEach((entry, index) => {
+    const projectErrors = {}
+    projects.entries.forEach((entry, index) => {
       if (isBlankEntry(entry)) return
-      if (!entry.name.trim()) items[index] = { name: tw.errors.projectNameRequired }
+      if (!entry.name.trim()) {
+        projectErrors[index] = { name: tw.errors.projectNameRequired }
+      }
     })
 
-    setErrors({ experience: jobs, projects: items })
-    return Object.keys(jobs).length === 0 && Object.keys(items).length === 0
+    setErrors({ experience: jobErrors, projects: projectErrors })
+    expandFirstInvalid(jobs, jobErrors)
+    expandFirstInvalid(projects, projectErrors)
+    return (
+      Object.keys(jobErrors).length === 0 && Object.keys(projectErrors).length === 0
+    )
   }
 
   // Skill extraction is an LLM round-trip, so the caption cycles through a few
@@ -84,7 +87,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
   // The model reads the whole resume, so there has to be something in it to read:
   // a job, a study, or at least the professional summary from step 2.
   const hasSourceContent =
-    pruneEntries(experience).length > 0 ||
+    pruneEntries(jobs.entries).length > 0 ||
     pruneEntries(data.education ?? []).length > 0 ||
     Boolean(data.personal?.summary?.trim())
 
@@ -97,7 +100,12 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
     try {
       const extracted = await resumeService.extract_skills(
         authFetch,
-        toResumePayload({ ...data, experience, skills, projects }),
+        toResumePayload({
+          ...data,
+          experience: jobs.entries,
+          skills,
+          projects: projects.entries,
+        }),
         // The candidate is writing the resume in the UI language, so the soft
         // skills must come back in it rather than in whatever language the model
         // infers from the draft text.
@@ -109,6 +117,9 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
         soft: cleanList([...skills.soft, ...(extracted?.soft ?? [])]),
       }
       setSkills(merged)
+      setSimilarityTags((previous) =>
+        cleanList([...previous, ...(extracted?.similarity_tags ?? [])]),
+      )
 
       const found = SKILL_GROUPS.reduce(
         (total, group) => total + merged[group].length,
@@ -130,7 +141,12 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
 
   const runPrimary = () => {
     if (!validate()) return
-    updateData({ experience, skills, projects })
+    updateData({
+      experience: jobs.entries,
+      skills,
+      similarityTags,
+      projects: projects.entries,
+    })
     next()
   }
 
@@ -174,19 +190,25 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
       <ResumeStepGroup
         title={tw.experienceHeading}
         addLabel={tw.addExperience}
-        onAdd={() => setExperience((prev) => [...prev, { ...EMPTY_EXPERIENCE }])}
+        onAdd={jobs.add}
         emptyLabel={tw.experienceEmpty}
-        isEmpty={experience.length === 0}
+        isEmpty={jobs.entries.length === 0}
       >
         <div className="resume-step-entries">
-          {experience.map((entry, index) => (
+          {jobs.entries.map((entry, index) => (
             <ResumeEntryCard
               // Index-keyed on purpose: rows have no stable id and are only ever
               // appended to or removed.
               key={`experience-${index}`}
               title={t.entry.replace('{index}', index + 1)}
+              summary={summarize(entry.position, entry.company)}
               removeLabel={t.remove}
-              onRemove={() => removeAt(setExperience)(index)}
+              toggleLabel={t.toggleEntry}
+              invalidLabel={t.entryIncomplete}
+              expanded={jobs.expanded === index}
+              invalid={Boolean(errors.experience?.[index])}
+              onToggle={() => jobs.toggle(index)}
+              onRemove={() => jobs.remove(index)}
             >
               <ResumeField
                 id={`resume-position-${index}`}
@@ -199,7 +221,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
                   value={entry.position}
                   aria-invalid={Boolean(errors.experience?.[index]?.position)}
                   onChange={(event) =>
-                    patchExperience(index, 'position', event.target.value)
+                    jobs.patch(index, 'position', event.target.value)
                   }
                 />
               </ResumeField>
@@ -215,7 +237,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
                   value={entry.company}
                   aria-invalid={Boolean(errors.experience?.[index]?.company)}
                   onChange={(event) =>
-                    patchExperience(index, 'company', event.target.value)
+                    jobs.patch(index, 'company', event.target.value)
                   }
                 />
               </ResumeField>
@@ -226,7 +248,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
                   placeholder={tw.locationPlaceholder}
                   value={entry.location}
                   onChange={(event) =>
-                    patchExperience(index, 'location', event.target.value)
+                    jobs.patch(index, 'location', event.target.value)
                   }
                 />
               </ResumeField>
@@ -236,7 +258,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
                   <MonthYearField
                     id={`resume-job-start-${index}`}
                     value={entry.start_date}
-                    onChange={(value) => patchExperience(index, 'start_date', value)}
+                    onChange={(value) => jobs.patch(index, 'start_date', value)}
                   />
                 </ResumeField>
                 <ResumeField id={`resume-job-end-${index}`} label={t.dates.end}>
@@ -244,7 +266,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
                     id={`resume-job-end-${index}`}
                     value={entry.end_date}
                     disabled={entry.is_current}
-                    onChange={(value) => patchExperience(index, 'end_date', value)}
+                    onChange={(value) => jobs.patch(index, 'end_date', value)}
                   />
                 </ResumeField>
               </div>
@@ -254,7 +276,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
                   type="checkbox"
                   checked={entry.is_current}
                   onChange={(event) =>
-                    patchExperience(index, 'is_current', event.target.checked)
+                    jobs.patch(index, 'is_current', event.target.checked)
                   }
                 />
                 {tw.currentLabel}
@@ -271,7 +293,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
                   placeholder={tw.descriptionPlaceholder}
                   value={entry.description}
                   onChange={(event) =>
-                    patchExperience(index, 'description', event.target.value)
+                    jobs.patch(index, 'description', event.target.value)
                   }
                 />
               </ResumeField>
@@ -286,7 +308,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
                   value={entry.achievements}
                   placeholder={tw.achievementsPlaceholder}
                   tone="purple"
-                  onChange={(value) => patchExperience(index, 'achievements', value)}
+                  onChange={(value) => jobs.patch(index, 'achievements', value)}
                 />
               </ResumeField>
             </ResumeEntryCard>
@@ -338,17 +360,23 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
       <ResumeStepGroup
         title={tw.projectsHeading}
         addLabel={tw.addProject}
-        onAdd={() => setProjects((prev) => [...prev, { ...EMPTY_PROJECT }])}
+        onAdd={projects.add}
         emptyLabel={tw.projectsEmpty}
-        isEmpty={projects.length === 0}
+        isEmpty={projects.entries.length === 0}
       >
         <div className="resume-step-entries">
-          {projects.map((entry, index) => (
+          {projects.entries.map((entry, index) => (
             <ResumeEntryCard
               key={`project-${index}`}
               title={t.entry.replace('{index}', index + 1)}
+              summary={summarize(entry.name, entry.url)}
               removeLabel={t.remove}
-              onRemove={() => removeAt(setProjects)(index)}
+              toggleLabel={t.toggleEntry}
+              invalidLabel={t.entryIncomplete}
+              expanded={projects.expanded === index}
+              invalid={Boolean(errors.projects?.[index])}
+              onToggle={() => projects.toggle(index)}
+              onRemove={() => projects.remove(index)}
             >
               <ResumeField
                 id={`resume-project-name-${index}`}
@@ -360,7 +388,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
                   placeholder={tw.projectNamePlaceholder}
                   value={entry.name}
                   aria-invalid={Boolean(errors.projects?.[index]?.name)}
-                  onChange={(event) => patchProject(index, 'name', event.target.value)}
+                  onChange={(event) => projects.patch(index, 'name', event.target.value)}
                 />
               </ResumeField>
 
@@ -370,7 +398,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
                   type="url"
                   placeholder={t.personal.linkPlaceholder}
                   value={entry.url}
-                  onChange={(event) => patchProject(index, 'url', event.target.value)}
+                  onChange={(event) => projects.patch(index, 'url', event.target.value)}
                 />
               </ResumeField>
 
@@ -385,7 +413,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
                   placeholder={tw.projectDescriptionPlaceholder}
                   value={entry.description}
                   onChange={(event) =>
-                    patchProject(index, 'description', event.target.value)
+                    projects.patch(index, 'description', event.target.value)
                   }
                 />
               </ResumeField>

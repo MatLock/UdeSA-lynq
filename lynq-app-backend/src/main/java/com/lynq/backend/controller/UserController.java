@@ -1,11 +1,13 @@
 package com.lynq.backend.controller;
 
 import com.lynq.backend.client.response.UpskillingSuggestionResponse;
+import com.lynq.backend.controller.request.CreateResumeRequest;
 import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadResumeRestResponse;
+import com.lynq.backend.controller.response.DeleteResumeRestResponse;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
@@ -654,6 +656,97 @@ public interface UserController {
           + "of type CANDIDATE can access resumes; any other type is rejected with 400.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<GlobalRestResponse<List<GetUserResumeRestResponse>>> getUserResumes(
+      @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
+      summary = "Create a resume the candidate approved",
+      description = "Stores the resume the candidate accepted in the preview step, together with "
+          + "the fileId of the PDF that lynq-bff's POST /resume/preview flow rendered and stored. "
+          + "The candidate is resolved from the bearer token. A fileId that already backs one of "
+          + "the user's resumes is rejected with 400, as is a user that is not of type CANDIDATE.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "201",
+          description = "Resume created successfully",
+          content = @Content(
+              schema = @Schema(implementation = GetUserResumeRestResponse.class),
+              examples = @ExampleObject(
+                  name = "Created resume",
+                  value = """
+                      {
+                        "success": true,
+                        "data": {
+                          "id": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60",
+                          "name": "Jane Doe",
+                          "language": "EN",
+                          "createdOn": "2026-09-02",
+                          "resume": { "personal_info": { "full_name": "Jane Doe" } },
+                          "pdfUrl": "https://lynq-bucket.s3.amazonaws.com/lynq/0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41/resume.pdf?X-Amz-Signature=..."
+                        }
+                      }"""))),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The authenticated user is not a candidate, or the PDF already backs a resume",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "File already used",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "File '0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41' already backs one of the user's resumes"
+                      }"""))),
+      @ApiResponse(responseCode = "404", description = "No user exists for the authenticated identity")
+  })
+  ResponseEntity<GlobalRestResponse<GetUserResumeRestResponse>> createUserResume(
+      @Valid CreateResumeRequest request,
+      @Parameter(hidden = true) LynqUserPrincipal principal);
+
+  @Operation(
+      summary = "Delete one of the candidate's resumes",
+      description = "Deletes the resume identified by the path id, which must belong to the "
+          + "authenticated candidate — another user's resume answers 404 rather than 403, so a "
+          + "resume the caller does not own is never acknowledged as existing. The PDF is NOT "
+          + "removed here: the response carries its lynq-file-storage id so lynq-bff, the only "
+          + "service that talks to both, can drop the file. The candidate's skills are left "
+          + "untouched: they are merged from every resume the person wrote, so there is no way to "
+          + "tell which came from this one.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "200",
+          description = "Resume deleted successfully",
+          content = @Content(
+              schema = @Schema(implementation = DeleteResumeRestResponse.class),
+              examples = @ExampleObject(
+                  name = "Deleted resume",
+                  value = """
+                      {
+                        "success": true,
+                        "data": {
+                          "id": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60",
+                          "fileId": "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41"
+                        }
+                      }"""))),
+      @ApiResponse(
+          responseCode = "400",
+          description = "The authenticated user is not a candidate"),
+      @ApiResponse(
+          responseCode = "404",
+          description = "No such resume belongs to the authenticated candidate",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Unknown resume",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Resume '018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60' not found"
+                      }""")))
+  })
+  ResponseEntity<GlobalRestResponse<DeleteResumeRestResponse>> deleteUserResume(
+      String resumeId,
       @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(

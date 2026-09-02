@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -14,11 +16,46 @@ from model.resume_template import Template
 # templates live under resources/resume_template/<variant>/.
 _TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "resources" / "resume_template"
 
+log = logging.getLogger(__name__)
+
+# Not Python packages, so pip cannot install them and requirements.txt cannot
+# pin them. Kept next to the check that reports they are missing.
+_NATIVE_LIBS_HINT = (
+    "install them with 'brew install pango' on macOS or "
+    "'apt-get install libcairo2 libpango-1.0-0 libpangocairo-1.0-0 "
+    "libgdk-pixbuf-2.0-0' on Debian/Ubuntu"
+)
+
 _env = Environment(
     loader=FileSystemLoader(str(_TEMPLATES_DIR)),
     autoescape=select_autoescape(["html", "xml"]),
     keep_trailing_newline=True,
 )
+
+
+# Cached: a failed import is not remembered by Python, so without this every
+# health probe would retry the dlopen and reprint WeasyPrint's own banner.
+@lru_cache(maxsize=1)
+def pdf_renderer_available() -> bool:
+    """Whether WeasyPrint can load its native stack (Pango/Cairo).
+
+    The WeasyPrint import is deliberately lazy inside :func:`render_resume_pdf`
+    so the service boots — and the unit tests run — on a machine without those
+    libraries. The cost is that a missing library stays invisible until the first
+    PDF request 500s, which is what this exists to prevent: it is checked at
+    startup and reported by ``/lynq-ml/health``.
+    """
+    try:
+        import weasyprint  # noqa: F401
+    except Exception as exc:  # noqa: BLE001 - any import failure means no PDFs
+        log.error(
+            "message= PDF rendering is unavailable, WeasyPrint could not load its "
+            "native libraries: %s",
+            _NATIVE_LIBS_HINT,
+            exc_info=exc,
+        )
+        return False
+    return True
 
 
 def render_resume_pdf(

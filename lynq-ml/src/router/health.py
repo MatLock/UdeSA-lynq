@@ -7,6 +7,8 @@ from fastapi.responses import JSONResponse
 
 from llm_client import LLMProvider, get_llm_client
 
+from renderer.resume_template import pdf_renderer_available
+
 router = APIRouter()
 
 
@@ -16,6 +18,11 @@ async def health() -> JSONResponse:
 
     Returns ``200`` when the LLM is reachable, ``503`` otherwise. This route is
     intentionally *not* wrapped in ``GlobalRestResponse`` — it is an infra probe.
+
+    ``renderer`` reports whether WeasyPrint found its native libraries, which
+    only ``/resume-template-creation`` needs. It is deliberately not part of the
+    status code: taking the pod out of rotation would break the seven endpoints
+    that render nothing, so a missing Pango is surfaced, not fatal.
     """
     try:
         client = get_llm_client()
@@ -29,5 +36,6 @@ async def health() -> JSONResponse:
         "provider": provider.value if isinstance(provider, LLMProvider) else None,
         "status": "UP" if llm_up else "DOWN",
     }
-    body = {"status": "UP" if llm_up else "DOWN", "llm": llm}
+    renderer = {"status": "UP" if pdf_renderer_available() else "DOWN"}
+    body = {"status": "UP" if llm_up else "DOWN", "llm": llm, "renderer": renderer}
     return JSONResponse(status_code=200 if llm_up else 503, content=body)

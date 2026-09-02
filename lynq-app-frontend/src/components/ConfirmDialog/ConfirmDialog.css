@@ -1,0 +1,109 @@
+/* ConfirmDialog — the "are you sure?" step before something irreversible. A
+   native modal <dialog> portaled to <body>; the browser paints the dim via
+   ::backdrop. Mirrors the ScoreExplanationModal visual language; brand tokens
+   from index.css. */
+
+.confirm-dialog {
+  width: min(420px, calc(100vw - 48px));
+  max-width: none;
+  margin: auto;
+  padding: 0;
+  color: inherit;
+  background: #fff;
+  border: none;
+  border-radius: 16px;
+  box-shadow: var(--shadow-dialog);
+}
+
+.confirm-dialog::backdrop {
+  background: var(--scrim);
+  backdrop-filter: blur(2px);
+}
+
+.confirm-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px;
+  text-align: left;
+}
+
+.confirm-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.confirm-dialog-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+}
+
+.confirm-dialog-icon--danger {
+  color: var(--danger-ink);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.confirm-dialog-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.confirm-dialog-message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.confirm-dialog-button {
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-gradient);
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.confirm-dialog-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.confirm-dialog-button--ghost {
+  color: var(--text);
+  background: none;
+  border-color: var(--border);
+}
+
+.confirm-dialog-button--ghost:hover:not(:disabled) {
+  border-color: var(--brand-purple-light);
+  color: var(--brand-purple-dark);
+}
+
+.confirm-dialog-button--danger {
+  background: var(--danger);
+}
+
+.confirm-dialog-button--danger:hover:not(:disabled) {
+  background: var(--danger-ink);
+}

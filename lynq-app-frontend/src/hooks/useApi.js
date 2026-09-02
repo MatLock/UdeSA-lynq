@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import useAuth from './useAuth'
 import requestUuidUtil from '../utils/requestUuid'
 import securedFetch from '../utils/securedFetch'
@@ -8,8 +8,21 @@ import securedFetch from '../utils/securedFetch'
 // provide: when the access token has expired (backend replies 401), it refreshes
 // the token via the session and retries the request once before surfacing the
 // error. Concurrent refreshes are deduped inside AuthContext.refreshSession.
+//
+// `authFetch` keeps a stable identity for the lifetime of the component. That
+// matters because almost every page lists it in the dependency array of its load
+// effect: closing over `accessToken` directly gave the function a new identity on
+// every refresh, so a token expiring mid-request re-ran those effects and reset
+// the page underneath the user — which wiped the resume wizard's draft when the
+// (slow) skill-extraction call was the one that triggered the refresh. The token
+// is read from a ref instead: same value at call time, no new identity.
 const useApi = () => {
   const { accessToken, refreshSession, logout } = useAuth()
+
+  const tokenRef = useRef(accessToken)
+  useEffect(() => {
+    tokenRef.current = accessToken
+  }, [accessToken])
 
   const authFetch = useCallback(
     async (path, options = {}) => {
@@ -19,7 +32,12 @@ const useApi = () => {
       const requestUuid = pinnedUuid ?? requestUuidUtil.newRequestUuid()
 
       try {
-        return await securedFetch.sendSecured(accessToken, path, fetchOptions, requestUuid)
+        return await securedFetch.sendSecured(
+          tokenRef.current,
+          path,
+          fetchOptions,
+          requestUuid,
+        )
       } catch (error) {
         if (error.status !== 401) throw error
 
@@ -36,7 +54,7 @@ const useApi = () => {
         return await securedFetch.sendSecured(freshToken, path, fetchOptions, requestUuid)
       }
     },
-    [accessToken, refreshSession, logout],
+    [refreshSession, logout],
   )
 
   return { authFetch }

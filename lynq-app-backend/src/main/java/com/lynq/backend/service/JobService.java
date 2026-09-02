@@ -28,10 +28,13 @@ import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSkillEntity;
 import com.lynq.backend.model.UserApplicationJobEntity;
 import com.lynq.backend.model.UserEntity;
+import com.lynq.backend.model.JobPostSimilarityTagEntity;
 import com.lynq.backend.model.UserSkillsEntity;
+import com.lynq.backend.model.UserSimilarityTagEntity;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
 import com.lynq.backend.repository.JobPostSkillRepository;
+import com.lynq.backend.repository.JobPostSimilarityTagRepository;
 import com.lynq.backend.repository.UserApplicationJobRepository;
 import com.lynq.backend.repository.UserRepository;
 import com.lynq.backend.repository.projection.JobCandidateProjection;
@@ -81,18 +84,20 @@ public class JobService {
   private final UserRepository userRepository;
   private final UserApplicationJobRepository userApplicationJobRepository;
   private final JobPostSkillRepository jobPostSkillRepository;
+  private final JobPostSimilarityTagRepository jobPostSimilarityTagRepository;
   private final FileStorageService fileStorageService;
   private final LynqMLClient lynqMLClient;
 
   public JobService(JobPostRepository jobPostRepository, CompanyRepository companyRepository,
       UserRepository userRepository, UserApplicationJobRepository userApplicationJobRepository,
-      JobPostSkillRepository jobPostSkillRepository, FileStorageService fileStorageService,
-      LynqMLClient lynqMLClient) {
+      JobPostSkillRepository jobPostSkillRepository, JobPostSimilarityTagRepository jobPostSimilarityTagRepository,
+      FileStorageService fileStorageService, LynqMLClient lynqMLClient) {
     this.jobPostRepository = jobPostRepository;
     this.companyRepository = companyRepository;
     this.userRepository = userRepository;
     this.userApplicationJobRepository = userApplicationJobRepository;
     this.jobPostSkillRepository = jobPostSkillRepository;
+    this.jobPostSimilarityTagRepository = jobPostSimilarityTagRepository;
     this.fileStorageService = fileStorageService;
     this.lynqMLClient = lynqMLClient;
   }
@@ -101,7 +106,7 @@ public class JobService {
   @Transactional
   public JobPostEntity createJob(String title, String description, WorkType workType,
       Integer salaryRangeDown, Integer salaryRangeTop, JobPostSource jobPostSource,
-      List<String> skills) {
+      List<String> skills, List<String> similarityTags) {
     UserEntity user = getAuthenticatedUser();
 
     if (user.getType() != UserType.COMPANY) {
@@ -125,6 +130,7 @@ public class JobService {
         .build();
 
     addSkills(job, skills);
+    addSimilarityTags(job, similarityTags);
 
     return jobPostRepository.save(job);
   }
@@ -175,7 +181,8 @@ public class JobService {
   @AuditLog
   @Transactional
   public JobPostEntity updateJob(String jobId, String title, String description, WorkType workType,
-      JobStatus status, Integer salaryRangeDown, Integer salaryRangeTop, List<String> skills) {
+      JobStatus status, Integer salaryRangeDown, Integer salaryRangeTop, List<String> skills,
+      List<String> similarityTags) {
     UserEntity user = getAuthenticatedUser();
     JobPostEntity job = getOwnedJob(jobId, user, ONLY_JOB_OWNER_CAN_UPDATE);
 
@@ -187,6 +194,7 @@ public class JobService {
     updateStatus(job, status);
 
     updateSkills(job, skills);
+    updateSimilarityTags(job, similarityTags);
 
     return jobPostRepository.save(job);
   }
@@ -201,12 +209,7 @@ public class JobService {
   }
 
   private void updateSkills(JobPostEntity job, List<String> skills) {
-    List<String> desired = skills == null ? List.of() : skills.stream()
-        .filter(Objects::nonNull)
-        .map(String::trim)
-        .filter(skill -> !skill.isEmpty())
-        .distinct()
-        .toList();
+    List<String> desired = clean(skills);
 
     List<JobPostSkillEntity> toRemove = job.getSkills().stream()
         .filter(existing -> !desired.contains(existing.getSkill()))
@@ -353,7 +356,7 @@ public class JobService {
             .build())
         .candidate(CandidateSpec.builder()
             .description(describe(candidate.getCurrentPosition(), candidate.getAbout()))
-            .skills(candidate.getSkills().stream().map(UserSkillsEntity::getSkill).toList())
+            .skills(skillNamesOf(candidate))
             .build())
         .build();
   }
@@ -423,7 +426,8 @@ public class JobService {
         .userProfileImage(signedUrl(profileImageUrls, projection.userFileStorageId()))
         .userCurrentPosition(projection.userCurrentPosition())
         .userAppliedOn(projection.appliedOn())
-        .lynqScore(calculateLyNQScore(jobSkills, candidateSkills))
+        .lynqScore(LyNQScoreCalculator.score(jobSkills, splitSkills(projection.jobSimilarityTags()),
+            candidateSkills, splitSkills(projection.userSimilarityTags())))
         .build();
   }
 
@@ -448,6 +452,7 @@ public class JobService {
   private GetJobRestResponse toResponse(JobWithDetailsProjection projection, UserEntity user,
       Map<String, String> imageUrls) {
     List<String> skills = splitSkills(projection.skills());
+    List<String> similarityTags = splitSkills(projection.similarityTags());
     return GetJobRestResponse.builder()
         .jobId(projection.jobId())
         .title(projection.title())
@@ -474,7 +479,8 @@ public class JobService {
             .currentPosition(projection.userCurrentPosition())
             .build())
         .skills(skills)
-        .lynqScore(calculateLyNQScore(skills, user))
+        .similarityTags(similarityTags)
+        .lynqScore(calculateLyNQScore(skills, similarityTags, user))
         .build();
   }
 
@@ -484,6 +490,59 @@ public class JobService {
     }
     return Arrays.stream(concatenatedSkills.split(","))
         .map(String::trim)
+        .toList();
+  }
+
+  /**
+   * Same replace-what-is-there semantics as {@link #updateSkills}, for the capability tags — except
+   * that an absent list means "leave them as they are". The tags are never edited by hand: they
+   * only exist when the AI enhancement produced them, so a client that does not send any is not
+   * asking for them to be cleared.
+   */
+  private void updateSimilarityTags(JobPostEntity job, List<String> similarityTags) {
+    if (similarityTags == null) {
+      return;
+    }
+
+    List<String> desired = clean(similarityTags);
+
+    List<JobPostSimilarityTagEntity> toRemove = job.getSimilarityTags().stream()
+        .filter(existing -> !desired.contains(existing.getSimilarityTag()))
+        .toList();
+    job.getSimilarityTags().removeAll(toRemove);
+    jobPostSimilarityTagRepository.deleteAll(toRemove);
+
+    Set<String> existingTags = job.getSimilarityTags().stream()
+        .map(JobPostSimilarityTagEntity::getSimilarityTag)
+        .collect(Collectors.toSet());
+
+    desired.stream()
+        .filter(tag -> !existingTags.contains(tag))
+        .map(tag -> JobPostSimilarityTagEntity.builder()
+            .id(Generators.timeBasedEpochGenerator().generate().toString())
+            .jobPost(job)
+            .similarityTag(tag)
+            .build())
+        .forEach(job.getSimilarityTags()::add);
+  }
+
+  private void addSimilarityTags(JobPostEntity job, List<String> similarityTags) {
+    clean(similarityTags).stream()
+        .map(tag -> JobPostSimilarityTagEntity.builder()
+            .id(Generators.timeBasedEpochGenerator().generate().toString())
+            .jobPost(job)
+            .similarityTag(tag)
+            .build())
+        .forEach(job.getSimilarityTags()::add);
+  }
+
+  /** Trimmed, de-duplicated, blanks dropped — what actually reaches the tables. */
+  private static List<String> clean(List<String> values) {
+    return values == null ? List.of() : values.stream()
+        .filter(Objects::nonNull)
+        .map(String::trim)
+        .filter(value -> !value.isEmpty())
+        .distinct()
         .toList();
   }
 
@@ -502,21 +561,28 @@ public class JobService {
         .forEach(job.getSkills()::add);
   }
 
-  private Integer calculateLyNQScore(List<String> jobSkillNames, UserEntity user) {
+  private Integer calculateLyNQScore(List<String> jobSkillNames, List<String> jobSimilarityTagNames,
+      UserEntity user) {
     if (user == null || user.getType() != UserType.CANDIDATE) {
       return null;
     }
 
-    List<UserSkillsEntity> userSkills = user.getSkills();
-    List<String> userSkillNames = userSkills == null ? null : userSkills.stream()
-        .map(UserSkillsEntity::getSkill)
-        .toList();
-
-    return calculateLyNQScore(jobSkillNames, userSkillNames);
+    return LyNQScoreCalculator.score(jobSkillNames, jobSimilarityTagNames, skillNamesOf(user),
+        similarityTagNamesOf(user));
   }
 
-  private Integer calculateLyNQScore(List<String> jobSkillNames, List<String> userSkillNames) {
-    return LyNQScoreCalculator.score(jobSkillNames, userSkillNames);
+  static List<String> skillNamesOf(UserEntity user) {
+    List<UserSkillsEntity> skills = user.getSkills();
+    return skills == null ? List.of() : skills.stream()
+        .map(UserSkillsEntity::getSkill)
+        .toList();
+  }
+
+  static List<String> similarityTagNamesOf(UserEntity user) {
+    List<UserSimilarityTagEntity> tags = user.getSimilarityTags();
+    return tags == null ? List.of() : tags.stream()
+        .map(UserSimilarityTagEntity::getSimilarityTag)
+        .toList();
   }
 
   private UserEntity getAuthenticatedUser() {

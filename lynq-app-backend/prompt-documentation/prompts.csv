@@ -164,3 +164,6 @@ parameters:
 "07-08-2026","add CI/Sonar workflow for lynq-file-storage. and include it also in the release workflow"
 "07-08-2026","add README.md for lynq-file-storage follow the same pattern as lynq-iam and lynq-app-backend"
 "07-08-2026","add a short description about lynq-file-storage in root readme and include the badges there as well."
+"02-09-2026","add the POST /user/resume endpoint to store the resume the candidate approved. it takes name, language, resume and the fileId of the pdf that was already generated. CANDIDATE users only"
+"02-09-2026","the same fileId cannot end up linked to two different resumes, validate that on create"
+"02-09-2026","create new endpoint DELETE /dmz/user/resume/{resumeId} to delete a resume previously created"

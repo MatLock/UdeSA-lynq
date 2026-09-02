@@ -33,6 +33,9 @@ const CreateJobPage = () => {
   // AI-generated then user-editable; the SkillsField component owns the editing
   // UI and generation, this page just holds the value that ships with the job.
   const [skills, setSkills] = useState([])
+  // Similarity tags from the same AI call. Never shown or edited — they only
+  // widen how the LyNQ score matches candidates against this post.
+  const [similarityTags, setSimilarityTags] = useState([])
 
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
@@ -74,6 +77,7 @@ const CreateJobPage = () => {
         salaryRangeDown,
         salaryRangeTop,
         skills,
+        similarityTags,
       })
       // Land back on the feed where the new post now appears.
       navigate('/home', { state: { jobCreated: true } })
@@ -210,6 +214,7 @@ const CreateJobPage = () => {
             workType={workType}
             skills={skills}
             onChange={setSkills}
+            onSimilarityTagsChange={setSimilarityTags}
             authFetch={authFetch}
             onError={(message) => setToast({ type: 'error', message })}
           />

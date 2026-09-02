@@ -3,11 +3,13 @@ package com.lynq.backend.controller.impl;
 import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.controller.UserController;
+import com.lynq.backend.controller.request.CreateResumeRequest;
 import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadResumeRestResponse;
+import com.lynq.backend.controller.response.DeleteResumeRestResponse;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
@@ -16,6 +18,7 @@ import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
 import com.lynq.backend.controller.response.UserApplicationResponse;
 import com.lynq.backend.model.UserEntity;
+import jakarta.validation.Valid;
 import com.lynq.backend.security.LynqUserPrincipal;
 import com.lynq.backend.service.JobService;
 import com.lynq.backend.service.UserService;
@@ -26,6 +29,7 @@ import com.lynq.backend.service.RegisteredUpload;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -201,6 +205,32 @@ public class UserControllerImpl implements UserController {
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, resumes));
+  }
+
+  @Override
+  @PostMapping("/resume")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<GetUserResumeRestResponse>> createUserResume(
+      @Valid @RequestBody CreateResumeRequest request,
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
+    GetUserResumeRestResponse resume = userService.createResume(principal.getId(), request);
+
+    return ResponseEntity
+        .status(HttpStatus.CREATED)
+        .body(new GlobalRestResponse<>(true, resume));
+  }
+
+  @Override
+  @DeleteMapping("/resume/{resumeId}")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<DeleteResumeRestResponse>> deleteUserResume(
+      @PathVariable String resumeId,
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
+    DeleteResumeRestResponse deleted = userService.deleteResume(principal.getId(), resumeId);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, deleted));
   }
 
   @Override

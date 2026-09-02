@@ -13,12 +13,19 @@ import './SkillsField.css'
 // parent (they ship with the job), so this component is controlled via
 // `skills` + `onChange`; the in-progress "add" text and generating flag are
 // local since they never leave this widget.
+//
+// The generation also returns similarity tags — the generalized form of the same
+// requirements, which the LyNQ score matches on so a candidate with an equivalent
+// technology still surfaces. They are handed straight to the parent via
+// `onSimilarityTagsChange`: unlike the skills they are never shown or edited, they
+// just travel with the job post.
 const SkillsField = ({
   title,
   description,
   workType,
   skills,
   onChange,
+  onSimilarityTagsChange,
   authFetch,
   onError,
 }) => {
@@ -73,7 +80,8 @@ const SkillsField = ({
         description: description.trim(),
         workType,
       })
-      onChange(mergeSkills(generated))
+      onChange(mergeSkills(generated.skills))
+      onSimilarityTagsChange?.(generated.similarityTags)
     } catch (error) {
       onError?.(error.reason ?? error.message ?? t.generateError)
     } finally {

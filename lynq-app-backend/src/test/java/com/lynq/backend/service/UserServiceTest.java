@@ -1,6 +1,7 @@
 package com.lynq.backend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lynq.backend.controller.request.CreateResumeRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.enums.JobStatus;
@@ -12,7 +13,9 @@ import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.model.UserResumeEntity;
+import com.lynq.backend.controller.response.DeleteResumeRestResponse;
 import com.lynq.backend.model.UserSkillsEntity;
+import com.lynq.backend.model.UserSimilarityTagEntity;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.controller.response.UserApplicationResponse;
@@ -45,6 +48,7 @@ import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -83,6 +87,17 @@ class UserServiceTest {
   private static final String RESUME_JSON = "{\"summary\":\"Backend engineer\",\"years\":8}";
   private static final String RESUME_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42";
   private static final String RESUME_PDF_URL = "https://presigned/cv.pdf";
+  private static final Map<String, Object> RESUME_CONTENT = Map.of("summary", "Backend engineer");
+  // A resume as the wizard sends it: the three skill buckets, of which only the technical skills
+  // and the tools describe something a job can ask for.
+  private static final Map<String, Object> RESUME_WITH_SKILLS = Map.of(
+      "summary", "Backend engineer",
+      "skills", Map.of(
+          "technical", List.of("Java", "RabbitMQ"),
+          "tools", List.of("Docker"),
+          "soft", List.of("Leadership")));
+  private static final List<String> RESUME_TAGS =
+      List.of("Backend Development", "Asynchronous Messaging");
 
   private static final String COMPANY_ID = "company-1";
   private static final String COMPANY_NAME = "Lynq";
@@ -420,6 +435,163 @@ class UserServiceTest {
   }
 
   @Test
+  void createResumePersistsTheResumePointingAtThePreviewedPdf() {
+    UserEntity candidate = candidate();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
+    when(fileStorageService.obtainDownloadUrl(RESUME_FILE_ID)).thenReturn(RESUME_PDF_URL);
+
+    GetUserResumeRestResponse result = userService.createResume(USER_ID, createRequest());
+
+    ArgumentCaptor<UserResumeEntity> captor = ArgumentCaptor.forClass(UserResumeEntity.class);
+    verify(userResumeRepository).save(captor.capture());
+    UserResumeEntity saved = captor.getValue();
+    assertThat(saved.getId(), is(notNullValue()));
+    assertThat(saved.getName(), is(RESUME_NAME));
+    assertThat(saved.getLanguage(), is(RESUME_LANGUAGE));
+    assertThat(saved.getCreatedOn(), is(LocalDate.now(ZoneOffset.UTC)));
+    assertThat(saved.getLynqFileStorageId(), is(RESUME_FILE_ID));
+    assertThat(saved.getUser(), is(sameInstance(candidate)));
+    assertThat(saved.getResume(), is("{\"summary\":\"Backend engineer\"}"));
+
+    assertThat(result.getName(), is(RESUME_NAME));
+    assertThat(result.getPdfUrl(), is(RESUME_PDF_URL));
+    @SuppressWarnings("unchecked")
+    Map<String, Object> resumeJson = (Map<String, Object>) result.getResume();
+    assertThat(resumeJson.get("summary"), is("Backend engineer"));
+  }
+
+  @Test
+  void createResumeFeedsTheCandidateSkillsAndTagsTheLynqScoreMatchesOn() {
+    // The resume is the only place a candidate's skills are ever written down, so creating one has
+    // to project them onto the user — otherwise every LyNQ score stays at 0.
+    UserEntity candidate = candidate();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
+    when(fileStorageService.obtainDownloadUrl(RESUME_FILE_ID)).thenReturn(RESUME_PDF_URL);
+
+    userService.createResume(USER_ID, requestWithSkills());
+
+    // Technical skills and tools, never the soft ones: a job requirement is not "Leadership".
+    assertThat(candidate.getSkills().stream().map(UserSkillsEntity::getSkill).toList(),
+        contains("Java", "RabbitMQ", "Docker"));
+    assertThat(candidate.getSimilarityTags().stream().map(UserSimilarityTagEntity::getSimilarityTag).toList(),
+        contains("Backend Development", "Asynchronous Messaging"));
+    verify(userRepository).save(candidate);
+  }
+
+  @Test
+  void createResumeAddsToTheSkillsTheCandidateAlreadyHasInsteadOfReplacingThem() {
+    // The same person may hold one resume per language or per role; the skills of the one they are
+    // not looking at right now are no less true. Case-insensitive, so "java" is not added twice.
+    UserEntity candidate = candidate();
+    candidate.getSkills().add(UserSkillsEntity.builder()
+        .id("existing-skill").user(candidate).skill("java").build());
+    candidate.getSimilarityTags().add(UserSimilarityTagEntity.builder()
+        .id("existing-tag").user(candidate).similarityTag("Backend Development").build());
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
+    when(fileStorageService.obtainDownloadUrl(RESUME_FILE_ID)).thenReturn(RESUME_PDF_URL);
+
+    userService.createResume(USER_ID, requestWithSkills());
+
+    assertThat(candidate.getSkills().stream().map(UserSkillsEntity::getSkill).toList(),
+        contains("java", "RabbitMQ", "Docker"));
+    assertThat(candidate.getSimilarityTags().stream().map(UserSimilarityTagEntity::getSimilarityTag).toList(),
+        contains("Backend Development", "Asynchronous Messaging"));
+  }
+
+  @Test
+  void createResumeLeavesTheCandidateSkillsAloneWhenTheResumeCarriesNone() {
+    UserEntity candidate = candidate();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
+    when(fileStorageService.obtainDownloadUrl(RESUME_FILE_ID)).thenReturn(RESUME_PDF_URL);
+
+    userService.createResume(USER_ID, createRequest());
+
+    assertThat(candidate.getSkills(), is(empty()));
+    assertThat(candidate.getSimilarityTags(), is(empty()));
+  }
+
+  @Test
+  void createResumeThrowsBadRequestWhenThePdfAlreadyBacksAnotherResume() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
+    when(userResumeRepository.findByUserId(USER_ID))
+        .thenReturn(List.of(resume(RESUME_JSON, RESUME_FILE_ID)));
+
+    BadRequestException exception = assertThrows(BadRequestException.class,
+        () -> userService.createResume(USER_ID, createRequest()));
+    assertThat(exception.getMessage(),
+        is("File '" + RESUME_FILE_ID + "' already backs one of the user's resumes"));
+    verify(userResumeRepository, never()).save(any());
+  }
+
+  @Test
+  void createResumeThrowsBadRequestWhenUserIsNotCandidate() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(companyOwner()));
+
+    assertThrows(BadRequestException.class, () -> userService.createResume(USER_ID, createRequest()));
+    verify(userResumeRepository, never()).save(any());
+  }
+
+  @Test
+  void deleteResumeRemovesItAndHandsBackThePdfForTheGatewayToDrop() {
+    // The PDF lives in lynq-file-storage, which this service never talks to, so
+    // the file id travels back for lynq-bff to clean up.
+    UserResumeEntity resume = resume(RESUME_JSON, RESUME_FILE_ID);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of(resume));
+
+    DeleteResumeRestResponse deleted = userService.deleteResume(USER_ID, resume.getId());
+
+    verify(userResumeRepository).delete(resume);
+    assertThat(deleted.getId(), is(resume.getId()));
+    assertThat(deleted.getFileId(), is(RESUME_FILE_ID));
+  }
+
+  @Test
+  void deleteResumeKeepsTheCandidateSkills() {
+    // They were merged from every resume the person wrote, so there is no way to
+    // tell which came from this one — dropping them would silently lower the
+    // candidate's LyNQ score.
+    UserEntity candidate = candidate();
+    candidate.getSkills().add(UserSkillsEntity.builder()
+        .id("skill-1").user(candidate).skill("Java").build());
+    UserResumeEntity resume = resume(RESUME_JSON, RESUME_FILE_ID);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of(resume));
+
+    userService.deleteResume(USER_ID, resume.getId());
+
+    assertThat(candidate.getSkills().stream().map(UserSkillsEntity::getSkill).toList(),
+        contains("Java"));
+  }
+
+  @Test
+  void deleteResumeThrowsNotFoundWhenItBelongsToAnotherCandidate() {
+    // Scoped to the caller's own resumes: someone else's id must not even be
+    // acknowledged as existing.
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
+
+    NotFoundException exception = assertThrows(NotFoundException.class,
+        () -> userService.deleteResume(USER_ID, "someone-elses-resume"));
+
+    assertThat(exception.getMessage(), is("Resume 'someone-elses-resume' not found"));
+    verify(userResumeRepository, never()).delete(any());
+  }
+
+  @Test
+  void deleteResumeThrowsBadRequestWhenUserIsNotCandidate() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(companyOwner()));
+
+    assertThrows(BadRequestException.class,
+        () -> userService.deleteResume(USER_ID, "any-resume"));
+    verify(userResumeRepository, never()).delete(any());
+  }
+
+  @Test
   void getUserResumesMapsEntitiesWithParsedJsonAndPresignedPdfUrl() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
     when(userResumeRepository.findByUserId(USER_ID))
@@ -630,6 +802,47 @@ class UserServiceTest {
   }
 
   @Test
+  void getUserApplicationsScoresLynqOnTheCapabilityTagsWhenTheyMatchBetterThanTheSkills() {
+    // The point of the tags: the candidate never used Kafka, but they did the same job with
+    // RabbitMQ, and both roll up to "Asynchronous Messaging". Matching only the literal names would
+    // hide them behind a 33%.
+    UserEntity candidate = candidate();
+    candidate.setSkills(List.of(UserSkillsEntity.builder().skill("Java").build()));
+    candidate.setSimilarityTags(List.of(
+        UserSimilarityTagEntity.builder().similarityTag("Backend Development").build(),
+        UserSimilarityTagEntity.builder().similarityTag("Asynchronous Messaging").build()));
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
+    when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
+        .thenReturn(new PageImpl<>(List.of(new UserApplicationProjection(
+            APPLICATION_ID, JOB_ID, JOB_TITLE, JOB_DESCRIPTION, COMPANY_ID, COMPANY_NAME, null,
+            APPLIED_ON, "Java,Kafka,Terraform",
+            "Backend Development,Asynchronous Messaging")), DEFAULT_PAGEABLE, 1));
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
+
+    UserApplicationResponse application =
+        userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE).getContent().get(0);
+
+    // 1 of 3 skills literally (33%), but 2 of 2 capability tags — the better reading wins.
+    assertThat(application.getLynqScore(), is(100));
+  }
+
+  @Test
+  void getUserApplicationsKeepsTheSkillScoreWhenTheJobCarriesNoTags() {
+    // Older posts have no tags at all; the score must fall back to what it always was rather than
+    // collapsing to zero.
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateWithSkills()));
+    when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
+        .thenReturn(new PageImpl<>(List.of(applicationProjection(APPLICATION_ID, null)),
+            DEFAULT_PAGEABLE, 1));
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
+
+    UserApplicationResponse application =
+        userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE).getContent().get(0);
+
+    assertThat(application.getLynqScore(), is(50));
+  }
+
+  @Test
   void getUserApplicationsScoresLynqZeroWhenCandidateHasNoSkills() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
     when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
@@ -717,7 +930,7 @@ class UserServiceTest {
 
   private UserApplicationProjection applicationProjection(String id, String companyImagePath) {
     return new UserApplicationProjection(id, JOB_ID, JOB_TITLE, JOB_DESCRIPTION, COMPANY_ID,
-        COMPANY_NAME, companyImagePath, APPLIED_ON, JOB_SKILLS_CSV);
+        COMPANY_NAME, companyImagePath, APPLIED_ON, JOB_SKILLS_CSV, null);
   }
 
   private UserEntity candidateWithSkills() {
@@ -726,6 +939,22 @@ class UserServiceTest {
         UserSkillsEntity.builder().skill("java").build(),
         UserSkillsEntity.builder().skill("kotlin").build()));
     return candidate;
+  }
+
+  private CreateResumeRequest requestWithSkills() {
+    CreateResumeRequest request = createRequest();
+    request.setResume(RESUME_WITH_SKILLS);
+    request.setSimilarityTags(RESUME_TAGS);
+    return request;
+  }
+
+  private CreateResumeRequest createRequest() {
+    CreateResumeRequest request = new CreateResumeRequest();
+    request.setName(RESUME_NAME);
+    request.setLanguage(RESUME_LANGUAGE);
+    request.setResume(RESUME_CONTENT);
+    request.setFileId(RESUME_FILE_ID);
+    return request;
   }
 
   private UserEntity candidate() {

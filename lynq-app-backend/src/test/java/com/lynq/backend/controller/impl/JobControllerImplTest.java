@@ -63,6 +63,7 @@ class JobControllerImplTest {
   private static final String SKILL_JAVA = "Java";
   private static final String SKILL_SPRING = "Spring";
   private static final List<String> SKILLS = List.of(SKILL_JAVA, SKILL_SPRING);
+  private static final List<String> TAGS = List.of("Backend Development", "Web Frameworks");
   private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 26);
   private static final String RAW_FILTER_VALUE = "  Java  ";
   private static final String NORMALIZED_FILTER_VALUE = "Java";
@@ -95,8 +96,9 @@ class JobControllerImplTest {
     lenient().when(request.getSalaryRangeTop()).thenReturn(SALARY_RANGE_TOP);
     lenient().when(request.getJobPostSource()).thenReturn(JOB_POST_TYPE);
     lenient().when(request.getSkills()).thenReturn(SKILLS);
+    lenient().when(request.getSimilarityTags()).thenReturn(TAGS);
     lenient().when(jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
-        SALARY_RANGE_TOP, JOB_POST_TYPE, SKILLS)).thenReturn(savedJob());
+        SALARY_RANGE_TOP, JOB_POST_TYPE, SKILLS, TAGS)).thenReturn(savedJob());
     lenient().when(updateRequest.getTitle()).thenReturn(TITLE);
     lenient().when(updateRequest.getDescription()).thenReturn(DESCRIPTION);
     lenient().when(updateRequest.getWorkType()).thenReturn(WORK_TYPE);
@@ -104,8 +106,9 @@ class JobControllerImplTest {
     lenient().when(updateRequest.getSalaryRangeDown()).thenReturn(SALARY_RANGE_DOWN);
     lenient().when(updateRequest.getSalaryRangeTop()).thenReturn(SALARY_RANGE_TOP);
     lenient().when(updateRequest.getSkills()).thenReturn(SKILLS);
+    lenient().when(updateRequest.getSimilarityTags()).thenReturn(TAGS);
     lenient().when(jobService.updateJob(JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, STATUS,
-        SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SKILLS)).thenReturn(savedJob());
+        SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SKILLS, TAGS)).thenReturn(savedJob());
   }
 
   @Test
@@ -113,7 +116,7 @@ class JobControllerImplTest {
     jobController.updateJob(JOB_ID, updateRequest);
 
     verify(jobService).updateJob(JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, STATUS, SALARY_RANGE_DOWN,
-        SALARY_RANGE_TOP, SKILLS);
+        SALARY_RANGE_TOP, SKILLS, TAGS);
   }
 
   @Test
@@ -152,7 +155,7 @@ class JobControllerImplTest {
     jobController.createJob(request);
 
     verify(jobService).createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
-        JOB_POST_TYPE, SKILLS);
+        JOB_POST_TYPE, SKILLS, TAGS);
   }
 
   @Test

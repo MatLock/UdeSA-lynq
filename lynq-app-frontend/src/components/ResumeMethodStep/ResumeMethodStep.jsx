@@ -8,8 +8,9 @@ import StepIndicator from '../StepIndicator/StepIndicator'
 import Toast from '../Toast/Toast'
 import useApi from '../../hooks/useApi'
 import useResumeWizard from '../../hooks/useResumeWizard'
+import useRotatingPhrase from '../../hooks/useRotatingPhrase'
 import resumeService from '../../services/resumeService'
-import strings from '../../i18n'
+import strings, { activeLocale } from '../../i18n'
 import './ResumeMethodStep.css'
 
 // Documents lynq-ml can read (see file_reader/resume_reader.py), and the size cap
@@ -20,9 +21,7 @@ const MAX_FILE_BYTES = 10 * 1024 * 1024
 // Step 1 of the resume wizard: how the candidate wants to create their resume.
 //
 // "Fill in the form" just advances into the following steps. "Upload a PDF or
-// Word file" finishes here: the file goes straight to S3 through a pre-signed
-// URL (GET /user/generate-upload-resume), and the parent is told the flow is done
-// so it can show the "we are processing it" state.
+// Word file" finishes here.
 const ResumeMethodStep = ({ active, stepNumber, totalSteps, onCompleted }) => {
   const t = strings.pages.resume.create
   const tm = t.method
@@ -33,8 +32,12 @@ const ResumeMethodStep = ({ active, stepNumber, totalSteps, onCompleted }) => {
   const [file, setFile] = useState(data.file ?? null)
   const [fileError, setFileError] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [toast, setToast] = useState(null)
   const fileInputRef = useRef(null)
+
+  const importingPhrase = useRotatingPhrase(tm.importing, importing)
+  const busy = uploading || importing
 
   const options = [
     {
@@ -80,19 +83,29 @@ const ResumeMethodStep = ({ active, stepNumber, totalSteps, onCompleted }) => {
   // bytes straight to S3 (the backend never sees them). Once stored, the flow is
   // over for this path — extraction happens server-side afterwards.
   const runUpload = async () => {
-    if (!file || uploading) return
+    if (!file || busy) return
+
     setUploading(true)
+    let fileId
     try {
-      const preSignedUrl = await resumeService.generate_resume_upload_url(
-        authFetch,
-        file.name,
-      )
-      await resumeService.upload_resume(preSignedUrl, file)
-      onCompleted?.('upload')
+      const upload = await resumeService.generate_resume_upload_url(authFetch, file.name)
+      await resumeService.upload_resume(upload.preSignedUrl, file)
+      fileId = upload.fileId
     } catch (error) {
       setToast(error.reason ?? error.message ?? tm.uploadError)
+      return
     } finally {
       setUploading(false)
+    }
+
+    setImporting(true)
+    try {
+      await resumeService.import_resume_document(authFetch, fileId, activeLocale)
+      onCompleted?.()
+    } catch (error) {
+      setToast(error.reason ?? error.message ?? tm.importError)
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -125,15 +138,16 @@ const ResumeMethodStep = ({ active, stepNumber, totalSteps, onCompleted }) => {
     setFooter({
       primary: {
         label: isUpload ? tm.uploadCta : t.next,
-        disabled: !method || uploading || (isUpload && !file),
+        disabled: !method || busy || (isUpload && !file),
         onClick: () => primaryActionRef.current(),
       },
     })
-  }, [active, method, file, uploading, setFooter, t.next, tm.uploadCta])
+  }, [active, method, file, busy, setFooter, t.next, tm.uploadCta])
 
   return (
     <div className="resume-step resume-method-step">
       {uploading && <LoadingOverlay label={tm.uploading} />}
+      {importing && <LoadingOverlay label={importingPhrase} />}
 
       <div className="resume-step-intro">
         <p className="resume-step-question">{tm.question}</p>
@@ -172,7 +186,7 @@ const ResumeMethodStep = ({ active, stepNumber, totalSteps, onCompleted }) => {
             type="button"
             className="resume-method-file-button"
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
+            disabled={busy}
           >
             <UploadFileOutlinedIcon sx={{ fontSize: 18 }} />
             {file ? tm.changeFile : tm.pickFile}

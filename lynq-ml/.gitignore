@@ -4,3 +4,4 @@
 aws_credentials.txt
 llm_client/__pycache__
 *__pycache__*
+openai_key.txt

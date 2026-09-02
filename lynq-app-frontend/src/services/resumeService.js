@@ -48,7 +48,8 @@ const get_resumes = async (authFetch) => {
  *   secured fetcher (useApi's authFetch).
  * @param {string} fileName - Name of the file to upload; used to build the S3
  *   object key (e.g. `resume.pdf`).
- * @returns {Promise<string>} The pre-signed upload URL (data.preSignedUrl).
+ * @returns {Promise<{ preSignedUrl: string, fileId: string }>} The pre-signed
+ *   upload URL and the file id it was registered under.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
 const generate_resume_upload_url = async (authFetch, fileName) => {
@@ -57,7 +58,7 @@ const generate_resume_upload_url = async (authFetch, fileName) => {
     method: 'GET',
   });
   // Unwrap the GlobalRestResponse envelope ({ success, data }).
-  return payload?.data?.preSignedUrl;
+  return payload?.data;
 };
 
 /**
@@ -89,6 +90,53 @@ const upload_resume = async (preSignedUrl, file) => {
   }
 };
 
+const import_resume_document = async (authFetch, fileId, language) => {
+  const query = language ? `?${new URLSearchParams({ language })}` : '';
+  const payload = await authFetch(
+    `/resume/document/${encodeURIComponent(fileId)}/import${query}`,
+    { method: 'POST' },
+  );
+  return payload?.data;
+};
+
+const preview_resume = async (authFetch, body) => {
+  const payload = await authFetch('/resume/preview', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return payload?.data;
+};
+
+const delete_resume_preview = async (authFetch, fileId) => {
+  await authFetch(`/resume/preview/${encodeURIComponent(fileId)}`, {
+    method: 'DELETE',
+  });
+};
+
+/**
+ * Delete a resume the candidate had already created.
+ *
+ * Calls DELETE /resume/{resumeId} on lynq-bff, which removes the resume from the
+ * app-backend and then drops its PDF from lynq-file-storage — the two live in
+ * different services and only the gateway talks to both. The candidate is
+ * resolved from the bearer token, so a resume that is not theirs answers 404.
+ *
+ * The candidate's skills are deliberately kept: they are merged from every
+ * resume the person wrote, so there is no way to tell which came from this one,
+ * and dropping them would silently lower their LyNQ score.
+ *
+ * @param {(path: string, options?: object) => Promise<object>} authFetch - The
+ *   secured fetcher (useApi's authFetch).
+ * @param {string} resumeId - Id of the resume to delete.
+ * @returns {Promise<void>} Resolves once the resume is gone (204).
+ * @throws {Error} On a non-OK response. Carries `status` and `reason`.
+ */
+const delete_resume = async (authFetch, resumeId) => {
+  await authFetch(`/resume/${encodeURIComponent(resumeId)}`, {
+    method: 'DELETE',
+  });
+};
+
 /**
  * Persist a resume the candidate filled in through the creation wizard.
  *
@@ -97,9 +145,9 @@ const upload_resume = async (preSignedUrl, file) => {
  *
  * @param {(path: string, options?: object) => Promise<object>} authFetch - The
  *   secured fetcher (useApi's authFetch).
- * @param {{ name: string, language: string, resume: object }} body - The resume
- *   name, the language its content is written in (see {@link LANGUAGES}), and
- *   the resume JSON itself.
+ * @param {{ name: string, language: string, resume: object, fileId: string }} body - The resume
+ *   name, the language its content is written in (see {@link LANGUAGES}), the
+ *   resume JSON itself, and the file id of its PDF.
  * @returns {Promise<object>} The created resume (unwrapped
  *   GetUserResumeRestResponse).
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
@@ -153,6 +201,10 @@ export default {
   get_resumes,
   generate_resume_upload_url,
   upload_resume,
+  import_resume_document,
+  preview_resume,
   create_resume,
+  delete_resume,
+  delete_resume_preview,
   extract_skills,
 };

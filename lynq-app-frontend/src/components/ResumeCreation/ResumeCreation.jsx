@@ -2,6 +2,9 @@ import AuthHeading from '../AuthHeading/AuthHeading'
 import LynqTitle from '../LynqTitle/LynqTitle'
 import ResumeWizard from '../ResumeWizard/ResumeWizard'
 import ResumeWizardFooter from '../ResumeWizardFooter/ResumeWizardFooter'
+import useApi from '../../hooks/useApi'
+import useResumeWizard from '../../hooks/useResumeWizard'
+import resumeService from '../../services/resumeService'
 import strings from '../../i18n'
 import './ResumeCreation.css'
 
@@ -14,6 +17,15 @@ import './ResumeCreation.css'
 // the flow starts from a clean draft.
 const ResumeCreation = ({ onCompleted, onCancel }) => {
   const t = strings.pages.resume.create
+  const { authFetch } = useApi()
+  const { data } = useResumeWizard()
+
+  const cancel = () => {
+    if (data.previewFileId) {
+      resumeService.delete_resume_preview(authFetch, data.previewFileId).catch(() => {})
+    }
+    onCancel()
+  }
 
   return (
     <div className="resume-create">
@@ -22,7 +34,7 @@ const ResumeCreation = ({ onCompleted, onCancel }) => {
         <AuthHeading title={t.title} subtitle={t.subtitle} />
 
         <ResumeWizard onCompleted={onCompleted} />
-        <ResumeWizardFooter onCancel={onCancel} />
+        <ResumeWizardFooter onCancel={onCancel ? cancel : undefined} />
       </main>
     </div>
   )

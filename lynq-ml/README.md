@@ -4,8 +4,8 @@
 
 Machine-learning service for the Lynq platform. A FastAPI app that augments the platform with LLM-backed features, served behind the standard `lynq-request-uuid` correlation header and the platform's `GlobalRestResponse` envelope. All features are backed by a pluggable LLM client (a local **Ollama** model by default, or **Amazon Bedrock**). It exposes:
 
-- **Skill enhancement** — extract key technical skills from a job posting.
-- **Resume skill extraction** — consolidate a whole resume's skills into technical/tools/soft buckets.
+- **Skill enhancement** — extract key skills from a job posting, plus generalized similarity tags.
+- **Resume skill extraction** — consolidate a whole resume's skills into technical/tools/soft buckets, plus generalized similarity tags.
 - **Upskilling suggestion** — assess a candidate against a job and return the skill gaps with real Udemy courses.
 - **Candidate explanation** — turn the same candidate/job assessment into a recruiter hiring verdict with strengths and concerns.
 - **Resume parsing** — download a resume (PDF/DOCX) and structure it into rich JSON.
@@ -142,11 +142,11 @@ sequenceDiagram
         R-->>C: 502 "LLM request failed: ..."
     else response returned
         L-->>R: raw completion (JSON)
-        R->>R: parse {"skills": [...]}, validate list of strings
+        R->>R: parse {"skills": [...], "similarity_tags": [...]}, validate lists of strings
         alt malformed output
             R-->>C: 502 "LLM returned malformed output"
         else valid
-            R-->>C: 200 { success:true, data:{ skills:[...] } }
+            R-->>C: 200 { success:true, data:{ skills:[...], similarity_tags:[...] } }
         end
     end
 ```
@@ -174,8 +174,8 @@ All routes require the `lynq-request-uuid` header **except** `/lynq-ml/health`.
 
 | Method | Path                       | Extra headers required          | Description                                            |
 | ------ | -------------------------- | ------------------------------- | ------------------------------------------------------ |
-| POST   | `/dmz/skill-enhance`           | `user-id` (`company-id` optional) | Extract 5–15 key technical skills from a job posting. Called straight through lynq-bff. |
-| POST   | `/dmz/resume/skill-extraction` | `user-id`                       | Consolidate a whole resume's skills into technical/tools/soft buckets. Called straight through lynq-bff. |
+| POST   | `/dmz/skill-enhance`           | `user-id` (`company-id` optional) | Extract 5–15 key skills from a job posting plus 5–12 similarity tags. Called straight through lynq-bff. |
+| POST   | `/dmz/resume/skill-extraction` | `user-id`                       | Consolidate a whole resume's skills into technical/tools/soft buckets plus similarity tags. Called straight through lynq-bff. |
 | POST   | `/dmz/upskilling_suggestion`   | `user-id`, `company-id`         | Assess a candidate vs. a job; return a verdict + Udemy courses for each gap. |
 | POST   | `/dmz/candidate-explanation`   | `user-id`, `company-id`         | Assess a candidate vs. a job; return a hiring verdict with strengths and concerns. |
 | POST   | `/dmz/parse-resume`            | `user-id`                       | Download a resume (PDF/DOCX) from a presigned URL and structure it into JSON. |
@@ -197,11 +197,22 @@ All routes require the `lynq-request-uuid` header **except** `/lynq-ml/health`.
 `work_type` is an enum: `REMOTE` or `IN_OFFICE`. The response is wrapped in `GlobalRestResponse<SkillEnhanceResponse>`:
 
 ```json
-{ "success": true, "data": { "skills": ["Java", "Spring", "AWS", "REST", "Docker"] } }
+{
+  "success": true,
+  "data": {
+    "skills": ["Java", "Spring", "AWS", "REST", "Docker"],
+    "similarity_tags": ["Backend Development", "Asynchronous Messaging", "Cloud Infrastructure", "Containerization"]
+  }
+}
 ```
 
+- `skills`: the concrete skills the posting asks for, written in the posting's own language.
+- `similarity_tags`: the same requirements generalized into transferable capabilities — see
+  [Similarity tags](#similarity-tags) below. Best-effort: a model that omits them, or returns them
+  in the wrong shape, yields `[]` rather than a `502`.
+
 **`POST /dmz/resume/skill-extraction`**`?language=es` reads a whole structured resume and returns
-its skills consolidated into three buckets. The request body is the `Resume` schema below (the same
+its skills consolidated into three buckets plus a list of similarity tags. The request body is the `Resume` schema below (the same
 one `/parse-resume` returns), so it chains straight off the parser — and since every field is
 defaulted, a draft resume the candidate is still filling in validates too:
 
@@ -223,14 +234,19 @@ skill into exactly one bucket. The response is wrapped in `GlobalRestResponse<Sk
   "data": {
     "skills": ["Java", "Spring", "AWS"],
     "tools": ["Docker", "Git"],
-    "soft": ["Liderazgo", "Comunicación"]
+    "soft": ["Liderazgo", "Comunicación"],
+    "similarity_tags": ["Backend Development", "Asynchronous Messaging", "Cloud Infrastructure", "Team Leadership"]
   }
 }
 ```
 
-- `skills`: technical skills — languages, frameworks, databases, cloud platforms, architecture concepts.
-- `tools`: concrete tools, software and platforms (Docker, Git, Jira).
+- `skills`: technical or domain skills — languages, frameworks, databases, cloud platforms,
+  architecture concepts; for a non-technical resume, the equivalent domain skills.
+- `tools`: concrete tools, software and platforms (Docker, Git, Jira, QuickBooks, Photoshop).
 - `soft`: soft/interpersonal skills.
+- `similarity_tags`: 8–20 generalized capabilities derived from the three buckets *and* from what
+  the candidate actually did in `work_experience` / `projects`. Always English — see
+  [Similarity tags](#similarity-tags) below.
 - `language` *(optional query param)*: the caller's UI language code (`en`, `es`; a region suffix
   like `es-AR` is accepted). Only `soft` is written in it — technical and tool names are proper
   nouns and are copied verbatim. Unknown or omitted codes fall back to English, so a resume drafted
@@ -238,6 +254,38 @@ skill into exactly one bucket. The response is wrapped in `GlobalRestResponse<Sk
 
 Nothing is persisted: the caller decides which of the returned skills to keep. Malformed LLM output
 returns `502`.
+
+### Similarity tags
+
+Matching a candidate on the literal spelling of a skill is too strict. A posting asking for **Kafka**
+never surfaces a candidate who only used **RabbitMQ**, even though both are ways of doing
+event-driven communication and that experience transfers. Both the job-posting and the resume
+prompts therefore return a `similarity_tags` list next to the concrete skills: the *capability*
+behind the skill, at the level of abstraction where two substitutes become interchangeable.
+
+The similarity tags are the join key between the two endpoints, which is why they are constrained:
+
+- **Always English**, whatever the language of the posting or of the resume — and, for
+  `/resume/skill-extraction`, whatever the `language` query param says. A Spanish posting and an
+  English resume have to meet on the same vocabulary, so unlike `soft` they are never translated.
+- **Title Case**, a noun phrase of 2–4 words, 40 characters or fewer.
+- **One or two levels above the concrete skill**: never a vendor, product or version name
+  (`Kafka`, `QuickBooks`, `Java 21`), never an industry (`Technology`, `Healthcare`).
+- **Substitutes share a tag** — that is the whole point of the list.
+
+This is not a software-only idea; the prompts carry examples from every field:
+
+| Concrete skills                     | Similarity tag                             |
+| ----------------------------------- | ------------------------------------------ |
+| Kafka, RabbitMQ, SQS, Pub/Sub       | `Asynchronous Messaging`, `Event Streaming` |
+| PostgreSQL, MySQL, Oracle           | `Relational Databases`                     |
+| Docker, Kubernetes, ECS             | `Containerization`, `Container Orchestration` |
+| QuickBooks, SAP FI, Xero            | `Accounting Software`                      |
+| IFRS, US GAAP                       | `Financial Reporting Standards`            |
+| Photoshop, Illustrator, Figma       | `Digital Design Tools`                     |
+| Triage, ACLS, ICU care              | `Emergency Patient Care`                   |
+| Litigation, arbitration, mediation  | `Dispute Resolution`                       |
+| Forklift licence, pallet jack       | `Warehouse Operations`                     |
 
 **`POST /dmz/upskilling_suggestion`** request body (the same `{ job, candidate }` structure the prompt consumes):
 
@@ -385,8 +433,18 @@ Returns `201 Created` with an empty `GlobalRestResponse` once the PDF has been g
 **`GET /health`** returns `200` when the configured LLM is reachable, `503` otherwise (this route is *not* wrapped in `GlobalRestResponse`):
 
 ```json
-{ "status": "UP", "llm": { "provider": "ollama", "status": "UP" } }
+{
+  "status": "UP",
+  "llm": { "provider": "ollama", "status": "UP" },
+  "renderer": { "status": "UP" }
+}
 ```
+
+`status` (and the HTTP code) follow the LLM alone. `renderer` reports whether
+WeasyPrint could load its native libraries — see
+[Running locally](#running-locally) — and is deliberately kept out of the status
+code: only `/resume-template-creation` renders anything, so a missing Pango is
+surfaced rather than pulling the whole service out of rotation.
 
 ---
 
@@ -524,6 +582,25 @@ curl http://localhost:8084/lynq-ml/health
 
 - Python 3.12
 - A reachable LLM backend — either a local Ollama server (default) or AWS credentials allowed to invoke a Bedrock model.
+- **Native libraries for WeasyPrint** (Pango/Cairo). These are C libraries, not
+  Python packages: pip cannot install them and `requirements.txt` cannot pin
+  them, so they have to be installed with the system package manager. Without
+  them the service still starts and every endpoint works *except*
+  `/resume-template-creation`, which fails with
+  `OSError: cannot load library 'pango-1.0-0'`.
+
+  ```bash
+  # macOS (pulls cairo, glib, harfbuzz and fontconfig as dependencies)
+  brew install pango
+
+  # Debian / Ubuntu — the same set the Dockerfile installs
+  sudo apt-get install -y libcairo2 libpango-1.0-0 libpangocairo-1.0-0 \
+                          libgdk-pixbuf-2.0-0 libffi8 fonts-dejavu-core
+  ```
+
+  Docker needs none of this: the [Dockerfile](Dockerfile) installs them in the
+  image. To check an already-running service, `GET /lynq-ml/health` reports
+  `renderer.status`, and the same probe runs at startup and logs the fix.
 
 **Steps**
 

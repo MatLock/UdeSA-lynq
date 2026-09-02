@@ -5,6 +5,7 @@ import ResumePersonalStep from '../ResumePersonalStep/ResumePersonalStep'
 import ResumeEducationStep from '../ResumeEducationStep/ResumeEducationStep'
 import ResumeEmploymentStep from '../ResumeEmploymentStep/ResumeEmploymentStep'
 import ResumeTemplateStep from '../ResumeTemplateStep/ResumeTemplateStep'
+import ResumePreviewStep from '../ResumePreviewStep/ResumePreviewStep'
 import './ResumeWizard.css'
 
 // Horizontal carousel of resume-creation steps, built exactly like the register
@@ -13,8 +14,8 @@ import './ResumeWizard.css'
 //
 // The upload path finishes inside the first step (pick a file, send it straight
 // to S3), so choosing it collapses the wizard to that single step; the form path
-// keeps its five views. Before a choice is made the full form path is shown, so
-// the step counter reads "1 of 5" rather than promising a shorter flow.
+// keeps its six views. Before a choice is made the full form path is shown, so
+// the step counter reads "1 of 6" rather than promising a shorter flow.
 const ResumeWizard = ({ onCompleted }) => {
   const { step, data } = useResumeWizard()
   const slideRefs = useRef([])
@@ -29,6 +30,7 @@ const ResumeWizard = ({ onCompleted }) => {
           ResumeEducationStep,
           ResumeEmploymentStep,
           ResumeTemplateStep,
+          ResumePreviewStep,
         ]
 
   useLayoutEffect(() => {

@@ -178,13 +178,43 @@ sequenceDiagram
     Svc->>FS: POST /dmz/files/download-urls (every company + poster file id on the page)
     FS-->>Svc: { fileId: downloadUrl }
     loop each job
-        Svc->>Svc: lynqScore = % of job skills the candidate has (CANDIDATE only)
+        Svc->>Svc: lynqScore = best of skill match / similarity-tag match (CANDIDATE only)
     end
     Svc-->>Ctrl: PagedRestResponse<GetJobRestResponse>
     Ctrl-->>C: 200 OK
 ```
 
-The **LyNQ score** is the percentage of a job's skills that the authenticated candidate already lists (case-insensitive, trimmed). It is `null` for `COMPANY` users, or when either the job or the user has no skills.
+#### The LyNQ score
+
+How much of what a job asks for the authenticated candidate has, as a percentage. `null` for
+`COMPANY` users; `0` when the candidate has nothing recorded or the job asks for nothing.
+
+A job is described **twice**: by its literal skills (`Kafka`) and by the *similarity tags*
+lynq-ml derives from them (`Asynchronous Messaging`). The candidate is described the same way. The
+score is computed against both descriptions and **the better one wins**:
+
+```
+candidateVocabulary = user_skills ∪ user_similarity_tags      (trimmed, lower-cased)
+score = max( |job_skills          ∩ candidateVocabulary| / |job_skills|,
+             |job_similarity_tags ∩ candidateVocabulary| / |job_similarity_tags| )
+```
+
+Matching only the literal names is too strict: a candidate who solved the same problem with
+RabbitMQ never surfaces for a Kafka post, even though the experience transfers. The similarity tags
+are not extra requirements — they are the same requirements stated at the level where substitutes
+are interchangeable, which is why the best of the two is taken rather than a blend. It also means
+the number can never fall below the skills-only score, so a post with no tags scores exactly as it
+always did.
+
+Nothing is stored: the score is computed per request, on every job that is read.
+
+**Where the candidate's skills come from.** The resume is the only place a candidate's skills are
+ever written down, so creating one (`POST /user/resume`) projects them onto the user:
+`skills.technical` and `skills.tools` become `user_skills`, and the similarity tags lynq-ml
+extracted become `user_similarity_tags`. Soft skills are left out — a job requirement is not
+"Leadership". New entries are **added** to what the candidate already has rather than replacing it:
+the same person may hold one resume per language or per role, and the skills of the one they are
+not looking at right now are no less true.
 
 ### 3. Candidate evaluations via lynq-ml
 
@@ -252,6 +282,9 @@ sequenceDiagram
 | `GET /dmz/company/generate-upload-image?file-name=…` | `POST /dmz/company/confirm-upload-image?file-id=…` |
 | `GET /dmz/user/generate-upload-resume?file-name=…`   | `POST /dmz/user/confirm-upload-resume?file-id=…`   |
 
+For the résumé the confirm step is not called by the browser: `lynq-bff`'s resume-import flow calls
+it as the first step of reading the uploaded document into a résumé (see that service's README).
+
 ---
 
 ## Data model
@@ -264,7 +297,9 @@ Liquibase provisions the `lynq_backend_db` schema on startup (`resources/changel
 | `companies`            | Company profile, unique `name`, `owner_user_id` → `users`. `lynq_file_storage_id` points at the logo held by `lynq-file-storage`. |
 | `job_posts`            | Job postings. `job_status` ∈ {`OPEN`, `CLOSE`}, `job_post_source` ∈ {`LYNQ`, `LINKEDIN`, `COMPUTRABAJO`, `BUMERAN`}, `work_type` ∈ {`REMOTE`, `IN_OFFICE`}. FKs to `users` (poster) and `companies` — both nullable for scraped jobs. |
 | `job_post_skills`      | Skills required by a job (`job_id`, `skill`), unique per pair.                           |
-| `user_skills`          | Skills a user has (`user_id`, `skill`), unique per pair — drives the LyNQ score.         |
+| `user_skills`          | Skills a user has (`user_id`, `skill`), unique per pair — drives the LyNQ score. Written when a resume is created. |
+| `job_post_similarity_tags` | Generalized capabilities of a job (`job_id`, `similarity_tag`), unique per pair. Derived by lynq-ml, never displayed — they only widen the LyNQ score. |
+| `user_similarity_tags` | The same for a candidate (`user_id`, `similarity_tag`). A post asking for Kafka and a candidate who used RabbitMQ meet here, on `Asynchronous Messaging`. |
 | `user_resumes`         | Uploaded/generated résumés (`resume` JSON, `language`, `lynq_file_storage_id` → the PDF held by `lynq-file-storage`). |
 | `user_application_job` | A user's application to a job (unique per `job_post_id` + `user_id`).                    |
 
@@ -286,6 +321,8 @@ Base path: `/lynq-backend-app` (Spring `server.servlet.context-path`).
 | POST   | `/dmz/user/confirm-upload-image`    | `?file-id=`                                                          | Mark the uploaded profile image available (204).         |
 | GET    | `/dmz/user/generate-upload-resume`  | `?file-name=`                                                        | Register a résumé PDF; returns `{preSignedUrl, fileId}` (`CANDIDATE` only). |
 | POST   | `/dmz/user/confirm-upload-resume`   | `?file-id=`                                                          | Mark the uploaded résumé available (204, `CANDIDATE` only). |
+| POST   | `/dmz/user/resume`                  | `{name?, language, resume, fileId}`                                  | Create the résumé the candidate approved, pointing at the PDF `lynq-bff`'s preview flow stored (`CANDIDATE` only). |
+| DELETE | `/dmz/user/resume/{resumeId}`       | —                                                                    | Delete one of the candidate's résumés. Answers the deleted `fileId` so `lynq-bff` can drop the PDF; another user's résumé is a 404. Skills are kept (`CANDIDATE` only). |
 | POST   | `/dmz/company`                      | `{fullName, currentPosition, userAbout, birthDate, companyName, companyAbout, companySize?, …}` | Create the authenticated user as a `COMPANY` and its company. |
 | GET    | `/dmz/company/generate-upload-image`| `?file-name=`                                                        | Register the company logo in `lynq-file-storage`; returns `{preSignedUrl, fileId}`. |
 | POST   | `/dmz/company/confirm-upload-image` | `?file-id=`                                                          | Mark the uploaded logo available (204).                  |

@@ -44,6 +44,11 @@ async def extract_resume_skills(
     written in the ``language`` query parameter (the caller's UI language,
     English when omitted) — a resume drafted in one language must not force the
     skills into it. Technical and tool names are always kept verbatim.
+
+    Alongside the buckets the model returns ``similarity_tags``: the same skills
+    generalized into transferable capabilities ("Asynchronous Messaging" rather
+    than Kafka or RabbitMQ), always in English so this resume can be matched
+    against postings written in another language.
     """
     log.info(
         "message= Started resume skill-extraction, " + _LOG_CONTEXT,
@@ -71,11 +76,12 @@ async def extract_resume_skills(
     log.info(
         "message= Finished resume skill-extraction, "
         + _LOG_CONTEXT
-        + ", skill_count=%s, tool_count=%s, soft_count=%s",
+        + ", skill_count=%s, tool_count=%s, soft_count=%s, similarity_tag_count=%s",
         user_id,
         len(skills.skills),
         len(skills.tools),
         len(skills.soft),
+        len(skills.similarity_tags),
     )
     return GlobalRestResponse(data=skills)
 
@@ -85,7 +91,8 @@ def _parse_llm_output(raw: str, user_id: str) -> SkillExtractionResponse:
 
     Raises:
         HTTPException: 502 if the output is not JSON or does not match the
-            expected ``{ skills, tools, soft }`` schema.
+            expected ``{ skills, tools, soft, similarity_tags }`` schema. Every field is
+            defaulted, so a completion missing one still validates.
     """
     try:
         return SkillExtractionResponse.model_validate(json.loads(raw))

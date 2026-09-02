@@ -28,6 +28,15 @@ const isBlankEntry = (entry) =>
 // Drop the entries the user never filled in.
 const pruneEntries = (entries) => entries.filter((entry) => !isBlankEntry(entry))
 
+// One-line recap of an entry for the header of a collapsed card — the couple of
+// fields that identify it ("Backend Engineer · Acme"), blanks dropped so a
+// half-filled entry still reads cleanly.
+const summarize = (...parts) =>
+  parts
+    .map((part) => (typeof part === 'string' ? part.trim() : ''))
+    .filter(Boolean)
+    .join(' · ')
+
 // Trimmed, de-duplicated tag list (skills, technologies, achievements).
 const cleanList = (items) => {
   const seen = new Set()
@@ -112,5 +121,6 @@ export default {
   isBlankEntry,
   pruneEntries,
   cleanList,
+  summarize,
   toResumePayload,
 }

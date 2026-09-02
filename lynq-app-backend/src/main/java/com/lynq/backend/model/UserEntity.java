@@ -65,6 +65,11 @@ public class UserEntity {
   @Builder.Default
   private List<UserSkillsEntity> skills = new ArrayList<>();
 
+  /** Generalized capability tags; scoring only, never shown as chips. */
+  @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+  @Builder.Default
+  private List<UserSimilarityTagEntity> similarityTags = new ArrayList<>();
+
   @OneToMany(mappedBy = "user", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
   @Builder.Default
   private List<UserResumeEntity> resumes = new ArrayList<>();

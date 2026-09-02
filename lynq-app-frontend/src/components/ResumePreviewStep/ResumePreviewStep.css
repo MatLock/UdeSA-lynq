@@ -1,0 +1,62 @@
+
+.resume-preview-frame {
+  max-height: 60vh;
+  min-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--code-bg);
+  padding: 10px;
+}
+
+.resume-preview-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.resume-preview-page {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.resume-preview-page + .resume-preview-page {
+  margin-top: 10px;
+}
+
+.resume-preview-error {
+  margin: 0;
+  padding: 24px 12px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--text);
+}
+
+.resume-preview-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.resume-preview-pages {
+  color: var(--text);
+}
+
+.resume-preview-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.resume-preview-open:hover {
+  text-decoration: underline;
+}

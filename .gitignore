@@ -14,3 +14,4 @@ crash.*.log
 aws_credentials.txt
 .aws/
 credentials
+.DS_Store

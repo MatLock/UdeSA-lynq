@@ -53,6 +53,7 @@ class SkillExtractionRouterTests(unittest.TestCase):
             "skills": ["Java", "Spring Boot", "AWS"],
             "tools": ["Docker"],
             "soft": ["Liderazgo"],
+            "similarity_tags": ["Backend Development", "Asynchronous Messaging"],
         }
         fake = _fake_client(generate_return=json.dumps(payload))
 
@@ -74,8 +75,24 @@ class SkillExtractionRouterTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json()["data"],
-            {"skills": ["Java"], "tools": [], "soft": []},
+            {"skills": ["Java"], "tools": [], "soft": [], "similarity_tags": []},
         )
+
+    def test_prompt_asks_for_english_similarity_tags(self) -> None:
+        # The similarity tags are the cross-language matching vocabulary, so the prompt must
+        # ask for them in English even when the soft skills are requested in
+        # Spanish.
+        fake = _fake_client(generate_return=json.dumps({"skills": [], "tools": [], "soft": []}))
+
+        with patch("router.user_resume_skill_extraction.get_llm_client", return_value=fake):
+            self.client.post(
+                _ENDPOINT, json=_BODY, headers=_HEADERS, params={"language": "es"}
+            )
+
+        prompt = fake.generate.await_args.args[0]
+        self.assertIn("similarity_tags", prompt)
+        self.assertIn("ALWAYS write similarity tags in English", prompt)
+        self.assertIn("Asynchronous Messaging", prompt)
 
     def test_prompt_is_built_from_resume_body(self) -> None:
         fake = _fake_client(generate_return=json.dumps({"skills": [], "tools": [], "soft": []}))

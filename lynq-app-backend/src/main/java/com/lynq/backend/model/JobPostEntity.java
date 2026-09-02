@@ -86,4 +86,9 @@ public class JobPostEntity {
   @Builder.Default
   private List<JobPostSkillEntity> skills = new ArrayList<>();
 
+  /** Generalized capability tags; scoring only, never shown as chips. */
+  @OneToMany(mappedBy = "jobPost", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+  @Builder.Default
+  private List<JobPostSimilarityTagEntity> similarityTags = new ArrayList<>();
+
 }

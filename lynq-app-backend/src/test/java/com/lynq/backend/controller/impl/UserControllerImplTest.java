@@ -1,10 +1,12 @@
 package com.lynq.backend.controller.impl;
 
+import com.lynq.backend.controller.request.CreateResumeRequest;
 import com.lynq.backend.controller.request.CreateUserRequest;
 import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.CreateUserRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadImageRestResponse;
 import com.lynq.backend.controller.response.GenerateUploadResumeRestResponse;
+import com.lynq.backend.controller.response.DeleteResumeRestResponse;
 import com.lynq.backend.controller.response.GetUserProfileRestResponse;
 import com.lynq.backend.controller.response.GetUserRestResponse;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
@@ -57,6 +59,7 @@ class UserControllerImplTest {
   private static final String PRE_SIGNED_URL =
       "https://lynq-bucket.s3.amazonaws.com/lynq/users/" + USER_ID + "/profile/" + FILE_NAME + "?X-Amz-Signature=abc";
   private static final String RESUME_ID = "resume-1";
+  private static final String RESUME_FILE_ID = "resume-file-1";
   private static final String RESUME_NAME = "Jane Doe - Backend";
   private static final String COMPANY_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
 
@@ -359,6 +362,61 @@ class UserControllerImplTest {
     assertThat(body.isSuccess(), is(true));
     assertThat(body.getData(), is(org.hamcrest.Matchers.hasSize(1)));
     assertThat(body.getData().get(0).getId(), is(RESUME_ID));
+  }
+
+  @Test
+  void createUserResumeDelegatesToServiceWithPrincipalId() {
+    CreateResumeRequest request = new CreateResumeRequest();
+    when(userService.createResume(USER_ID, request))
+        .thenReturn(GetUserResumeRestResponse.builder().build());
+
+    userController.createUserResume(request, principal);
+
+    verify(userService).createResume(USER_ID, request);
+  }
+
+  @Test
+  void createUserResumeRespondsWithCreatedStatusAndTheStoredResume() {
+    CreateResumeRequest request = new CreateResumeRequest();
+    GetUserResumeRestResponse resume = GetUserResumeRestResponse.builder().id(RESUME_ID).build();
+    when(userService.createResume(USER_ID, request)).thenReturn(resume);
+
+    ResponseEntity<GlobalRestResponse<GetUserResumeRestResponse>> response =
+        userController.createUserResume(request, principal);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
+    GlobalRestResponse<GetUserResumeRestResponse> body = response.getBody();
+    assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData(), is(sameInstance(resume)));
+  }
+
+  @Test
+  void deleteUserResumeDelegatesToServiceWithPrincipalId() {
+    when(userService.deleteResume(USER_ID, RESUME_ID))
+        .thenReturn(DeleteResumeRestResponse.builder().build());
+
+    userController.deleteUserResume(RESUME_ID, principal);
+
+    verify(userService).deleteResume(USER_ID, RESUME_ID);
+  }
+
+  @Test
+  void deleteUserResumeRespondsWithOkAndTheDeletedResumeFileId() {
+    DeleteResumeRestResponse deleted = DeleteResumeRestResponse.builder()
+        .id(RESUME_ID)
+        .fileId(RESUME_FILE_ID)
+        .build();
+    when(userService.deleteResume(USER_ID, RESUME_ID)).thenReturn(deleted);
+
+    ResponseEntity<GlobalRestResponse<DeleteResumeRestResponse>> response =
+        userController.deleteUserResume(RESUME_ID, principal);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+    GlobalRestResponse<DeleteResumeRestResponse> body = response.getBody();
+    assertThat(body, is(org.hamcrest.Matchers.notNullValue()));
+    assertThat(body.isSuccess(), is(true));
+    assertThat(body.getData(), is(sameInstance(deleted)));
   }
 
   @Test

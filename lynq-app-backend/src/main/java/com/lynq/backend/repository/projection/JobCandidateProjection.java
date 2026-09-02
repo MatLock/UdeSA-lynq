@@ -11,7 +11,9 @@ import java.time.LocalDate;
  * whole page in one call. {@code jobSkills} and {@code userSkills} carry
  * the comma-separated skill names (or {@code null} when there are none), each pulled in the same
  * query via a correlated {@code group_concat} subquery, so the service can compute the LyNQ score
- * of every candidate against the job without extra round-trips.
+ * of every candidate against the job without extra round-trips. {@code jobSimilarityTags} and
+ * {@code userSimilarityTags} carry the generalized capability tags the same score also matches on, pulled the
+ * same way.
  */
 public record JobCandidateProjection(
     String id,
@@ -22,5 +24,7 @@ public record JobCandidateProjection(
     String userCurrentPosition,
     LocalDate appliedOn,
     String jobSkills,
-    String userSkills) {
+    String userSkills,
+    String jobSimilarityTags,
+    String userSimilarityTags) {
 }

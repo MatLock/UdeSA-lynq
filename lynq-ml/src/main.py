@@ -1,6 +1,9 @@
+from contextlib import asynccontextmanager
+
 from fastapi import APIRouter, FastAPI
 
 from exception_handlers import register_exception_handlers
+from renderer.resume_template import pdf_renderer_available
 from middleware.request_uuid import require_request_uuid
 from router.candidate_explanation import router as candidate_explanation_router
 from router.health import router as health_router
@@ -42,7 +45,18 @@ def _read_version() -> str:
 LOGGING_CONFIG = _build_logging_config()
 logging.config.dictConfig(LOGGING_CONFIG)
 
-app = FastAPI(version=_read_version())
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+  # WeasyPrint's native libraries are not Python packages, so pip cannot install
+  # them and a machine missing them looks perfectly healthy until someone asks
+  # for a resume PDF. Probe once at boot so the error is in the startup log
+  # rather than in a 500 half an hour later. The probe itself logs the fix; the
+  # service still starts, since only one of the eight endpoints needs it.
+  pdf_renderer_available()
+  yield
+
+
+app = FastAPI(version=_read_version(), lifespan=lifespan)
 
 app.middleware("http")(require_request_uuid)
 register_exception_handlers(app)

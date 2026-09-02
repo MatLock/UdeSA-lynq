@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import AddRoundedIcon from '@mui/icons-material/AddRounded'
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded'
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined'
-import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined'
+import ConfirmDialog from '../../components/ConfirmDialog/ConfirmDialog.jsx'
 import ResumeCreation from '../../components/ResumeCreation/ResumeCreation.jsx'
 import ResumeDocument from '../../components/ResumeDocument/ResumeDocument.jsx'
 import ResumeSectionNav from '../../components/ResumeSectionNav/ResumeSectionNav.jsx'
@@ -39,8 +40,8 @@ const formatCreatedOn = (isoDate) => {
 //
 // A candidate can hold the same resume in several languages, so "which resume to
 // show" is a language match first and a manual choice second (the switcher above
-// the document). When no resume exists in the UI language we show another one and
-// say so, rather than pretending the section is empty.
+// the document). When no resume exists in the UI language we simply show another
+// one, rather than pretending the section is empty.
 const MyResumePage = () => {
   const t = strings.pages.resume
   const { authFetch } = useApi()
@@ -57,9 +58,10 @@ const MyResumePage = () => {
   // over the viewer. The counter re-keys the provider so each run starts clean.
   const [creating, setCreating] = useState(false)
   const [wizardRun, setWizardRun] = useState(0)
-  // A document was uploaded but no parsed resume has appeared yet: extraction
-  // happens server-side, so the list can still be empty right afterwards.
-  const [uploadPending, setUploadPending] = useState(false)
+  // The resume the user asked to delete, held until they confirm; null closes the
+  // dialog. `deleting` keeps it open with the buttons disabled while it runs.
+  const [pendingDeletion, setPendingDeletion] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Bumped to re-run the fetch (retry, post-creation reload, manual refresh).
   const [reloadToken, setReloadToken] = useState(0)
@@ -105,23 +107,39 @@ const MyResumePage = () => {
   const sectionKey = `${selected?.id ?? ''}:${sections.map((section) => section.id).join('|')}`
   const { activeId, scrollTo } = useActiveSection(documentRef, sectionKey)
 
-  const languageName = (code) => t.languageNames[(code ?? '').toUpperCase()] ?? code
-
   const startCreating = () => {
     setWizardRun((previous) => previous + 1)
     setCreating(true)
   }
 
-  // The wizard finished. The form path persisted a resume, so reload and show it;
-  // the upload path only stored a document, so flag that the parsed resume may not
-  // exist yet — the pending panel stands in until a reload turns one up.
-  const handleCompleted = (method) => {
-    setCreating(false)
-    if (method === 'form') {
-      setToast({ type: 'success', message: t.create.success })
-    } else {
-      setUploadPending(true)
+  // Drop the resume, then reload: the viewer picks the next one on its own (the
+  // UI-language match, else whatever is left), and falls through to the creation
+  // wizard when that was the last one.
+  const handleDelete = async () => {
+    if (!pendingDeletion || deleting) return
+
+    setDeleting(true)
+    try {
+      await resumeService.delete_resume(authFetch, pendingDeletion.id)
+      // The selection is pinned by id; clear it so it can't point at a resume
+      // that no longer exists.
+      setSelectedId(null)
+      setPendingDeletion(null)
+      setToast({ type: 'success', message: t.deleteSuccess })
+      reload()
+    } catch (error) {
+      setToast({
+        type: 'error',
+        message: error.reason ?? error.message ?? t.deleteError,
+      })
+    } finally {
+      setDeleting(false)
     }
+  }
+
+  const handleCompleted = () => {
+    setCreating(false)
+    setToast({ type: 'success', message: t.create.success })
     reload()
   }
 
@@ -141,19 +159,6 @@ const MyResumePage = () => {
     </ResumeWizardProvider>
   )
 
-  const renderPending = () => (
-    <div className="resume-page-panel">
-      <span className="resume-page-panel-icon">
-        <AutoAwesomeOutlinedIcon sx={{ fontSize: 26 }} />
-      </span>
-      <h2 className="resume-page-panel-title">{t.create.pending.title}</h2>
-      <p className="resume-page-panel-body">{t.create.pending.body}</p>
-      <button type="button" className="resume-page-action" onClick={reload}>
-        {t.create.pending.refresh}
-      </button>
-    </div>
-  )
-
   const renderViewer = () => (
     <>
       <header className="resume-page-hero">
@@ -167,18 +172,10 @@ const MyResumePage = () => {
           <p className="resume-page-subtitle">{t.subtitle}</p>
         </div>
 
+        {/* The hero carries the one action that changes the collection; the
+            actions that operate on a single resume live on its own toolbar,
+            down at the document. */}
         <div className="resume-page-actions">
-          {selected?.pdfUrl && (
-            <a
-              className="resume-page-action resume-page-action--ghost"
-              href={selected.pdfUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <DownloadRoundedIcon sx={{ fontSize: 17 }} />
-              {t.downloadPdf}
-            </a>
-          )}
           <button type="button" className="resume-page-action" onClick={startCreating}>
             <AddRoundedIcon sx={{ fontSize: 17 }} />
             {t.newResume}
@@ -209,40 +206,75 @@ const MyResumePage = () => {
         </div>
       )}
 
-      <div className="resume-page-meta">
-        {selected?.createdOn && (
-          <span className="resume-page-created">
-            {t.createdOn.replace('{date}', formatCreatedOn(selected.createdOn))}
-          </span>
-        )}
-        {selected &&
-          (selected.language ?? '').toUpperCase() !== preferredLanguage && (
-            <span className="resume-page-note">
-              {t.languageFallback
-                .replace('{expected}', languageName(preferredLanguage))
-                .replace('{shown}', languageName(selected.language))}
-            </span>
-          )}
-      </div>
-
       <div className="resume-page-body">
         <ResumeSectionNav
           sections={sections}
           activeId={activeId}
           onSelect={scrollTo}
         />
-        <main className="resume-page-document" ref={documentRef}>
-          {sections.length > 0 ? (
-            <ResumeDocument resume={selected.resume} sections={sections} />
-          ) : (
-            <p className="resume-page-empty">{t.noContent}</p>
-          )}
-        </main>
+
+        <div className="resume-page-doc-column">
+          {/* Pinned to the top edge of the paper: what this document is on the
+              left, what you can do to it on the right. The language badge also
+              covers the single-resume case, where there are no tabs to show it. */}
+          <div className="resume-page-doc-bar">
+            {selected?.createdOn && (
+              <span className="resume-page-doc-date">
+                {t.createdOn.replace('{date}', formatCreatedOn(selected.createdOn))}
+              </span>
+            )}
+            {selected?.language && (
+              <span className="resume-page-doc-language">{selected.language}</span>
+            )}
+
+            <div className="resume-page-doc-actions">
+              {selected?.pdfUrl && (
+                <a
+                  className="resume-page-doc-download"
+                  href={selected.pdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <DownloadRoundedIcon sx={{ fontSize: 16 }} />
+                  {t.downloadPdf}
+                </a>
+              )}
+              {/* Rare and irreversible: a quiet glyph that only turns red on
+                  hover, one click from the confirmation. */}
+              {selected && (
+                <button
+                  type="button"
+                  className="resume-page-doc-delete"
+                  aria-label={t.deleteResume}
+                  title={t.deleteResume}
+                  onClick={() => setPendingDeletion(selected)}
+                >
+                  <DeleteOutlineRoundedIcon sx={{ fontSize: 17 }} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <main className="resume-page-document" ref={documentRef}>
+            {sections.length > 0 ? (
+              <ResumeDocument resume={selected.resume} sections={sections} />
+            ) : (
+              <p className="resume-page-empty">{t.noContent}</p>
+            )}
+          </main>
+        </div>
       </div>
     </>
   )
 
   const renderContent = () => {
+    // The wizard holds an unsaved draft, so it outranks the page's own loading
+    // and error states: a background refetch must not unmount it and take the
+    // half-written resume with it.
+    if (creating) {
+      return renderWizard()
+    }
+
     if (loading) {
       return (
         <div className="resume-page-state">
@@ -264,10 +296,9 @@ const MyResumePage = () => {
       )
     }
 
-    // No resume on file (or the candidate asked for another one) — the creation
-    // workflow is the whole page.
-    if (creating || resumes.length === 0) {
-      return uploadPending && resumes.length === 0 ? renderPending() : renderWizard()
+    // No resume on file — the creation workflow is the whole page.
+    if (resumes.length === 0) {
+      return renderWizard()
     }
 
     return renderViewer()
@@ -285,6 +316,23 @@ const MyResumePage = () => {
         onClose={() => setToast(null)}
       />
       {renderContent()}
+
+      {pendingDeletion && (
+        <ConfirmDialog
+          destructive
+          busy={deleting}
+          title={t.deleteTitle}
+          message={t.deleteMessage.replace(
+            '{name}',
+            pendingDeletion.name || t.untitled,
+          )}
+          confirmLabel={t.deleteConfirm}
+          busyLabel={t.deleting}
+          cancelLabel={t.create.cancel}
+          onConfirm={handleDelete}
+          onCancel={() => setPendingDeletion(null)}
+        />
+      )}
     </div>
   )
 }

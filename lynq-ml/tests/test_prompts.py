@@ -49,6 +49,37 @@ class RenderKeyExtractorPromptTests(unittest.TestCase):
 
         self.assertNotEqual(ollama, bedrock)
 
+    def test_every_template_requests_similarity_tags(self) -> None:
+        # Both providers must ask for the "similarity_tags" list, always in English, so the
+        # job posting and the resume end up sharing one matching vocabulary.
+        for provider in (LLMProvider.OLLAMA, LLMProvider.BEDROCK):
+            with self.subTest(provider=provider):
+                prompt = render_key_extractor_prompt(
+                    provider,
+                    job_title="Backend Engineer",
+                    work_type="REMOTE",
+                    job_description="Event driven services.",
+                )
+
+                self.assertIn('"similarity_tags"', prompt)
+                self.assertIn("English", prompt)
+                self.assertIn("Asynchronous Messaging", prompt)
+
+    def test_templates_cover_non_technical_domains(self) -> None:
+        # Generalization is not a software-only idea: the templates carry
+        # examples from other fields so a non-tech posting is tagged too.
+        for provider in (LLMProvider.OLLAMA, LLMProvider.BEDROCK):
+            with self.subTest(provider=provider):
+                prompt = render_key_extractor_prompt(
+                    provider,
+                    job_title="Enfermero de Guardia",
+                    work_type="IN_OFFICE",
+                    job_description="Triage y atención de pacientes.",
+                )
+
+                self.assertIn("Emergency Patient Care", prompt)
+                self.assertIn("Accounting Software", prompt)
+
     def test_missing_variable_raises_under_strict_undefined(self) -> None:
         # The environment uses StrictUndefined, so rendering the template
         # without all variables must raise rather than emit empty strings.

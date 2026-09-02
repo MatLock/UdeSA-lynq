@@ -14,9 +14,10 @@ import java.time.LocalDate;
  * scraped jobs that have no company. {@code jobSkills} carries the comma-separated job skill names
  * (or {@code null} when there are none), pulled in the same query via a correlated
  * {@code group_concat} subquery, so the service can compute the candidate's LyNQ score against
- * every job without extra round-trips. The candidate's own skills are not part of the projection:
- * they are the same for every row (always the authenticated candidate) and are read once from the
- * user entity.
+ * every job without extra round-trips. {@code jobSimilarityTags} carries the generalized capability tags the
+ * same score also matches on, pulled the same way. The candidate's own skills and tags are not part
+ * of the projection: they are the same for every row (always the authenticated candidate) and are
+ * read once from the user entity.
  */
 public record UserApplicationProjection(
     String id,
@@ -27,5 +28,6 @@ public record UserApplicationProjection(
     String companyName,
     String companyFileStorageId,
     LocalDate appliedOn,
-    String jobSkills) {
+    String jobSkills,
+    String jobSimilarityTags) {
 }

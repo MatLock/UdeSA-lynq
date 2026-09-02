@@ -63,7 +63,8 @@ async def skill_enhance(
         raise HTTPException(status_code=502, detail=f"LLM request failed: {exc}") from exc
 
     try:
-        skills = json.loads(raw)["skills"]
+        completion = json.loads(raw)
+        skills = completion["skills"]
         if not isinstance(skills, list) or not all(isinstance(s, str) for s in skills):
             raise TypeError("skills is not a list of strings")
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
@@ -76,10 +77,41 @@ async def skill_enhance(
         )
         raise HTTPException(status_code=502, detail="LLM returned malformed output") from exc
 
+    similarity_tags = _read_similarity_tags(completion, user_id, company_id)
+
     log.info(
-        "message= Finished skill-enhance, " + _LOG_CONTEXT + ", skill_count=%s",
+        "message= Finished skill-enhance, "
+        + _LOG_CONTEXT
+        + ", skill_count=%s, similarity_tag_count=%s",
         user_id,
         company_id,
         len(skills),
+        len(similarity_tags),
     )
-    return GlobalRestResponse(data=SkillEnhanceResponse(skills=skills))
+    return GlobalRestResponse(
+        data=SkillEnhanceResponse(skills=skills, similarity_tags=similarity_tags)
+    )
+
+
+def _read_similarity_tags(
+    completion: dict, user_id: str, company_id: Optional[str]
+) -> list[str]:
+    """Read the generalized capability tags out of the model's completion.
+
+    Unlike ``skills``, they are best-effort: they widen how a posting is matched
+    against resumes, so a model that omits them — or returns them in the wrong
+    shape — degrades the match instead of failing the request.
+    """
+    similarity_tags = completion.get("similarity_tags", [])
+    if isinstance(similarity_tags, list) and all(
+        isinstance(tag, str) for tag in similarity_tags
+    ):
+        return similarity_tags
+
+    log.warning(
+        "message= LLM returned malformed similarity_tags on skill-enhance, "
+        "ignoring them, " + _LOG_CONTEXT,
+        user_id,
+        company_id,
+    )
+    return []
