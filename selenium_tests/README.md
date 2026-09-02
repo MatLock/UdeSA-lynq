@@ -19,6 +19,18 @@ language the UI runs in; the scripts themselves are in English.
    out.
 4. **Logs back in as the candidate**, finds the job in the feed, opens its detail
    page, applies, and checks the application shows up under *Mis Postulaciones*.
+5. **Creates a resume and manages its alias**: uploads `files/resume_mock.pdf`
+   through the wizard's upload path (the ML service reads the document into a
+   structured resume, so this step waits up to `EXTRA_LONG_TIMEOUT_MS`), then
+   assigns an alias from the viewer's *Asignar alias* button and overrides it —
+   asserting the success toast, that the button switches to *Editar alias*, and
+   that reopening the dialog comes prefilled with the alias on file.
+6. **Creates a second resume through the translation flow**: opens *Traducir
+   CV* (source and target language keep the dialog's defaults), waits for the
+   ML translation, generates the template preview and asserts the PDF canvas
+   actually draws content (fraction of non-white pixels), then confirms with
+   *Usar esta plantilla* — asserting the success toast and that the resume
+   switcher now offers both resumes.
 
 Each account and the job carry a unique per-run suffix (base36 of the
 timestamp), so the test can be run over and over without colliding with data
@@ -29,8 +41,9 @@ already in the database.
 - Node.js 20 or newer.
 - Google Chrome installed (Selenium Manager downloads the matching
   `chromedriver` on its own).
-- The application running: the frontend plus `lynq-iam`, `lynq-app-backend` and
-  `lynq-file-storage` (uploading the pictures needs the storage service).
+- The application running: the frontend plus `lynq-iam`, `lynq-app-backend`,
+  `lynq-bff`, `lynq-file-storage` (uploading the pictures needs the storage
+  service) and `lynq-ml` (the resume import and the AI skill generation).
 
 ```bash
 docker compose up -d
@@ -84,6 +97,7 @@ The cleanup script does not use `BASE_URL`: it talks straight to MySQL and to
 | `ACTION_DELAY_MS` | `0`                     | Pause after each action, in milliseconds.   |
 | `TIMEOUT_MS`      | `20000`                 | Wait for UI elements.                       |
 | `LONG_TIMEOUT_MS` | `60000`                 | Wait for backend round-trips.               |
+| `EXTRA_LONG_TIMEOUT_MS` | `300000`          | Wait for LLM-backed flows (resume import).  |
 
 The console prints each step as it happens and, on success, the accounts it
 created together with their password, in case you want to keep using them by

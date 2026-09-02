@@ -43,6 +43,9 @@ const FILE_STORAGE_URL = (
   process.env.FILE_STORAGE_URL ?? 'http://localhost:8085/lynq-file-storage'
 ).replace(/\/$/, '')
 
+// FileControllerImpl maps every route under /dmz/files.
+const FILES_ENDPOINT = `${FILE_STORAGE_URL}/dmz/files`
+
 // The email domain test.js uses for every account it creates.
 const DEFAULT_EMAIL_PATTERN = '%@lynq.test'
 
@@ -168,6 +171,16 @@ const survey = async (connection, emailPattern) => {
     `SELECT id FROM ${BACKEND_DB}.job_post_skills WHERE job_id IN (?)`,
     jobIds,
   )
+  const jobTags = await queryByIds(
+    connection,
+    `SELECT id FROM ${BACKEND_DB}.job_post_tags WHERE job_id IN (?)`,
+    jobIds,
+  )
+  const jobSimilarityTags = await queryByIds(
+    connection,
+    `SELECT id FROM ${BACKEND_DB}.job_post_similarity_tags WHERE job_id IN (?)`,
+    jobIds,
+  )
   const userSkills = await queryByIds(
     connection,
     `SELECT id FROM ${BACKEND_DB}.user_skills WHERE user_id IN (?)`,
@@ -176,6 +189,16 @@ const survey = async (connection, emailPattern) => {
   const resumes = await queryByIds(
     connection,
     `SELECT id, lynq_file_storage_id FROM ${BACKEND_DB}.user_resumes WHERE user_id IN (?)`,
+    userIds,
+  )
+  const userTags = await queryByIds(
+    connection,
+    `SELECT id FROM ${BACKEND_DB}.user_tags WHERE user_id IN (?)`,
+    userIds,
+  )
+  const userSimilarityTags = await queryByIds(
+    connection,
+    `SELECT id FROM ${BACKEND_DB}.user_similarity_tags WHERE user_id IN (?)`,
     userIds,
   )
   const profiles = await queryByIds(
@@ -193,6 +216,17 @@ const survey = async (connection, emailPattern) => {
     ]),
   ]
 
+  // 6. The file-storage checks that the caller owns the file, so the owner of
+  //    each one is needed to build the "user-id" header of the DELETE.
+  const storedFiles = await queryByIds(
+    connection,
+    `SELECT id, owner_user_id FROM ${STORAGE_DB}.stored_files WHERE id IN (?)`,
+    fileIds,
+  )
+  const fileOwners = new Map(
+    storedFiles.map((row) => [row.id, row.owner_user_id]),
+  )
+
   return {
     accounts,
     userIds,
@@ -202,10 +236,15 @@ const survey = async (connection, emailPattern) => {
     jobIds,
     applicationIds,
     jobSkillIds: idsOf(jobSkills),
+    jobTagIds: idsOf(jobTags),
+    jobSimilarityTagIds: idsOf(jobSimilarityTags),
     userSkillIds: idsOf(userSkills),
+    userTagIds: idsOf(userTags),
+    userSimilarityTagIds: idsOf(userSimilarityTags),
     resumeIds: idsOf(resumes),
     profileIds: idsOf(profiles),
     fileIds,
+    fileOwners,
   }
 }
 
@@ -222,7 +261,9 @@ const printPlan = (plan) => {
   detail(`published jobs       : ${plan.jobIds.length}`)
   for (const job of plan.jobs) detail(`    · ${job.title}`)
   detail(`job skills           : ${plan.jobSkillIds.length}`)
+  detail(`job tags             : ${plan.jobTagIds.length + plan.jobSimilarityTagIds.length}`)
   detail(`user skills          : ${plan.userSkillIds.length}`)
+  detail(`user tags            : ${plan.userTagIds.length + plan.userSimilarityTagIds.length}`)
   detail(`resumes              : ${plan.resumeIds.length}`)
   detail(`applications         : ${plan.applicationIds.length}`)
   detail(`files in file-storage: ${plan.fileIds.length}`)
@@ -235,7 +276,9 @@ const printPlan = (plan) => {
 // Files go through the file-storage API because that endpoint also removes the
 // S3 object. Failures are collected rather than thrown so the caller can decide
 // what to do with them.
-const deleteFiles = async (fileIds) => {
+const CLEANUP_USER_ID = 'cleanup-script'
+
+const deleteFiles = async (fileIds, fileOwners) => {
   if (fileIds.length === 0) return { deleted: 0, failed: [] }
 
   heading('Deleting files from the file-storage (database + S3)')
@@ -244,11 +287,16 @@ const deleteFiles = async (fileIds) => {
 
   for (const fileId of fileIds) {
     try {
-      const response = await fetch(`${FILE_STORAGE_URL}/files/${fileId}`, {
+      const response = await fetch(`${FILES_ENDPOINT}/${fileId}`, {
         method: 'DELETE',
-        // The file-storage requires the correlation header on every route
-        // (RequestUuidFilter); without it the answer is a 403.
-        headers: { 'lynq-request-uuid': randomUUID() },
+        headers: {
+          // The file-storage requires the correlation header on every route
+          // (RequestUuidFilter); without it the answer is a 403.
+          'lynq-request-uuid': randomUUID(),
+          // And the owner of the file, otherwise it answers 403 (a file with
+          // no owner accepts any caller).
+          'user-id': fileOwners.get(fileId) ?? CLEANUP_USER_ID,
+        },
       })
       if (response.ok) {
         deleted += 1
@@ -288,6 +336,18 @@ const deleteData = async (connection, plan) => {
   )
   await deleteByIds(
     connection,
+    `DELETE FROM ${BACKEND_DB}.job_post_tags WHERE id IN (?)`,
+    plan.jobTagIds,
+    'job tags',
+  )
+  await deleteByIds(
+    connection,
+    `DELETE FROM ${BACKEND_DB}.job_post_similarity_tags WHERE id IN (?)`,
+    plan.jobSimilarityTagIds,
+    'job similarity tags',
+  )
+  await deleteByIds(
+    connection,
     `DELETE FROM ${BACKEND_DB}.job_posts WHERE id IN (?)`,
     plan.jobIds,
     'jobs',
@@ -297,6 +357,18 @@ const deleteData = async (connection, plan) => {
     `DELETE FROM ${BACKEND_DB}.user_skills WHERE id IN (?)`,
     plan.userSkillIds,
     'user skills',
+  )
+  await deleteByIds(
+    connection,
+    `DELETE FROM ${BACKEND_DB}.user_tags WHERE id IN (?)`,
+    plan.userTagIds,
+    'user tags',
+  )
+  await deleteByIds(
+    connection,
+    `DELETE FROM ${BACKEND_DB}.user_similarity_tags WHERE id IN (?)`,
+    plan.userSimilarityTagIds,
+    'user similarity tags',
   )
   await deleteByIds(
     connection,
@@ -327,7 +399,7 @@ const deleteData = async (connection, plan) => {
 // With --ignore-files the accounts are deleted anyway, so the pictures that
 // could not be removed end up referenced by nobody. Their ids are listed so they
 // can be deleted by hand later on.
-const reportOrphanFiles = async (connection, fileIds) => {
+const reportOrphanFiles = async (connection, fileIds, fileOwners) => {
   const remaining = await queryByIds(
     connection,
     `SELECT id FROM ${STORAGE_DB}.stored_files WHERE id IN (?)`,
@@ -339,8 +411,9 @@ const reportOrphanFiles = async (connection, fileIds) => {
   detail('no user or company references them anymore. To delete them:')
   for (const row of remaining) {
     detail(
-      `curl -X DELETE ${FILE_STORAGE_URL}/files/${row.id} ` +
-        '-H "lynq-request-uuid: $(uuidgen)"',
+      `curl -X DELETE ${FILES_ENDPOINT}/${row.id} ` +
+        '-H "lynq-request-uuid: $(uuidgen)" ' +
+        `-H "user-id: ${fileOwners.get(row.id) ?? CLEANUP_USER_ID}"`,
     )
   }
 }
@@ -398,7 +471,7 @@ const run = async () => {
     // Files go first: once the accounts are gone there is no way to tell which
     // stored_files rows belonged to them, so if the file-storage is unreachable
     // we stop here and leave the database untouched for a full retry.
-    const { failed } = await deleteFiles(plan.fileIds)
+    const { failed } = await deleteFiles(plan.fileIds, plan.fileOwners)
     if (failed.length > 0 && !options.ignoreFiles) {
       throw new Error(
         'Not every picture could be deleted, so the database was left untouched ' +
@@ -411,7 +484,7 @@ const run = async () => {
     await deleteData(connection, plan)
 
     if (failed.length > 0) {
-      await reportOrphanFiles(connection, plan.fileIds)
+      await reportOrphanFiles(connection, plan.fileIds, plan.fileOwners)
     }
 
     log('\n═══════════════════════════════════════════════════════════')

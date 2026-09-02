@@ -1,0 +1,53 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 1832 >>
+stream
+BT /F1 18 Tf 56 760 Td (Maria Fernanda Gomez) Tj ET
+BT /F1 12 Tf 56 738 Td (Desarrolladora Backend Semi Senior) Tj ET
+BT /F1 10 Tf 56 720 Td (Buenos Aires, Argentina  |  candidata@lynq.test  |  +54 11 5555-0000) Tj ET
+BT /F1 10 Tf 56 706 Td (github.com/mfgomez-dev  |  linkedin.com/in/maria-fernanda-gomez) Tj ET
+BT /F1 13 Tf 56 676 Td (RESUMEN) Tj ET
+BT /F1 10 Tf 56 658 Td (Desarrolladora backend con cinco anios de experiencia construyendo APIs REST) Tj ET
+BT /F1 10 Tf 56 644 Td (en Java y Spring Boot para empresas de tecnologia financiera. Trabaje con) Tj ET
+BT /F1 10 Tf 56 630 Td (MySQL, Docker y despliegues en AWS, participando de todo el ciclo de vida) Tj ET
+BT /F1 10 Tf 56 616 Td (del producto: diseno, implementacion, pruebas automatizadas y monitoreo.) Tj ET
+BT /F1 13 Tf 56 586 Td (EXPERIENCIA LABORAL) Tj ET
+BT /F1 11 Tf 56 568 Td (Desarrolladora Backend Semi Senior - FintechAr S.A. \(2022 - Actualidad\)) Tj ET
+BT /F1 10 Tf 56 554 Td (Diseno y mantenimiento de microservicios en Java 17 con Spring Boot 3.) Tj ET
+BT /F1 10 Tf 56 540 Td (Modelado de datos sobre MySQL y despliegue continuo sobre contenedores en AWS.) Tj ET
+BT /F1 11 Tf 56 518 Td (Desarrolladora Backend Junior - Pagos Digitales SRL \(2019 - 2022\)) Tj ET
+BT /F1 10 Tf 56 504 Td (APIs REST para conciliacion de pagos, integraciones con proveedores externos) Tj ET
+BT /F1 10 Tf 56 490 Td (y cobertura de pruebas unitarias con JUnit y Mockito.) Tj ET
+BT /F1 13 Tf 56 460 Td (EDUCACION) Tj ET
+BT /F1 11 Tf 56 442 Td (Licenciatura en Sistemas - Universidad de Buenos Aires \(2015 - 2019\)) Tj ET
+BT /F1 13 Tf 56 412 Td (HABILIDADES) Tj ET
+BT /F1 10 Tf 56 394 Td (Java, Spring Boot, MySQL, Docker, AWS, Git, JUnit, Mockito, REST, CI/CD) Tj ET
+BT /F1 13 Tf 56 364 Td (IDIOMAS) Tj ET
+BT /F1 10 Tf 56 346 Td (Espanol \(nativo\), Ingles \(avanzado\)) Tj ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2195
+%%EOF
