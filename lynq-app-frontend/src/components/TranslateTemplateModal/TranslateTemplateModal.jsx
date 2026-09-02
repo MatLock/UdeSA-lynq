@@ -167,7 +167,12 @@ const TranslateTemplateModal = ({ source, language, resume, onCompleted, onCance
     discardPreview(preview?.fileId)
     onCancel()
   }
-  cancelRef.current = cancel
+  // The Escape listener is wired once, so it reaches the handler through a ref
+  // that every render refreshes — from an effect, since a ref must never be
+  // written during render.
+  useEffect(() => {
+    cancelRef.current = cancel
+  })
 
   return createPortal(
     <div
