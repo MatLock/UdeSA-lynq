@@ -67,7 +67,7 @@ ingress:
 
 lynq_ml:
   replicas: 1
-  image: matlock0o/lynq:lynq-ml-1.0.12-SNAPSHOT
+  image: matlock0o/lynq:lynq-ml-1.0.13-SNAPSHOT
   resources:
     requests:
       cpu: 100m
@@ -92,7 +92,7 @@ lynq_ml:
 
 lynq_bff:
   replicas: 1
-  image: matlock0o/lynq:lynq-bff-1.0.12-SNAPSHOT
+  image: matlock0o/lynq:lynq-bff-1.0.13-SNAPSHOT
   resources:
     requests:
       cpu: 100m
@@ -108,7 +108,7 @@ lynq_bff:
 
 lynq_app_backend:
   replicas: 1
-  image: matlock0o/lynq:lynq-app-backend-1.0.12-SNAPSHOT
+  image: matlock0o/lynq:lynq-app-backend-1.0.13-SNAPSHOT
   resources:
     requests:
       cpu: 100m
@@ -127,7 +127,7 @@ lynq_app_backend:
 # file metadata all live here.
 lynq_file_storage:
   replicas: 1
-  image: matlock0o/lynq:lynq-file-storage-1.0.12-SNAPSHOT
+  image: matlock0o/lynq:lynq-file-storage-1.0.13-SNAPSHOT
   resources:
     requests:
       cpu: 100m
@@ -144,7 +144,7 @@ lynq_file_storage:
 
 lynq_iam:
   replicas: 1
-  image: matlock0o/lynq:lynq-iam-1.0.12-SNAPSHOT
+  image: matlock0o/lynq:lynq-iam-1.0.13-SNAPSHOT
   resources:
     requests:
       cpu: 100m
