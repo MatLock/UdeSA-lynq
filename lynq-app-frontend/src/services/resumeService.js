@@ -24,6 +24,7 @@ const TEMPLATES = ['MODERN', 'CLASSIC'];
  * @returns {Promise<Array<{
  *   id: string,
  *   name: string | null,
+ *   alias: string | null,
  *   language: string,
  *   createdOn: string,
  *   resume: object | null,

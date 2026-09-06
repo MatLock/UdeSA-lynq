@@ -5,6 +5,7 @@ import strings, { activeLocale } from '../../i18n'
 import useApi from '../../hooks/useApi'
 import useAuth from '../../hooks/useAuth'
 import jobService from '../../services/jobService'
+import ApplyResumeModal from '../../components/ApplyResumeModal/ApplyResumeModal.jsx'
 import CompanyIcon from '../../components/CompanyIcon/CompanyIcon.jsx'
 import UserIcon from '../../components/UserIcon/UserIcon.jsx'
 import Spinner from '../../components/Spinner/Spinner.jsx'
@@ -72,6 +73,11 @@ const useJobDetails = (jobId, initialJob, authFetch) => {
   // (direct navigation / reload); otherwise we render the placeholder and update
   // it in place once the details load.
   const [loading, setLoading] = useState(!initialJob)
+  // Whether the details fetch has settled. Distinct from `loading`, which is
+  // false from the start whenever a placeholder is showing: the placeholder
+  // comes from the feed and does not say whether this candidate already
+  // applied, so the apply action stays disabled until this flips.
+  const [detailsSettled, setDetailsSettled] = useState(false)
   // Tracks the job we've already counted a view for, so the increment fires once
   // per job even through React StrictMode's dev double-mount (which re-runs the
   // effect and would otherwise count the same view twice).
@@ -101,7 +107,10 @@ const useJobDetails = (jobId, initialJob, authFetch) => {
       } catch {
         // keep the router-state placeholder; the guard below covers no-data
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+          setDetailsSettled(true)
+        }
       }
     }
     load()
@@ -110,7 +119,7 @@ const useJobDetails = (jobId, initialJob, authFetch) => {
     }
   }, [authFetch, jobId])
 
-  return { job, setJob, seenCount, appliedCount, loading }
+  return { job, setJob, seenCount, appliedCount, loading, detailsSettled }
 }
 
 // Hero right-hand column: the owner's close/re-open controls, or (for
@@ -124,6 +133,7 @@ const JobHeroSide = ({
   hasScore,
   job,
   applyState,
+  applyDisabled,
   onApply,
   t,
 }) => {
@@ -192,11 +202,7 @@ const JobHeroSide = ({
             type="button"
             className="job-detail-apply"
             onClick={onApply}
-            disabled={
-              applyState === 'applying' ||
-              applyState === 'applied' ||
-              applyState === 'already'
-            }
+            disabled={applyDisabled}
           >
             {applyState === 'applying' ? t.applying : t.apply}
           </button>
@@ -507,11 +513,8 @@ const JobDetailPage = () => {
   // from GET /job/{jobId}/details, which also lets direct navigation / reload
   // work without any router state.
   const initialJob = location.state?.job ?? null
-  const { job, setJob, seenCount, appliedCount, loading } = useJobDetails(
-    jobId,
-    initialJob,
-    authFetch,
-  )
+  const { job, setJob, seenCount, appliedCount, loading, detailsSettled } =
+    useJobDetails(jobId, initialJob, authFetch)
 
   // Mirror the feed's rule (HomePage/JobCard): candidate-only concerns (the LYNQ
   // score, the Apply action) are shown to everyone except COMPANY users. We
@@ -524,22 +527,55 @@ const JobDetailPage = () => {
   // already applied to this job, so seed the apply state accordingly to disable
   // the button and show the "already applied" legend without needing an attempt.
   const alreadyApplied = location.state?.alreadyApplied === true
-  const [applyState, setApplyState] = useState(alreadyApplied ? 'already' : 'idle') // idle|applying|applied|already|error
+  // What the user has done to the apply action *in this session*.
+  const [applyAttempt, setApplyAttempt] = useState(alreadyApplied ? 'already' : 'idle') // idle|applying|applied|already|error
+
+  // The details endpoint reports whether this candidate applied before, so the
+  // legend is there on arrival instead of appearing only after an attempt that
+  // was always going to be refused. Derived rather than synced into state: an
+  // attempt made in this session is the newer truth and wins over the response.
+  const applyState =
+    applyAttempt === 'idle' && job?.alreadyApplied === true ? 'already' : applyAttempt
+
+  // Until the details settle we do not know whether they applied, so the action
+  // is not offered — otherwise the button paints enabled over the feed's
+  // placeholder and only disables a moment later, long enough to click it and be
+  // refused.
+  const applyDisabled =
+    !detailsSettled ||
+    applyState === 'applying' ||
+    applyState === 'applied' ||
+    applyState === 'already'
   // Owner-only close/re-open action. The button shown (and which endpoint it
   // hits) is derived from the job's live status; this only tracks the in-flight
   // request so the button can disable and surface an error.
   const [ownerAction, setOwnerAction] = useState('idle') // idle|working|error
 
-  const handleApply = async () => {
-    if (applyState === 'applying' || applyState === 'applied') return
-    setApplyState('applying')
+  // The apply action opens the resume picker instead of applying straight away:
+  // a candidate keeps several resumes and the recruiter only ever sees the one
+  // they applied with, so which one is a decision, not a default.
+  const [pickingResume, setPickingResume] = useState(false)
+
+  const handleApply = () => {
+    // Same condition the button is disabled on, so the two cannot drift apart.
+    if (applyDisabled) return
+    setPickingResume(true)
+  }
+
+  const handleApplyWithResume = async (resumeId) => {
+    if (applyAttempt === 'applying') return
+    setApplyAttempt('applying')
     try {
-      await jobService.apply_to_job(authFetch, jobId)
-      setApplyState('applied')
+      await jobService.apply_to_job(authFetch, jobId, resumeId)
+      setApplyAttempt('applied')
     } catch (error) {
       // The backend replies 400 when the user has already applied — surface that
       // as an informative state rather than a generic error.
-      setApplyState(error?.status === 400 ? 'already' : 'error')
+      setApplyAttempt(error?.status === 400 ? 'already' : 'error')
+    } finally {
+      // Closed either way: the outcome is reported by the legend under the
+      // button, where it stays after the dialog is gone.
+      setPickingResume(false)
     }
   }
 
@@ -641,6 +677,7 @@ const JobDetailPage = () => {
               hasScore={hasScore}
               job={job}
               applyState={applyState}
+              applyDisabled={applyDisabled}
               onApply={handleApply}
               t={t}
             />
@@ -675,6 +712,17 @@ const JobDetailPage = () => {
           </aside>
         </div>
       </div>
+
+      {/* Mounted only while open, so the dialog reloads the resume list on each
+          attempt rather than showing a stale one, and unmounting is what closes
+          it (the <dialog> owns the backdrop, focus trap and Escape). */}
+      {pickingResume && (
+        <ApplyResumeModal
+          busy={applyState === 'applying'}
+          onConfirm={handleApplyWithResume}
+          onCancel={() => setPickingResume(false)}
+        />
+      )}
     </div>
   )
 }

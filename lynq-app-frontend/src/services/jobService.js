@@ -192,8 +192,10 @@ const generate_skills = async (authFetch, { title, description, workType } = {})
  * Calls GET /job/{jobId}/details (JobController.getJobDetails) through
  * `authFetch`. Returns the same job shape as the feed (get_jobs) — including the
  * LYNQ score computed for the authenticated candidate — enriched with two
- * counters: `totalSeen` and `totalCandidatesApplied`. Read-only: it does not
- * count the view (use increase_seen for that).
+ * counters, `totalSeen` and `totalCandidatesApplied`, and `alreadyApplied`:
+ * whether this candidate has already applied, which is what disables the apply
+ * action and shows its legend before any attempt (always false for a company
+ * viewer). Read-only: it does not count the view (use increase_seen for that).
  *
  * @param {(path: string, options?: object) => Promise<object>} authFetch
  * @param {string} jobId
@@ -228,18 +230,23 @@ const increase_seen = async (authFetch, jobId) => {
  * Apply the authenticated user to a job post.
  *
  * Calls POST /job/{jobId}/apply (JobController.applyToJob) through `authFetch`.
- * The applicant is resolved from the bearer token. The backend replies 400 when
- * the user has already applied to the same job, so callers should treat that
- * status as an "already applied" outcome rather than a hard failure.
+ * The applicant is resolved from the bearer token; the resume they chose to
+ * apply with is not, so it travels in the body — it is what the recruiter will
+ * read, and the backend rejects one that is not the caller's with a 404. The
+ * backend replies 400 when the user has already applied to the same job, so
+ * callers should treat that status as an "already applied" outcome rather than
+ * a hard failure.
  *
  * @param {(path: string, options?: object) => Promise<object>} authFetch
  * @param {string} jobId
+ * @param {string} resumeId - Id of the candidate's own resume to apply with.
  * @returns {Promise<object>} The unwrapped ApplyJobRestResponse.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
-const apply_to_job = async (authFetch, jobId) => {
+const apply_to_job = async (authFetch, jobId, resumeId) => {
   const payload = await authFetch(`/job/${jobId}/apply`, {
     method: 'POST',
+    body: JSON.stringify({ resumeId }),
   });
   return payload?.data;
 };
@@ -322,8 +329,10 @@ const create_job = async (
  *
  * Calls GET /job/{jobId}/candidates (JobController.getJobCandidates) through
  * `authFetch`. Powers the owner's "see candidates" list reached from the my-job-
- * posts cards. Each item carries the applicant's public profile plus their LYNQ
- * match score for this job. Note the backend paging param is `pageSize` (not
+ * posts cards. Each item carries the applicant's public profile, their LYNQ
+ * match score for this job, and `userResumeUrl` — a short-lived download URL for
+ * the resume they chose to apply with, null for applications registered before
+ * that choice existed. Note the backend paging param is `pageSize` (not
  * `size`).
  *
  * @param {(path: string, options?: object) => Promise<object>} authFetch
@@ -333,7 +342,7 @@ const create_job = async (
  * @param {number} [params.pageSize=10] - Page size.
  * @returns {Promise<object>} The unwrapped PagedRestResponse of
  *   JobCandidateResponse ({ id, userId, jobId, userFullName, userProfileImage,
- *   userCurrentPosition, userAppliedOn, lynqScore }).
+ *   userCurrentPosition, userAppliedOn, userResumeUrl, lynqScore }).
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
 const get_job_candidates = async (authFetch, jobId, { page = 0, pageSize = 10 } = {}) => {

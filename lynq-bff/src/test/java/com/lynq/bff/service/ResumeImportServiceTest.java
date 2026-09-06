@@ -20,6 +20,7 @@ import com.lynq.bff.client.request.LanguageDetectionRequest;
 import com.lynq.bff.client.request.ParseResumeRequest;
 import com.lynq.bff.client.response.CreateFileDownloadResponse;
 import com.lynq.bff.client.response.LanguageDetectionResponse;
+import com.lynq.bff.client.response.SkillExtractionResponse;
 import com.lynq.bff.client.response.UserResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.exceptions.BadGatewayException;
@@ -54,6 +55,8 @@ class ResumeImportServiceTest {
       "work_experience", List.of(Map.of("company", "LYNQ", "description", ROLE_DESCRIPTION)),
       "skills", Map.of("technical", List.of("Java")));
   private static final Object STORED_RESUME = Map.of("id", "resume-1", "language", "EN");
+  private static final List<String> SIMILARITY_TAGS =
+      List.of("Asynchronous Messaging", "Payment Processing");
 
   private static final String ONLY_CANDIDATES = "Only users of type CANDIDATE can do this";
   private static final String IMPORT_FAILED = "The uploaded resume could not be imported";
@@ -108,6 +111,8 @@ class ResumeImportServiceTest {
     order.verify(lynqFileStorageClient).createDownloadUrl(FILE_ID, REQUEST_UUID);
     order.verify(lynqMlClient).parseResume(any(), eq(REQUEST_UUID), eq(USER_ID));
     order.verify(lynqMlClient).detectLanguage(any(), eq(REQUEST_UUID), eq(USER_ID));
+    order.verify(lynqMlClient)
+        .extractResumeSkills(any(), eq(UI_LANGUAGE), eq(REQUEST_UUID), eq(USER_ID));
     order.verify(lynqBackendClient).createResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
   }
 
@@ -269,6 +274,74 @@ class ResumeImportServiceTest {
     verify(lynqMlClient, never()).parseResume(any(), any(), any());
   }
 
+  @Test
+  void importStoresTheSimilarityTagsLynqMlDerivesFromTheParsedResume() {
+    givenCandidate();
+    givenReadUrl();
+    givenParsedResume();
+    givenDetectedLanguage("EN");
+    givenExtractedTags(SIMILARITY_TAGS);
+    givenStoredResume();
+
+    resumeImportService.importUploadedDocument(FILE_ID, UI_LANGUAGE, CALLER);
+
+    ArgumentCaptor<CreateResumeRequest> captor = ArgumentCaptor.forClass(CreateResumeRequest.class);
+    verify(lynqBackendClient).createResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    assertThat(captor.getValue().getSimilarityTags(), is(SIMILARITY_TAGS));
+  }
+
+  @Test
+  void importDerivesTheTagsFromTheResumeItIsAboutToStore() {
+    givenCandidate();
+    givenReadUrl();
+    givenParsedResume();
+    givenDetectedLanguage("EN");
+    givenExtractedTags(SIMILARITY_TAGS);
+    givenStoredResume();
+
+    resumeImportService.importUploadedDocument(FILE_ID, UI_LANGUAGE, CALLER);
+
+    ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+    verify(lynqMlClient)
+        .extractResumeSkills(captor.capture(), eq(UI_LANGUAGE), eq(REQUEST_UUID), eq(USER_ID));
+    assertThat(captor.getValue(), is(sameInstance(PARSED_RESUME)));
+  }
+
+  @Test
+  void importStoresTheResumeWithoutTagsWhenLynqMlCannotDeriveThem() {
+    givenCandidate();
+    givenReadUrl();
+    givenParsedResume();
+    givenDetectedLanguage("EN");
+    when(lynqMlClient.extractResumeSkills(any(), eq(UI_LANGUAGE), eq(REQUEST_UUID), eq(USER_ID)))
+        .thenThrow(new IllegalStateException("the LLM timed out"));
+    givenStoredResume();
+
+    Object stored = resumeImportService.importUploadedDocument(FILE_ID, UI_LANGUAGE, CALLER);
+
+    assertThat(stored, is(sameInstance(STORED_RESUME)));
+    ArgumentCaptor<CreateResumeRequest> captor = ArgumentCaptor.forClass(CreateResumeRequest.class);
+    verify(lynqBackendClient).createResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    assertThat(captor.getValue().getSimilarityTags(), is(List.of()));
+    verify(lynqFileStorageClient, never()).deleteFile(any(), any(), any());
+  }
+
+  @Test
+  void importStoresTheResumeWithoutTagsWhenLynqMlOmitsThem() {
+    givenCandidate();
+    givenReadUrl();
+    givenParsedResume();
+    givenDetectedLanguage("EN");
+    givenExtractedTags(null);
+    givenStoredResume();
+
+    resumeImportService.importUploadedDocument(FILE_ID, UI_LANGUAGE, CALLER);
+
+    ArgumentCaptor<CreateResumeRequest> captor = ArgumentCaptor.forClass(CreateResumeRequest.class);
+    verify(lynqBackendClient).createResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    assertThat(captor.getValue().getSimilarityTags(), is(List.of()));
+  }
+
   private void givenCandidate() {
     when(candidateReader.read(CALLER))
         .thenReturn(UserResponse.builder().id(USER_ID).userType("CANDIDATE").build());
@@ -291,6 +364,12 @@ class ResumeImportServiceTest {
     when(lynqMlClient.detectLanguage(any(), eq(REQUEST_UUID), eq(USER_ID)))
         .thenReturn(new GlobalRestResponse<>(true,
             LanguageDetectionResponse.builder().language(language).build()));
+  }
+
+  private void givenExtractedTags(List<String> similarityTags) {
+    when(lynqMlClient.extractResumeSkills(any(), eq(UI_LANGUAGE), eq(REQUEST_UUID), eq(USER_ID)))
+        .thenReturn(new GlobalRestResponse<>(true,
+            SkillExtractionResponse.builder().similarityTags(similarityTags).build()));
   }
 
   private void givenStoredResume() {

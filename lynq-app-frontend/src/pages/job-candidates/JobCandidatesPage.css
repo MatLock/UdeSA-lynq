@@ -209,10 +209,12 @@ a.candidate-name:hover {
   gap: 8px;
 }
 
-/* "AI Evaluation" trigger — same brand-gradient + sparkle icon language as the
-   skill-enhance generate button (SkillsField.css), sized to match the review
-   pill it sits beside. */
-.candidate-ai-button {
+/* The two icon actions in the row — "AI Evaluation" and "Download resume" —
+   share one declaration so they cannot drift apart: same brand-gradient and
+   sparkle/download icon language as the skill-enhance generate button
+   (SkillsField.css), sized to match the review pill they sit beside. */
+.candidate-ai-button,
+.candidate-resume {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -225,12 +227,14 @@ a.candidate-name:hover {
   background: var(--brand-gradient);
   border: none;
   border-radius: 8px;
+  text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
   transition: opacity 0.15s ease;
 }
 
-.candidate-ai-button:hover {
+.candidate-ai-button:hover,
+.candidate-resume:hover {
   opacity: 0.92;
 }
 

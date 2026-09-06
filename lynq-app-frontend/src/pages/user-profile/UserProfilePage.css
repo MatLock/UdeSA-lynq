@@ -218,7 +218,11 @@
   margin-top: 8px;
 }
 
-.user-profile-link {
+/* The social links and the applied-with resume share one declaration: on this
+   screen they are all "open this elsewhere" pills, and a lone gradient button
+   among them read as a different component. */
+.user-profile-link,
+.user-profile-resume {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -235,9 +239,17 @@
     box-shadow 0.15s ease;
 }
 
-.user-profile-link:hover {
+.user-profile-link:hover,
+.user-profile-resume:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-raised);
+}
+
+/* Only what sets the resume pill apart from a social link: it is not part of
+   the links row, so it starts its own line instead of flowing beside them. */
+.user-profile-resume {
+  align-self: flex-start;
+  margin-top: 10px;
 }
 
 /* ── Body grid ────────────────────────────────────────────────────────── */

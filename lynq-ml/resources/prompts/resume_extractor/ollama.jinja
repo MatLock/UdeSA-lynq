@@ -10,6 +10,11 @@ Rules:
 - Normalize dates to `YYYY-MM`, or `YYYY` if only the year is known.
 - Ongoing role/study -> end_date = null and is_current = true.
 - description = general role text. achievements = quantifiable results.
+- Keep the line structure of `description` and `summary`. One bullet or one
+  paragraph per line, joined with `\n` inside the JSON string. NEVER merge
+  separate bullets into a single line or a single sentence.
+- Drop the bullet glyph itself (`-`, `*`, `•`): the line is the content, the
+  glyph is how the original document drew it.
 - Deduplicate skills and classify them into technical / tools / soft.
 - Copy emails, phones and URLs exactly as written.
 - Return ONLY valid JSON. No markdown, no comments, no explanations.
@@ -106,7 +111,7 @@ Example Output:
       "start_date": "2021-03",
       "end_date": null,
       "is_current": true,
-      "description": "Designed event-driven services.",
+      "description": "Owned the payments platform.\n- Cut p99 latency by 40%\n- Migrated the ledger to Kafka",
       "achievements": ["Reduced API latency by 40%."],
       "technologies": ["Java", "Spring Boot"]
     }

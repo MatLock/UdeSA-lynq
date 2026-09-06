@@ -2,6 +2,7 @@ package com.lynq.backend.controller;
 
 import com.lynq.backend.client.response.CandidateExplanationResponse;
 import com.lynq.backend.client.response.UpskillingSuggestionResponse;
+import com.lynq.backend.controller.request.ApplyJobRequest;
 import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.request.UpdateJobRequest;
 import com.lynq.backend.controller.response.ApplyJobRestResponse;
@@ -109,11 +110,13 @@ public interface JobController {
   @Operation(
       summary = "Apply to a job post",
       description = "Registers an application of the authenticated user to the job post identified "
-          + "by the given id. The applicant identity is resolved from the bearer token. Fails with "
-          + "404 when no job post matches the id, and with 400 when the user has already applied to "
-          + "the same job.",
+          + "by the given id, with the resume the candidate chose to apply with. The applicant "
+          + "identity is resolved from the bearer token, and the resume is looked up among that "
+          + "candidate's own. Fails with 404 when no job post matches the id or the resume is not "
+          + "one of the caller's, and with 400 when the user has already applied to the same job.",
       security = @SecurityRequirement(name = "bearerAuth"))
-  ResponseEntity<GlobalRestResponse<ApplyJobRestResponse>> applyToJob(String jobId);
+  ResponseEntity<GlobalRestResponse<ApplyJobRestResponse>> applyToJob(String jobId,
+      @Valid ApplyJobRequest request);
 
   @Operation(
       summary = "List the candidates that applied to a job post",

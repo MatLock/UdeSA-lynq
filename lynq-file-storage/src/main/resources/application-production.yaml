@@ -26,8 +26,14 @@ spring:
     change-log: classpath:changelog/db.changelog-config.xml
   servlet:
     multipart:
-      max-file-size: 25MB
-      max-request-size: 25MB
+      # This service never receives file bytes: a client asks for a pre-signed S3
+      # URL and PUTs the document straight to the bucket, so every endpoint here
+      # is JSON and nothing binds a MultipartFile. Resolving multipart was dead
+      # configuration whose only effect was letting the container buffer a 25MB
+      # body on any endpoint — larger than Spring's own defaults and than the
+      # 10MB the UI accepts. Disabled instead of resized: a limit implies uploads
+      # arrive here, and they do not (sonar java:S5693).
+      enabled: false
 
 lynq:
   aws:

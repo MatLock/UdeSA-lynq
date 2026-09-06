@@ -194,12 +194,24 @@ body {
   text-align: justify;
 }
 
-.bullets {
+/* The achievement list and the bullet runs inside a description or the
+   summary are the same object to the reader, so they share one look. */
+.bullets,
+.summary--list,
+.desc--list {
   margin: 1.6mm 0 0;
   padding-left: 4.5mm;
 }
 
-.bullets li {
+/* Justified text breaks up on lines as short as a bullet. */
+.summary--list,
+.desc--list {
+  text-align: left;
+}
+
+.bullets li,
+.summary--list li,
+.desc--list li {
   margin-bottom: 1mm;
 }
 

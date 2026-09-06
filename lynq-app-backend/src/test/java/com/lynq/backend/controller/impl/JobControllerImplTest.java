@@ -1,5 +1,6 @@
 package com.lynq.backend.controller.impl;
 
+import com.lynq.backend.controller.request.ApplyJobRequest;
 import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.request.UpdateJobRequest;
 import com.lynq.backend.controller.response.ApplyJobRestResponse;
@@ -51,6 +52,7 @@ import static org.mockito.Mockito.when;
 class JobControllerImplTest {
 
   private static final String JOB_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
+  private static final String RESUME_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
   private static final String COMPANY_ID = "018f9c3a-2b1d-7c4e-9a6f-aaaaaaaaaaaa";
   private static final String USER_ID = "550e8400-e29b-41d4-a716-446655440000";
   private static final String TITLE = "Senior Backend Engineer";
@@ -446,31 +448,37 @@ class JobControllerImplTest {
         .build();
   }
 
+  private ApplyJobRequest applyRequest() {
+    ApplyJobRequest request = new ApplyJobRequest();
+    request.setResumeId(RESUME_ID);
+    return request;
+  }
+
   @Test
-  void applyToJobDelegatesToServiceWithJobId() {
-    when(jobService.applyToJob(JOB_ID)).thenReturn(application());
+  void applyToJobDelegatesToServiceWithJobIdAndTheChosenResume() {
+    when(jobService.applyToJob(JOB_ID, RESUME_ID)).thenReturn(application());
 
-    jobController.applyToJob(JOB_ID);
+    jobController.applyToJob(JOB_ID, applyRequest());
 
-    verify(jobService).applyToJob(JOB_ID);
+    verify(jobService).applyToJob(JOB_ID, RESUME_ID);
   }
 
   @Test
   void applyToJobRespondsWithCreatedStatus() {
-    when(jobService.applyToJob(JOB_ID)).thenReturn(application());
+    when(jobService.applyToJob(JOB_ID, RESUME_ID)).thenReturn(application());
 
     ResponseEntity<GlobalRestResponse<ApplyJobRestResponse>> response =
-        jobController.applyToJob(JOB_ID);
+        jobController.applyToJob(JOB_ID, applyRequest());
 
     assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
   }
 
   @Test
   void applyToJobMapsApplicationIntoSuccessfulResponseData() {
-    when(jobService.applyToJob(JOB_ID)).thenReturn(application());
+    when(jobService.applyToJob(JOB_ID, RESUME_ID)).thenReturn(application());
 
     ResponseEntity<GlobalRestResponse<ApplyJobRestResponse>> response =
-        jobController.applyToJob(JOB_ID);
+        jobController.applyToJob(JOB_ID, applyRequest());
 
     GlobalRestResponse<ApplyJobRestResponse> body = response.getBody();
     assertThat(body, is(notNullValue()));

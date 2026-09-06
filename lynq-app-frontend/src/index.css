@@ -203,7 +203,10 @@ p {
    instead of keeping a full-size gap where it used to be.
 
    The non-<button> elements that render as buttons are listed alongside — the
-   card actions are React Router <Link>s, so the `button` selector misses them.
+   card actions are React Router <Link>s, and the candidates row's review and
+   download-resume pills are <a>/<Link>, so the `button` selector misses them.
+   Miss one and it renders 25% larger than the controls it sits next to, which
+   is what an unscaled pill in a scaled row looks like.
    For the two card actions the class sits on the <Link> wrapper, not on the
    inner pill, so the trailing chevron scales with the pill instead of towering
    over it. Plain text links (job-detail-back, job-card-candidates-link, …) are
@@ -222,7 +225,8 @@ button,
 .job-card-actions,
 .job-card-edit,
 .application-card-actions,
-.candidate-review {
+.candidate-review,
+.candidate-resume {
   zoom: var(--button-scale, 1);
 }
 

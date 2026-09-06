@@ -20,6 +20,9 @@ into the target language.
    - Never rename, add, remove or reorder keys.
    - Keep the same nesting, arrays and value types.
    - Preserve `null` values as `null`.
+   - Keep the line structure of every text value: a value written as several
+     lines joined with `\n` comes back with the same lines, in the same order.
+     Translating a bulleted description must not merge it into one paragraph.
 
 3. Translate only human-readable text values, such as:
    - summary, headline, descriptions, achievements

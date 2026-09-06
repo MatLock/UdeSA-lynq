@@ -37,6 +37,14 @@ public class UserApplicationJobEntity {
   @JoinColumn(name = "user_id", nullable = false)
   private UserEntity user;
 
+  /**
+   * The resume the candidate chose to apply with. Nullable: applications made
+   * before the choice existed carry none, so a reader must not assume one.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "user_resume_id")
+  private UserResumeEntity userResume;
+
   @Column(name = "applied_on", nullable = false)
   private LocalDate appliedOn;
 

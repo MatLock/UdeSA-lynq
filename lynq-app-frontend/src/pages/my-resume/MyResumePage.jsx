@@ -22,20 +22,11 @@ import useApi from '../../hooks/useApi'
 import useAuth from '../../hooks/useAuth'
 import useActiveSection from '../../hooks/useActiveSection'
 import resumeService from '../../services/resumeService'
+import resumeLabel from '../../utils/resumeLabel'
+import formatResumeDate from '../../utils/formatResumeDate'
 import resumeSections from '../../utils/resumeSections'
 import strings, { activeLocale } from '../../i18n'
 import './MyResumePage.css'
-
-// The resume's own dates are partial (see utils/formatResumeDate); createdOn is a
-// full backend LocalDate, so it is formatted here in the active UI locale.
-const formatCreatedOn = (isoDate) => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate ?? '')
-  if (!match) return isoDate ?? ''
-  const [, year, month, day] = match
-  return new Intl.DateTimeFormat(activeLocale, { dateStyle: 'medium' }).format(
-    new Date(Number(year), Number(month) - 1, Number(day)),
-  )
-}
 
 // The candidate's "My Resume" section. It opens by asking the backend for every
 // resume the user has (GET /user/resume) and branches on the answer:
@@ -116,9 +107,8 @@ const MyResumePage = () => {
 
   const reload = () => setReloadToken((previous) => previous + 1)
 
-  // What a resume is called everywhere on this page: the alias the candidate
-  // assigned wins, falling back to the document's own name.
-  const displayNameOf = (resume) => resume?.alias || resume?.name || t.untitled
+  // What a resume is called everywhere on this page (see utils/resumeLabel).
+  const displayNameOf = (resume) => resumeLabel(resume, t.untitled)
 
   // The resume the viewer shows: the user's explicit pick, else the one written in
   // the UI language, else whatever the candidate has.
@@ -343,7 +333,7 @@ const MyResumePage = () => {
           <div className="resume-page-doc-bar">
             {selected?.createdOn && (
               <span className="resume-page-doc-date">
-                {t.createdOn.replace('{date}', formatCreatedOn(selected.createdOn))}
+                {t.createdOn.replace('{date}', formatResumeDate.formatResumeCreatedOn(selected.createdOn))}
               </span>
             )}
             <div className="resume-page-doc-actions">

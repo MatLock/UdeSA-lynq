@@ -285,6 +285,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
               <ResumeField
                 id={`resume-job-description-${index}`}
                 label={tw.descriptionLabel}
+                hint={t.richTextHint}
                 full
               >
                 <textarea
@@ -405,6 +406,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
               <ResumeField
                 id={`resume-project-description-${index}`}
                 label={tw.projectDescriptionLabel}
+                hint={t.richTextHint}
                 full
               >
                 <textarea

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Chip } from '@mui/material'
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined'
+import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
 import strings from '../../i18n'
 import useApi from '../../hooks/useApi'
 import useAuth from '../../hooks/useAuth'
@@ -213,7 +214,8 @@ const JobCandidatesPage = () => {
                     )}
                   </div>
 
-                  {/* Trailing actions: AI evaluation + review on their profile. */}
+                  {/* Trailing actions: AI evaluation, the resume they applied
+                      with, and review on their profile. */}
                   {candidate.userId && (
                     <div className="candidate-actions">
                       <button
@@ -227,9 +229,28 @@ const JobCandidatesPage = () => {
                         <AutoAwesomeOutlinedIcon sx={{ fontSize: 16 }} />
                         {isEvaluating ? t.aiEvaluating : t.aiEvaluation}
                       </button>
+                      {/* Only rendered when the application carries a resume:
+                          the ones registered before candidates could choose one
+                          have none, and an action that cannot work should not be
+                          offered. */}
+                      {candidate.userResumeUrl && (
+                        <a
+                          className="candidate-resume"
+                          href={candidate.userResumeUrl}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          aria-label={`${t.downloadResume} — ${candidate.userFullName ?? t.unknownCandidate}`}
+                        >
+                          <DownloadRoundedIcon sx={{ fontSize: 16 }} />
+                          {t.downloadResume}
+                        </a>
+                      )}
                       <Link
                         to={`/user/${candidate.userId}`}
-                        state={{ lynqScore: candidate.lynqScore }}
+                        state={{
+                          lynqScore: candidate.lynqScore,
+                          resumeUrl: candidate.userResumeUrl ?? null,
+                        }}
                         className="candidate-review"
                         aria-label={`${t.reviewApplication} — ${candidate.userFullName ?? t.unknownCandidate}`}
                       >

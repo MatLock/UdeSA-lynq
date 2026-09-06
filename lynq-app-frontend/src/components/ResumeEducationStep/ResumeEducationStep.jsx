@@ -219,6 +219,7 @@ const ResumeEducationStep = ({ active, stepNumber, totalSteps }) => {
               <ResumeField
                 id={`resume-study-description-${index}`}
                 label={te.descriptionLabel}
+                hint={t.richTextHint}
                 full
               >
                 <textarea
