@@ -11,6 +11,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from model.resume_extractor import Resume
 from model.resume_template import Template
+from renderer.rich_text import rich_text_blocks
 
 # src/renderer/resume_template.py -> parents[2] is the repo root; the HTML/CSS
 # templates live under resources/resume_template/<variant>/.
@@ -31,6 +32,11 @@ _env = Environment(
     autoescape=select_autoescape(["html", "xml"]),
     keep_trailing_newline=True,
 )
+
+# Resume prose carries its own line structure (one line per bullet). Templates
+# render it through _rich_text.html rather than interpolating the raw string,
+# which HTML would collapse into a single paragraph.
+_env.filters["rich_blocks"] = rich_text_blocks
 
 
 # Cached: a failed import is not remembered by Python, so without this every

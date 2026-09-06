@@ -7,6 +7,9 @@ Rules:
 - Translate every natural-language text value into: {{ target_language }}.
 - Preserve the JSON structure EXACTLY: never rename, add, remove or reorder keys.
 - Keep the same nesting, arrays and value types. Keep `null` as `null`.
+- Keep the line structure of every text value: a value written as several
+  lines joined with `\n` comes back with the same lines, in the same order.
+  Translating a bulleted description must not merge it into one paragraph.
 - Translate human-readable text: summary, headline, descriptions, achievements,
   degree, field_of_study, proficiency labels, descriptive names.
 - DO NOT translate; copy verbatim:

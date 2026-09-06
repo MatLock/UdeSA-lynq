@@ -428,6 +428,16 @@ unsupported one; output that is not a valid enum value returns `502`.
 - `put_resume_url`: presigned S3 PUT URL the rendered PDF is streamed to.
 - `template`: visual template — `MODERN` (default) or `CLASSIC`, each backed by `resources/resume_template/<name lowercased>/`.
 
+**Prose keeps its shape.** A `description` or `summary` carries the structure the candidate wrote
+into it — one line per bullet, one line per paragraph — and HTML collapses every run of whitespace,
+so interpolating the raw string printed a bulleted role as one run-on sentence. Both templates
+render prose through `_rich_text.html`, whose `rich_text()` macro turns a bullet run into a real
+`<ul>` and everything else into a `<p>`; the split itself lives in `renderer/rich_text.py`, exposed
+to Jinja as the `rich_blocks` filter. The frontend's `components/RichText` implements the same rule,
+so a resume reads the same on screen and in the PDF. This is also why the resume-parsing and
+translation prompts are explicit about preserving `\n`: without it there is no structure left for
+the templates to render.
+
 Returns `201 Created` with an empty `GlobalRestResponse` once the PDF has been generated and stored. Render failures return `500`; upload failures return `502`.
 
 **`GET /health`** returns `200` when the configured LLM is reachable, `503` otherwise (this route is *not* wrapped in `GlobalRestResponse`):
@@ -741,7 +751,8 @@ lynq-ml/
 │   │   ├── resume_extractor.py # render_resume_extractor_prompt
 │   │   └── translation.py      # render_translation_prompt
 │   ├── renderer/
-│   │   └── resume_template.py  # render_resume_pdf (Jinja + WeasyPrint)
+│   │   ├── resume_template.py  # render_resume_pdf (Jinja + WeasyPrint)
+│   │   └── rich_text.py        # prose -> paragraph/bullet blocks
 │   ├── llm_client/
 │   │   ├── base.py             # LLMClient interface, LLMProvider enum
 │   │   ├── ollama_client.py    # Ollama implementation

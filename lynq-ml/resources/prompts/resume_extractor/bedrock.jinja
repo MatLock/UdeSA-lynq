@@ -30,13 +30,21 @@ into the JSON schema described below.
    - `description` → the general role/summary text.
    - `achievements` → concrete, quantifiable results (bullet points).
 
-5. For `skills`, deduplicate and classify each skill into the right bucket
+5. Preserve the line structure of multi-line text (`description`, `summary`).
+   - One bullet or one paragraph per line, joined with `\n` inside the JSON
+     string.
+   - NEVER merge separate bullets into a single line or a single sentence: a
+     résumé written as a bulleted list must come back as one line per bullet.
+   - Drop the bullet glyph itself (`-`, `*`, `•`). The line is the content; the
+     glyph is only how the original document drew it.
+
+6. For `skills`, deduplicate and classify each skill into the right bucket
    (`technical`, `tools`, `soft`). Do not repeat the same skill across buckets.
 
-6. Emails, phones and URLs must be copied exactly as written, without
+7. Emails, phones and URLs must be copied exactly as written, without
    reformatting.
 
-7. Return ONLY valid JSON. No markdown, no comments, no explanations.
+8. Return ONLY valid JSON. No markdown, no comments, no explanations.
 
 ## JSON Schema
 
@@ -157,7 +165,7 @@ Output:
       "start_date": "2021-03",
       "end_date": null,
       "is_current": true,
-      "description": "Designed event-driven services.",
+      "description": "Owned the payments platform.\n- Cut p99 latency by 40%\n- Migrated the ledger to Kafka",
       "achievements": [
         "Reduced API latency by 40% by introducing caching."
       ],

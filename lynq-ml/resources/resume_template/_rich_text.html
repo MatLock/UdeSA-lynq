@@ -1,0 +1,19 @@
+{#
+  Renders one piece of resume prose with the structure the candidate wrote into
+  it: bullet runs become a real list, everything else a paragraph.
+
+  `variant` is the class the calling template already uses for that kind of text
+  ("summary", "desc"); a list gets the same class plus a `--list` suffix, so
+  each template sizes its own prose without inventing a second vocabulary.
+#}
+{% macro rich_text(text, variant) -%}
+  {%- for block in text | rich_blocks -%}
+    {%- if block.type == 'list' -%}
+      <ul class="{{ variant }} {{ variant }}--list">
+        {%- for entry in block['entries'] -%}<li>{{ entry }}</li>{%- endfor -%}
+      </ul>
+    {%- else -%}
+      <p class="{{ variant }}">{{ block.text }}</p>
+    {%- endif -%}
+  {%- endfor -%}
+{%- endmacro %}
