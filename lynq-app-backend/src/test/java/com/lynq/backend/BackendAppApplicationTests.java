@@ -156,6 +156,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String APPLICATION_OLDEST_ID = "a5a5a5a5-a5a5-a5a5-a5a5-a5a5a5a5a5a5";
 
   private static final String RESUME_ID = "66666666-6666-6666-6666-666666666666";
+  private static final String UNKNOWN_RESUME_ID = "66666666-6666-6666-6666-666666666667";
   private static final String RESUME_NAME = "Jane Doe - Backend";
   private static final Language RESUME_LANGUAGE = Language.EN;
   private static final String RESUME_SUMMARY = "Backend engineer";
@@ -1426,6 +1427,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     stubIamUserInfo();
     seedUser(UserType.CANDIDATE);
     seedSingleJob(INITIAL_SEEN);
+    seedResume();
 
     HttpResponse<String> response = postApply(JOB_ID);
 
@@ -1439,6 +1441,36 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(data.get("userId"), is(USER_ID));
     assertThat(data.get("applicationId"), is(notNullValue()));
     assertThat(userApplicationJobRepository.existsByJobIdAndUserId(JOB_ID, USER_ID), is(true));
+
+    UserApplicationJobEntity application = userApplicationJobRepository
+        .findByJobIdAndUserId(JOB_ID, USER_ID).orElseThrow();
+    assertThat(application.getUserResume().getId(), is(RESUME_ID));
+  }
+
+  @Test
+  void applyToJobReturnsNotFoundWhenTheResumeIsNotTheCandidatesOwn() throws Exception {
+    stubIamUserInfo();
+    seedUser(UserType.CANDIDATE);
+    seedSingleJob(INITIAL_SEEN);
+
+    HttpResponse<String> response = postApply(JOB_ID, UNKNOWN_RESUME_ID);
+
+    assertThat(response.statusCode(), is(404));
+    assertThat(parse(response.body()).get("success"), is(false));
+    assertThat(userApplicationJobRepository.count(), is(0L));
+  }
+
+  @Test
+  void applyToJobReturnsBadRequestWhenNoResumeIsChosen() throws Exception {
+    stubIamUserInfo();
+    seedUser(UserType.CANDIDATE);
+    seedSingleJob(INITIAL_SEEN);
+    seedResume();
+
+    HttpResponse<String> response = postApply(JOB_ID, "  ");
+
+    assertThat(response.statusCode(), is(400));
+    assertThat(userApplicationJobRepository.count(), is(0L));
   }
 
   @Test
@@ -1446,6 +1478,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     stubIamUserInfo();
     seedUser(UserType.CANDIDATE);
     seedSingleJob(INITIAL_SEEN);
+    seedResume();
 
     assertThat(postApply(JOB_ID).statusCode(), is(201));
     HttpResponse<String> response = postApply(JOB_ID);
@@ -1841,12 +1874,17 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   private HttpResponse<String> postApply(String jobId) throws Exception {
+    return postApply(jobId, RESUME_ID);
+  }
+
+  private HttpResponse<String> postApply(String jobId, String resumeId) throws Exception {
     HttpRequest httpRequest = HttpRequest.newBuilder()
         .uri(URI.create(jobSubResourceUrl(jobId, "apply")))
         .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
         .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
         .header(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .POST(HttpRequest.BodyPublishers.noBody())
+        .POST(HttpRequest.BodyPublishers.ofString(
+            String.format("{\"resumeId\": \"%s\"}", resumeId)))
         .build();
     return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
   }

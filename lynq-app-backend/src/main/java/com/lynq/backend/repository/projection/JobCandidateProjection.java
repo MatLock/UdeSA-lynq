@@ -9,6 +9,9 @@ public record JobCandidateProjection(
     String userFullName,
     String userFileStorageId,
     String userCurrentPosition,
+    // Null for applications registered before candidates chose a resume, and
+    // for a resume whose document was never stored.
+    String userResumeFileStorageId,
     LocalDate appliedOn,
     String jobSkills,
     String userSkills,

@@ -28,6 +28,7 @@ import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSkillEntity;
 import com.lynq.backend.model.UserApplicationJobEntity;
 import com.lynq.backend.model.UserEntity;
+import com.lynq.backend.model.UserResumeEntity;
 import com.lynq.backend.model.JobPostSimilarityTagEntity;
 import com.lynq.backend.model.UserSkillsEntity;
 import com.lynq.backend.model.UserSimilarityTagEntity;
@@ -37,6 +38,7 @@ import com.lynq.backend.repository.JobPostSkillRepository;
 import com.lynq.backend.repository.JobPostSimilarityTagRepository;
 import com.lynq.backend.repository.UserApplicationJobRepository;
 import com.lynq.backend.repository.UserRepository;
+import com.lynq.backend.repository.UserResumeRepository;
 import com.lynq.backend.repository.projection.JobCandidateProjection;
 import com.lynq.backend.repository.projection.JobWithDetailsProjection;
 import com.lynq.backend.security.LynqUserPrincipal;
@@ -65,6 +67,7 @@ public class JobService {
   private static final String AUTHENTICATED_USER_NOT_FOUND = "Authenticated user not found";
   private static final String JOB_POST_NOT_FOUND = "Job post not found";
   private static final String ALREADY_APPLIED_TO_JOB = "User has already applied to this job";
+  private static final String RESUME_NOT_FOUND = "Resume '%s' not found";
   private static final String ONLY_JOB_OWNER_CAN_REFRESH = "Only the owner of the job post can refresh it";
   private static final String ONLY_CLOSED_JOBS_CAN_BE_REFRESHED = "Only closed job posts can be refreshed";
   private static final String ONLY_JOB_OWNER_CAN_CLOSE = "Only the owner of the job post can close it";
@@ -83,6 +86,7 @@ public class JobService {
   private final CompanyRepository companyRepository;
   private final UserRepository userRepository;
   private final UserApplicationJobRepository userApplicationJobRepository;
+  private final UserResumeRepository userResumeRepository;
   private final JobPostSkillRepository jobPostSkillRepository;
   private final JobPostSimilarityTagRepository jobPostSimilarityTagRepository;
   private final FileStorageService fileStorageService;
@@ -90,12 +94,14 @@ public class JobService {
 
   public JobService(JobPostRepository jobPostRepository, CompanyRepository companyRepository,
       UserRepository userRepository, UserApplicationJobRepository userApplicationJobRepository,
+      UserResumeRepository userResumeRepository,
       JobPostSkillRepository jobPostSkillRepository, JobPostSimilarityTagRepository jobPostSimilarityTagRepository,
       FileStorageService fileStorageService, LynqMLClient lynqMLClient) {
     this.jobPostRepository = jobPostRepository;
     this.companyRepository = companyRepository;
     this.userRepository = userRepository;
     this.userApplicationJobRepository = userApplicationJobRepository;
+    this.userResumeRepository = userResumeRepository;
     this.jobPostSkillRepository = jobPostSkillRepository;
     this.jobPostSimilarityTagRepository = jobPostSimilarityTagRepository;
     this.fileStorageService = fileStorageService;
@@ -245,7 +251,15 @@ public class JobService {
 
   @AuditLog
   @Transactional
-  public UserApplicationJobEntity applyToJob(String jobId) {
+  /**
+   * Register an application of the authenticated candidate, with the resume they
+   * chose to apply with.
+   *
+   * <p>The resume is looked up scoped to its owner, so one belonging to another
+   * candidate is a 404 rather than a 403: the caller learns nothing about
+   * resumes that are not theirs.
+   */
+  public UserApplicationJobEntity applyToJob(String jobId, String resumeId) {
     UserEntity user = getAuthenticatedUser();
 
     if (user.getType() != UserType.CANDIDATE) {
@@ -255,6 +269,9 @@ public class JobService {
     JobPostEntity job = jobPostRepository.findById(jobId)
         .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
 
+    UserResumeEntity resume = userResumeRepository.findByIdAndUserId(resumeId, user.getId())
+        .orElseThrow(() -> new NotFoundException(String.format(RESUME_NOT_FOUND, resumeId)));
+
     if (userApplicationJobRepository.existsByJobIdAndUserId(jobId, user.getId())) {
       throw new AlreadyAppliedToJobException(ALREADY_APPLIED_TO_JOB);
     }
@@ -263,6 +280,7 @@ public class JobService {
         .id(Generators.timeBasedEpochGenerator().generate().toString())
         .jobPost(job)
         .user(user)
+        .userResume(resume)
         .appliedOn(LocalDate.now(ZoneOffset.UTC))
         .build();
 
@@ -278,13 +296,18 @@ public class JobService {
     Page<JobCandidateProjection> candidates =
         userApplicationJobRepository.findCandidatesByJobId(jobId, pageable);
 
-    Map<String, String> profileImageUrls = fileStorageService.obtainDownloadUrls(
+    // Avatars and applied-with resumes are signed in one round trip: the map is
+    // keyed by file id, so the two kinds of document share it without clashing.
+    Map<String, String> downloadUrls = fileStorageService.obtainDownloadUrls(
         candidates.getContent().stream()
-            .map(JobCandidateProjection::userFileStorageId)
+            .flatMap(candidate -> Stream.of(
+                candidate.userFileStorageId(), candidate.userResumeFileStorageId()))
+            .filter(Objects::nonNull)
+            .distinct()
             .toList());
 
     return PagedRestResponse.from(
-        candidates.map(projection -> toCandidateResponse(projection, profileImageUrls)));
+        candidates.map(projection -> toCandidateResponse(projection, downloadUrls)));
   }
 
   @AuditLog
@@ -398,11 +421,25 @@ public class JobService {
 
     return GetJobDetailForCandidateRestResponse.from(
         toResponse(projection, user, signProfileImages(List.of(projection))),
-        userApplicationJobRepository.countByJobId(jobId));
+        userApplicationJobRepository.countByJobId(jobId),
+        hasApplied(jobId, user));
+  }
+
+  /**
+   * Whether this viewer already applied to the job. Only a candidate ever can,
+   * so a company viewer answers false without hitting the database — the same
+   * rule {@link #calculateLyNQScore} follows for the score.
+   */
+  private boolean hasApplied(String jobId, UserEntity user) {
+    if (user == null || user.getType() != UserType.CANDIDATE) {
+      return false;
+    }
+
+    return userApplicationJobRepository.existsByJobIdAndUserId(jobId, user.getId());
   }
 
   private JobCandidateResponse toCandidateResponse(JobCandidateProjection projection,
-      Map<String, String> profileImageUrls) {
+      Map<String, String> downloadUrls) {
     List<String> jobSkills = splitSkills(projection.jobSkills());
     List<String> candidateSkills = splitSkills(projection.userSkills());
     return JobCandidateResponse.builder()
@@ -410,9 +447,10 @@ public class JobService {
         .userId(projection.userId())
         .jobId(projection.jobId())
         .userFullName(projection.userFullName())
-        .userProfileImage(signedUrl(profileImageUrls, projection.userFileStorageId()))
+        .userProfileImage(signedUrl(downloadUrls, projection.userFileStorageId()))
         .userCurrentPosition(projection.userCurrentPosition())
         .userAppliedOn(projection.appliedOn())
+        .userResumeUrl(signedUrl(downloadUrls, projection.userResumeFileStorageId()))
         .lynqScore(LyNQScoreCalculator.score(jobSkills, splitSkills(projection.jobSimilarityTags()),
             candidateSkills, splitSkills(projection.userSimilarityTags())))
         .build();

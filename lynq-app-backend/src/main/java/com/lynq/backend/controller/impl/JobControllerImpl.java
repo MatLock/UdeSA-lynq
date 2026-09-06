@@ -4,6 +4,7 @@ import com.lynq.backend.aspect.AuditLog;
 import com.lynq.backend.client.response.CandidateExplanationResponse;
 import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.controller.JobController;
+import com.lynq.backend.controller.request.ApplyJobRequest;
 import com.lynq.backend.controller.request.CreateJobRequest;
 import com.lynq.backend.controller.request.UpdateJobRequest;
 import com.lynq.backend.controller.response.ApplyJobRestResponse;
@@ -21,6 +22,7 @@ import com.lynq.backend.model.JobPostSkillEntity;
 import com.lynq.backend.model.UserApplicationJobEntity;
 import com.lynq.backend.service.JobFilter;
 import com.lynq.backend.service.JobService;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -206,8 +208,8 @@ public class JobControllerImpl implements JobController {
   @PostMapping("/{jobId}/apply")
   @AuditLog
   public ResponseEntity<GlobalRestResponse<ApplyJobRestResponse>> applyToJob(
-      @PathVariable String jobId) {
-    UserApplicationJobEntity application = jobService.applyToJob(jobId);
+      @PathVariable String jobId, @Valid @RequestBody ApplyJobRequest request) {
+    UserApplicationJobEntity application = jobService.applyToJob(jobId, request.getResumeId());
 
     ApplyJobRestResponse response = ApplyJobRestResponse.builder()
         .applicationId(application.getId())
