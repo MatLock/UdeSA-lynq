@@ -7,6 +7,7 @@ import com.lynq.bff.client.request.CreateResumeRequest;
 import com.lynq.bff.client.request.LanguageDetectionRequest;
 import com.lynq.bff.client.request.ParseResumeRequest;
 import com.lynq.bff.client.response.LanguageDetectionResponse;
+import com.lynq.bff.client.response.SkillExtractionResponse;
 import com.lynq.bff.exceptions.BadGatewayException;
 import java.util.List;
 import java.util.Locale;
@@ -51,7 +52,9 @@ public class ResumeImportService {
 
     try {
       Object resume = parse(readUrl(fileId, caller), caller);
-      Object stored = store(resume, language(resume, fallbackLanguage, caller), fileId, caller);
+      String language = language(resume, fallbackLanguage, caller);
+      List<String> similarityTags = similarityTags(resume, fallbackLanguage, fileId, caller);
+      Object stored = store(resume, language, similarityTags, fileId, caller);
 
       log.info("message= Finished resume import, user_id={}, file_id={}", caller.userId(), fileId);
 
@@ -99,11 +102,47 @@ public class ResumeImportService {
     return LANGUAGES.contains(code) ? code : DEFAULT_LANGUAGE;
   }
 
-  private Object store(Object resume, String language, String fileId, Caller caller) {
+  /**
+   * The transferable capabilities behind the resume's skills, best-effort.
+   *
+   * <p>Parsing only recovers the skills the candidate literally wrote down. The
+   * generalized tags — "Asynchronous Messaging" rather than Kafka or RabbitMQ —
+   * have no other source, and without them an imported resume can only be
+   * matched on exact skill names, scoring below the same resume typed into the
+   * wizard, which asks lynq-ml for them explicitly.
+   *
+   * <p>This is a second LLM round-trip on a path that already made one, so a
+   * failure here degrades to no tags instead of losing the import: the tags can
+   * be regenerated from the stored resume later, the uploaded document cannot.
+   *
+   * <p>{@code language} is the caller's UI language, passed for parity with the
+   * wizard. It only decides the wording of the soft skills, which this path does
+   * not read — the tags themselves are always English.
+   */
+  private List<String> similarityTags(Object resume, String language, String fileId,
+                                      Caller caller) {
+    try {
+      SkillExtractionResponse extracted = lynqMlClient
+          .extractResumeSkills(resume, language, caller.requestUuid(), caller.userId())
+          .getData();
+
+      return extracted == null || extracted.getSimilarityTags() == null
+          ? List.of()
+          : extracted.getSimilarityTags();
+    } catch (RuntimeException e) {
+      log.warn("message= Could not derive the similarity tags of an imported resume, it is stored "
+          + "without them, user_id={}, file_id={}", caller.userId(), fileId, e);
+      return List.of();
+    }
+  }
+
+  private Object store(Object resume, String language, List<String> similarityTags, String fileId,
+                       Caller caller) {
     CreateResumeRequest request = CreateResumeRequest.builder()
         .name(ParsedResume.fullName(resume))
         .language(language)
         .resume(resume)
+        .similarityTags(similarityTags)
         .fileId(fileId)
         .build();
 

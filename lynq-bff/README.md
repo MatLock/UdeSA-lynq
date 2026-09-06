@@ -163,7 +163,8 @@ POST /lynq-bff/resume/document/{fileId}/import?language=es
   2. GET    lynq-file-storage /dmz/files/{fileId}/download-url  sign a URL to read it
   3. POST   lynq-ml           /dmz/parse-resume                 read it into resume JSON
   4. POST   lynq-ml           /dmz/detect-language              which language is it written in
-  5. POST   lynq-app-backend  /dmz/user/resume                  store it against the candidate
+  5. POST   lynq-ml           /dmz/resume/skill-extraction      generalize its skills into tags
+  6. POST   lynq-app-backend  /dmz/user/resume                  store it against the candidate
 
   -> 201 { "success": true, "data": { …the stored resume… } }
 ```
@@ -178,6 +179,15 @@ POST /lynq-bff/resume/document/{fileId}/import?language=es
   to lynq-ml is the resume's own prose (summary, headline, the descriptions of its sections) —
   `ParsedResume` is the one place the gateway looks inside a resume, and it skips the skill lists and
   the English JSON keys that would drag the classification towards English.
+- **The skills are parsed, the capabilities are derived.** Step 3 only recovers what the candidate
+  literally wrote down, and the app-backend copies those into their skill list on its own. The
+  generalized similarity tags — "Asynchronous Messaging" rather than Kafka or RabbitMQ — have no
+  other source, and they are half of the LyNQ score: without them an imported resume can only match
+  a posting on exact skill names, scoring below the same resume typed into the wizard, where the
+  candidate presses "generate skills" and gets them. Step 5 closes that gap. It is best-effort — the
+  second LLM round-trip on this path, so a failure stores the resume without tags instead of losing
+  an otherwise valid import; the tags can be derived again from the stored resume, the uploaded
+  document cannot.
 - **The document does not outlive a failed import.** Once step 1 has confirmed it, any later failure
   deletes it before the `502` is returned — the candidate still has the original file, so a retry
   starts clean rather than accumulating documents no resume points at.
