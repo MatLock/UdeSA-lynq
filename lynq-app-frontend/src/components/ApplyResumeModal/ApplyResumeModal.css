@@ -1,0 +1,167 @@
+/* ApplyResumeModal — pick which stored resume to apply with. A native modal
+   <dialog> portaled to <body>; the browser paints the dim via ::backdrop.
+   Mirrors ResumeAliasModal's visual language; brand tokens from index.css. */
+
+.apply-resume-dialog {
+  width: min(460px, calc(100vw - 48px));
+  max-width: none;
+  margin: auto;
+  padding: 0;
+  color: inherit;
+  background: #fff;
+  border: none;
+  border-radius: 16px;
+  box-shadow: var(--shadow-dialog);
+}
+
+.apply-resume-dialog::backdrop {
+  background: var(--scrim);
+  backdrop-filter: blur(2px);
+}
+
+.apply-resume-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  text-align: left;
+}
+
+.apply-resume-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.apply-resume-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+}
+
+.apply-resume-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.apply-resume-subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.apply-resume-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.apply-resume-note.is-error {
+  color: var(--danger-ink);
+}
+
+.apply-resume-link {
+  color: var(--brand-purple-dark);
+  font-weight: 700;
+}
+
+/* The list scrolls rather than growing the dialog past the viewport: a
+   candidate can accumulate a resume per language and per kind of role. */
+.apply-resume-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  margin: 0;
+  padding: 2px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.apply-resume-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.apply-resume-option:hover {
+  border-color: var(--brand-purple-light);
+}
+
+.apply-resume-option.is-selected {
+  border-color: var(--brand-purple-light);
+  background: var(--accent-bg);
+}
+
+.apply-resume-option input {
+  accent-color: var(--brand-purple-dark);
+}
+
+.apply-resume-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.apply-resume-option-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+
+.apply-resume-option-meta {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.apply-resume-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.apply-resume-button {
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-gradient);
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.apply-resume-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.apply-resume-button--ghost {
+  color: var(--text);
+  background: none;
+  border-color: var(--border);
+}
+
+.apply-resume-button--ghost:hover:not(:disabled) {
+  border-color: var(--brand-purple-light);
+  color: var(--brand-purple-dark);
+}

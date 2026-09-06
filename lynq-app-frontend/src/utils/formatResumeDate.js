@@ -42,7 +42,22 @@ const formatResumeDateRange = (start, end, isCurrent, presentLabel, locale = act
   return from || to || ''
 }
 
+// The date a resume was stored is not one of the resume's own partial dates: it
+// is a full backend LocalDate ("YYYY-MM-DD"), which the two formatters above
+// deliberately reject. Shown in the active UI locale, and returned unchanged
+// when it is not a date at all, so a caller never prints "Invalid Date".
+const formatResumeCreatedOn = (isoDate, locale = activeLocale) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate ?? '')
+  if (!match) return isoDate ?? ''
+
+  const [, year, month, day] = match
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(
+    new Date(Number(year), Number(month) - 1, Number(day)),
+  )
+}
+
 export default {
   formatResumeDate,
   formatResumeDateRange,
+  formatResumeCreatedOn,
 }

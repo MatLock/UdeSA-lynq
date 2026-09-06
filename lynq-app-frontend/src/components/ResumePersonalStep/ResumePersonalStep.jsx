@@ -146,7 +146,12 @@ const ResumePersonalStep = ({ active, stepNumber, totalSteps }) => {
         </div>
       </ResumeStepGroup>
 
-      <ResumeField id="resume-summary" label={tp.summaryLabel} full>
+      <ResumeField
+        id="resume-summary"
+        label={tp.summaryLabel}
+        hint={t.richTextHint}
+        full
+      >
         <textarea
           id="resume-summary"
           className="resume-personal-summary"

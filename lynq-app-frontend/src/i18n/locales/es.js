@@ -172,6 +172,20 @@ const es = {
     applied: 'Te postulaste a este empleo.',
     alreadyApplied: 'Ya te postulaste a este empleo.',
     applyError: 'No se pudo postular. Intentá de nuevo.',
+    // The dialog that opens on "Apply now": the candidate keeps several resumes
+    // and the recruiter only ever sees the one they applied with.
+    applyDialog: {
+      title: '¿Con qué CV querés postularte?',
+      subtitle: 'El reclutador solo va a ver el que elijas acá.',
+      untitled: 'CV sin nombre',
+      loading: 'Cargando tus CVs…',
+      loadError: 'No pudimos cargar tus CVs. Cerrá y probá de nuevo.',
+      emptyBody: 'Todavía no tenés ningún CV.',
+      emptyAction: 'Crear uno',
+      cancel: 'Cancelar',
+      confirm: 'Postularme con este CV',
+      applying: 'Postulando…',
+    },
     stopSeeking: 'Dejar de buscar candidatos',
     stopping: 'Deteniendo…',
     stopError: 'No se pudo detener la búsqueda. Intentá de nuevo.',
@@ -195,6 +209,9 @@ const es = {
     github: 'GitHub',
     linkedin: 'LinkedIn',
     noLinks: 'No se proporcionaron enlaces.',
+    // Shown only when this page was reached from a job's candidates list,
+    // which carries the resume the candidate applied with.
+    downloadResume: 'Descargar CV',
     companyHeading: 'Empresa',
     companyLogoAlt: 'Logo de la empresa',
     jobsHeading: 'Empleos publicados',
@@ -367,6 +384,9 @@ const es = {
         title: 'Creá tu CV',
         subtitle: 'Todavía no tenés un CV en LYNQ. Armemos uno juntos.',
         stepCounter: 'Paso {current} de {total}',
+        // Shown under every free-text field: the wizard keeps the line
+        // structure, and the resume renders it as real bullets.
+        richTextHint: 'Se respetan los saltos de línea. Empezá una línea con "-" para una viñeta.',
         next: 'Siguiente',
         back: 'Atrás',
         finish: 'Crear mi CV',
@@ -620,6 +640,7 @@ const es = {
       lynqScore: 'LYNQ-SCORE',
       unknownCandidate: 'Desconocido',
       reviewApplication: 'Revisar postulación',
+      downloadResume: 'Descargar CV',
       aiEvaluation: 'Evaluación IA',
       aiEvaluating: 'Evaluando…',
       aiError: 'No pudimos generar la evaluación con IA. Intentá de nuevo.',

@@ -1,0 +1,26 @@
+/* The bullet look shared by every list RichText renders. Size, colour and
+   line-height come from the caller's own class, which the list carries too —
+   this only owns what makes it read as a list. */
+
+.rich-text-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rich-text-list li::marker {
+  color: var(--brand-purple);
+}
+
+/* One piece of prose can render as several blocks. The first sits exactly where
+   the single paragraph used to (the caller's own margin), and every block after
+   it is spaced off the one before — so a description that gained a list does not
+   also gain a gap above itself. */
+.rich-text-paragraph + .rich-text-paragraph,
+.rich-text-paragraph + .rich-text-list,
+.rich-text-list + .rich-text-paragraph,
+.rich-text-list + .rich-text-list {
+  margin-top: 6px;
+}

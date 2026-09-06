@@ -172,6 +172,20 @@ const en = {
     applied: 'You have applied to this job.',
     alreadyApplied: 'You have already applied to this job.',
     applyError: 'Could not apply. Please try again.',
+    // The dialog that opens on "Apply now": the candidate keeps several resumes
+    // and the recruiter only ever sees the one they applied with.
+    applyDialog: {
+      title: 'Which resume do you want to apply with?',
+      subtitle: 'The recruiter will only see the one you choose here.',
+      untitled: 'Untitled resume',
+      loading: 'Loading your resumes…',
+      loadError: 'We could not load your resumes. Please close and try again.',
+      emptyBody: 'You do not have a resume yet.',
+      emptyAction: 'Create one',
+      cancel: 'Cancel',
+      confirm: 'Apply with this resume',
+      applying: 'Applying…',
+    },
     stopSeeking: 'Stop seeking candidates',
     stopping: 'Stopping…',
     stopError: 'Could not stop the search. Please try again.',
@@ -195,6 +209,9 @@ const en = {
     github: 'GitHub',
     linkedin: 'LinkedIn',
     noLinks: 'No links provided.',
+    // Shown only when this page was reached from a job's candidates list,
+    // which carries the resume the candidate applied with.
+    downloadResume: 'Download resume',
     companyHeading: 'Company',
     companyLogoAlt: 'Company logo',
     jobsHeading: 'Posted jobs',
@@ -367,6 +384,9 @@ const en = {
         title: 'Create your resume',
         subtitle: 'You do not have a resume on LYNQ yet. Let us build one.',
         stepCounter: 'Step {current} of {total}',
+        // Shown under every free-text field: the wizard keeps the line
+        // structure, and the resume renders it as real bullets.
+        richTextHint: 'Line breaks are kept. Start a line with "-" for a bullet.',
         next: 'Next',
         back: 'Back',
         finish: 'Create my resume',
@@ -620,6 +640,7 @@ const en = {
       lynqScore: 'LYNQ-SCORE',
       unknownCandidate: 'Unknown',
       reviewApplication: 'Review application',
+      downloadResume: 'Download resume',
       aiEvaluation: 'AI Evaluation',
       aiEvaluating: 'Evaluating…',
       aiError: 'We could not generate the AI evaluation. Please try again.',

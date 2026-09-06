@@ -154,12 +154,14 @@
   background: var(--brand-gradient);
 }
 
+/* Rendered through RichText, which splits the prose into paragraphs and bullet
+   lists — hence no `white-space` rule: there is no collapsed text left to keep
+   the line breaks of. */
 .resume-summary {
   margin: 0;
   font-size: 14px;
   line-height: 1.65;
   color: var(--text);
-  white-space: pre-line;
 }
 
 /* ── Timeline (work experience, education) ───────────────────────────────── */
@@ -259,12 +261,12 @@
   background: var(--brand-gradient);
 }
 
+/* Rendered through RichText — see .resume-summary. */
 .resume-entry-body {
   margin: 0;
   font-size: 13px;
   line-height: 1.6;
   color: var(--text);
-  white-space: pre-line;
 }
 
 .resume-entry-block {

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Chip } from '@mui/material'
 import GitHubIcon from '@mui/icons-material/GitHub'
 import LinkedInIcon from '@mui/icons-material/LinkedIn'
+import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded'
 import strings from '../../i18n'
 import useApi from '../../hooks/useApi'
 import userService from '../../services/userService'
@@ -43,9 +44,13 @@ const UserProfilePage = () => {
   const navigate = useNavigate()
   const { authFetch } = useApi()
   // Reached from a job's candidates list, the applicant's job-specific LYNQ
-  // match score rides along via router state so it can sit next to the name.
+  // match score and the resume they applied with ride along via router state,
+  // so this page can show both without knowing which job it was reached from.
+  // Both are absent on a direct visit or a reload, which is why each is
+  // rendered only when present rather than assumed.
   const { state } = useLocation()
   const lynqScore = state?.lynqScore ?? null
+  const resumeUrl = state?.resumeUrl ?? null
 
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -239,6 +244,21 @@ const UserProfilePage = () => {
                     </a>
                   )}
                 </div>
+              )}
+
+              {/* The CV this candidate chose to apply with — the same document
+                  the candidates list offers, carried here so the recruiter can
+                  open it without going back. */}
+              {resumeUrl && (
+                <a
+                  className="user-profile-resume"
+                  href={resumeUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                >
+                  <DownloadRoundedIcon sx={{ fontSize: 16 }} />
+                  {t.downloadResume}
+                </a>
               )}
             </div>
           </div>

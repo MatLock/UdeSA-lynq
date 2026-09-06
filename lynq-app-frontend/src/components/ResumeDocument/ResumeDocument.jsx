@@ -7,6 +7,7 @@ import RocketLaunchOutlinedIcon from '@mui/icons-material/RocketLaunchOutlined'
 import LanguageOutlinedIcon from '@mui/icons-material/LanguageOutlined'
 import LinkRoundedIcon from '@mui/icons-material/LinkRounded'
 import WorkspacePremiumOutlinedIcon from '@mui/icons-material/WorkspacePremiumOutlined'
+import RichText from '../RichText/RichText'
 import strings from '../../i18n'
 import resumeSections from '../../utils/resumeSections'
 import formatResumeDate from '../../utils/formatResumeDate'
@@ -165,9 +166,7 @@ const ResumeDocument = ({ resume, sections }) => {
                 </div>
               </header>
 
-              {hasText(job.description) && (
-                <p className="resume-entry-body">{job.description}</p>
-              )}
+              <RichText text={job.description} className="resume-entry-body" />
 
               {entriesOf(job.achievements).length > 0 && (
                 <div className="resume-entry-block">
@@ -215,9 +214,7 @@ const ResumeDocument = ({ resume, sections }) => {
                 </div>
               </header>
 
-              {hasText(study.description) && (
-                <p className="resume-entry-body">{study.description}</p>
-              )}
+              <RichText text={study.description} className="resume-entry-body" />
             </article>
           </li>
         ))}
@@ -297,9 +294,7 @@ const ResumeDocument = ({ resume, sections }) => {
             </span>
             <div className="resume-card-body">
               <p className="resume-card-title">{project.name}</p>
-              {hasText(project.description) && (
-                <p className="resume-card-meta">{project.description}</p>
-              )}
+              <RichText text={project.description} className="resume-card-meta" />
               {entriesOf(project.technologies).length > 0 &&
                 renderChips(entriesOf(project.technologies), 'blue')}
               {hasText(project.url) && (
@@ -323,7 +318,10 @@ const ResumeDocument = ({ resume, sections }) => {
     <article className="resume-document">
       {shown.has('personal') && renderPersonal()}
       {shown.has('summary') &&
-        renderSection('summary', <p className="resume-summary">{resume.summary}</p>)}
+        renderSection(
+          'summary',
+          <RichText text={resume.summary} className="resume-summary" />,
+        )}
       {shown.has('experience') && renderExperience()}
       {shown.has('education') && renderEducation()}
       {shown.has('skills') && renderSkills()}
