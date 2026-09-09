@@ -507,7 +507,7 @@ const JobDetailPage = () => {
   const location = useLocation()
   const { jobId } = useParams()
   const { authFetch } = useApi()
-  const { user } = useAuth()
+  const { user, isCompany } = useAuth()
   // The JobCard click hands the job in via router state for an instant first
   // paint; the authoritative data (including the counters below) is then loaded
   // from GET /job/{jobId}/details, which also lets direct navigation / reload
@@ -517,12 +517,7 @@ const JobDetailPage = () => {
     useJobDetails(jobId, initialJob, authFetch)
 
   // Mirror the feed's rule (HomePage/JobCard): candidate-only concerns (the LYNQ
-  // score, the Apply action) are shown to everyone except COMPANY users. We
-  // derive from isCompany rather than a positive `userType === 'CANDIDATE'` check
-  // so behavior matches the feed even when the profile hasn't populated userType
-  // (e.g. the login profile lookup failed) — otherwise the score would show in
-  // the feed but silently vanish here.
-  const isCompany = user?.userType === 'COMPANY'
+  // score, the Apply action) are shown to everyone except COMPANY users.
   // Reaching this page from "My Applications" (ApplicationCard) means the user has
   // already applied to this job, so seed the apply state accordingly to disable
   // the button and show the "already applied" legend without needing an attempt.

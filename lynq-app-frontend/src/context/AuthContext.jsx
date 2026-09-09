@@ -9,6 +9,7 @@ import {
 import authService from '../services/authService'
 import userService from '../services/userService'
 import securedFetch from '../utils/securedFetch'
+import accessTokenRoles from '../utils/accessTokenRoles'
 import profileImageCache from '../utils/profileImageCache'
 import fileToDataUrl from '../utils/fileToDataUrl'
 import useReduxDevtools from '../hooks/useReduxDevtools'
@@ -77,7 +78,6 @@ const withProfile = (user, profile) =>
         // URL when nothing is cached.
         profileImageUrl:
           profileImageCache.read(user.id) ?? profile.userProfileImageUrl,
-        userType: profile.userType,
         // COMPANY owners carry the id of the company they own; the sidebar uses
         // it to open their own company at /company/{companyId}.
         companyId: profile.companyId,
@@ -276,11 +276,14 @@ const AuthProvider = ({ children }) => {
     }
   }, [])
 
-  const value = useMemo(
-    () => ({
+  const value = useMemo(() => {
+    const roles = accessTokenRoles.rolesOf(session?.accessToken)
+    return {
       accessToken: session?.accessToken ?? null,
       refreshToken: session?.refreshToken ?? null,
       user: session?.user ?? null,
+      roles,
+      isCompany: roles.includes(accessTokenRoles.COMPANY),
       isAuthenticated: Boolean(
         session?.accessToken && session?.refreshToken && session?.user,
       ),
@@ -290,9 +293,8 @@ const AuthProvider = ({ children }) => {
       updateUser,
       applyTokens,
       refreshSession,
-    }),
-    [session, loading, login, logout, updateUser, applyTokens, refreshSession],
-  )
+    }
+  }, [session, loading, login, logout, updateUser, applyTokens, refreshSession])
 
   // Mirror the auth state into the Redux DevTools extension (dev only). Tokens
   // are reduced to presence flags to keep the inspector readable and avoid
@@ -301,6 +303,7 @@ const AuthProvider = ({ children }) => {
     isAuthenticated: value.isAuthenticated,
     loading,
     user: value.user,
+    roles: value.roles,
     remembered: session?.remembered ?? false,
     hasAccessToken: Boolean(session?.accessToken),
     hasRefreshToken: Boolean(session?.refreshToken),

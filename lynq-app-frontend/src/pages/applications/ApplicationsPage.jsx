@@ -21,7 +21,7 @@ const ApplicationsPage = () => {
   const t = strings.pages.applications
   // Refresh-aware fetcher so the list survives access-token expiry.
   const { authFetch } = useApi()
-  const { user } = useAuth()
+  const { isCompany } = useAuth()
   const navigate = useNavigate()
 
   const [page, setPage] = useState(0)
@@ -93,7 +93,7 @@ const ApplicationsPage = () => {
   }
 
   // Candidate-only page: send company users back to the feed.
-  if (user?.userType === 'COMPANY') {
+  if (isCompany) {
     return <Navigate to="/home" replace />
   }
 

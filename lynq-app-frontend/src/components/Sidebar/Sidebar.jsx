@@ -29,14 +29,13 @@ const LogoutIcon = () => (
 // highlighted. Owns its collapsed/expanded state.
 const Sidebar = () => {
   const t = strings.sidebar
-  const { user, logout } = useAuth()
+  const { user, isCompany, logout } = useAuth()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [collapsed, setCollapsed] = useState(false)
 
 
   const profileImageUrl = user?.profileImageUrl ?? null
-  const isCompany = user?.userType === 'COMPANY'
   const items = [
     { key: 'home', icon: '🏠', label: t.home, to: '/home' },
     { key: 'profile', icon: '👤', label: t.profile, to: '/profile' },

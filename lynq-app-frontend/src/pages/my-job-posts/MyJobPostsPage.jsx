@@ -21,7 +21,7 @@ const MyJobPostsPage = () => {
   const t = strings.pages.jobPosts
   // Refresh-aware fetcher so the list survives access-token expiry.
   const { authFetch } = useApi()
-  const { user } = useAuth()
+  const { isCompany } = useAuth()
   const navigate = useNavigate()
 
   const [page, setPage] = useState(0)
@@ -56,7 +56,7 @@ const MyJobPostsPage = () => {
   }, [authFetch, page])
 
   // Company-only page: send everyone else back to the feed.
-  if (user && user.userType !== 'COMPANY') {
+  if (!isCompany) {
     return <Navigate to="/home" replace />
   }
 

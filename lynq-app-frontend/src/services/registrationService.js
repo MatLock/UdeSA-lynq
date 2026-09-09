@@ -1,9 +1,9 @@
 // Registration orchestration — composes the lynq-iam auth call with the
 // lynq-backend-app profile/company calls.
 //
-// Both flows first create the auth identity (username/password/email) via
-// authService, which returns an access token, then use that token to create the
-// domain entity:
+// Both flows first create the auth identity (username/password/email/role) via
+// authService, which returns an access token carrying the role, then use that
+// token to create the domain entity:
 //   - candidate: POST /user            (UserController.createUser)
 //   - company:   POST /company         (CompanyController.createUserWithCompany,
 //                                        which creates the owner profile AND the
@@ -14,6 +14,9 @@ import requestUuidUtil from '../utils/requestUuid';
 
 const APP_BASE_URL =
   import.meta.env.LYNQ_BFF_BASE_URL ?? 'http://localhost:8087/lynq-bff';
+
+const CANDIDATE_ROLE = 'R_CANDIDATE';
+const COMPANY_ROLE = 'R_COMPANY';
 
 /**
  * POST to a secured app-backend endpoint with the bearer token and the required
@@ -68,9 +71,12 @@ const register_candidate = async ({ username, email, password, fullName, birthDa
   // One correlation id for the whole functionality: the IAM register call and
   // the backend profile call below share it so they trace as a single flow.
   const requestUuid = requestUuidUtil.newRequestUuid();
-  const auth = await authService.user_register({ username, email, password }, requestUuid);
+  const auth = await authService.user_register(
+    { username, email, password, role: CANDIDATE_ROLE },
+    requestUuid
+  );
   const accessToken = auth?.accessToken;
-  await postSecured('/user', { userType: 'CANDIDATE', fullName, birthDate }, accessToken, requestUuid);
+  await postSecured('/user', { fullName, birthDate }, accessToken, requestUuid);
   return auth;
 };
 
@@ -104,7 +110,10 @@ const register_company = async ({
   // the backend owner-profile + company call below share it so they trace as a
   // single flow.
   const requestUuid = requestUuidUtil.newRequestUuid();
-  const auth = await authService.user_register({ username, email, password }, requestUuid);
+  const auth = await authService.user_register(
+    { username, email, password, role: COMPANY_ROLE },
+    requestUuid
+  );
   const accessToken = auth?.accessToken;
   const companyResponse = await postSecured(
     '/company',

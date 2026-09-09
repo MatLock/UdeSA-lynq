@@ -15,7 +15,6 @@
  *   secured fetcher (useApi's authFetch, or a tokenFetcher for pre-session use).
  * @returns {Promise<{
  *   id: string,
- *   userType: string,
  *   companyId: string | null,
  *   fullName: string,
  *   userProfileImageUrl: string,

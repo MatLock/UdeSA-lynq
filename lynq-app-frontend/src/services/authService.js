@@ -96,6 +96,9 @@ const email_authenticate = async (email, password, requestUuid) =>
  * @param {string} userInfo.username - Unique username (3–20 chars).
  * @param {string} userInfo.password - User password (min 8 chars).
  * @param {string} userInfo.email - Unique email address (max 100 chars).
+ * @param {'R_CANDIDATE' | 'R_COMPANY'} userInfo.role - Role the user registers
+ *   with. Required: it is the claim every service authorizes against, and the
+ *   only place the candidate/company choice is recorded.
  * @param {string} [requestUuid] - Correlation id for the `lynq-request-uuid`
  *   header; defaults to a fresh id. Registration passes a shared id so the IAM
  *   call and the subsequent backend profile/company call share one trace.

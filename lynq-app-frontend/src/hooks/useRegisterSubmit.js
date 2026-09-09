@@ -24,9 +24,9 @@ const useRegisterSubmit = () => {
     try {
       const auth = await action()
 
-      // Enrich the session with the freshly-created profile (fullName, avatar,
-      // and crucially userType, which drives the sidebar menu). Non-fatal: the
-      // user is still logged in if the lookup fails.
+      // Enrich the session with the freshly-created profile (fullName, avatar).
+      // Non-fatal: the user is still logged in if the lookup fails, and the
+      // candidate/company menu comes from the token's roles, not from here.
       let profile = null
       try {
         // Fresh token from the registration just completed — no refresh needed.

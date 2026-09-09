@@ -42,7 +42,7 @@ import './MyResumePage.css'
 const MyResumePage = () => {
   const t = strings.pages.resume
   const { authFetch, freshAuthFetch } = useApi()
-  const { user } = useAuth()
+  const { isCompany } = useAuth()
 
   const [resumes, setResumes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -251,7 +251,7 @@ const MyResumePage = () => {
 
   // Candidate-only page: send company users back to the feed (same as the
   // applications section).
-  if (user?.userType === 'COMPANY') {
+  if (isCompany) {
     return <Navigate to="/home" replace />
   }
 

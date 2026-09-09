@@ -41,7 +41,7 @@ const JobCandidatesPage = () => {
   const { state } = useLocation()
   const jobTitle = state?.job?.title ?? null
   const { authFetch } = useApi()
-  const { user } = useAuth()
+  const { isCompany } = useAuth()
   const navigate = useNavigate()
 
   const [page, setPage] = useState(0)
@@ -106,7 +106,7 @@ const JobCandidatesPage = () => {
   }
 
   // Company-only page: send everyone else back to the feed.
-  if (user && user.userType !== 'COMPANY') {
+  if (!isCompany) {
     return <Navigate to="/home" replace />
   }
 
