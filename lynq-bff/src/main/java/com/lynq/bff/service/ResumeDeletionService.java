@@ -23,21 +23,16 @@ public class ResumeDeletionService {
 
   private static final String DELETE_FAILED = "The resume could not be deleted";
 
-  private final CandidateReader candidateReader;
   private final LynqBackendClient lynqBackendClient;
   private final LynqFileStorageClient lynqFileStorageClient;
 
-  public ResumeDeletionService(CandidateReader candidateReader,
-                               LynqBackendClient lynqBackendClient,
+  public ResumeDeletionService(LynqBackendClient lynqBackendClient,
                                LynqFileStorageClient lynqFileStorageClient) {
-    this.candidateReader = candidateReader;
     this.lynqBackendClient = lynqBackendClient;
     this.lynqFileStorageClient = lynqFileStorageClient;
   }
 
   public void delete(String resumeId, Caller caller) {
-    candidateReader.read(caller);
-
     log.info("message= Started resume deletion, user_id={}, resume_id={}",
         caller.userId(), resumeId);
 

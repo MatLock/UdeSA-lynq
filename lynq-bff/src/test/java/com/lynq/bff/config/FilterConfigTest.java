@@ -2,6 +2,7 @@ package com.lynq.bff.config;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThan;
@@ -10,6 +11,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynq.bff.filter.AuthHeaderExistenceFilter;
 import com.lynq.bff.filter.JwtSignatureFilter;
+import com.lynq.bff.filter.RelayRoleFilter;
 import com.lynq.bff.filter.RequestUuidFilter;
 import com.lynq.bff.security.JwtSignatureVerifier;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +30,7 @@ class FilterConfigTest {
   private static final int REQUEST_UUID_FILTER_ORDER = 0;
   private static final int AUTH_HEADER_EXISTENCE_FILTER_ORDER = 1;
   private static final int JWT_SIGNATURE_FILTER_ORDER = 2;
+  private static final int RELAY_ROLE_FILTER_ORDER = 3;
 
   @Mock
   private JwtSignatureVerifier jwtSignatureVerifier;
@@ -100,6 +103,25 @@ class FilterConfigTest {
         filterConfig.createJwtSignatureFilter(jwtSignatureVerifier, objectMapper);
 
     assertThat(registration.getOrder(), is(JWT_SIGNATURE_FILTER_ORDER));
+  }
+
+  @Test
+  void createRelayRoleFilterReturnsRegistrationBeanWithRelayRoleFilter() {
+    FilterRegistrationBean<RelayRoleFilter> registration =
+        filterConfig.createRelayRoleFilter(objectMapper);
+
+    assertThat(registration, is(notNullValue()));
+    assertThat(registration.getFilter(), is(instanceOf(RelayRoleFilter.class)));
+    assertThat(registration.getUrlPatterns(), contains(URL_PATTERN_ALL));
+  }
+
+  @Test
+  void createRelayRoleFilterRunsAfterTheSignatureIsVerified() {
+    FilterRegistrationBean<RelayRoleFilter> registration =
+        filterConfig.createRelayRoleFilter(objectMapper);
+
+    assertThat(registration.getOrder(), is(RELAY_ROLE_FILTER_ORDER));
+    assertThat(registration.getOrder(), is(greaterThan(JWT_SIGNATURE_FILTER_ORDER)));
   }
 
   @Test

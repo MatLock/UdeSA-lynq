@@ -20,8 +20,8 @@ paths:
       - User
       summary: Create a new user
       description: "Creates the profile of the authenticated user. The user identity\
-        \ is resolved from the bearer token, so only the profile fields are supplied\
-        \ in the request body."
+        \ and the user type are resolved from the bearer token, so only the profile\
+        \ fields are supplied in the request body."
       operationId: createUser
       parameters:
       - name: lynq-request-uuid
@@ -40,7 +40,6 @@ paths:
               Candidate profile:
                 description: Candidate profile
                 value:
-                  userType: CANDIDATE
                   userProfileImageUrl: https://cdn.lynq.com/avatars/jane.png
                   currentPosition: Backend Engineer
                   about: Java developer focused on distributed systems.
@@ -62,7 +61,6 @@ paths:
                     success: true
                     data:
                       id: 550e8400-e29b-41d4-a716-446655440000
-                      userType: CANDIDATE
                       userProfileImageUrl: https://cdn.lynq.com/avatars/jane.png
                       currentPosition: Backend Engineer
                       about: Java developer focused on distributed systems.
@@ -160,7 +158,6 @@ paths:
                     success: true
                     data:
                       id: 550e8400-e29b-41d4-a716-446655440000
-                      userType: CANDIDATE
                       fullName: Jane Doe
                       userProfileImageUrl: https://cdn.lynq.com/avatars/jane.png
                       currentPosition: Staff Engineer
@@ -348,11 +345,6 @@ components:
     CreateUserRequest:
       type: object
       properties:
-        userType:
-          type: string
-          enum:
-          - CANDIDATE
-          - COMPANY
         fullName:
           type: string
           minLength: 1
@@ -372,17 +364,11 @@ components:
       required:
       - birthDate
       - fullName
-      - userType
     CreateUserRestResponse:
       type: object
       properties:
         id:
           type: string
-        userType:
-          type: string
-          enum:
-          - CANDIDATE
-          - COMPANY
         fullName:
           type: string
         userProfileImageUrl:
@@ -557,11 +543,6 @@ components:
       properties:
         id:
           type: string
-        userType:
-          type: string
-          enum:
-          - CANDIDATE
-          - COMPANY
         fullName:
           type: string
         userProfileImageUrl:

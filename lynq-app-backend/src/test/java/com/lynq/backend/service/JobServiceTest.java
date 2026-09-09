@@ -12,7 +12,6 @@ import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
-import com.lynq.backend.enums.UserType;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.exceptions.AlreadyAppliedToJobException;
 import com.lynq.backend.exceptions.BadRequestException;
@@ -37,6 +36,7 @@ import com.lynq.backend.repository.UserResumeRepository;
 import com.lynq.backend.repository.projection.JobCandidateProjection;
 import com.lynq.backend.repository.projection.JobWithDetailsProjection;
 import com.lynq.backend.security.LynqUserPrincipal;
+import com.lynq.backend.security.Role;
 import java.time.LocalDate;
 import java.time.Month;
 import java.time.ZoneOffset;
@@ -59,6 +59,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -148,15 +149,9 @@ class JobServiceTest {
   private static final Pageable DEFAULT_PAGEABLE = PageRequest.of(0, 20);
 
   private static final String AUTHENTICATED_USER_NOT_FOUND = "Authenticated user not found";
-  private static final String ONLY_COMPANY_USERS_CAN_CREATE_JOBS =
-      "Only users of type COMPANY can create jobs";
-  private static final String ONLY_COMPANY_USERS_CAN_VIEW_OWNED_JOBS =
-      "Only users of type COMPANY can view their own jobs";
   private static final String USER_NOT_LINKED_TO_COMPANY = "User is not linked to any company";
   private static final String JOB_POST_NOT_FOUND = "Job post not found";
   private static final String ALREADY_APPLIED_TO_JOB = "User has already applied to this job";
-  private static final String ONLY_CANDIDATE_USERS_CAN_APPLY =
-      "Only users of type CANDIDATE can apply to jobs";
   private static final String ONLY_JOB_OWNER_CAN_REFRESH =
       "Only the owner of the job post can refresh it";
   private static final String ONLY_CLOSED_JOBS_CAN_BE_REFRESHED =
@@ -173,8 +168,6 @@ class JobServiceTest {
       "Only the owner of the job post can request an AI evaluation of its candidates";
   private static final String CANDIDATE_APPLICATION_NOT_FOUND =
       "The candidate has not applied to this job post";
-  private static final String ONLY_CANDIDATE_USERS_CAN_GET_UPSKILLING =
-      "Only users of type CANDIDATE can request upskilling suggestions";
 
   private static final String REQUEST_UUID = "11111111-1111-1111-1111-111111111111";
   private static final String OUTPUT_LANGUAGE = "en";
@@ -356,19 +349,6 @@ class JobServiceTest {
   }
 
   @Test
-  void createJobThrowsBadRequestWhenUserIsNotCompanyType() {
-    UserEntity candidate = UserEntity.builder().id(USER_ID).type(UserType.CANDIDATE).build();
-    stubAuthenticatedPrincipal();
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
-
-    BadRequestException exception = assertThrows(BadRequestException.class,
-        () -> jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
-            SALARY_RANGE_TOP, JOB_POST_TYPE, NO_SKILLS, TAGS));
-    assertThat(exception.getMessage(), is(ONLY_COMPANY_USERS_CAN_CREATE_JOBS));
-    verify(jobPostRepository, never()).save(any());
-  }
-
-  @Test
   void createJobThrowsBadRequestWhenUserNotLinkedToCompany() {
     UserEntity user = companyUser();
     stubAuthenticatedPrincipal();
@@ -509,7 +489,7 @@ class JobServiceTest {
 
   @Test
   void searchAvailableJobsDoesNotScoreLynqWhenUserIsCompany() {
-    stubAuthenticatedUser(companyUser());
+    stubAuthenticatedCompanyCaller(companyUser());
     stubSingleJob(JOB_SKILLS_CONCATENATED);
 
     assertThat(searchSingleJobLynqScore(), is(nullValue()));
@@ -534,7 +514,7 @@ class JobServiceTest {
   @Test
   void searchOwnedJobsReturnsOwnersJobsIncludingClosedOnesMappedToResponse() {
     UserEntity owner = companyUser();
-    stubAuthenticatedUser(owner);
+    stubAuthenticatedCompanyCaller(owner);
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.CLOSE,
@@ -591,16 +571,6 @@ class JobServiceTest {
     assertThat(result.getTotalElements(), is(6L));
     assertThat(result.getContent().stream().map(GetJobRestResponse::getJobId).toList(),
         contains(JOB_ID_NEWEST, JOB_ID_OLDEST));
-  }
-
-  @Test
-  void searchOwnedJobsThrowsBadRequestWhenUserIsNotCompany() {
-    stubAuthenticatedUser(candidateUser(null));
-
-    BadRequestException exception = assertThrows(BadRequestException.class,
-        () -> jobService.searchOwnedJobs(DEFAULT_PAGEABLE));
-    assertThat(exception.getMessage(), is(ONLY_COMPANY_USERS_CAN_VIEW_OWNED_JOBS));
-    verify(jobPostRepository, never()).searchJobsOwnedByUser(any(), any());
   }
 
   @Test
@@ -667,7 +637,7 @@ class JobServiceTest {
 
   @Test
   void getJobDetailsNeverAsksWhetherACompanyAppliedBecauseItCannot() {
-    stubAuthenticatedUser(companyUser());
+    stubAuthenticatedCompanyCaller(companyUser());
     stubJobDetails();
 
     GetJobDetailForCandidateRestResponse job = jobService.getJobDetails(JOB_ID);
@@ -786,17 +756,6 @@ class JobServiceTest {
     AlreadyAppliedToJobException exception = assertThrows(AlreadyAppliedToJobException.class,
         () -> jobService.applyToJob(JOB_ID, RESUME_ID));
     assertThat(exception.getMessage(), is(ALREADY_APPLIED_TO_JOB));
-    verify(userApplicationJobRepository, never()).save(any());
-  }
-
-  @Test
-  void applyToJobThrowsBadRequestWhenUserIsNotCandidate() {
-    stubAuthenticatedUser(companyUser());
-
-    BadRequestException exception = assertThrows(BadRequestException.class,
-        () -> jobService.applyToJob(JOB_ID, RESUME_ID));
-    assertThat(exception.getMessage(), is(ONLY_CANDIDATE_USERS_CAN_APPLY));
-    verify(jobPostRepository, never()).findById(any());
     verify(userApplicationJobRepository, never()).save(any());
   }
 
@@ -1346,7 +1305,7 @@ class JobServiceTest {
   @Test
   void explainCandidateThrowsForbiddenWhenCallerDoesNotOwnJob() {
     UserEntity caller = companyUser();
-    UserEntity otherOwner = UserEntity.builder().id("other-owner").type(UserType.COMPANY).build();
+    UserEntity otherOwner = UserEntity.builder().id("other-owner").build();
     JobPostEntity job = ownedJob(otherOwner, List.of(SKILL_JAVA));
     UserEntity candidate = candidateForExplanation(List.of(SKILL_JAVA));
     stubAuthenticatedUser(caller);
@@ -1430,16 +1389,6 @@ class JobServiceTest {
   }
 
   @Test
-  void suggestUpskillingThrowsBadRequestWhenUserIsNotCandidate() {
-    stubAuthenticatedUser(companyUser());
-
-    BadRequestException exception = assertThrows(BadRequestException.class,
-        () -> jobService.suggestUpskilling(JOB_ID, REQUEST_UUID, OUTPUT_LANGUAGE));
-    assertThat(exception.getMessage(), is(ONLY_CANDIDATE_USERS_CAN_GET_UPSKILLING));
-    verify(lynqMLClient, never()).upskillingSuggestion(any(), any(), any(), any(), any());
-  }
-
-  @Test
   void suggestUpskillingThrowsNotFoundWhenJobDoesNotExist() {
     stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA)));
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.empty());
@@ -1453,7 +1402,6 @@ class JobServiceTest {
   private UserEntity authenticatedCandidate(List<String> skillNames) {
     UserEntity candidate = UserEntity.builder()
         .id(USER_ID)
-        .type(UserType.CANDIDATE)
         .currentPosition(CANDIDATE_CURRENT_POSITION)
         .about(CANDIDATE_ABOUT)
         .skills(new ArrayList<>())
@@ -1497,7 +1445,6 @@ class JobServiceTest {
   private UserEntity candidateForExplanation(List<String> skillNames) {
     UserEntity candidate = UserEntity.builder()
         .id(CANDIDATE_ID)
-        .type(UserType.CANDIDATE)
         .fullName(CANDIDATE_FULL_NAME)
         .currentPosition(CANDIDATE_CURRENT_POSITION)
         .about(CANDIDATE_ABOUT)
@@ -1536,7 +1483,7 @@ class JobServiceTest {
   }
 
   private UserEntity companyUser() {
-    return UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
+    return UserEntity.builder().id(USER_ID).build();
   }
 
   private JobPostEntity ownedJob(UserEntity owner, List<String> skillNames) {
@@ -1565,7 +1512,7 @@ class JobServiceTest {
   }
 
   private UserEntity candidateUser(List<String> skillNames) {
-    UserEntity user = UserEntity.builder().id(USER_ID).type(UserType.CANDIDATE).build();
+    UserEntity user = UserEntity.builder().id(USER_ID).build();
     if (skillNames != null) {
       user.setSkills(skillNames.stream()
           .map(name -> UserSkillsEntity.builder().skill(name).user(user).build())
@@ -1615,9 +1562,18 @@ class JobServiceTest {
   }
 
   private void stubAuthenticatedPrincipal() {
+    stubAuthenticatedPrincipalWithRole(Role.CANDIDATE);
+  }
+
+  private void stubAuthenticatedPrincipalWithRole(String role) {
     when(securityContext.getAuthentication()).thenReturn(authentication);
-    when(authentication.getPrincipal())
-        .thenReturn(new LynqUserPrincipal(USER_ID, USERNAME, EMAIL));
+    when(authentication.getPrincipal()).thenReturn(new LynqUserPrincipal(USER_ID, USERNAME, EMAIL,
+        List.of(new SimpleGrantedAuthority(Role.PREFIX + role))));
+  }
+
+  private void stubAuthenticatedCompanyCaller(UserEntity user) {
+    stubAuthenticatedPrincipalWithRole(Role.COMPANY);
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
   }
 
   private CompanyEntity stubAuthenticatedCompanyUserWithCompany(UserEntity user) {

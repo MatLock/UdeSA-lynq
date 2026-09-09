@@ -7,6 +7,7 @@ import com.lynq.backend.client.LynqIamClient;
 import com.lynq.backend.client.response.UserInfoResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.security.LynqUserPrincipal;
+import com.lynq.backend.security.Role;
 import feign.FeignException;
 import feign.Request;
 import jakarta.servlet.FilterChain;
@@ -24,10 +25,15 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
@@ -48,6 +54,7 @@ class IamAuthenticationFilterTest {
   private static final String USER_ID = "550e8400-e29b-41d4-a716-446655440000";
   private static final String USERNAME = "johndoe";
   private static final String EMAIL = "johndoe@example.com";
+  private static final List<String> ROLES = List.of("R_CANDIDATE");
 
   private static final String EXPECTED_IAM_UNAVAILABLE_REASON = "Authentication service is unavailable";
   private static final int UNAUTHORIZED = HttpStatus.UNAUTHORIZED.value();
@@ -99,7 +106,8 @@ class IamAuthenticationFilterTest {
   void loadsUserIntoSecurityContextAndDelegatesWhenTokenIsValid() throws Exception {
     stubHeaders();
     when(lynqIamClient.getUserInfo(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
-        .thenReturn(new GlobalRestResponse<>(true, new UserInfoResponse(USER_ID, USERNAME, EMAIL)));
+        .thenReturn(new GlobalRestResponse<>(true,
+            new UserInfoResponse(USER_ID, USERNAME, EMAIL, ROLES)));
 
     LynqUserPrincipal[] principalDuringChain = new LynqUserPrincipal[1];
     doAnswer(invocation -> {
@@ -115,7 +123,49 @@ class IamAuthenticationFilterTest {
     assertThat(principalDuringChain[0].getId(), is(USER_ID));
     assertThat(principalDuringChain[0].getUsername(), is(USERNAME));
     assertThat(principalDuringChain[0].getEmail(), is(EMAIL));
+    assertThat(principalDuringChain[0].hasRole(Role.CANDIDATE), is(true));
     assertThat(SecurityContextHolder.getContext().getAuthentication(), is(nullValue()));
+  }
+
+  @Test
+  void loadsTheRolesOfTheUserAsAuthoritiesWhenTokenIsValid() throws Exception {
+    stubHeaders();
+    when(lynqIamClient.getUserInfo(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
+        .thenReturn(new GlobalRestResponse<>(true,
+            new UserInfoResponse(USER_ID, USERNAME, EMAIL, List.of("R_COMPANY"))));
+
+    Collection<String> authoritiesDuringChain = new ArrayList<>();
+    doAnswer(invocation -> {
+      Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+      authentication.getAuthorities()
+          .forEach(authority -> authoritiesDuringChain.add(authority.getAuthority()));
+      return null;
+    }).when(filterChain).doFilter(request, response);
+
+    filter.doFilterInternal(request, response, filterChain);
+
+    assertThat(authoritiesDuringChain, contains("R_COMPANY"));
+  }
+
+  @Test
+  void loadsNoAuthoritiesWhenUserInfoCarriesNoRoles() throws Exception {
+    stubHeaders();
+    when(lynqIamClient.getUserInfo(VALID_AUTH_HEADER_VALUE, REQUEST_UUID_VALUE))
+        .thenReturn(new GlobalRestResponse<>(true,
+            new UserInfoResponse(USER_ID, USERNAME, EMAIL, null)));
+
+    LynqUserPrincipal[] principalDuringChain = new LynqUserPrincipal[1];
+    doAnswer(invocation -> {
+      principalDuringChain[0] = (LynqUserPrincipal) SecurityContextHolder.getContext()
+          .getAuthentication()
+          .getPrincipal();
+      return null;
+    }).when(filterChain).doFilter(request, response);
+
+    filter.doFilterInternal(request, response, filterChain);
+
+    assertThat(principalDuringChain[0].getAuthorities(), is(empty()));
+    assertThat(principalDuringChain[0].hasRole(Role.CANDIDATE), is(false));
   }
 
   @Test

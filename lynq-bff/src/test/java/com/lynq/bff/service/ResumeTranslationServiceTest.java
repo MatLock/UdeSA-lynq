@@ -14,12 +14,10 @@ import com.lynq.bff.client.LynqBackendClient;
 import com.lynq.bff.client.LynqMlClient;
 import com.lynq.bff.client.request.TranslateResumeRequest;
 import com.lynq.bff.client.response.SupportedLanguageResponse;
-import com.lynq.bff.client.response.UserResponse;
 import com.lynq.bff.client.response.UserResumeResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.exceptions.BadGatewayException;
 import com.lynq.bff.exceptions.BadRequestException;
-import com.lynq.bff.exceptions.ForbiddenException;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,11 +45,7 @@ class ResumeTranslationServiceTest {
       Map.of("summary", "Ingénieur backend",
           "personal_info", Map.of("full_name", "Jane Doe"));
 
-  private static final String ONLY_CANDIDATES = "Only users of type CANDIDATE can do this";
   private static final String TRANSLATE_FAILED = "The resume could not be translated";
-
-  @Mock
-  private CandidateReader candidateReader;
 
   @Mock
   private LynqBackendClient lynqBackendClient;
@@ -64,7 +58,7 @@ class ResumeTranslationServiceTest {
   @BeforeEach
   void setUp() {
     resumeTranslationService =
-        new ResumeTranslationService(candidateReader, lynqBackendClient, lynqMlClient);
+        new ResumeTranslationService(lynqBackendClient, lynqMlClient);
   }
 
   @Test
@@ -105,13 +99,11 @@ class ResumeTranslationServiceTest {
     assertThrows(BadRequestException.class,
         () -> resumeTranslationService.translate(RESUME_ID, " ", CALLER));
 
-    verify(candidateReader, never()).read(any());
     verify(lynqMlClient, never()).translateResume(any(), any(), any());
   }
 
   @Test
   void translateRejectsAResumeTheCallerDoesNotHold() {
-    givenCandidate();
     givenResumes(resume(RESUME_ID, RESUME_NAME, SOURCE_LANGUAGE));
 
     assertThrows(BadRequestException.class,
@@ -122,7 +114,6 @@ class ResumeTranslationServiceTest {
 
   @Test
   void translateRejectsALanguageTheBackendDoesNotSupport() {
-    givenCandidate();
     givenResumes(resume(RESUME_ID, RESUME_NAME, SOURCE_LANGUAGE));
     givenSupportedLanguages("EN", "FR");
 
@@ -134,7 +125,6 @@ class ResumeTranslationServiceTest {
 
   @Test
   void translateRejectsALanguageTheCandidateAlreadyHoldsAResumeIn() {
-    givenCandidate();
     givenResumes(
         resume(RESUME_ID, RESUME_NAME, SOURCE_LANGUAGE),
         resume("resume-2", RESUME_NAME, TARGET_LANGUAGE));
@@ -148,7 +138,6 @@ class ResumeTranslationServiceTest {
 
   @Test
   void translateRejectsTheSourceResumesOwnLanguage() {
-    givenCandidate();
     givenResumes(resume(RESUME_ID, RESUME_NAME, SOURCE_LANGUAGE));
     givenSupportedLanguages("EN", "FR");
 
@@ -159,19 +148,7 @@ class ResumeTranslationServiceTest {
   }
 
   @Test
-  void translateDoesNotTouchAnyServiceWhenTheCallerIsNotACandidate() {
-    when(candidateReader.read(CALLER)).thenThrow(new ForbiddenException(ONLY_CANDIDATES));
-
-    ForbiddenException exception = assertThrows(ForbiddenException.class,
-        () -> resumeTranslationService.translate(RESUME_ID, TARGET_LANGUAGE, CALLER));
-
-    assertThat(exception.getMessage(), is(ONLY_CANDIDATES));
-    verify(lynqMlClient, never()).translateResume(any(), any(), any());
-  }
-
-  @Test
   void translateAnswersBadGatewayWhenTheTranslationFails() {
-    givenCandidate();
     givenResumes(resume(RESUME_ID, RESUME_NAME, SOURCE_LANGUAGE));
     givenSupportedLanguages("EN", "FR");
     when(lynqMlClient.translateResume(any(), eq(REQUEST_UUID), eq(USER_ID)))
@@ -184,17 +161,9 @@ class ResumeTranslationServiceTest {
   }
 
   private void givenHappyPath() {
-    givenCandidate();
     givenResumes(resume(RESUME_ID, RESUME_NAME, SOURCE_LANGUAGE));
     givenSupportedLanguages("EN", "ES", "FR", "PR");
     givenTranslation();
-  }
-
-  private void givenCandidate() {
-    when(candidateReader.read(CALLER)).thenReturn(UserResponse.builder()
-        .id(USER_ID)
-        .userType("CANDIDATE")
-        .build());
   }
 
   private void givenResumes(UserResumeResponse... resumes) {

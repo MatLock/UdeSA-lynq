@@ -22,7 +22,6 @@ import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.model.UserResumeEntity;
 import com.lynq.backend.model.UserSkillsEntity;
 import com.lynq.backend.model.UserSimilarityTagEntity;
-import com.lynq.backend.enums.UserType;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
 import com.lynq.backend.repository.UserApplicationJobRepository;
@@ -48,12 +47,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
   private static final String USER_NOT_FOUND = "User '%s' not found";
-  private static final String ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES =
-      "Only users of type CANDIDATE can access resumes";
-  private static final String ONLY_CANDIDATE_USERS_CAN_VIEW_APPLICATIONS =
-      "Only users of type CANDIDATE can view their applications";
-  private static final String ONLY_CANDIDATE_USERS_CAN_UPLOAD_RESUMES =
-      "Only users of type CANDIDATE can upload resumes";
   private static final String RESUME_NOT_VALID_JSON = "Stored resume is not valid JSON";
   private static final String RESUME_NOT_SERIALIZABLE = "The resume could not be serialized to JSON";
   private static final String RESUME_FILE_ALREADY_USED =
@@ -88,11 +81,10 @@ public class UserService {
 
   @AuditLog
   @Transactional
-  public UserEntity saveNewUser(String userId, UserType type, String fullName,
+  public UserEntity saveNewUser(String userId, String fullName,
       String currentPosition, String about, String githubUrl, String linkedInUrl, LocalDate birthDate) {
     UserEntity user = UserEntity.builder()
         .id(userId)
-        .type(type)
         .fullName(fullName)
         .currentPosition(currentPosition)
         .about(about)
@@ -114,10 +106,7 @@ public class UserService {
 
   @AuditLog
   @Transactional(readOnly = true)
-  public String obtainOwnedCompanyId(String userId, UserType userType) {
-    if (userType != UserType.COMPANY) {
-      return null;
-    }
+  public String obtainOwnedCompanyId(String userId) {
     return companyRepository.findByOwnerId(userId)
         .map(CompanyEntity::getId)
         .orElse(null);
@@ -138,13 +127,11 @@ public class UserService {
             .githubUrl(user.getGithubUrl())
             .linkedinUrl(user.getLinkedinUrl());
 
-    if (user.getType() == UserType.COMPANY) {
-      companyRepository.findByOwner(user)
-          .ifPresent(company -> response.company(toCompanyResponse(company)));
-      response.jobs(jobPostRepository.findByCreatedByUserId(userId).stream()
-          .map(this::toJobResponse)
-          .toList());
-    }
+    companyRepository.findByOwner(user)
+        .ifPresent(company -> response.company(toCompanyResponse(company)));
+    response.jobs(jobPostRepository.findByCreatedByUserId(userId).stream()
+        .map(this::toJobResponse)
+        .toList());
 
     return response.build();
   }
@@ -229,12 +216,8 @@ public class UserService {
   @AuditLog
   @Transactional(readOnly = true)
   public RegisteredUpload generateResumeUploadUrl(String userId, String fileName) {
-    UserEntity user = userRepository.findById(userId)
+    userRepository.findById(userId)
         .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
-
-    if (user.getType() != UserType.CANDIDATE) {
-      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_UPLOAD_RESUMES);
-    }
 
     return fileStorageService.registerUpload(fileName);
   }
@@ -242,12 +225,8 @@ public class UserService {
   @AuditLog
   @Transactional(readOnly = true)
   public void confirmResumeUpload(String userId, String fileId) {
-    UserEntity user = userRepository.findById(userId)
+    userRepository.findById(userId)
         .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
-
-    if (user.getType() != UserType.CANDIDATE) {
-      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_UPLOAD_RESUMES);
-    }
 
     fileStorageService.confirmUpload(fileId);
   }
@@ -270,12 +249,8 @@ public class UserService {
   @AuditLog
   @Transactional(readOnly = true)
   public List<GetUserResumeRestResponse> getUserResumes(String userId) {
-    UserEntity user = userRepository.findById(userId)
+    userRepository.findById(userId)
         .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
-
-    if (user.getType() != UserType.CANDIDATE) {
-      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES);
-    }
 
     List<UserResumeEntity> resumes = userResumeRepository.findByUserId(userId);
 
@@ -293,10 +268,6 @@ public class UserService {
   public GetUserResumeRestResponse createResume(String userId, CreateResumeRequest request) {
     UserEntity user = userRepository.findById(userId)
         .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
-
-    if (user.getType() != UserType.CANDIDATE) {
-      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_UPLOAD_RESUMES);
-    }
 
     if (holdsResumeFile(userId, request.getFileId())) {
       throw new BadRequestException(String.format(RESUME_FILE_ALREADY_USED, request.getFileId()));
@@ -388,12 +359,8 @@ public class UserService {
   @AuditLog
   @Transactional
   public GetUserResumeRestResponse updateResumeAlias(String userId, String resumeId, String alias) {
-    UserEntity user = userRepository.findById(userId)
+    userRepository.findById(userId)
         .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
-
-    if (user.getType() != UserType.CANDIDATE) {
-      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES);
-    }
 
     UserResumeEntity resume = userResumeRepository.findByUserId(userId).stream()
         .filter(owned -> owned.getId().equals(resumeId))
@@ -409,12 +376,8 @@ public class UserService {
   @AuditLog
   @Transactional
   public DeleteResumeRestResponse deleteResume(String userId, String resumeId) {
-    UserEntity user = userRepository.findById(userId)
+    userRepository.findById(userId)
         .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
-
-    if (user.getType() != UserType.CANDIDATE) {
-      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES);
-    }
 
     UserResumeEntity resume = userResumeRepository.findByUserId(userId).stream()
         .filter(owned -> owned.getId().equals(resumeId))
@@ -440,10 +403,6 @@ public class UserService {
       Pageable pageable) {
     UserEntity user = userRepository.findById(userId)
         .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
-
-    if (user.getType() != UserType.CANDIDATE) {
-      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_VIEW_APPLICATIONS);
-    }
 
     List<String> candidateSkills = user.getSkills() == null ? List.of() : user.getSkills().stream()
         .map(UserSkillsEntity::getSkill)

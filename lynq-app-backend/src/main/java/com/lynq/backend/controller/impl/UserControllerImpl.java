@@ -21,7 +21,9 @@ import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
 import com.lynq.backend.controller.response.UserApplicationResponse;
 import com.lynq.backend.model.UserEntity;
 import jakarta.validation.Valid;
+import com.lynq.backend.security.HasRole;
 import com.lynq.backend.security.LynqUserPrincipal;
+import com.lynq.backend.security.Role;
 import com.lynq.backend.service.JobService;
 import com.lynq.backend.service.UserService;
 import java.util.List;
@@ -65,11 +67,12 @@ public class UserControllerImpl implements UserController {
   public ResponseEntity<GlobalRestResponse<GetUserRestResponse>> getUser(@AuthenticationPrincipal LynqUserPrincipal principal) {
     UserEntity user = userService.getUser(principal.getId());
     String profileImageUrl = userService.obtainProfileImagePreSignedUrl(user.getLynqFileStorageId());
-    String companyId = userService.obtainOwnedCompanyId(user.getId(), user.getType());
+    String companyId = principal.hasRole(Role.COMPANY)
+        ? userService.obtainOwnedCompanyId(user.getId())
+        : null;
 
     GetUserRestResponse response = GetUserRestResponse.builder()
         .id(user.getId())
-        .userType(user.getType())
         .fullName(user.getFullName())
         .userProfileImageUrl(profileImageUrl)
         .currentPosition(user.getCurrentPosition())
@@ -92,7 +95,6 @@ public class UserControllerImpl implements UserController {
   public ResponseEntity<GlobalRestResponse<CreateUserRestResponse>> createUser(@RequestBody CreateUserRequest request, @AuthenticationPrincipal LynqUserPrincipal principal) {
     UserEntity user = userService.saveNewUser(
         principal.getId(),
-        request.getUserType(),
         request.getFullName(),
         request.getCurrentPosition(),
         request.getAbout(),
@@ -104,7 +106,6 @@ public class UserControllerImpl implements UserController {
 
     CreateUserRestResponse response = CreateUserRestResponse.builder()
         .id(user.getId())
-        .userType(user.getType())
         .fullName(user.getFullName())
         .userProfileImageUrl(profileImageUrl)
         .currentPosition(user.getCurrentPosition())
@@ -128,7 +129,6 @@ public class UserControllerImpl implements UserController {
 
     UpdateUserProfileRestResponse response = UpdateUserProfileRestResponse.builder()
         .id(user.getId())
-        .userType(user.getType())
         .fullName(user.getFullName())
         .userProfileImageUrl(userService.obtainProfileImagePreSignedUrl(user.getLynqFileStorageId()))
         .currentPosition(user.getCurrentPosition())
@@ -173,6 +173,7 @@ public class UserControllerImpl implements UserController {
 
   @Override
   @GetMapping("/generate-upload-resume")
+  @HasRole(Role.CANDIDATE)
   @AuditLog
   public ResponseEntity<GlobalRestResponse<GenerateUploadResumeRestResponse>> generateUploadResumeUrl(
       @RequestParam("file-name") String fileName, @AuthenticationPrincipal LynqUserPrincipal principal) {
@@ -190,6 +191,7 @@ public class UserControllerImpl implements UserController {
 
   @Override
   @PostMapping("/confirm-upload-resume")
+  @HasRole(Role.CANDIDATE)
   @AuditLog
   public ResponseEntity<Void> confirmUploadResume(
       @RequestParam("file-id") String fileId, @AuthenticationPrincipal LynqUserPrincipal principal) {
@@ -200,6 +202,7 @@ public class UserControllerImpl implements UserController {
 
   @Override
   @GetMapping("/resume")
+  @HasRole(Role.CANDIDATE)
   @AuditLog
   public ResponseEntity<GlobalRestResponse<List<GetUserResumeRestResponse>>> getUserResumes(
       @AuthenticationPrincipal LynqUserPrincipal principal) {
@@ -212,6 +215,7 @@ public class UserControllerImpl implements UserController {
 
   @Override
   @GetMapping("/resume/languages")
+  @HasRole(Role.CANDIDATE)
   @AuditLog
   public ResponseEntity<GlobalRestResponse<List<GetSupportedLanguageRestResponse>>> getSupportedResumeLanguages() {
     List<GetSupportedLanguageRestResponse> languages = userService.getSupportedResumeLanguages();
@@ -223,6 +227,7 @@ public class UserControllerImpl implements UserController {
 
   @Override
   @PostMapping("/resume")
+  @HasRole(Role.CANDIDATE)
   @AuditLog
   public ResponseEntity<GlobalRestResponse<GetUserResumeRestResponse>> createUserResume(
       @Valid @RequestBody CreateResumeRequest request,
@@ -236,6 +241,7 @@ public class UserControllerImpl implements UserController {
 
   @Override
   @PutMapping("/resume/{resumeId}/alias")
+  @HasRole(Role.CANDIDATE)
   @AuditLog
   public ResponseEntity<GlobalRestResponse<GetUserResumeRestResponse>> updateResumeAlias(
       @PathVariable String resumeId,
@@ -251,6 +257,7 @@ public class UserControllerImpl implements UserController {
 
   @Override
   @DeleteMapping("/resume/{resumeId}")
+  @HasRole(Role.CANDIDATE)
   @AuditLog
   public ResponseEntity<GlobalRestResponse<DeleteResumeRestResponse>> deleteUserResume(
       @PathVariable String resumeId,
@@ -264,6 +271,7 @@ public class UserControllerImpl implements UserController {
 
   @Override
   @GetMapping("/application")
+  @HasRole(Role.CANDIDATE)
   @AuditLog
   public ResponseEntity<GlobalRestResponse<PagedRestResponse<UserApplicationResponse>>> getUserApplications(
       @RequestParam(defaultValue = "0") Integer page,
@@ -279,6 +287,7 @@ public class UserControllerImpl implements UserController {
 
   @Override
   @GetMapping("/upskilling-suggestion/{jobPostId}")
+  @HasRole(Role.CANDIDATE)
   @AuditLog
   public ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> suggestUpskilling(
       @PathVariable String jobPostId,

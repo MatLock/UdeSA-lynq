@@ -8,6 +8,7 @@ import com.lynq.iam.controller.response.UserRestResponse;
 import com.lynq.iam.exceptions.ForbiddenException;
 import com.lynq.iam.exceptions.InvalidPasswordException;
 import com.lynq.iam.exceptions.UserNotFoundException;
+import com.lynq.iam.model.Role;
 import com.lynq.iam.model.UserEntity;
 import com.lynq.iam.repository.UserRepository;
 import com.lynq.iam.security.RefreshTokenGenerator;
@@ -22,7 +23,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -67,6 +70,8 @@ class AuthServiceTest {
   private static final String EMAIL_LENGTH_REASON = "Email must not exceed 100 characters";
   private static final String EMAIL_FORMAT_REASON = "Email format is invalid";
   private static final String EMAIL_TAKEN_REASON = "Email is already taken";
+  private static final Role SAMPLE_ROLE = Role.R_CANDIDATE;
+  private static final List<String> SAMPLE_ROLES = List.of("R_CANDIDATE");
 
   @Mock
   private UserService userService;
@@ -98,16 +103,17 @@ class AuthServiceTest {
         .username(SAMPLE_USERNAME)
         .email(SAMPLE_EMAIL)
         .password(SAMPLE_ENCODED_PASSWORD)
+        .roles(Set.of(SAMPLE_ROLE))
         .build();
   }
 
   @Test
   void registerUserReturnsResponseWithUserDataAndGeneratedTokens() {
-    when(userService.createUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL)).thenReturn(sampleUser);
+    when(userService.createUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, SAMPLE_ROLE)).thenReturn(sampleUser);
     when(jwtService.generateAccessToken(sampleUser)).thenReturn(SAMPLE_ACCESS_TOKEN);
     when(refreshTokenGenerator.generate()).thenReturn(SAMPLE_REFRESH_TOKEN);
 
-    UserRestResponse response = authService.registerUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL);
+    UserRestResponse response = authService.registerUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, SAMPLE_ROLE);
 
     assertThat(response.getId(), is(SAMPLE_USER_ID));
     assertThat(response.getUsername(), is(SAMPLE_USERNAME));
@@ -118,11 +124,11 @@ class AuthServiceTest {
 
   @Test
   void registerUserPersistsRefreshTokenForCreatedUser() {
-    when(userService.createUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL)).thenReturn(sampleUser);
+    when(userService.createUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, SAMPLE_ROLE)).thenReturn(sampleUser);
     when(jwtService.generateAccessToken(sampleUser)).thenReturn(SAMPLE_ACCESS_TOKEN);
     when(refreshTokenGenerator.generate()).thenReturn(SAMPLE_REFRESH_TOKEN);
 
-    authService.registerUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL);
+    authService.registerUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, SAMPLE_ROLE);
 
     verify(redisService).saveRefreshTokenForUser(SAMPLE_USER_ID, SAMPLE_REFRESH_TOKEN);
   }
@@ -377,12 +383,14 @@ class AuthServiceTest {
     when(jwtService.extractUserId(SAMPLE_ACCESS_TOKEN)).thenReturn(SAMPLE_USER_ID);
     when(jwtService.extractUsername(SAMPLE_ACCESS_TOKEN)).thenReturn(SAMPLE_USERNAME);
     when(jwtService.extractEmail(SAMPLE_ACCESS_TOKEN)).thenReturn(SAMPLE_EMAIL);
+    when(jwtService.extractRoles(SAMPLE_ACCESS_TOKEN)).thenReturn(SAMPLE_ROLES);
 
     UserInfoRestResponse response = authService.obtainUserInfoFromToken(SAMPLE_ACCESS_TOKEN);
 
     assertThat(response.getId(), is(SAMPLE_USER_ID));
     assertThat(response.getUsername(), is(SAMPLE_USERNAME));
     assertThat(response.getEmail(), is(SAMPLE_EMAIL));
+    assertThat(response.getRoles(), is(SAMPLE_ROLES));
   }
 
   @Test

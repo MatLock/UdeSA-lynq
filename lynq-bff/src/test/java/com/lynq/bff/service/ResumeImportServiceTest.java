@@ -21,10 +21,8 @@ import com.lynq.bff.client.request.ParseResumeRequest;
 import com.lynq.bff.client.response.CreateFileDownloadResponse;
 import com.lynq.bff.client.response.LanguageDetectionResponse;
 import com.lynq.bff.client.response.SkillExtractionResponse;
-import com.lynq.bff.client.response.UserResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.exceptions.BadGatewayException;
-import com.lynq.bff.exceptions.ForbiddenException;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,13 +56,9 @@ class ResumeImportServiceTest {
   private static final List<String> SIMILARITY_TAGS =
       List.of("Asynchronous Messaging", "Payment Processing");
 
-  private static final String ONLY_CANDIDATES = "Only users of type CANDIDATE can do this";
   private static final String IMPORT_FAILED = "The uploaded resume could not be imported";
   private static final String CONFIRM_FAILED =
       "The uploaded resume document could not be confirmed";
-
-  @Mock
-  private CandidateReader candidateReader;
 
   @Mock
   private LynqBackendClient lynqBackendClient;
@@ -79,13 +73,12 @@ class ResumeImportServiceTest {
 
   @BeforeEach
   void setUp() {
-    resumeImportService = new ResumeImportService(
-        candidateReader, lynqBackendClient, lynqFileStorageClient, lynqMlClient);
+    resumeImportService =
+        new ResumeImportService(lynqBackendClient, lynqFileStorageClient, lynqMlClient);
   }
 
   @Test
   void importReturnsTheResumeLynqAppBackendStored() {
-    givenCandidate();
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("EN");
@@ -98,7 +91,6 @@ class ResumeImportServiceTest {
 
   @Test
   void importRunsTheDocumentThroughEveryServiceInOrder() {
-    givenCandidate();
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("EN");
@@ -118,7 +110,6 @@ class ResumeImportServiceTest {
 
   @Test
   void importSendsLynqMlTheSignedReadUrlOfTheUploadedDocument() {
-    givenCandidate();
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("EN");
@@ -133,7 +124,6 @@ class ResumeImportServiceTest {
 
   @Test
   void importClassifiesTheLanguageFromTheResumesOwnProse() {
-    givenCandidate();
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("EN");
@@ -154,7 +144,6 @@ class ResumeImportServiceTest {
 
   @Test
   void importStoresTheParsedResumeUnderTheCandidatesNameAndTheDetectedLanguage() {
-    givenCandidate();
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("ES");
@@ -173,7 +162,6 @@ class ResumeImportServiceTest {
 
   @Test
   void importFallsBackToTheCallersLanguageWhenTheResumeHasNoProseToClassify() {
-    givenCandidate();
     givenReadUrl();
     when(lynqMlClient.parseResume(any(), eq(REQUEST_UUID), eq(USER_ID)))
         .thenReturn(new GlobalRestResponse<>(true, Map.of(
@@ -191,7 +179,6 @@ class ResumeImportServiceTest {
 
   @Test
   void importStoresEnglishWhenNeitherTheResumeNorTheCallerNamesAStoredLanguage() {
-    givenCandidate();
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("Klingon");
@@ -206,7 +193,6 @@ class ResumeImportServiceTest {
 
   @Test
   void importDeletesTheDocumentWhenItCannotBeParsed() {
-    givenCandidate();
     givenReadUrl();
     when(lynqMlClient.parseResume(any(), eq(REQUEST_UUID), eq(USER_ID)))
         .thenThrow(new IllegalStateException("the LLM returned nonsense"));
@@ -221,7 +207,6 @@ class ResumeImportServiceTest {
 
   @Test
   void importDeletesTheDocumentWhenTheResumeCannotBeStored() {
-    givenCandidate();
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("EN");
@@ -236,7 +221,6 @@ class ResumeImportServiceTest {
 
   @Test
   void importLeavesTheDocumentAloneWhenConfirmingItFails() {
-    givenCandidate();
     doThrow(new IllegalStateException("the bytes never arrived"))
         .when(lynqBackendClient).confirmResumeUpload(FILE_ID, REQUEST_UUID, AUTHORIZATION);
 
@@ -250,7 +234,6 @@ class ResumeImportServiceTest {
 
   @Test
   void importReportsTheFailureEvenWhenTheRollbackAlsoFails() {
-    givenCandidate();
     givenReadUrl();
     when(lynqMlClient.parseResume(any(), eq(REQUEST_UUID), eq(USER_ID)))
         .thenThrow(new IllegalStateException("the LLM returned nonsense"));
@@ -264,19 +247,7 @@ class ResumeImportServiceTest {
   }
 
   @Test
-  void importTouchesNothingWhenTheCallerIsNotACandidate() {
-    when(candidateReader.read(CALLER)).thenThrow(new ForbiddenException(ONLY_CANDIDATES));
-
-    assertThrows(ForbiddenException.class,
-        () -> resumeImportService.importUploadedDocument(FILE_ID, UI_LANGUAGE, CALLER));
-
-    verify(lynqBackendClient, never()).confirmResumeUpload(any(), any(), any());
-    verify(lynqMlClient, never()).parseResume(any(), any(), any());
-  }
-
-  @Test
   void importStoresTheSimilarityTagsLynqMlDerivesFromTheParsedResume() {
-    givenCandidate();
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("EN");
@@ -292,7 +263,6 @@ class ResumeImportServiceTest {
 
   @Test
   void importDerivesTheTagsFromTheResumeItIsAboutToStore() {
-    givenCandidate();
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("EN");
@@ -309,7 +279,6 @@ class ResumeImportServiceTest {
 
   @Test
   void importStoresTheResumeWithoutTagsWhenLynqMlCannotDeriveThem() {
-    givenCandidate();
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("EN");
@@ -328,7 +297,6 @@ class ResumeImportServiceTest {
 
   @Test
   void importStoresTheResumeWithoutTagsWhenLynqMlOmitsThem() {
-    givenCandidate();
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("EN");
@@ -340,11 +308,6 @@ class ResumeImportServiceTest {
     ArgumentCaptor<CreateResumeRequest> captor = ArgumentCaptor.forClass(CreateResumeRequest.class);
     verify(lynqBackendClient).createResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     assertThat(captor.getValue().getSimilarityTags(), is(List.of()));
-  }
-
-  private void givenCandidate() {
-    when(candidateReader.read(CALLER))
-        .thenReturn(UserResponse.builder().id(USER_ID).userType("CANDIDATE").build());
   }
 
   private void givenReadUrl() {

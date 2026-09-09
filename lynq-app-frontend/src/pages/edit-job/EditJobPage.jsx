@@ -23,7 +23,7 @@ import './EditJobPage.css'
 // requires on every update. Company-only: candidates are bounced to the feed.
 const EditJobPage = () => {
   const t = strings.pages.editJob
-  const { user } = useAuth()
+  const { isCompany } = useAuth()
   // Refresh-aware fetcher so a long-open form still submits past token expiry.
   const { authFetch } = useApi()
   const navigate = useNavigate()
@@ -93,7 +93,7 @@ const EditJobPage = () => {
   }, [authFetch, jobId])
 
   // Company-only page: send everyone else back to the feed.
-  if (user && user.userType !== 'COMPANY') {
+  if (!isCompany) {
     return <Navigate to="/home" replace />
   }
 

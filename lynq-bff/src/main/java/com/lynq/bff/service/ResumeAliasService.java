@@ -10,8 +10,8 @@ import org.springframework.stereotype.Service;
 /**
  * Assigning (or replacing — same operation) the alias a candidate uses to tell one of their
  * resumes apart from the others. The alias lives in a single service, lynq-app-backend, so the
- * gateway only validates the input, checks the caller is a candidate, and relays; ownership of
- * the resume is enforced downstream, where the row lives.
+ * gateway only validates the input and relays; ownership of the resume is enforced downstream,
+ * where the row lives.
  */
 @Service
 @Log4j2
@@ -24,11 +24,9 @@ public class ResumeAliasService {
       "The alias cannot be longer than " + MAX_ALIAS_LENGTH + " characters";
   private static final String ALIAS_NOT_SAVED = "The resume alias could not be saved";
 
-  private final CandidateReader candidateReader;
   private final LynqBackendClient lynqBackendClient;
 
-  public ResumeAliasService(CandidateReader candidateReader, LynqBackendClient lynqBackendClient) {
-    this.candidateReader = candidateReader;
+  public ResumeAliasService(LynqBackendClient lynqBackendClient) {
     this.lynqBackendClient = lynqBackendClient;
   }
 
@@ -40,8 +38,6 @@ public class ResumeAliasService {
     if (trimmed.length() > MAX_ALIAS_LENGTH) {
       throw new BadRequestException(ALIAS_TOO_LONG);
     }
-
-    candidateReader.read(caller);
 
     log.info("message= Assigning resume alias, user_id={}, resume_id={}",
         caller.userId(), resumeId);

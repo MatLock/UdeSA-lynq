@@ -1,5 +1,6 @@
 package com.lynq.iam.service;
 
+import com.lynq.iam.model.Role;
 import com.lynq.iam.model.UserEntity;
 import com.lynq.iam.repository.UserRepository;
 import com.lynq.iam.service.UserService;
@@ -12,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.Optional;
+import java.util.Set;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -34,6 +36,7 @@ class UserServiceTest {
   private static final String SAMPLE_NEW_PASSWORD = "N3wStr0ngPass!";
   private static final String SAMPLE_NEW_ENCODED_PASSWORD = "$2a$10$newencodedpasswordhash";
   private static final String SAMPLE_USER_ID = "550e8400-e29b-41d4-a716-446655440000";
+  private static final Role SAMPLE_ROLE = Role.R_CANDIDATE;
   private static final String EXISTING_USERNAME_REASON_FRAGMENT = "Username already exists";
   private static final String EXISTING_EMAIL_REASON_FRAGMENT = "Email already exists";
   private static final String USER_NOT_FOUND_REASON_FRAGMENT = "User not found";
@@ -61,7 +64,7 @@ class UserServiceTest {
     when(passwordEncoder.encode(SAMPLE_PASSWORD)).thenReturn(SAMPLE_ENCODED_PASSWORD);
     when(userRepository.save(any(UserEntity.class))).thenReturn(savedUserEntity);
 
-    UserEntity result = userService.createUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL);
+    UserEntity result = userService.createUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, SAMPLE_ROLE);
 
     assertThat(result, is(sameInstance(savedUserEntity)));
   }
@@ -74,7 +77,7 @@ class UserServiceTest {
     when(userRepository.save(any(UserEntity.class))).thenReturn(savedUserEntity);
     ArgumentCaptor<UserEntity> entityCaptor = ArgumentCaptor.forClass(UserEntity.class);
 
-    userService.createUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL);
+    userService.createUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, SAMPLE_ROLE);
 
     verify(userRepository).save(entityCaptor.capture());
     UserEntity captured = entityCaptor.getValue();
@@ -83,6 +86,21 @@ class UserServiceTest {
     assertThat(captured.getPassword(), is(SAMPLE_ENCODED_PASSWORD));
     assertThat(captured.getId(), is(notNullValue()));
     assertThat(captured.getCreationDate(), is(notNullValue()));
+    assertThat(captured.getRoles(), is(Set.of(SAMPLE_ROLE)));
+  }
+
+  @Test
+  void createUserPersistsEntityWithTheCompanyRoleWhenRegisteredAsCompany() {
+    when(userRepository.existsByUsername(SAMPLE_USERNAME)).thenReturn(false);
+    when(userRepository.existsByEmail(SAMPLE_EMAIL)).thenReturn(false);
+    when(passwordEncoder.encode(SAMPLE_PASSWORD)).thenReturn(SAMPLE_ENCODED_PASSWORD);
+    when(userRepository.save(any(UserEntity.class))).thenReturn(savedUserEntity);
+    ArgumentCaptor<UserEntity> entityCaptor = ArgumentCaptor.forClass(UserEntity.class);
+
+    userService.createUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, Role.R_COMPANY);
+
+    verify(userRepository).save(entityCaptor.capture());
+    assertThat(entityCaptor.getValue().getRoles(), is(Set.of(Role.R_COMPANY)));
   }
 
   @Test
@@ -90,7 +108,7 @@ class UserServiceTest {
     when(userRepository.existsByUsername(SAMPLE_USERNAME)).thenReturn(true);
 
     IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
-        () -> userService.createUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL));
+        () -> userService.createUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, SAMPLE_ROLE));
 
     assertThat(thrown.getMessage(), containsString(EXISTING_USERNAME_REASON_FRAGMENT));
     verify(userRepository, never()).save(any());
@@ -102,7 +120,7 @@ class UserServiceTest {
     when(userRepository.existsByEmail(SAMPLE_EMAIL)).thenReturn(true);
 
     IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
-        () -> userService.createUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL));
+        () -> userService.createUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, SAMPLE_ROLE));
 
     assertThat(thrown.getMessage(), containsString(EXISTING_EMAIL_REASON_FRAGMENT));
     verify(userRepository, never()).save(any());

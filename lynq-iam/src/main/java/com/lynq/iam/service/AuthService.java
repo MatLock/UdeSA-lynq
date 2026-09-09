@@ -9,6 +9,7 @@ import com.lynq.iam.controller.response.UserRestResponse;
 import com.lynq.iam.exceptions.ForbiddenException;
 import com.lynq.iam.exceptions.InvalidPasswordException;
 import com.lynq.iam.exceptions.UserNotFoundException;
+import com.lynq.iam.model.Role;
 import com.lynq.iam.model.UserEntity;
 import com.lynq.iam.repository.UserRepository;
 import com.lynq.iam.security.RefreshTokenGenerator;
@@ -66,8 +67,8 @@ public class AuthService {
   }
 
   @AuditLog
-  public UserRestResponse registerUser(String username, String password, String email) {
-    UserEntity user = userService.createUser(username, password, email);
+  public UserRestResponse registerUser(String username, String password, String email, Role role) {
+    UserEntity user = userService.createUser(username, password, email, role);
 
     String accessToken = jwtService.generateAccessToken(user);
     String refreshToken = refreshTokenGenerator.generate();
@@ -206,6 +207,7 @@ public class AuthService {
         .id(jwtService.extractUserId(accessToken))
         .username(jwtService.extractUsername(accessToken))
         .email(jwtService.extractEmail(accessToken))
+        .roles(jwtService.extractRoles(accessToken))
         .build();
   }
 

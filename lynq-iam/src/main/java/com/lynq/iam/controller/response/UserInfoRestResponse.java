@@ -1,6 +1,7 @@
 package com.lynq.iam.controller.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,5 +22,7 @@ public class UserInfoRestResponse {
   private String username;
   @Schema(description = "Email address", example = "johndoe@example.com")
   private String email;
+  @Schema(description = "Roles granted to the user", example = "[\"R_CANDIDATE\"]")
+  private List<String> roles;
 
 }

@@ -1,6 +1,7 @@
 package com.lynq.iam.service;
 
 import com.lynq.iam.aspect.AuditLog;
+import com.lynq.iam.model.Role;
 import com.lynq.iam.model.UserEntity;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -14,6 +15,8 @@ import java.security.Key;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -23,6 +26,7 @@ public class JWTService {
 
   private static final String USERNAME_CLAIM = "username";
   private static final String EMAIL_CLAIM = "email";
+  private static final String ROLES_CLAIM = "roles";
 
   private final String secret;
   private final long accessTokenExpirationMinutes;
@@ -47,6 +51,7 @@ public class JWTService {
       .subject(user.getId())
       .claim(USERNAME_CLAIM, user.getUsername())
       .claim(EMAIL_CLAIM, user.getEmail())
+      .claim(ROLES_CLAIM, roleNames(user.getRoles()))
       .issuedAt(Date.from(now))
       .expiration(Date.from(now.plus(accessTokenExpirationMinutes, ChronoUnit.MINUTES)))
       .signWith(getSigningKey())
@@ -66,6 +71,20 @@ public class JWTService {
   @AuditLog
   public String extractEmail(String token) {
     return parseClaims(token).get(EMAIL_CLAIM, String.class);
+  }
+
+  @AuditLog
+  @SuppressWarnings("unchecked")
+  public List<String> extractRoles(String token) {
+    Object roles = parseClaims(token).get(ROLES_CLAIM);
+    return roles instanceof List<?> ? List.copyOf((List<String>) roles) : List.of();
+  }
+
+  private static List<String> roleNames(Set<Role> roles) {
+    return roles == null ? List.of() : roles.stream()
+        .map(Role::name)
+        .sorted()
+        .toList();
   }
 
   @AuditLog

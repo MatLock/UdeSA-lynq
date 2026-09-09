@@ -17,7 +17,7 @@ const TEMPLATES = ['MODERN', 'CLASSIC'];
  *
  * Calls GET /user/resume (UserController.getUserResumes). Each entry carries the
  * structured resume JSON plus a short-lived public link to the PDF stored in S3.
- * Candidate-only: the backend rejects other user types with 400.
+ * Candidate-only: the backend rejects other user types with 403.
  *
  * @param {(path: string, options?: object) => Promise<object>} authFetch - The
  *   secured fetcher (useApi's authFetch).

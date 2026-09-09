@@ -20,6 +20,8 @@ import com.lynq.backend.controller.response.UpdateJobRestResponse;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSkillEntity;
 import com.lynq.backend.model.UserApplicationJobEntity;
+import com.lynq.backend.security.HasRole;
+import com.lynq.backend.security.Role;
 import com.lynq.backend.service.JobFilter;
 import com.lynq.backend.service.JobService;
 import jakarta.validation.Valid;
@@ -44,6 +46,7 @@ public class JobControllerImpl implements JobController {
 
   @Override
   @PostMapping
+  @HasRole(Role.COMPANY)
   @AuditLog
   public ResponseEntity<GlobalRestResponse<CreateJobRestResponse>> createJob(@RequestBody CreateJobRequest request) {
     JobPostEntity job = jobService.createJob(
@@ -133,6 +136,7 @@ public class JobControllerImpl implements JobController {
 
   @Override
   @GetMapping("/mine")
+  @HasRole(Role.COMPANY)
   @AuditLog
   public ResponseEntity<GlobalRestResponse<PagedRestResponse<GetJobRestResponse>>> getMyJobs(
       @RequestParam(defaultValue = "0") Integer page,
@@ -206,6 +210,7 @@ public class JobControllerImpl implements JobController {
 
   @Override
   @PostMapping("/{jobId}/apply")
+  @HasRole(Role.CANDIDATE)
   @AuditLog
   public ResponseEntity<GlobalRestResponse<ApplyJobRestResponse>> applyToJob(
       @PathVariable String jobId, @Valid @RequestBody ApplyJobRequest request) {
@@ -255,6 +260,7 @@ public class JobControllerImpl implements JobController {
 
   @Override
   @GetMapping("/{jobId}/upskilling-suggestion")
+  @HasRole(Role.CANDIDATE)
   @AuditLog
   public ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> suggestUpskilling(
       @PathVariable String jobId,

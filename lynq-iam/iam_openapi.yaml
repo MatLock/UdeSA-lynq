@@ -15,7 +15,8 @@ paths:
       tags:
       - Users
       summary: Create a new user
-      description: Registers a new user with unique username and email
+      description: "Registers a new user with unique username and email, granted the\
+        \ role sent in the request"
       operationId: createUser
       parameters:
       - name: lynq-request-uuid
@@ -243,8 +244,8 @@ paths:
       tags:
       - Users
       summary: Get user info from access token
-      description: "Extracts user identity (id, username, email) from a valid access\
-        \ token"
+      description: "Extracts user identity (id, username, email) and roles from a valid\
+        \ access token"
       operationId: obtainUserInfoFromToken
       parameters:
       - name: lynq-request-uuid
@@ -292,9 +293,17 @@ components:
           example: johndoe@example.com
           maxLength: 100
           minLength: 0
+        role:
+          type: string
+          description: Role the user is registered with
+          example: R_CANDIDATE
+          enum:
+          - R_CANDIDATE
+          - R_COMPANY
       required:
       - email
       - password
+      - role
       - username
     UserRestResponse:
       type: object
@@ -402,6 +411,13 @@ components:
           type: string
           description: Email address
           example: johndoe@example.com
+        roles:
+          type: array
+          description: Roles granted to the user
+          example:
+          - R_CANDIDATE
+          items:
+            type: string
   securitySchemes:
     bearerAuth:
       type: http

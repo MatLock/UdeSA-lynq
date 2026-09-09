@@ -7,7 +7,6 @@ import com.lynq.backend.controller.request.UpdateCompanyRequest;
 import com.lynq.backend.controller.response.CompanyJobRestResponse;
 import com.lynq.backend.controller.response.GetCompanyDetailRestResponse;
 import com.lynq.backend.controller.response.UpdateCompanyRestResponse;
-import com.lynq.backend.enums.UserType;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.model.CompanyEntity;
@@ -48,7 +47,6 @@ public class CompanyService {
 
     UserEntity owner = userService.saveNewUser(
         userId,
-        UserType.COMPANY,
         request.getFullName(),
         request.getCurrentPosition(),
         request.getUserAbout(),

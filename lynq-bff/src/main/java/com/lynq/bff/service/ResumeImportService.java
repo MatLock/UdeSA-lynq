@@ -24,24 +24,19 @@ public class ResumeImportService {
   private static final String IMPORT_FAILED = "The uploaded resume could not be imported";
   private static final String CONFIRM_FAILED = "The uploaded resume document could not be confirmed";
 
-  private final CandidateReader candidateReader;
   private final LynqBackendClient lynqBackendClient;
   private final LynqFileStorageClient lynqFileStorageClient;
   private final LynqMlClient lynqMlClient;
 
-  public ResumeImportService(CandidateReader candidateReader,
-                             LynqBackendClient lynqBackendClient,
+  public ResumeImportService(LynqBackendClient lynqBackendClient,
                              LynqFileStorageClient lynqFileStorageClient,
                              LynqMlClient lynqMlClient) {
-    this.candidateReader = candidateReader;
     this.lynqBackendClient = lynqBackendClient;
     this.lynqFileStorageClient = lynqFileStorageClient;
     this.lynqMlClient = lynqMlClient;
   }
 
   public Object importUploadedDocument(String fileId, String fallbackLanguage, Caller caller) {
-    candidateReader.read(caller);
-
     log.info("message= Started resume import, user_id={}, file_id={}", caller.userId(), fileId);
 
     try {

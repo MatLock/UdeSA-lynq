@@ -13,10 +13,8 @@ import static org.mockito.Mockito.when;
 import com.lynq.bff.client.LynqBackendClient;
 import com.lynq.bff.client.LynqFileStorageClient;
 import com.lynq.bff.client.response.DeletedResumeResponse;
-import com.lynq.bff.client.response.UserResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.exceptions.BadGatewayException;
-import com.lynq.bff.exceptions.ForbiddenException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,9 +34,6 @@ class ResumeDeletionServiceTest {
   private static final String FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
 
   @Mock
-  private CandidateReader candidateReader;
-
-  @Mock
   private LynqBackendClient lynqBackendClient;
 
   @Mock
@@ -48,8 +43,8 @@ class ResumeDeletionServiceTest {
 
   @BeforeEach
   void setUp() {
-    resumeDeletionService = new ResumeDeletionService(
-        candidateReader, lynqBackendClient, lynqFileStorageClient);
+    resumeDeletionService =
+        new ResumeDeletionService(lynqBackendClient, lynqFileStorageClient);
   }
 
   @Test
@@ -66,17 +61,7 @@ class ResumeDeletionServiceTest {
   }
 
   @Test
-  void rejectsCallersThatAreNotCandidates() {
-    when(candidateReader.read(any())).thenThrow(new ForbiddenException("nope"));
-
-    assertThrows(ForbiddenException.class, () -> resumeDeletionService.delete(RESUME_ID, CALLER));
-    verify(lynqBackendClient, never()).deleteResume(any(), any(), any());
-    verify(lynqFileStorageClient, never()).deleteFile(any(), any(), any());
-  }
-
-  @Test
   void failsWithBadGatewayWhenTheBackendCannotDeleteTheResume() {
-    when(candidateReader.read(any())).thenReturn(candidate());
     when(lynqBackendClient.deleteResume(RESUME_ID, REQUEST_UUID, AUTHORIZATION))
         .thenThrow(new IllegalStateException("boom"));
 
@@ -111,7 +96,6 @@ class ResumeDeletionServiceTest {
   }
 
   private void stubDeleted(String fileId) {
-    when(candidateReader.read(any())).thenReturn(candidate());
     DeletedResumeResponse deleted = DeletedResumeResponse.builder()
         .id(RESUME_ID)
         .fileId(fileId)
@@ -120,7 +104,4 @@ class ResumeDeletionServiceTest {
         .thenReturn(new GlobalRestResponse<>(true, deleted));
   }
 
-  private UserResponse candidate() {
-    return UserResponse.builder().id(USER_ID).userType("CANDIDATE").build();
-  }
 }

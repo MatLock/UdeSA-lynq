@@ -2,7 +2,6 @@ package com.lynq.backend.service;
 
 import com.lynq.backend.controller.request.CreateUserWithCompanyRequest;
 import com.lynq.backend.controller.request.UpdateCompanyRequest;
-import com.lynq.backend.enums.UserType;
 import com.lynq.backend.controller.response.GetCompanyDetailRestResponse;
 import com.lynq.backend.controller.response.UpdateCompanyRestResponse;
 import com.lynq.backend.enums.JobStatus;
@@ -99,7 +98,7 @@ class CompanyServiceTest {
 
     companyService.createUserWithCompany(USER_ID, request);
 
-    verify(userService).saveNewUser(USER_ID, UserType.COMPANY, FULL_NAME,
+    verify(userService).saveNewUser(USER_ID, FULL_NAME,
         CURRENT_POSITION, USER_ABOUT, NO_GITHUB_URL, LINKEDIN_URL, BIRTH_DATE);
   }
 
@@ -107,7 +106,7 @@ class CompanyServiceTest {
   void createUserWithCompanyPersistsCompanyBuiltFromRequestAndOwner() {
     stubRequestFields();
     UserEntity owner = UserEntity.builder().id(USER_ID).build();
-    when(userService.saveNewUser(USER_ID, UserType.COMPANY, FULL_NAME,
+    when(userService.saveNewUser(USER_ID, FULL_NAME,
         CURRENT_POSITION, USER_ABOUT, NO_GITHUB_URL, LINKEDIN_URL, BIRTH_DATE)).thenReturn(owner);
     when(companyRepository.save(any(CompanyEntity.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
@@ -168,7 +167,7 @@ class CompanyServiceTest {
     assertThrows(BadRequestException.class,
         () -> companyService.createUserWithCompany(USER_ID, request));
 
-    verify(userService, never()).saveNewUser(any(), any(), any(), any(), any(), any(), any(), any());
+    verify(userService, never()).saveNewUser(any(), any(), any(), any(), any(), any(), any());
     verify(companyRepository, never()).save(any());
   }
 

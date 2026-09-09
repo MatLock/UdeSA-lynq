@@ -22,7 +22,7 @@ import org.springframework.http.ResponseEntity;
 @Tag(name = "Users", description = "User management operations")
 public interface AuthController {
 
-  @Operation(summary = "Create a new user", description = "Registers a new user with unique username and email")
+  @Operation(summary = "Create a new user", description = "Registers a new user with unique username and email, granted the role sent in the request")
   @Parameters({
     @Parameter(name = "lynq-request-uuid", in = ParameterIn.HEADER, required = true,
       description = "Per-request correlation UUID used for log tracing",
@@ -128,7 +128,7 @@ public interface AuthController {
   ResponseEntity<GlobalRestResponse<AccessTokenRefreshedResponse>> generateNewAccessToken(
       @Parameter(hidden = true) @NotBlank String refreshToken);
 
-  @Operation(summary = "Get user info from access token", description = "Extracts user identity (id, username, email) from a valid access token")
+  @Operation(summary = "Get user info from access token", description = "Extracts user identity (id, username, email) and roles from a valid access token")
   @SecurityRequirement(name = "bearerAuth")
   @Parameters({
     @Parameter(name = "lynq-request-uuid", in = ParameterIn.HEADER, required = true,

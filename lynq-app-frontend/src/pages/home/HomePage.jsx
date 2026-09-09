@@ -21,10 +21,9 @@ const HomePage = () => {
   // authFetch transparently refreshes an expired access token and retries once
   // before surfacing an error, so the feed survives token expiry.
   const { authFetch } = useApi()
-  const { user } = useAuth()
+  const { isCompany } = useAuth()
   const navigate = useNavigate()
   // Only company owners can publish jobs, so the action is theirs alone.
-  const isCompany = user?.userType === 'COMPANY'
 
   const [query, setQuery] = useState('')
   const [filterValue, setFilterValue] = useState('')

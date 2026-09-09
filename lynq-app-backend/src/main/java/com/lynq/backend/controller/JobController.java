@@ -28,7 +28,7 @@ public interface JobController {
       summary = "Create a job post",
       description = "Creates a job post for the company owned by the authenticated user. The owner "
           + "identity is resolved from the bearer token and must be a COMPANY-type user linked to "
-          + "a company.",
+          + "a company; any other type is rejected with 403.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<GlobalRestResponse<CreateJobRestResponse>> createJob(
       @Valid CreateJobRequest request);
@@ -65,7 +65,7 @@ public interface JobController {
           + "(ordered by creation date descending), using the same response shape as the public "
           + "listing (company, poster and skills). Unlike the public feed this includes job posts "
           + "in any status. Only COMPANY-type users may call it; the owner identity is resolved "
-          + "from the bearer token. Fails with 400 when the caller is not a COMPANY-type user.",
+          + "from the bearer token. Fails with 403 when the caller is not a COMPANY-type user.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<GlobalRestResponse<PagedRestResponse<GetJobRestResponse>>> getMyJobs(
       Integer page,
@@ -112,8 +112,9 @@ public interface JobController {
       description = "Registers an application of the authenticated user to the job post identified "
           + "by the given id, with the resume the candidate chose to apply with. The applicant "
           + "identity is resolved from the bearer token, and the resume is looked up among that "
-          + "candidate's own. Fails with 404 when no job post matches the id or the resume is not "
-          + "one of the caller's, and with 400 when the user has already applied to the same job.",
+          + "candidate's own. Only CANDIDATE-type users may call it; any other type is rejected "
+          + "with 403. Fails with 404 when no job post matches the id or the resume is not one of "
+          + "the caller's, and with 400 when the user has already applied to the same job.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<GlobalRestResponse<ApplyJobRestResponse>> applyToJob(String jobId,
       @Valid ApplyJobRequest request);
@@ -152,7 +153,7 @@ public interface JobController {
           + "for the authenticated user against the job post identified by 'jobId'. The user and "
           + "job information is read from the database and forwarded to the lynq-ml service. Only "
           + "CANDIDATE-type users may call it; the caller identity is resolved from the bearer "
-          + "token. Fails with 400 when the caller is not a CANDIDATE and 404 when the job post "
+          + "token. Fails with 403 when the caller is not a CANDIDATE and 404 when the job post "
           + "does not exist.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> suggestUpskilling(

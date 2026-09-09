@@ -1,5 +1,6 @@
 package com.lynq.bff.service;
 
+import com.lynq.bff.client.LynqBackendClient;
 import com.lynq.bff.client.LynqFileStorageClient;
 import com.lynq.bff.client.LynqMlClient;
 import com.lynq.bff.client.request.CreateFileUploadRequest;
@@ -26,15 +27,16 @@ public class ResumePreviewService {
   private static final String READ_URL_FAILED = "The stored resume PDF could not be signed to read";
   private static final String REGISTER_FAILED = "The resume PDF could not be registered for upload";
   private static final String DISCARD_FAILED = "The previewed resume PDF could not be discarded";
+  private static final String CALLER_UNREADABLE = "The caller could not be resolved";
 
-  private final CandidateReader candidateReader;
+  private final LynqBackendClient lynqBackendClient;
   private final LynqFileStorageClient lynqFileStorageClient;
   private final LynqMlClient lynqMlClient;
 
-  public ResumePreviewService(CandidateReader candidateReader,
+  public ResumePreviewService(LynqBackendClient lynqBackendClient,
                               LynqFileStorageClient lynqFileStorageClient,
                               LynqMlClient lynqMlClient) {
-    this.candidateReader = candidateReader;
+    this.lynqBackendClient = lynqBackendClient;
     this.lynqFileStorageClient = lynqFileStorageClient;
     this.lynqMlClient = lynqMlClient;
   }
@@ -47,7 +49,7 @@ public class ResumePreviewService {
       throw new BadRequestException(TEMPLATE_REQUIRED);
     }
 
-    UserResponse user = candidateReader.read(caller);
+    UserResponse user = readCaller(caller);
     CreateFileUploadResponse upload = registerPdf(caller);
 
     log.info("message= Started resume preview, user_id={}, template={}, file_id={}",
@@ -80,6 +82,21 @@ public class ResumePreviewService {
     }
 
     log.info("message= Discarded resume preview, user_id={}, file_id={}", caller.userId(), fileId);
+  }
+
+  private UserResponse readCaller(Caller caller) {
+    UserResponse user;
+    try {
+      user = lynqBackendClient.getUser(caller.requestUuid(), caller.authorization()).getData();
+    } catch (RuntimeException e) {
+      throw new BadGatewayException(CALLER_UNREADABLE, e);
+    }
+
+    if (user == null) {
+      throw new BadGatewayException(CALLER_UNREADABLE);
+    }
+
+    return user;
   }
 
   private CreateFileUploadResponse registerPdf(Caller caller) {

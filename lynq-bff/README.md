@@ -101,9 +101,8 @@ lynq-file-storage. Neither can see the other, so deleting one is a composition.
 
 ```
 DELETE /lynq-bff/resume/{resumeId}
-  1. GET  /dmz/user            → the caller must be a CANDIDATE
-  2. DELETE /dmz/user/resume/{resumeId}   → the row; answers the PDF's fileId
-  3. DELETE /dmz/files/{fileId}           → the PDF
+  1. DELETE /dmz/user/resume/{resumeId}   → the row; answers the PDF's fileId
+  2. DELETE /dmz/files/{fileId}           → the PDF
   → 204
 ```
 
@@ -144,8 +143,8 @@ Three things this flow is responsible for, and a proxy could not be:
   is deleted before the `502` is returned, so a failed preview never leaves a metadata row with no
   object behind it.
 
-`403` when the caller is not a `CANDIDATE` — checked here because no downstream call in the
-sequence would otherwise check it.
+`403` when the caller is not a `CANDIDATE`, enforced by `@HasRole(Role.CANDIDATE)` on
+`ResumeControllerImpl` against the `roles` claim of the verified token.
 
 ### Resume import
 
@@ -192,8 +191,9 @@ POST /lynq-bff/resume/document/{fileId}/import?language=es
   deletes it before the `502` is returned — the candidate still has the original file, so a retry
   starts clean rather than accumulating documents no resume points at.
 
-`403` when the caller is not a `CANDIDATE`, checked by `CandidateReader` — the same guard the
-preview flow uses, since neither lynq-ml nor lynq-file-storage knows what a candidate is.
+`403` when the caller is not a `CANDIDATE`, enforced by `@HasRole(Role.CANDIDATE)` on
+`ResumeControllerImpl` — the roles come from the verified token, so no round-trip to
+lynq-app-backend is needed to know who is calling.
 
 ### Identity headers
 
@@ -214,7 +214,37 @@ letting anyone confirm or delete that file.
 | -1    | `CorsFilter`               | all routes                     | Answers browser preflights. Runs first on purpose: a preflight carries neither header below, so the filters after it would reject it and the real request would never be sent. |
 | 0     | `RequestUuidFilter`        | all routes except Swagger      | 403 if `lynq-request-uuid` is missing/blank; echoes it back and binds it to the logging context (MDC). |
 | 1     | `AuthHeaderExistenceFilter`| all routes except Swagger      | 401 if the `Authorization` header is missing.                          |
-| 2     | `JwtSignatureFilter`       | all routes except Swagger      | 401 if the token's signature does not verify, it has expired, or it carries no subject. Publishes the verified subject for the proxy to forward as `user-id`. |
+| 2     | `JwtSignatureFilter`       | all routes except Swagger      | 401 if the token's signature does not verify, it has expired, or it carries no subject. Publishes the verified subject for the proxy to forward as `user-id`, and loads it — with the token's `roles` claim as authorities — into the `SecurityContext`. |
+| 3     | `RelayRoleFilter`          | all routes except Swagger      | 403 for the relayed routes whose role is structural (`RelayRoleRules`). **Default allow**: a route no rule covers is relayed untouched. |
+
+Authorization is method security on top of those authorities (`SecurityConfig`,
+`@EnableMethodSecurity`): `@HasRole(Role.CANDIDATE)` on `ResumeControllerImpl` is what makes the whole
+resume flow candidate-only, read from the token instead of asking lynq-app-backend who is calling.
+Spring Security's own filter chain is `permitAll` and stateless — the filters above are what enforce
+authentication.
+
+### Roles on the relayed routes
+
+The flows the gateway owns are authorized here, but the relayed routes belong to the service that
+owns the data: lynq-app-backend carries its own `@HasRole` on every endpoint that belongs to one kind
+of user, and it is the only place that can also enforce ownership ("this resume is yours"). So the
+role check downstream is the one that decides.
+
+`RelayRoleFilter` is an **optimization, not the enforcement point**: it bounces the requests it knows
+are doomed before they cost a hop to lynq-app-backend and another from there to lynq-iam. Everything
+it does not recognize is relayed, so a rule missing from `RelayRoleRules` can never open a hole nor
+invent a `403` — the worst case is the request travelling one service further to get the same answer.
+
+| Role | Relayed routes |
+| ---- | -------------- |
+| `R_COMPANY` | `POST /job`, `GET /job/mine`, `POST /company` |
+| `R_CANDIDATE` | `POST /job/{jobId}/apply`, `GET /job/{jobId}/upskilling-suggestion`, `GET /user/generate-upload-resume`, `POST /user/confirm-upload-resume`, `GET|POST /user/resume`, `GET /user/resume/languages`, `PUT /user/resume/{resumeId}/alias`, `DELETE /user/resume/{resumeId}`, `GET /user/application`, `GET /user/upskilling-suggestion/{jobPostId}` |
+
+The rules are exact method + path templates on purpose, never prefixes. A prefix would bounce
+whatever appears under it later, and the gateway is the one place that cannot tell an endpoint it has
+never heard of from one that is open by design — the downstream service can. Adding a role-scoped
+endpoint there without adding a rule here is a missed optimization; adding a prefix rule here is a
+bug waiting for the next endpoint.
 
 ---
 
@@ -228,7 +258,7 @@ in these cases:
 | ------ | ----------------------------------------------------------------------- |
 | 400    | A flow's request is missing something it needs (e.g. a preview with no resume or no template). |
 | 401    | Missing `Authorization` header, or an invalid/expired token signature. A correctly signed token with no `sub` claim is rejected here too: the caller id is forwarded downstream, so an anonymous one is no good. |
-| 403    | Missing `lynq-request-uuid` header, a lynq-ml endpoint the gateway does not relay (see above), or a flow the caller's user type may not run. |
+| 403    | Missing `lynq-request-uuid` header, a lynq-ml endpoint the gateway does not relay (see above), or a flow the caller's role may not run (`@HasRole`). |
 | 404    | A resource the gateway does not route — the mappings are an allowlist.  |
 | 405    | An HTTP verb the gateway does not relay (only GET/POST/PUT/PATCH/DELETE).|
 | 502    | A DMZ service could not be reached at all, or a step of a flow failed — in which case the flow has already undone what it had done. |

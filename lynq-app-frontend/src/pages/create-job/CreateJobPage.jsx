@@ -20,7 +20,7 @@ import './CreateJobPage.css'
 // this page is company-only.
 const CreateJobPage = () => {
   const t = strings.pages.createJob
-  const { user } = useAuth()
+  const { isCompany } = useAuth()
   // Refresh-aware fetcher so a long-open form still submits past token expiry.
   const { authFetch } = useApi()
   const navigate = useNavigate()
@@ -42,7 +42,7 @@ const CreateJobPage = () => {
   const [toast, setToast] = useState(null)
 
   // Company-only page: send everyone else back to the feed.
-  if (user && user.userType !== 'COMPANY') {
+  if (!isCompany) {
     return <Navigate to="/home" replace />
   }
 

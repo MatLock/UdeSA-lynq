@@ -1,6 +1,7 @@
 package com.lynq.iam.service;
 
 import com.lynq.iam.aspect.AuditLog;
+import com.lynq.iam.model.Role;
 import com.lynq.iam.model.UserEntity;
 import com.lynq.iam.repository.UserRepository;
 import jakarta.transaction.Transactional;
@@ -11,6 +12,7 @@ import com.fasterxml.uuid.Generators;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Set;
 
 @Service
 public class UserService {
@@ -25,7 +27,7 @@ public class UserService {
 
   @Transactional
   @AuditLog
-  public UserEntity createUser(String username, String password, String email) {
+  public UserEntity createUser(String username, String password, String email, Role role) {
     validateUniqueness(username, email);
 
     UserEntity user = UserEntity.builder()
@@ -34,6 +36,7 @@ public class UserService {
         .email(email)
         .password(passwordEncoder.encode(password))
         .creationDate(LocalDateTime.now(ZoneOffset.UTC))
+        .roles(Set.of(role))
         .build();
 
     return userRepository.save(user);

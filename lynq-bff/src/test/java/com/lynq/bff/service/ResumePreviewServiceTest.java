@@ -11,6 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.lynq.bff.client.LynqBackendClient;
 import com.lynq.bff.client.LynqFileStorageClient;
 import com.lynq.bff.client.LynqMlClient;
 import com.lynq.bff.client.request.CreateFileUploadRequest;
@@ -24,7 +25,6 @@ import com.lynq.bff.controller.response.ResumePreviewRestResponse;
 import com.lynq.bff.enums.ResumeTemplate;
 import com.lynq.bff.exceptions.BadGatewayException;
 import com.lynq.bff.exceptions.BadRequestException;
-import com.lynq.bff.exceptions.ForbiddenException;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -50,11 +50,11 @@ class ResumePreviewServiceTest {
   private static final String RESUME_FILE_NAME = "resume.pdf";
   private static final String PDF_CONTENT_TYPE = "application/pdf";
 
-  private static final String ONLY_CANDIDATES = "Only users of type CANDIDATE can do this";
+  private static final String CALLER_UNREADABLE = "The caller could not be resolved";
   private static final String RENDER_FAILED = "The resume PDF could not be rendered and stored";
 
   @Mock
-  private CandidateReader candidateReader;
+  private LynqBackendClient lynqBackendClient;
 
   @Mock
   private LynqFileStorageClient lynqFileStorageClient;
@@ -67,7 +67,7 @@ class ResumePreviewServiceTest {
   @BeforeEach
   void setUp() {
     resumePreviewService =
-        new ResumePreviewService(candidateReader, lynqFileStorageClient, lynqMlClient);
+        new ResumePreviewService(lynqBackendClient, lynqFileStorageClient, lynqMlClient);
   }
 
   @Test
@@ -189,15 +189,28 @@ class ResumePreviewServiceTest {
   }
 
   @Test
-  void previewDoesNotTouchAnyServiceWhenTheCallerIsNotACandidate() {
-    when(candidateReader.read(CALLER)).thenThrow(new ForbiddenException(ONLY_CANDIDATES));
+  void previewReportsABadGatewayWhenTheCallerCannotBeRead() {
+    when(lynqBackendClient.getUser(REQUEST_UUID, AUTHORIZATION))
+        .thenThrow(new IllegalStateException("backend down"));
 
-    ForbiddenException exception = assertThrows(ForbiddenException.class,
+    BadGatewayException exception = assertThrows(BadGatewayException.class,
         () -> resumePreviewService.preview(request(ResumeTemplate.MODERN), CALLER));
 
-    assertThat(exception.getMessage(), is(ONLY_CANDIDATES));
+    assertThat(exception.getMessage(), is(CALLER_UNREADABLE));
     verify(lynqFileStorageClient, never()).createUpload(any(), any(), any());
     verify(lynqMlClient, never()).createResumeTemplate(any(), any(), any());
+  }
+
+  @Test
+  void previewReportsABadGatewayWhenTheBackendDoesNotKnowTheCaller() {
+    when(lynqBackendClient.getUser(REQUEST_UUID, AUTHORIZATION))
+        .thenReturn(new GlobalRestResponse<>(true, null));
+
+    BadGatewayException exception = assertThrows(BadGatewayException.class,
+        () -> resumePreviewService.preview(request(ResumeTemplate.MODERN), CALLER));
+
+    assertThat(exception.getMessage(), is(CALLER_UNREADABLE));
+    verify(lynqFileStorageClient, never()).createUpload(any(), any(), any());
   }
 
   @Test
@@ -206,7 +219,7 @@ class ResumePreviewServiceTest {
 
     assertThrows(BadRequestException.class, () -> resumePreviewService.preview(request, CALLER));
 
-    verify(candidateReader, never()).read(any());
+    verify(lynqBackendClient, never()).getUser(any(), any());
   }
 
   @Test
@@ -215,7 +228,7 @@ class ResumePreviewServiceTest {
 
     assertThrows(BadRequestException.class, () -> resumePreviewService.preview(request, CALLER));
 
-    verify(candidateReader, never()).read(any());
+    verify(lynqBackendClient, never()).getUser(any(), any());
   }
 
   @Test
@@ -251,11 +264,12 @@ class ResumePreviewServiceTest {
   }
 
   private void givenCandidate(String profileImageUrl) {
-    when(candidateReader.read(CALLER)).thenReturn(UserResponse.builder()
-        .id(USER_ID)
-        .userType("CANDIDATE")
-        .userProfileImageUrl(profileImageUrl)
-        .build());
+    when(lynqBackendClient.getUser(REQUEST_UUID, AUTHORIZATION))
+        .thenReturn(new GlobalRestResponse<>(true, UserResponse.builder()
+            .id(USER_ID)
+            .userType("CANDIDATE")
+            .userProfileImageUrl(profileImageUrl)
+            .build()));
   }
 
   private void givenRegisteredUpload() {

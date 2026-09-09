@@ -392,6 +392,12 @@ const deleteData = async (connection, plan) => {
   )
   await deleteByIds(
     connection,
+    `DELETE FROM ${IAM_DB}.user_roles WHERE user_id IN (?)`,
+    plan.userIds,
+    'roles (IAM)',
+  )
+  await deleteByIds(
+    connection,
     `DELETE FROM ${IAM_DB}.users WHERE id IN (?)`,
     plan.userIds,
     'accounts (IAM)',

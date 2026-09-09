@@ -15,10 +15,10 @@ import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.controller.response.UpdateUserProfileRestResponse;
 import com.lynq.backend.controller.response.UserApplicationResponse;
-import com.lynq.backend.enums.UserType;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.client.response.UpskillingSuggestionResponse;
 import com.lynq.backend.security.LynqUserPrincipal;
+import com.lynq.backend.security.Role;
 import com.lynq.backend.service.JobService;
 import com.lynq.backend.service.RegisteredUpload;
 import com.lynq.backend.service.UserService;
@@ -37,8 +37,11 @@ import java.util.List;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,7 +49,6 @@ import static org.mockito.Mockito.when;
 class UserControllerImplTest {
 
   private static final String USER_ID = "550e8400-e29b-41d4-a716-446655440000";
-  private static final UserType USER_TYPE = UserType.CANDIDATE;
   private static final String FULL_NAME = "Jane Doe";
   private static final String PROFILE_IMAGE_URL = "https://cdn.lynq.com/avatars/jane.png";
   private static final String CURRENT_POSITION = "Backend Engineer";
@@ -91,7 +93,6 @@ class UserControllerImplTest {
   }
 
   private void stubCreateRequestFields() {
-    when(request.getUserType()).thenReturn(USER_TYPE);
     when(request.getFullName()).thenReturn(FULL_NAME);
     when(request.getCurrentPosition()).thenReturn(CURRENT_POSITION);
     when(request.getAbout()).thenReturn(ABOUT);
@@ -122,9 +123,10 @@ class UserControllerImplTest {
   @Test
   void getUserMapsEntityIntoResponseData() {
     UserEntity user = savedUser();
+    when(principal.hasRole(Role.COMPANY)).thenReturn(true);
     when(userService.getUser(USER_ID)).thenReturn(user);
     when(userService.obtainProfileImagePreSignedUrl(FILE_ID)).thenReturn(PRE_SIGNED_URL);
-    when(userService.obtainOwnedCompanyId(USER_ID, USER_TYPE)).thenReturn(COMPANY_ID);
+    when(userService.obtainOwnedCompanyId(USER_ID)).thenReturn(COMPANY_ID);
 
     ResponseEntity<GlobalRestResponse<GetUserRestResponse>> response =
         userController.getUser(principal);
@@ -134,7 +136,6 @@ class UserControllerImplTest {
     assertThat(body.isSuccess(), is(true));
     GetUserRestResponse data = body.getData();
     assertThat(data.getId(), is(USER_ID));
-    assertThat(data.getUserType(), is(USER_TYPE));
     assertThat(data.getFullName(), is(FULL_NAME));
     assertThat(data.getUserProfileImageUrl(), is(PRE_SIGNED_URL));
     assertThat(data.getCurrentPosition(), is(CURRENT_POSITION));
@@ -147,21 +148,44 @@ class UserControllerImplTest {
   }
 
   @Test
+  void getUserResolvesTheOwnedCompanyOnlyForACallerHoldingTheCompanyRole() {
+    when(principal.hasRole(Role.COMPANY)).thenReturn(true);
+    when(userService.getUser(USER_ID)).thenReturn(savedUser());
+    when(userService.obtainOwnedCompanyId(USER_ID)).thenReturn(COMPANY_ID);
+
+    ResponseEntity<GlobalRestResponse<GetUserRestResponse>> response =
+        userController.getUser(principal);
+
+    assertThat(response.getBody().getData().getCompanyId(), is(COMPANY_ID));
+  }
+
+  @Test
+  void getUserDoesNotLookForACompanyWhenTheCallerIsNotACompany() {
+    when(userService.getUser(USER_ID)).thenReturn(savedUser());
+
+    ResponseEntity<GlobalRestResponse<GetUserRestResponse>> response =
+        userController.getUser(principal);
+
+    assertThat(response.getBody().getData().getCompanyId(), is(nullValue()));
+    verify(userService, never()).obtainOwnedCompanyId(any());
+  }
+
+  @Test
   void createUserDelegatesToServiceWithPrincipalIdAndRequestFields() {
     stubCreateRequestFields();
-    when(userService.saveNewUser(USER_ID, USER_TYPE, FULL_NAME, CURRENT_POSITION, ABOUT,
+    when(userService.saveNewUser(USER_ID, FULL_NAME, CURRENT_POSITION, ABOUT,
         GITHUB_URL, LINKEDIN_URL, BIRTH_DATE)).thenReturn(savedUser());
 
     userController.createUser(request, principal);
 
-    verify(userService).saveNewUser(USER_ID, USER_TYPE, FULL_NAME, CURRENT_POSITION, ABOUT,
+    verify(userService).saveNewUser(USER_ID, FULL_NAME, CURRENT_POSITION, ABOUT,
         GITHUB_URL, LINKEDIN_URL, BIRTH_DATE);
   }
 
   @Test
   void createUserRespondsWithCreatedStatus() {
     stubCreateRequestFields();
-    when(userService.saveNewUser(USER_ID, USER_TYPE, FULL_NAME, CURRENT_POSITION, ABOUT,
+    when(userService.saveNewUser(USER_ID, FULL_NAME, CURRENT_POSITION, ABOUT,
         GITHUB_URL, LINKEDIN_URL, BIRTH_DATE)).thenReturn(savedUser());
 
     ResponseEntity<GlobalRestResponse<CreateUserRestResponse>> response =
@@ -173,7 +197,7 @@ class UserControllerImplTest {
   @Test
   void createUserWrapsSuccessfulResponseBody() {
     stubCreateRequestFields();
-    when(userService.saveNewUser(USER_ID, USER_TYPE, FULL_NAME, CURRENT_POSITION, ABOUT,
+    when(userService.saveNewUser(USER_ID, FULL_NAME, CURRENT_POSITION, ABOUT,
         GITHUB_URL, LINKEDIN_URL, BIRTH_DATE)).thenReturn(savedUser());
 
     ResponseEntity<GlobalRestResponse<CreateUserRestResponse>> response =
@@ -188,7 +212,7 @@ class UserControllerImplTest {
   void createUserMapsSavedEntityIntoResponseData() {
     stubCreateRequestFields();
     UserEntity user = savedUser();
-    when(userService.saveNewUser(USER_ID, USER_TYPE, FULL_NAME, CURRENT_POSITION, ABOUT,
+    when(userService.saveNewUser(USER_ID, FULL_NAME, CURRENT_POSITION, ABOUT,
         GITHUB_URL, LINKEDIN_URL, BIRTH_DATE)).thenReturn(user);
     when(userService.obtainProfileImagePreSignedUrl(FILE_ID)).thenReturn(PRE_SIGNED_URL);
 
@@ -197,7 +221,6 @@ class UserControllerImplTest {
 
     CreateUserRestResponse data = response.getBody().getData();
     assertThat(data.getId(), is(USER_ID));
-    assertThat(data.getUserType(), is(USER_TYPE));
     assertThat(data.getFullName(), is(FULL_NAME));
     assertThat(data.getUserProfileImageUrl(), is(PRE_SIGNED_URL));
     assertThat(data.getCurrentPosition(), is(CURRENT_POSITION));
@@ -241,7 +264,6 @@ class UserControllerImplTest {
     assertThat(body.isSuccess(), is(true));
     UpdateUserProfileRestResponse data = body.getData();
     assertThat(data.getId(), is(USER_ID));
-    assertThat(data.getUserType(), is(USER_TYPE));
     assertThat(data.getFullName(), is(FULL_NAME));
     assertThat(data.getUserProfileImageUrl(), is(PROFILE_IMAGE_URL));
     assertThat(data.getCurrentPosition(), is(CURRENT_POSITION));
@@ -518,7 +540,6 @@ class UserControllerImplTest {
   private UserEntity savedUser() {
     return UserEntity.builder()
         .id(USER_ID)
-        .type(USER_TYPE)
         .fullName(FULL_NAME)
         .lynqFileStorageId(FILE_ID)
         .currentPosition(CURRENT_POSITION)

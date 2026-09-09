@@ -1,11 +1,8 @@
 package com.lynq.backend.model;
 
-import com.lynq.backend.enums.UserType;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
@@ -34,10 +31,6 @@ public class UserEntity {
 
   @Column(name = "full_name")
   private String fullName;
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "type", nullable = false)
-  private UserType type;
 
   @Column(name = "lynq_file_storage_id", length = 36)
   private String lynqFileStorageId;

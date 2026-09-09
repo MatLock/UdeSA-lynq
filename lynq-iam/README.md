@@ -76,10 +76,11 @@ Identity and Access Management service for the Lynq platform. Issues short-lived
         │  UserRepo (JPA)│ │ Service  │ │  (refresh tokens)│
         └────────┬───────┘ └────┬─────┘ └────────┬─────────┘
                  ▼              ▼                ▼
-            ┌────────┐     ┌────────┐       ┌────────┐
-            │ MySQL  │     │ HMAC   │       │ Redis  │
-            │ users  │     │ secret │       │ refresh│
-            └────────┘     └────────┘       └────────┘
+            ┌────────────┐ ┌────────┐       ┌────────┐
+            │ MySQL      │ │ HMAC   │       │ Redis  │
+            │ users +    │ │ secret │       │ refresh│
+            │ user_roles │ └────────┘       └────────┘
+            └────────────┘
 ```
 
 **Layers**
@@ -89,7 +90,9 @@ Identity and Access Management service for the Lynq platform. Issues short-lived
 - **Security** (`security/`) — `JWTService` signs and verifies access tokens; `RefreshTokenGenerator` produces 64-byte URL-safe opaque tokens.
 - **Filters** (`filter/`) — cross-cutting request handling registered via `FilterConfig` with explicit ordering.
 - **Aspect** (`aspect/`) — `@AuditLog` annotation + `LogAspect` produce structured entry/exit logs around annotated methods.
-- **Model / Repository** (`model/`, `repository/`) — JPA entities and Spring Data interfaces.
+- **Model / Repository** (`model/`, `repository/`) — JPA entities and Spring Data interfaces. `Role`
+  (`R_CANDIDATE`, `R_COMPANY`) is an `@ElementCollection` of `UserEntity` mapped to `user_roles`, and
+  is fetched eagerly on purpose: every operation that mints a token reads it, and it is at most two rows.
 - **Exception handling** (`exceptions/`, `controller/handler/`) — domain exceptions mapped to consistent error responses by `ControllerExceptionHandler`.
 - **Migrations** (`resources/changelog/`) — Liquibase changelogs run on startup.
 
@@ -129,16 +132,16 @@ sequenceDiagram
     participant J as JWTService
     participant R as RedisService
 
-    C->>F: POST /auth/register<br/>headers: lynq-request-uuid<br/>body: {username, password, email}
+    C->>F: POST /auth/register<br/>headers: lynq-request-uuid<br/>body: {username, password, email, role}
     F->>Ctrl: forward (MDC requestId set)
-    Ctrl->>Svc: registerUser(username, password, email)
+    Ctrl->>Svc: registerUser(username, password, email, role)
     Svc->>U: createUser(...)
     U->>U: validate uniqueness (username, email)
     U->>U: BCrypt.encode(password)
-    U->>DB: INSERT user (UUIDv7 id)
+    U->>DB: INSERT user (UUIDv7 id) + user_roles row
     DB-->>U: row persisted
     U-->>Svc: UserEntity
-    Svc->>J: generateAccessToken(user) [15 min, HS256]
+    Svc->>J: generateAccessToken(user) [15 min, HS256, roles claim]
     Svc->>R: SET refresh:{token} = userId  (TTL 30d)
     Svc-->>Ctrl: UserRestResponse {id, username, email, accessToken, refreshToken}
     Ctrl-->>C: 201 Created
@@ -228,13 +231,13 @@ All requests must include the `lynq-request-uuid` header.
 
 | Method | Path                          | Auth header required | Description                                  |
 | ------ | ----------------------------- | -------------------- | -------------------------------------------- |
-| POST   | `/auth/register`              | —                    | Create user, return user + access + refresh. |
+| POST   | `/auth/register`              | —                    | Create user with the role in the body, return user + access + refresh. |
 | POST   | `/auth/login/username`        | —                    | Login by username + password.                |
 | POST   | `/auth/login/email`           | —                    | Login by email + password.                   |
 | POST   | `/auth/refresh`               | Bearer refresh token | Issue a new 15-min access token.             |
 | GET    | `/auth/validate`              | Bearer access token  | Returns `true` if the access token is valid. |
 | PATCH  | `/auth/update-password`       | Bearer access token  | Rotate password, return fresh tokens.        |
-| GET    | `/auth/user-info`              | Bearer access token  | Return user identity (id, username, email) extracted from the access token. |
+| GET    | `/auth/user-info`              | Bearer access token  | Return user identity (id, username, email) and roles extracted from the access token. |
 | GET    | `/auth/check-username`         | —                    | Check whether a username has a valid format and is available. |
 | GET    | `/auth/check-email`            | —                    | Check whether an email has a valid format and is available. |
 
@@ -274,7 +277,8 @@ curl -X POST http://localhost:8080/lynq-iam/auth/register \
   -d '{
     "username": "johndoe",
     "password": "P@ssw0rd123",
-    "email": "johndoe@example.com"
+    "email": "johndoe@example.com",
+    "role": "R_CANDIDATE"
   }'
 ```
 
@@ -422,7 +426,10 @@ java -jar target/lynq-iam.jar
 ./mvnw spring-boot:run
 ```
 
-Liquibase will create the schema and `users` table on first startup.
+Liquibase will create the schema and the `users` and `user_roles` tables on first startup.
+
+Accounts created before roles existed are filled in by `scripts/backfill-user-roles.sql`, run by hand
+once per environment (see `scripts/README.md`).
 
 Service URLs:
 - API: `http://localhost:8080/lynq-iam`
