@@ -11,6 +11,7 @@ import com.lynq.iam.controller.response.CheckUsernameResponse;
 import com.lynq.iam.controller.response.GlobalRestResponse;
 import com.lynq.iam.controller.response.UserInfoRestResponse;
 import com.lynq.iam.controller.response.UserRestResponse;
+import com.lynq.iam.model.Role;
 import com.lynq.iam.service.AuthService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,7 @@ class AuthControllerImplTest {
   private static final String SAMPLE_USERNAME = "johndoe";
   private static final String SAMPLE_PASSWORD = "P@ssw0rd123";
   private static final String SAMPLE_EMAIL = "johndoe@example.com";
+  private static final Role SAMPLE_ROLE = Role.R_CANDIDATE;
   private static final String SAMPLE_NEW_PASSWORD = "N3wStr0ngPass!";
   private static final String RAW_ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiJ9.access.token";
   private static final String RAW_REFRESH_TOKEN = "eyJhbGciOiJIUzI1NiJ9.refresh.token";
@@ -65,6 +67,9 @@ class AuthControllerImplTest {
   @Mock
   private CheckEmailResponse checkEmailResponse;
 
+  @Mock
+  private CreateUserRequest createUserRequest;
+
   private AuthControllerImpl authController;
 
   @BeforeEach
@@ -74,11 +79,12 @@ class AuthControllerImplTest {
 
   @Test
   void createUserReturnsCreatedStatusWithJsonContentTypeAndServiceResultBody() {
-    CreateUserRequest request = new CreateUserRequest(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL);
-    when(authService.registerUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL))
+    stubCreateUserRequest();
+    when(authService.registerUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, SAMPLE_ROLE))
         .thenReturn(userRestResponse);
 
-    ResponseEntity<GlobalRestResponse<UserRestResponse>> result = authController.createUser(request);
+    ResponseEntity<GlobalRestResponse<UserRestResponse>> result =
+        authController.createUser(createUserRequest);
 
     assertThat(result, is(notNullValue()));
     assertThat(result.getStatusCode(), is(EXPECTED_CREATED_STATUS));
@@ -90,13 +96,34 @@ class AuthControllerImplTest {
 
   @Test
   void createUserDelegatesToAuthServiceWithRequestFields() {
-    CreateUserRequest request = new CreateUserRequest(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL);
-    when(authService.registerUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL))
+    stubCreateUserRequest();
+    when(authService.registerUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, SAMPLE_ROLE))
         .thenReturn(userRestResponse);
 
-    authController.createUser(request);
+    authController.createUser(createUserRequest);
 
-    verify(authService).registerUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL);
+    verify(authService).registerUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, SAMPLE_ROLE);
+  }
+
+  @Test
+  void createUserDelegatesTheCompanyRoleToAuthService() {
+    when(createUserRequest.getUsername()).thenReturn(SAMPLE_USERNAME);
+    when(createUserRequest.getPassword()).thenReturn(SAMPLE_PASSWORD);
+    when(createUserRequest.getEmail()).thenReturn(SAMPLE_EMAIL);
+    when(createUserRequest.getRole()).thenReturn(Role.R_COMPANY);
+    when(authService.registerUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, Role.R_COMPANY))
+        .thenReturn(userRestResponse);
+
+    authController.createUser(createUserRequest);
+
+    verify(authService).registerUser(SAMPLE_USERNAME, SAMPLE_PASSWORD, SAMPLE_EMAIL, Role.R_COMPANY);
+  }
+
+  private void stubCreateUserRequest() {
+    when(createUserRequest.getUsername()).thenReturn(SAMPLE_USERNAME);
+    when(createUserRequest.getPassword()).thenReturn(SAMPLE_PASSWORD);
+    when(createUserRequest.getEmail()).thenReturn(SAMPLE_EMAIL);
+    when(createUserRequest.getRole()).thenReturn(SAMPLE_ROLE);
   }
 
   @Test

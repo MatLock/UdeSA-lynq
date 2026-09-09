@@ -4,8 +4,10 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.time.Month;
+import java.util.Set;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
@@ -23,17 +25,19 @@ class UserEntityTest {
   private static final int CREATION_MINUTE = 30;
   private static final LocalDateTime SAMPLE_CREATION_DATE =
       LocalDateTime.of(CREATION_YEAR, CREATION_MONTH, CREATION_DAY, CREATION_HOUR, CREATION_MINUTE);
+  private static final Set<Role> SAMPLE_ROLES = Set.of(Role.R_CANDIDATE);
 
   @Test
   void allArgsConstructorAssignsAllFields() {
-    UserEntity user = new UserEntity(
-        SAMPLE_ID, SAMPLE_EMAIL, SAMPLE_USERNAME, SAMPLE_PASSWORD_HASH, SAMPLE_CREATION_DATE);
+    UserEntity user = new UserEntity(SAMPLE_ID, SAMPLE_EMAIL, SAMPLE_USERNAME,
+        SAMPLE_PASSWORD_HASH, SAMPLE_CREATION_DATE, SAMPLE_ROLES);
 
     assertThat(user.getId(), is(SAMPLE_ID));
     assertThat(user.getEmail(), is(SAMPLE_EMAIL));
     assertThat(user.getUsername(), is(SAMPLE_USERNAME));
     assertThat(user.getPassword(), is(SAMPLE_PASSWORD_HASH));
     assertThat(user.getCreationDate(), is(SAMPLE_CREATION_DATE));
+    assertThat(user.getRoles(), is(SAMPLE_ROLES));
   }
 
   @Test
@@ -45,6 +49,7 @@ class UserEntityTest {
     assertThat(user.getUsername(), is(nullValue()));
     assertThat(user.getPassword(), is(nullValue()));
     assertThat(user.getCreationDate(), is(nullValue()));
+    assertThat(user.getRoles(), is(empty()));
   }
 
   @Test
@@ -55,6 +60,7 @@ class UserEntityTest {
         .username(SAMPLE_USERNAME)
         .password(SAMPLE_PASSWORD_HASH)
         .creationDate(SAMPLE_CREATION_DATE)
+        .roles(SAMPLE_ROLES)
         .build();
 
     assertThat(built, is(notNullValue()));
@@ -63,6 +69,7 @@ class UserEntityTest {
     assertThat(built.getUsername(), is(SAMPLE_USERNAME));
     assertThat(built.getPassword(), is(SAMPLE_PASSWORD_HASH));
     assertThat(built.getCreationDate(), is(SAMPLE_CREATION_DATE));
+    assertThat(built.getRoles(), is(SAMPLE_ROLES));
   }
 
   @Test
@@ -74,11 +81,13 @@ class UserEntityTest {
     user.setUsername(SAMPLE_USERNAME);
     user.setPassword(SAMPLE_PASSWORD_HASH);
     user.setCreationDate(SAMPLE_CREATION_DATE);
+    user.setRoles(SAMPLE_ROLES);
 
     assertThat(user.getId(), is(SAMPLE_ID));
     assertThat(user.getEmail(), is(SAMPLE_EMAIL));
     assertThat(user.getUsername(), is(SAMPLE_USERNAME));
     assertThat(user.getPassword(), is(SAMPLE_PASSWORD_HASH));
     assertThat(user.getCreationDate(), is(SAMPLE_CREATION_DATE));
+    assertThat(user.getRoles(), is(SAMPLE_ROLES));
   }
 }

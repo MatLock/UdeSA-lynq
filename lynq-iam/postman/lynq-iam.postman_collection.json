@@ -52,14 +52,14 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"P@ssw0rd123\",\n  \"email\": \"johndoe@example.com\"\n}"
+          "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"P@ssw0rd123\",\n  \"email\": \"johndoe@example.com\",\n  \"role\": \"R_CANDIDATE\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/register",
           "host": ["{{baseUrl}}"],
           "path": ["register"]
         },
-        "description": "Creates a new user with unique username and email. Returns 201 on success, 409 if username/email already exists."
+        "description": "Creates a new user with unique username and email, granted the role sent in the body. Returns 201 on success, 400 if the role is missing or unknown, 409 if username/email already exists."
       },
       "event": [
         {

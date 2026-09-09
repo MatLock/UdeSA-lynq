@@ -13,6 +13,7 @@ import com.lynq.iam.controller.response.GlobalRestResponse;
 import com.lynq.iam.controller.response.UserInfoRestResponse;
 import com.lynq.iam.controller.response.UserRestResponse;
 import com.lynq.iam.service.AuthService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -34,11 +35,12 @@ public class AuthControllerImpl implements AuthController {
   @Override
   @PostMapping("/register")
   @AuditLog
-  public ResponseEntity<GlobalRestResponse<UserRestResponse>> createUser(@RequestBody CreateUserRequest request) {
+  public ResponseEntity<GlobalRestResponse<UserRestResponse>> createUser(@Valid @RequestBody CreateUserRequest request) {
     GlobalRestResponse<UserRestResponse> body = new GlobalRestResponse<>(true, authService.registerUser(
         request.getUsername(),
         request.getPassword(),
-        request.getEmail()
+        request.getEmail(),
+        request.getRole()
     ));
     return ResponseEntity.status(HttpStatus.CREATED)
         .contentType(MediaType.APPLICATION_JSON)

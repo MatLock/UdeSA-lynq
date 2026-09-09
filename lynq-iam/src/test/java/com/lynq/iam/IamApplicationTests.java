@@ -5,6 +5,7 @@ import com.lynq.iam.controller.request.CreateUserRequest;
 import com.lynq.iam.controller.request.EmailUserLogin;
 import com.lynq.iam.controller.request.UserUpdatePasswordRequest;
 import com.lynq.iam.controller.request.UsernameLogin;
+import com.lynq.iam.model.Role;
 import com.lynq.iam.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.*;
 
+import java.util.Set;
 import java.util.UUID;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -273,13 +275,58 @@ class IamApplicationTests extends AbstractE2ETest {
 		assertThat(data.get("id").asText(), is(notNullValue()));
 		assertThat(data.get("username").asText(), is(username));
 		assertThat(data.get("email").asText(), is(email));
+		assertThat(data.get("roles").isArray(), is(true));
+		assertThat(data.get("roles").get(0).asText(), is(Role.R_CANDIDATE.name()));
+	}
+
+	@Test
+	void userInfoEndpointReturnsTheCompanyRoleForAUserRegisteredAsCompany() {
+		CreateUserRequest request =
+				buildCreateUserRequest(uniqueUsername(), uniqueEmail(), VALID_PASSWORD, Role.R_COMPANY);
+		String accessToken = postJson(REGISTER_ENDPOINT, request)
+				.getBody().get("data").get("accessToken").asText();
+
+		ResponseEntity<JsonNode> response = getWithAuth(USERINFO_ENDPOINT, BEARER_PREFIX + accessToken);
+
+		assertThat(response.getStatusCode(), is(HttpStatus.OK));
+		JsonNode roles = response.getBody().get("data").get("roles");
+		assertThat(roles.size(), is(1));
+		assertThat(roles.get(0).asText(), is(Role.R_COMPANY.name()));
+	}
+
+	@Test
+	void registerEndpointPersistsTheRoleSentInTheRequest() {
+		CreateUserRequest request =
+				buildCreateUserRequest(uniqueUsername(), uniqueEmail(), VALID_PASSWORD, Role.R_COMPANY);
+
+		String id = postJson(REGISTER_ENDPOINT, request).getBody().get("data").get("id").asText();
+
+		assertThat(userRepository.findById(id).orElseThrow().getRoles(),
+				is(Set.of(Role.R_COMPANY)));
+	}
+
+	@Test
+	void registerEndpointReturnsBadRequestWhenRoleIsMissing() {
+		CreateUserRequest request =
+				buildCreateUserRequest(uniqueUsername(), uniqueEmail(), VALID_PASSWORD, null);
+
+		ResponseEntity<JsonNode> response = postJson(REGISTER_ENDPOINT, request);
+
+		assertThat(response.getStatusCode(), is(HttpStatus.BAD_REQUEST));
+		assertThat(response.getBody().get("success").asBoolean(), is(false));
 	}
 
 	private CreateUserRequest buildCreateUserRequest(String username, String email, String password) {
+		return buildCreateUserRequest(username, email, password, Role.R_CANDIDATE);
+	}
+
+	private CreateUserRequest buildCreateUserRequest(String username, String email, String password,
+			Role role) {
 		return CreateUserRequest.builder()
 				.username(username)
 				.email(email)
 				.password(password)
+				.role(role)
 				.build();
 	}
 
