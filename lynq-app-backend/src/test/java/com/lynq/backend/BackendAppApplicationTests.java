@@ -8,7 +8,6 @@ import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.Language;
-import com.lynq.backend.enums.UserType;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
@@ -17,6 +16,7 @@ import com.lynq.backend.model.UserApplicationJobEntity;
 import com.lynq.backend.model.UserEntity;
 import com.lynq.backend.model.UserResumeEntity;
 import com.lynq.backend.model.UserSkillsEntity;
+import com.lynq.backend.security.Role;
 import com.lynq.backend.repository.CompanyRepository;
 import com.lynq.backend.repository.JobPostRepository;
 import com.lynq.backend.repository.JobPostSkillRepository;
@@ -241,7 +241,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     @SuppressWarnings("unchecked")
     Map<String, Object> data = (Map<String, Object>) body.get("data");
     assertThat(data.get("id"), is(USER_ID));
-    assertThat(data.get("userType"), is(UserType.CANDIDATE.name()));
     assertThat(data.get("fullName"), is(FULL_NAME));
     assertThat(data.get("currentPosition"), is(CURRENT_POSITION));
     assertThat(data.get("about"), is(ABOUT));
@@ -252,7 +251,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(persisted.isPresent(), is(true));
     assertThat(persisted.get().getCurrentPosition(), is(CURRENT_POSITION));
     assertThat(persisted.get().getFullName(), is(FULL_NAME));
-    assertThat(persisted.get().getType(), is(UserType.CANDIDATE));
   }
 
   @Test
@@ -279,7 +277,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     @SuppressWarnings("unchecked")
     Map<String, Object> data = (Map<String, Object>) body.get("data");
     assertThat(data.get("id"), is(USER_ID));
-    assertThat(data.get("userType"), is(UserType.CANDIDATE.name()));
     assertThat(data.get("fullName"), is(FULL_NAME));
     assertThat(data.get("userProfileImageUrl"), is(PROFILE_IMAGE_URL));
     assertThat(data.get("currentPosition"), is(CURRENT_POSITION));
@@ -510,7 +507,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void createUserWithCompanyAuthenticatesPersistsOwnerAndCompanyAndReturnsCreated() throws Exception {
-    stubIamUserInfo();
+    stubIamUserInfo(Role.COMPANY);
 
     HttpResponse<String> response = postCreateUserWithCompany();
 
@@ -535,13 +532,12 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
     Optional<UserEntity> persistedOwner = userRepository.findById(USER_ID);
     assertThat(persistedOwner.isPresent(), is(true));
-    assertThat(persistedOwner.get().getType(), is(UserType.COMPANY));
     assertThat(persistedOwner.get().getCurrentPosition(), is(CURRENT_POSITION));
   }
 
   @Test
   void createUserWithCompanyReturnsBadRequestWhenCompanyNameAlreadyExists() throws Exception {
-    stubIamUserInfo();
+    stubIamUserInfo(Role.COMPANY);
     companyRepository.save(CompanyEntity.builder()
         .id("22222222-2222-2222-2222-222222222222")
         .name(COMPANY_NAME)
@@ -557,6 +553,18 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   @Test
+  void createUserWithCompanyReturnsForbiddenWhenCallerIsNotACompany() throws Exception {
+    stubIamUserInfo(Role.CANDIDATE);
+
+    HttpResponse<String> response = postCreateUserWithCompany();
+
+    assertThat(response.statusCode(), is(403));
+    assertThat(parse(response.body()).get("success"), is(false));
+    assertThat(userRepository.findById(USER_ID).isPresent(), is(false));
+    assertThat(companyRepository.count(), is(0L));
+  }
+
+  @Test
   void createUserWithCompanyReturnsUnauthorizedWhenIamRejectsToken() throws Exception {
     stubIamInvalidToken();
 
@@ -569,7 +577,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void createJobPersistsJobForCompanyOwnerAndReturnsCreated() throws Exception {
-    stubIamUserInfo();
+    stubIamUserInfo(Role.COMPANY);
     seedCompanyOwnerWithCompany();
 
     HttpResponse<String> response = postCreateJob();
@@ -602,7 +610,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   @Test
   void createJobPersistsJobWithSkillsWhenSkillsProvided() throws Exception {
-    stubIamUserInfo();
+    stubIamUserInfo(Role.COMPANY);
     seedCompanyOwnerWithCompany();
 
     HttpResponse<String> response = postCreateJob(JOB_SKILLS);
@@ -625,27 +633,25 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void createJobReturnsBadRequestWhenUserIsNotCompanyType() throws Exception {
-    stubIamUserInfo();
+  void createJobReturnsForbiddenWhenCallerIsNotACompany() throws Exception {
+    stubIamUserInfo(Role.CANDIDATE);
     userRepository.save(UserEntity.builder()
         .id(USER_ID)
-        .type(UserType.CANDIDATE)
         .createdOn(LocalDate.now())
         .build());
 
     HttpResponse<String> response = postCreateJob();
 
-    assertThat(response.statusCode(), is(400));
+    assertThat(response.statusCode(), is(403));
     assertThat(parse(response.body()).get("success"), is(false));
     assertThat(jobPostRepository.count(), is(0L));
   }
 
   @Test
   void createJobReturnsBadRequestWhenCompanyOwnerHasNoCompany() throws Exception {
-    stubIamUserInfo();
+    stubIamUserInfo(Role.COMPANY);
     userRepository.save(UserEntity.builder()
         .id(USER_ID)
-        .type(UserType.COMPANY)
         .createdOn(LocalDate.now())
         .build());
 
@@ -853,7 +859,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
       String lynqFileStorageId) {
     return userRepository.save(UserEntity.builder()
         .id(id)
-        .type(UserType.COMPANY)
         .fullName(fullName)
         .currentPosition(currentPosition)
         .lynqFileStorageId(lynqFileStorageId)
@@ -926,7 +931,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private void seedCompanyOwnerWithCompany() {
     UserEntity owner = userRepository.save(UserEntity.builder()
         .id(USER_ID)
-        .type(UserType.COMPANY)
         .createdOn(LocalDate.now())
         .build());
     companyRepository.save(CompanyEntity.builder()
@@ -940,7 +944,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private void seedCandidateUser() {
     userRepository.save(UserEntity.builder()
         .id(USER_ID)
-        .type(UserType.CANDIDATE)
         .fullName(FULL_NAME)
         .lynqFileStorageId(PROFILE_FILE_ID)
         .currentPosition(CURRENT_POSITION)
@@ -1037,6 +1040,10 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   private void stubIamUserInfo() {
+    stubIamUserInfo(Role.CANDIDATE);
+  }
+
+  private void stubIamUserInfo(String role) {
     lynqIamMock.when(request().withMethod("GET").withPath(USERINFO_PATH))
         .respond(response()
             .withStatusCode(200)
@@ -1047,9 +1054,10 @@ class BackendAppApplicationTests extends AbstractE2ETest {
                   "data": {
                     "id": "%s",
                     "username": "%s",
-                    "email": "%s"
+                    "email": "%s",
+                    "roles": ["%s"]
                   }
-                }""".formatted(USER_ID, USERNAME, EMAIL)));
+                }""".formatted(USER_ID, USERNAME, EMAIL, Role.PREFIX + role)));
   }
 
   private void stubFileStorageDownloadUrls() {
@@ -1166,7 +1174,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   private CreateUserRequest validRequest() {
     CreateUserRequest request = new CreateUserRequest();
-    request.setUserType(UserType.CANDIDATE);
     request.setFullName(FULL_NAME);
     request.setCurrentPosition(CURRENT_POSITION);
     request.setAbout(ABOUT);
@@ -1266,15 +1273,15 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void upskillingSuggestionReturnsBadRequestWhenUserIsNotCandidate() throws Exception {
-    stubIamUserInfo();
-    seedUser(UserType.COMPANY);
+  void upskillingSuggestionReturnsForbiddenWhenCallerIsNotACandidate() throws Exception {
+    stubIamUserInfo(Role.COMPANY);
+    seedUser();
     seedJobWithCompany(JOB_SKILLS);
     stubMlUpskillingSuggestion();
 
     HttpResponse<String> response = getUpskillingSuggestion(JOB_ID);
 
-    assertThat(response.statusCode(), is(400));
+    assertThat(response.statusCode(), is(403));
     assertThat(parse(response.body()).get("success"), is(false));
     lynqMlMock.verify(request().withPath(ML_UPSKILLING_PATH), VerificationTimes.exactly(0));
   }
@@ -1425,7 +1432,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   void applyToJobPersistsApplicationAndReturnsCreated() throws Exception {
     stubIamUserInfo();
-    seedUser(UserType.CANDIDATE);
+    seedUser();
     seedSingleJob(INITIAL_SEEN);
     seedResume();
 
@@ -1450,7 +1457,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   void applyToJobReturnsNotFoundWhenTheResumeIsNotTheCandidatesOwn() throws Exception {
     stubIamUserInfo();
-    seedUser(UserType.CANDIDATE);
+    seedUser();
     seedSingleJob(INITIAL_SEEN);
 
     HttpResponse<String> response = postApply(JOB_ID, UNKNOWN_RESUME_ID);
@@ -1463,7 +1470,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   void applyToJobReturnsBadRequestWhenNoResumeIsChosen() throws Exception {
     stubIamUserInfo();
-    seedUser(UserType.CANDIDATE);
+    seedUser();
     seedSingleJob(INITIAL_SEEN);
     seedResume();
 
@@ -1476,7 +1483,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   void applyToJobTwiceReturnsBadRequestAndDoesNotCreateSecondApplication() throws Exception {
     stubIamUserInfo();
-    seedUser(UserType.CANDIDATE);
+    seedUser();
     seedSingleJob(INITIAL_SEEN);
     seedResume();
 
@@ -1491,7 +1498,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @Test
   void applyToJobReturnsNotFoundWhenJobDoesNotExist() throws Exception {
     stubIamUserInfo();
-    seedUser(UserType.CANDIDATE);
+    seedUser();
 
     HttpResponse<String> response = postApply(UNKNOWN_JOB_ID);
 
@@ -1501,14 +1508,14 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void applyToJobReturnsBadRequestWhenUserIsNotCandidate() throws Exception {
-    stubIamUserInfo();
-    seedUser(UserType.COMPANY);
+  void applyToJobReturnsForbiddenWhenCallerIsNotACandidate() throws Exception {
+    stubIamUserInfo(Role.COMPANY);
+    seedUser();
     seedSingleJob(INITIAL_SEEN);
 
     HttpResponse<String> response = postApply(JOB_ID);
 
-    assertThat(response.statusCode(), is(400));
+    assertThat(response.statusCode(), is(403));
     assertThat(parse(response.body()).get("success"), is(false));
     assertThat(userApplicationJobRepository.count(), is(0L));
   }
@@ -1657,14 +1664,14 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void getUserResumesReturnsBadRequestWhenUserIsNotCandidate() throws Exception {
-    stubIamUserInfo();
-    seedUser(UserType.COMPANY);
+  void getUserResumesReturnsForbiddenWhenCallerIsNotACandidate() throws Exception {
+    stubIamUserInfo(Role.COMPANY);
+    seedUser();
     seedResume();
 
     HttpResponse<String> response = getResumes();
 
-    assertThat(response.statusCode(), is(400));
+    assertThat(response.statusCode(), is(403));
     assertThat(parse(response.body()).get("success"), is(false));
   }
 
@@ -1734,15 +1741,17 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void updateResumeAliasReturnsBadRequestWhenUserIsNotCandidate() throws Exception {
-    stubIamUserInfo();
-    seedUser(UserType.COMPANY);
+  void updateResumeAliasReturnsForbiddenWhenCallerIsNotACandidate() throws Exception {
+    stubIamUserInfo(Role.COMPANY);
+    seedUser();
     seedResume();
 
     HttpResponse<String> response = putResumeAlias(RESUME_ID, RESUME_ALIAS);
 
-    assertThat(response.statusCode(), is(400));
+    assertThat(response.statusCode(), is(403));
     assertThat(parse(response.body()).get("success"), is(false));
+    UserResumeEntity persisted = userResumeRepository.findById(RESUME_ID).orElseThrow();
+    assertThat(persisted.getAlias(), is(nullValue()));
   }
 
   @Test
@@ -1760,10 +1769,9 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(persisted.getAlias(), is(nullValue()));
   }
 
-  private void seedUser(UserType type) {
+  private void seedUser() {
     userRepository.save(UserEntity.builder()
         .id(USER_ID)
-        .type(type)
         .createdOn(LocalDate.now())
         .build());
   }
@@ -1782,7 +1790,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private UserEntity seedCompanyOwner(String id) {
     return userRepository.save(UserEntity.builder()
         .id(id)
-        .type(UserType.COMPANY)
         .createdOn(LocalDate.now())
         .build());
   }
@@ -1810,7 +1817,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private void seedCandidate(String userId, String fullName, String position) {
     userRepository.save(UserEntity.builder()
         .id(userId)
-        .type(UserType.CANDIDATE)
         .fullName(fullName)
         .currentPosition(position)
         .createdOn(LocalDate.now())
@@ -1821,7 +1827,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
       List<String> skills) {
     UserEntity user = UserEntity.builder()
         .id(userId)
-        .type(UserType.CANDIDATE)
         .fullName(fullName)
         .currentPosition(position)
         .createdOn(LocalDate.now())

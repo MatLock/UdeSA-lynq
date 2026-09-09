@@ -6,7 +6,6 @@ import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.Language;
-import com.lynq.backend.enums.UserType;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.controller.response.GetSupportedLanguageRestResponse;
@@ -65,7 +64,6 @@ import static org.mockito.Mockito.when;
 class UserServiceTest {
 
   private static final String USER_ID = "550e8400-e29b-41d4-a716-446655440000";
-  private static final UserType USER_TYPE = UserType.CANDIDATE;
   private static final String FULL_NAME = "Jane Doe";
   private static final String CURRENT_POSITION = "Backend Engineer";
   private static final String ABOUT = "Java developer focused on distributed systems.";
@@ -116,10 +114,6 @@ class UserServiceTest {
   private static final Pageable DEFAULT_PAGEABLE = PageRequest.of(0, 10);
 
   private static final String USER_NOT_FOUND = "User '" + USER_ID + "' not found";
-  private static final String ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES =
-      "Only users of type CANDIDATE can access resumes";
-  private static final String ONLY_CANDIDATE_USERS_CAN_VIEW_APPLICATIONS =
-      "Only users of type CANDIDATE can view their applications";
 
   @Mock
   private UserRepository userRepository;
@@ -161,13 +155,12 @@ class UserServiceTest {
     when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
     ArgumentCaptor<UserEntity> userCaptor = ArgumentCaptor.forClass(UserEntity.class);
 
-    userService.saveNewUser(USER_ID, USER_TYPE, FULL_NAME, CURRENT_POSITION, ABOUT,
+    userService.saveNewUser(USER_ID, FULL_NAME, CURRENT_POSITION, ABOUT,
         GITHUB_URL, LINKEDIN_URL, BIRTH_DATE);
 
     verify(userRepository).save(userCaptor.capture());
     UserEntity saved = userCaptor.getValue();
     assertThat(saved.getId(), is(USER_ID));
-    assertThat(saved.getType(), is(USER_TYPE));
     assertThat(saved.getFullName(), is(FULL_NAME));
     assertThat(saved.getLynqFileStorageId(), is(org.hamcrest.Matchers.nullValue()));
     assertThat(saved.getCurrentPosition(), is(CURRENT_POSITION));
@@ -182,7 +175,7 @@ class UserServiceTest {
     when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
     ArgumentCaptor<UserEntity> userCaptor = ArgumentCaptor.forClass(UserEntity.class);
 
-    userService.saveNewUser(USER_ID, USER_TYPE, FULL_NAME, CURRENT_POSITION, ABOUT,
+    userService.saveNewUser(USER_ID, FULL_NAME, CURRENT_POSITION, ABOUT,
         GITHUB_URL, LINKEDIN_URL, BIRTH_DATE);
 
     verify(userRepository).save(userCaptor.capture());
@@ -194,7 +187,7 @@ class UserServiceTest {
     UserEntity persisted = UserEntity.builder().id(USER_ID).build();
     when(userRepository.save(any(UserEntity.class))).thenReturn(persisted);
 
-    UserEntity result = userService.saveNewUser(USER_ID, USER_TYPE, FULL_NAME,
+    UserEntity result = userService.saveNewUser(USER_ID, FULL_NAME,
         CURRENT_POSITION, ABOUT, GITHUB_URL, LINKEDIN_URL, BIRTH_DATE);
 
     assertThat(result, is(sameInstance(persisted)));
@@ -395,17 +388,6 @@ class UserServiceTest {
   }
 
   @Test
-  void generateResumeUploadUrlThrowsBadRequestWhenUserIsNotCandidate() {
-    UserEntity company = UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(company));
-
-    BadRequestException exception = assertThrows(BadRequestException.class,
-        () -> userService.generateResumeUploadUrl(USER_ID, FILE_NAME));
-    assertThat(exception.getMessage(), is("Only users of type CANDIDATE can upload resumes"));
-    verify(fileStorageService, never()).registerUpload(any());
-  }
-
-  @Test
   void generateResumeUploadUrlThrowsNotFoundWhenUserDoesNotExist() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
@@ -422,16 +404,6 @@ class UserServiceTest {
     userService.confirmResumeUpload(USER_ID, RESUME_FILE_ID);
 
     verify(fileStorageService).confirmUpload(RESUME_FILE_ID);
-  }
-
-  @Test
-  void confirmResumeUploadThrowsBadRequestWhenUserIsNotCandidate() {
-    UserEntity company = UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(company));
-
-    assertThrows(BadRequestException.class,
-        () -> userService.confirmResumeUpload(USER_ID, RESUME_FILE_ID));
-    verify(fileStorageService, never()).confirmUpload(any());
   }
 
   @Test
@@ -523,14 +495,6 @@ class UserServiceTest {
   }
 
   @Test
-  void createResumeThrowsBadRequestWhenUserIsNotCandidate() {
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(companyOwner()));
-
-    assertThrows(BadRequestException.class, () -> userService.createResume(USER_ID, createRequest()));
-    verify(userResumeRepository, never()).save(any());
-  }
-
-  @Test
   void deleteResumeRemovesItAndHandsBackThePdfForTheGatewayToDrop() {
     UserResumeEntity resume = resume(RESUME_JSON, RESUME_FILE_ID);
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
@@ -567,15 +531,6 @@ class UserServiceTest {
         () -> userService.deleteResume(USER_ID, "someone-elses-resume"));
 
     assertThat(exception.getMessage(), is("Resume 'someone-elses-resume' not found"));
-    verify(userResumeRepository, never()).delete(any());
-  }
-
-  @Test
-  void deleteResumeThrowsBadRequestWhenUserIsNotCandidate() {
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(companyOwner()));
-
-    assertThrows(BadRequestException.class,
-        () -> userService.deleteResume(USER_ID, "any-resume"));
     verify(userResumeRepository, never()).delete(any());
   }
 
@@ -659,17 +614,6 @@ class UserServiceTest {
   }
 
   @Test
-  void getUserResumesThrowsBadRequestWhenUserIsNotCandidate() {
-    UserEntity company = UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(company));
-
-    BadRequestException exception = assertThrows(BadRequestException.class,
-        () -> userService.getUserResumes(USER_ID));
-    assertThat(exception.getMessage(), is(ONLY_CANDIDATE_USERS_CAN_ACCESS_RESUMES));
-    verify(userResumeRepository, never()).findByUserId(any());
-  }
-
-  @Test
   void getUserResumesThrowsNotFoundWhenUserDoesNotExist() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
@@ -685,6 +629,8 @@ class UserServiceTest {
     existing.setLynqFileStorageId(FILE_ID);
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
     when(fileStorageService.obtainDownloadUrl(FILE_ID)).thenReturn(PRE_SIGNED_URL);
+    when(companyRepository.findByOwner(existing)).thenReturn(Optional.empty());
+    when(jobPostRepository.findByCreatedByUserId(USER_ID)).thenReturn(List.of());
 
     GetUserProfileRestResponse profile = userService.getUserProfile(USER_ID);
 
@@ -695,9 +641,7 @@ class UserServiceTest {
     assertThat(profile.getGithubUrl(), is(GITHUB_URL));
     assertThat(profile.getLinkedinUrl(), is(LINKEDIN_URL));
     assertThat(profile.getCompany(), is(nullValue()));
-    assertThat(profile.getJobs(), is(nullValue()));
-    verify(companyRepository, never()).findByOwner(any());
-    verify(jobPostRepository, never()).findByCreatedByUserId(any());
+    assertThat(profile.getJobs(), is(empty()));
   }
 
   @Test
@@ -754,20 +698,14 @@ class UserServiceTest {
     CompanyEntity company = CompanyEntity.builder().id(COMPANY_ID).build();
     when(companyRepository.findByOwnerId(USER_ID)).thenReturn(Optional.of(company));
 
-    assertThat(userService.obtainOwnedCompanyId(USER_ID, UserType.COMPANY), is(COMPANY_ID));
+    assertThat(userService.obtainOwnedCompanyId(USER_ID), is(COMPANY_ID));
   }
 
   @Test
   void obtainOwnedCompanyIdReturnsNullWhenCompanyOwnerOwnsNoCompany() {
     when(companyRepository.findByOwnerId(USER_ID)).thenReturn(Optional.empty());
 
-    assertThat(userService.obtainOwnedCompanyId(USER_ID, UserType.COMPANY), is(nullValue()));
-  }
-
-  @Test
-  void obtainOwnedCompanyIdReturnsNullForNonCompanyUserWithoutQueryingCompanies() {
-    assertThat(userService.obtainOwnedCompanyId(USER_ID, UserType.CANDIDATE), is(nullValue()));
-    verify(companyRepository, never()).findByOwnerId(any());
+    assertThat(userService.obtainOwnedCompanyId(USER_ID), is(nullValue()));
   }
 
   @Test
@@ -909,17 +847,6 @@ class UserServiceTest {
   }
 
   @Test
-  void getUserApplicationsThrowsBadRequestWhenUserIsNotCandidate() {
-    UserEntity company = UserEntity.builder().id(USER_ID).type(UserType.COMPANY).build();
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(company));
-
-    BadRequestException exception = assertThrows(BadRequestException.class,
-        () -> userService.getUserApplications(USER_ID, DEFAULT_PAGEABLE));
-    assertThat(exception.getMessage(), is(ONLY_CANDIDATE_USERS_CAN_VIEW_APPLICATIONS));
-    verify(userApplicationJobRepository, never()).findApplicationsByUserId(any(), any());
-  }
-
-  @Test
   void getUserApplicationsThrowsNotFoundWhenUserDoesNotExist() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
@@ -959,11 +886,11 @@ class UserServiceTest {
   }
 
   private UserEntity candidate() {
-    return UserEntity.builder().id(USER_ID).type(UserType.CANDIDATE).build();
+    return UserEntity.builder().id(USER_ID).build();
   }
 
   private UserEntity companyOwner() {
-    return UserEntity.builder().id(USER_ID).type(UserType.COMPANY).fullName(FULL_NAME).build();
+    return UserEntity.builder().id(USER_ID).fullName(FULL_NAME).build();
   }
 
   private JobPostEntity job() {
@@ -989,7 +916,6 @@ class UserServiceTest {
   private UserEntity existingUser() {
     return UserEntity.builder()
         .id(USER_ID)
-        .type(USER_TYPE)
         .fullName(FULL_NAME)
         .lynqFileStorageId(FILE_ID)
         .currentPosition(CURRENT_POSITION)

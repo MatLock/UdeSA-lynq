@@ -9,7 +9,9 @@ import com.lynq.backend.controller.response.GetCompanyDetailRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.UpdateCompanyRestResponse;
 import com.lynq.backend.model.CompanyEntity;
+import com.lynq.backend.security.HasRole;
 import com.lynq.backend.security.LynqUserPrincipal;
+import com.lynq.backend.security.Role;
 import com.lynq.backend.service.CompanyService;
 import com.lynq.backend.service.RegisteredUpload;
 import org.springframework.http.HttpStatus;
@@ -38,6 +40,7 @@ public class CompanyControllerImpl implements com.lynq.backend.controller.Compan
 
   @Override
   @PostMapping
+  @HasRole(Role.COMPANY)
   @AuditLog
   public ResponseEntity<GlobalRestResponse<CreateUserWithCompanyRestResponse>> createUserWithCompany(@RequestBody CreateUserWithCompanyRequest request, @AuthenticationPrincipal LynqUserPrincipal principal) {
     CompanyEntity company = companyService.createUserWithCompany(principal.getId(), request);

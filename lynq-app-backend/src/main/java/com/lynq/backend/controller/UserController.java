@@ -56,7 +56,6 @@ public interface UserController {
                         "success": true,
                         "data": {
                           "id": "550e8400-e29b-41d4-a716-446655440000",
-                          "userType": "CANDIDATE",
                           "fullName": "Jane Doe",
                           "userProfileImageUrl": "https://cdn.lynq.com/avatars/jane.png",
                           "currentPosition": "Backend Engineer",
@@ -130,8 +129,9 @@ public interface UserController {
 
   @Operation(
       summary = "Create a new user",
-      description = "Creates the profile of the authenticated user. The user identity is resolved "
-          + "from the bearer token, so only the profile fields are supplied in the request body.",
+      description = "Creates the profile of the authenticated user. The user identity and the user "
+          + "type are resolved from the bearer token, so only the profile fields are supplied in "
+          + "the request body.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
       @ApiResponse(
@@ -146,7 +146,6 @@ public interface UserController {
                         "success": true,
                         "data": {
                           "id": "550e8400-e29b-41d4-a716-446655440000",
-                          "userType": "CANDIDATE",
                           "userProfileImageUrl": "https://cdn.lynq.com/avatars/jane.png",
                           "currentPosition": "Backend Engineer",
                           "about": "Java developer focused on distributed systems.",
@@ -225,7 +224,6 @@ public interface UserController {
               name = "Candidate profile",
               value = """
                   {
-                    "userType": "CANDIDATE",
                     "currentPosition": "Backend Engineer",
                     "about": "Java developer focused on distributed systems.",
                     "githubUrl": "https://github.com/janedoe",
@@ -254,7 +252,6 @@ public interface UserController {
                         "success": true,
                         "data": {
                           "id": "550e8400-e29b-41d4-a716-446655440000",
-                          "userType": "CANDIDATE",
                           "fullName": "Jane Doe",
                           "userProfileImageUrl": "https://cdn.lynq.com/avatars/jane.png",
                           "currentPosition": "Staff Engineer",
@@ -494,7 +491,7 @@ public interface UserController {
           + "URL together with the file id. The frontend uploads the resume binary directly to the "
           + "storage bucket with an HTTP PUT against the returned URL and then confirms it through "
           + "POST /user/confirm-upload-resume. Only users of type CANDIDATE can upload resumes; any "
-          + "other type is rejected with 400.",
+          + "other type is rejected with 403.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
       @ApiResponse(
@@ -513,18 +510,6 @@ public interface UserController {
                         }
                       }"""))),
       @ApiResponse(
-          responseCode = "400",
-          description = "The authenticated user is not a candidate",
-          content = @Content(
-              examples = @ExampleObject(
-                  name = "Not a candidate",
-                  value = """
-                      {
-                        "success": false,
-                        "data": null,
-                        "reason": "Only users of type CANDIDATE can upload resumes"
-                      }"""))),
-      @ApiResponse(
           responseCode = "404",
           description = "No user exists for the authenticated identity",
           content = @Content(
@@ -538,16 +523,27 @@ public interface UserController {
                       }"""))),
       @ApiResponse(
           responseCode = "403",
-          description = "Missing required lynq-request-uuid header",
+          description = "The authenticated user is not a candidate, or the required "
+              + "lynq-request-uuid header is missing",
           content = @Content(
-              examples = @ExampleObject(
-                  name = "Missing header",
-                  value = """
-                      {
-                        "success": false,
-                        "data": null,
-                        "reason": "Missing required header"
-                      }"""))),
+              examples = {
+                  @ExampleObject(
+                      name = "Not a candidate",
+                      value = """
+                          {
+                            "success": false,
+                            "data": null,
+                            "reason": "Only users of type CANDIDATE can perform this action"
+                          }"""),
+                  @ExampleObject(
+                      name = "Missing header",
+                      value = """
+                          {
+                            "success": false,
+                            "data": null,
+                            "reason": "Missing required header"
+                          }""")
+              })),
       @ApiResponse(
           responseCode = "401",
           description = "Missing or invalid bearer token",
@@ -599,7 +595,7 @@ public interface UserController {
           + "PUT to the pre-signed URL succeeded, with the file id returned by "
           + "GET /user/generate-upload-resume. It is rejected while the bytes have not reached the "
           + "bucket. Only users of type CANDIDATE can upload resumes; any other type is rejected "
-          + "with 400.",
+          + "with 403.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
       @ApiResponse(
@@ -607,16 +603,30 @@ public interface UserController {
           description = "Resume confirmed and now readable"),
       @ApiResponse(
           responseCode = "400",
-          description = "The authenticated user is not a candidate, or the bytes were never uploaded",
+          description = "The bytes were never uploaded"),
+      @ApiResponse(
+          responseCode = "403",
+          description = "The authenticated user is not a candidate, or the required "
+              + "lynq-request-uuid header is missing",
           content = @Content(
-              examples = @ExampleObject(
-                  name = "Not a candidate",
-                  value = """
-                      {
-                        "success": false,
-                        "data": null,
-                        "reason": "Only users of type CANDIDATE can upload resumes"
-                      }"""))),
+              examples = {
+                  @ExampleObject(
+                      name = "Not a candidate",
+                      value = """
+                          {
+                            "success": false,
+                            "data": null,
+                            "reason": "Only users of type CANDIDATE can perform this action"
+                          }"""),
+                  @ExampleObject(
+                      name = "Missing header",
+                      value = """
+                          {
+                            "success": false,
+                            "data": null,
+                            "reason": "Missing required header"
+                          }""")
+              })),
       @ApiResponse(
           responseCode = "404",
           description = "No user exists for the authenticated identity, or lynq-file-storage does "
@@ -655,7 +665,7 @@ public interface UserController {
       description = "Returns every resume of the authenticated user in both formats: the structured "
           + "JSON content and a short-lived link to the PDF held by lynq-file-storage. The user "
           + "identity is resolved from the bearer token, so no parameters are required. Only users "
-          + "of type CANDIDATE can access resumes; any other type is rejected with 400.",
+          + "of type CANDIDATE can access resumes; any other type is rejected with 403.",
       security = @SecurityRequirement(name = "bearerAuth"))
   ResponseEntity<GlobalRestResponse<List<GetUserResumeRestResponse>>> getUserResumes(
       @Parameter(hidden = true) LynqUserPrincipal principal);
@@ -665,7 +675,8 @@ public interface UserController {
       description = "Returns every language the platform supports for resumes, read from the "
           + "supported_languages table rather than hardcoded, so clients always offer the current "
           + "set. The resume translation dialog uses it as the target-language choices, minus the "
-          + "languages the candidate already holds a resume in.",
+          + "languages the candidate already holds a resume in. Only users of type CANDIDATE can "
+          + "read it; any other type is rejected with 403.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
       @ApiResponse(
@@ -684,6 +695,18 @@ public interface UserController {
                           { "code": "FR", "name": "Français" },
                           { "code": "PR", "name": "Português" }
                         ]
+                      }"""))),
+      @ApiResponse(
+          responseCode = "403",
+          description = "The authenticated user is not a candidate",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Not a candidate",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Only users of type CANDIDATE can perform this action"
                       }""")))
   })
   ResponseEntity<GlobalRestResponse<List<GetSupportedLanguageRestResponse>>> getSupportedResumeLanguages();
@@ -693,7 +716,8 @@ public interface UserController {
       description = "Stores the resume the candidate accepted in the preview step, together with "
           + "the fileId of the PDF that lynq-bff's POST /resume/preview flow rendered and stored. "
           + "The candidate is resolved from the bearer token. A fileId that already backs one of "
-          + "the user's resumes is rejected with 400, as is a user that is not of type CANDIDATE.",
+          + "the user's resumes is rejected with 400; a user that is not of type CANDIDATE is "
+          + "rejected with 403.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
       @ApiResponse(
@@ -717,7 +741,7 @@ public interface UserController {
                       }"""))),
       @ApiResponse(
           responseCode = "400",
-          description = "The authenticated user is not a candidate, or the PDF already backs a resume",
+          description = "The PDF already backs a resume",
           content = @Content(
               examples = @ExampleObject(
                   name = "File already used",
@@ -726,6 +750,18 @@ public interface UserController {
                         "success": false,
                         "data": null,
                         "reason": "File '0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41' already backs one of the user's resumes"
+                      }"""))),
+      @ApiResponse(
+          responseCode = "403",
+          description = "The authenticated user is not a candidate",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Not a candidate",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Only users of type CANDIDATE can perform this action"
                       }"""))),
       @ApiResponse(responseCode = "404", description = "No user exists for the authenticated identity")
   })
@@ -740,7 +776,7 @@ public interface UserController {
           + "same operation. The resume must belong to the authenticated candidate; another "
           + "user's resume answers 404 rather than 403, so a resume the caller does not own is "
           + "never acknowledged as existing. Only users of type CANDIDATE can access resumes; any "
-          + "other type is rejected with 400.",
+          + "other type is rejected with 403.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
       @ApiResponse(
@@ -764,9 +800,20 @@ public interface UserController {
                         }
                       }"""))),
       @ApiResponse(
+          responseCode = "403",
+          description = "The authenticated user is not a candidate",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Not a candidate",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "Only users of type CANDIDATE can perform this action"
+                      }"""))),
+      @ApiResponse(
           responseCode = "400",
-          description = "The authenticated user is not a candidate, or the alias is blank or "
-              + "longer than 100 characters",
+          description = "The alias is blank or longer than 100 characters",
           content = @Content(
               examples = @ExampleObject(
                   name = "Invalid alias",
@@ -832,7 +879,7 @@ public interface UserController {
                         }
                       }"""))),
       @ApiResponse(
-          responseCode = "400",
+          responseCode = "403",
           description = "The authenticated user is not a candidate"),
       @ApiResponse(
           responseCode = "404",
@@ -859,7 +906,7 @@ public interface UserController {
           + "application was submitted, and the candidate's LyNQ score against that job. The "
           + "candidate identity is resolved from the bearer token, so a user only ever sees their "
           + "own applications. Only users of type CANDIDATE can access this endpoint; any other "
-          + "type is rejected with 400.",
+          + "type is rejected with 403.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
       @ApiResponse(
@@ -894,7 +941,7 @@ public interface UserController {
                         }
                       }"""))),
       @ApiResponse(
-          responseCode = "400",
+          responseCode = "403",
           description = "The authenticated user is not a candidate",
           content = @Content(
               examples = @ExampleObject(
@@ -903,7 +950,7 @@ public interface UserController {
                       {
                         "success": false,
                         "data": null,
-                        "reason": "Only users of type CANDIDATE can view their applications"
+                        "reason": "Only users of type CANDIDATE can perform this action"
                       }"""))),
       @ApiResponse(
           responseCode = "404",
@@ -960,7 +1007,7 @@ public interface UserController {
           + "for the authenticated user against the job post identified by 'jobPostId'. The user "
           + "and job information is read from the database and forwarded to the lynq-ml service. "
           + "Only CANDIDATE-type users may call it; the caller identity is resolved from the bearer "
-          + "token. Fails with 400 when the caller is not a CANDIDATE and 404 when the job post "
+          + "token. Fails with 403 when the caller is not a CANDIDATE and 404 when the job post "
           + "does not exist.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
@@ -990,7 +1037,7 @@ public interface UserController {
                         }
                       }"""))),
       @ApiResponse(
-          responseCode = "400",
+          responseCode = "403",
           description = "The authenticated user is not a candidate",
           content = @Content(
               examples = @ExampleObject(
@@ -999,7 +1046,7 @@ public interface UserController {
                       {
                         "success": false,
                         "data": null,
-                        "reason": "Only users of type CANDIDATE can request upskilling suggestions"
+                        "reason": "Only users of type CANDIDATE can perform this action"
                       }"""))),
       @ApiResponse(
           responseCode = "404",

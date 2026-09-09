@@ -1,6 +1,5 @@
 package com.lynq.backend.controller.request;
 
-import com.lynq.backend.enums.UserType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -14,8 +13,6 @@ import java.time.LocalDate;
 @NoArgsConstructor
 public class CreateUserRequest {
 
-  @NotNull
-  private UserType userType;
   @NotBlank
   private String fullName;
   private String currentPosition;

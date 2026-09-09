@@ -111,13 +111,21 @@ Every request passes through an ordered filter chain before reaching a controlle
 | :---: | ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------ |
 | 0     | `RequestUuidFilter`          | `/*`                         | Require the `lynq-request-uuid` header; bind it to SLF4J MDC (`requestId`) and echo it back on the response for cross-service log correlation. `403` if missing. |
 | 1     | `AuthHeaderExistenceFilter`  | `/*` (Swagger paths exempt)  | `401` if the `Authorization` header is missing or blank.                                         |
-| 2     | `IamAuthenticationFilter`    | `/*` (Swagger paths exempt)  | Call `lynq-iam` for the token's user info, then load a `LynqUserPrincipal` into the `SecurityContext`. `401` if IAM will not resolve the token, `503` if IAM is unreachable. |
+| 2     | `IamAuthenticationFilter`    | `/*` (Swagger paths exempt)  | Call `lynq-iam` for the token's user info, then load a `LynqUserPrincipal` — with the roles it reports as authorities — into the `SecurityContext`. `401` if IAM will not resolve the token, `503` if IAM is unreachable. |
 
 > This service does **not** verify the access token's signature. Every request reaches it through
 > [`lynq-bff`](../lynq-bff) — the single entry point into the DMZ — which validates the signature
 > before proxying, which is also why this service's whole API sits behind the `/dmz` prefix.
 
 Spring Security itself is configured **stateless** and `permitAll` (`SecurityConfig`) — the filter chain above, not Spring Security, is what enforces authentication. CORS is open (`*` origins) and CSRF/form-login/HTTP-basic are disabled. Only Swagger UI / OpenAPI asset paths are public (`PublicPaths`).
+
+**Authorization** is method security (`@EnableMethodSecurity`), on top of the authorities the filter
+loaded: `@HasRole(Role.CANDIDATE)` / `@HasRole(Role.COMPANY)` on the controller methods that belong
+to one kind of user. `@HasRole` is a meta-annotation over `@PreAuthorize("hasRole('{value}')")`, and
+`GrantedAuthorityDefaults("R_")` is what maps `hasRole('CANDIDATE')` onto the `R_CANDIDATE` authority
+the token carries. A caller without the role gets `403` with the usual `ErrorRestResponse`
+(`AccessDeniedException` is handled in `ControllerExceptionHandler`); the candidate/company axis
+lives in `lynq-iam` and reaches this service only in the token's `roles` claim.
 
 > The `lynq-request-uuid` header is forwarded on every downstream call to `lynq-iam` and `lynq-ml`, so a single logical request can be traced across all services by its UUID.
 
@@ -141,13 +149,13 @@ sequenceDiagram
     participant DB as MySQL
 
     C->>Ctrl: POST /dmz/job<br/>Authorization + lynq-request-uuid<br/>{title, description, workType, salary…, skills}
-    Ctrl->>Svc: createJob(...)
-    Svc->>Sec: resolve LynqUserPrincipal
-    Svc->>DB: findById(userId)
-    alt user is not COMPANY
-        Svc-->>Ctrl: BadRequestException
-        Ctrl-->>C: 400 "Only users of type COMPANY can create jobs"
-    else COMPANY user
+    Ctrl->>Sec: @HasRole(Role.COMPANY) against the token's roles
+    alt caller does not hold R_COMPANY
+        Ctrl-->>C: 403 "Only users of type COMPANY can perform this action"
+    else COMPANY caller
+        Ctrl->>Svc: createJob(...)
+        Svc->>Sec: resolve LynqUserPrincipal
+        Svc->>DB: findById(userId)
         Svc->>DB: findByOwner(user) → CompanyEntity
         Svc->>Svc: build JobPostEntity (UUIDv7 id, status OPEN, source)
         Svc->>Svc: attach distinct skills
@@ -315,7 +323,7 @@ Base path: `/lynq-backend-app` (Spring `server.servlet.context-path`).
 | Method | Path                            | Body / Params                                                        | Description                                              |
 | ------ | ------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------- |
 | GET    | `/dmz/user`                         | —                                                                    | Get the authenticated user's profile (+ pre-signed image URL). |
-| POST   | `/dmz/user`                         | `{userType, fullName, currentPosition?, about?, githubUrl?, linkedinUrl?, birthDate}` | Create the profile for the authenticated user.           |
+| POST   | `/dmz/user`                         | `{fullName, currentPosition?, about?, githubUrl?, linkedinUrl?, birthDate}` | Create the profile for the authenticated user. |
 | PATCH  | `/dmz/user`                         | Any subset of profile fields                                         | Partially update the profile (non-null fields only).    |
 | GET    | `/dmz/user/generate-upload-image`   | `?file-name=`                                                        | Register the profile image in `lynq-file-storage`; returns `{preSignedUrl, fileId}`. |
 | POST   | `/dmz/user/confirm-upload-image`    | `?file-id=`                                                          | Mark the uploaded profile image available (204).         |
@@ -351,6 +359,7 @@ Errors are wrapped in `ErrorRestResponse` (`{ success:false, data, reason }`). M
 | ------------------------------- | ----------- |
 | `BadRequestException`           | 400         |
 | `ForbiddenException`            | 403         |
+| `AccessDeniedException` (`@HasRole`) | 403    |
 | `NotFoundException`             | 404         |
 | `IllegalArgumentException`      | 409         |
 | bean-validation failure         | 400 (`{ reason: "Invalid Fields Found", data: { field → message } }`) |
@@ -372,7 +381,6 @@ curl -X POST http://localhost:8082/lynq-backend-app/dmz/user \
   -H "lynq-request-uuid: $UUID" \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
-    "userType": "CANDIDATE",
     "fullName": "John Doe",
     "currentPosition": "Backend Engineer",
     "about": "10 years building JVM services",
@@ -538,7 +546,7 @@ src/
 │   │   ├── client/        # Feign clients for lynq-iam, lynq-ml & lynq-file-storage + DTOs
 │   │   ├── config/        # App (Jackson), Security, Filter, OpenAPI beans
 │   │   ├── controller/    # Controller interfaces + impls, request/response DTOs, error handler
-│   │   ├── enums/         # UserType, WorkType, JobStatus, JobPostSource, Language
+│   │   ├── enums/         # WorkType, JobStatus, JobPostSource, Language
 │   │   ├── exceptions/    # BadRequest / Forbidden / NotFound
 │   │   ├── filter/        # RequestUuid + auth-header + IAM-authentication filters, PublicPaths
 │   │   ├── model/         # JPA entities

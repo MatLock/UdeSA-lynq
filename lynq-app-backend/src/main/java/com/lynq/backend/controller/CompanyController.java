@@ -29,7 +29,8 @@ public interface CompanyController {
       summary = "Create a company together with its owner profile",
       description = "Creates the profile of the authenticated user as a COMPANY-type user and the "
           + "company they own in a single call. The owner identity is resolved from the bearer "
-          + "token, while the company id is generated server-side.",
+          + "token, while the company id is generated server-side. Only callers registered with "
+          + "the COMPANY role may use it; any other role is rejected with 403.",
       security = @SecurityRequirement(name = "bearerAuth"))
   @ApiResponses({
       @ApiResponse(
@@ -68,16 +69,27 @@ public interface CompanyController {
                       }"""))),
       @ApiResponse(
           responseCode = "403",
-          description = "Missing required lynq-request-uuid header",
+          description = "The caller is not registered with the COMPANY role, or the required "
+              + "lynq-request-uuid header is missing",
           content = @Content(
-              examples = @ExampleObject(
-                  name = "Missing header",
-                  value = """
-                      {
-                        "success": false,
-                        "data": null,
-                        "reason": "Missing required header"
-                      }"""))),
+              examples = {
+                  @ExampleObject(
+                      name = "Not a company",
+                      value = """
+                          {
+                            "success": false,
+                            "data": null,
+                            "reason": "Only users of type COMPANY can perform this action"
+                          }"""),
+                  @ExampleObject(
+                      name = "Missing header",
+                      value = """
+                          {
+                            "success": false,
+                            "data": null,
+                            "reason": "Missing required header"
+                          }""")
+              })),
       @ApiResponse(
           responseCode = "401",
           description = "Missing or invalid bearer token",

@@ -14,12 +14,15 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
 
 public class IamAuthenticationFilter extends OncePerRequestFilter {
 
@@ -73,12 +76,20 @@ public class IamAuthenticationFilter extends OncePerRequestFilter {
   }
 
   private void loadSecurityContext(UserInfoResponse userInfo, HttpServletRequest request) {
+    List<GrantedAuthority> authorities = toAuthorities(userInfo.getRoles());
     LynqUserPrincipal principal = new LynqUserPrincipal(
-        userInfo.getId(), userInfo.getUsername(), userInfo.getEmail());
+        userInfo.getId(), userInfo.getUsername(), userInfo.getEmail(), authorities);
     UsernamePasswordAuthenticationToken authentication =
-        new UsernamePasswordAuthenticationToken(principal, null, Collections.emptyList());
+        new UsernamePasswordAuthenticationToken(principal, null, authorities);
     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
     SecurityContextHolder.getContext().setAuthentication(authentication);
+  }
+
+  private static List<GrantedAuthority> toAuthorities(List<String> roles) {
+    return roles == null ? List.of() : roles.stream()
+        .filter(Objects::nonNull)
+        .<GrantedAuthority>map(SimpleGrantedAuthority::new)
+        .toList();
   }
 
   private void writeError(HttpServletResponse response, HttpStatus status, String reason) throws IOException {

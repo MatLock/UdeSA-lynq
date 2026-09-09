@@ -17,7 +17,6 @@ import com.lynq.backend.controller.response.JobPostedByRestResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
-import com.lynq.backend.enums.UserType;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.exceptions.AlreadyAppliedToJobException;
 import com.lynq.backend.exceptions.BadRequestException;
@@ -42,6 +41,7 @@ import com.lynq.backend.repository.UserResumeRepository;
 import com.lynq.backend.repository.projection.JobCandidateProjection;
 import com.lynq.backend.repository.projection.JobWithDetailsProjection;
 import com.lynq.backend.security.LynqUserPrincipal;
+import com.lynq.backend.security.Role;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Arrays;
@@ -60,9 +60,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class JobService {
 
-  private static final String ONLY_COMPANY_USERS_CAN_CREATE_JOBS = "Only users of type COMPANY can create jobs";
-  private static final String ONLY_COMPANY_USERS_CAN_VIEW_OWNED_JOBS = "Only users of type COMPANY can view their own jobs";
-  private static final String ONLY_CANDIDATE_USERS_CAN_APPLY = "Only users of type CANDIDATE can apply to jobs";
   private static final String USER_NOT_LINKED_TO_COMPANY = "User is not linked to any company";
   private static final String AUTHENTICATED_USER_NOT_FOUND = "Authenticated user not found";
   private static final String JOB_POST_NOT_FOUND = "Job post not found";
@@ -79,8 +76,6 @@ public class JobService {
       "Only the owner of the job post can request an AI evaluation of its candidates";
   private static final String CANDIDATE_APPLICATION_NOT_FOUND =
       "The candidate has not applied to this job post";
-  private static final String ONLY_CANDIDATE_USERS_CAN_GET_UPSKILLING =
-      "Only users of type CANDIDATE can request upskilling suggestions";
 
   private final JobPostRepository jobPostRepository;
   private final CompanyRepository companyRepository;
@@ -114,10 +109,6 @@ public class JobService {
       Integer salaryRangeDown, Integer salaryRangeTop, JobPostSource jobPostSource,
       List<String> skills, List<String> similarityTags) {
     UserEntity user = getAuthenticatedUser();
-
-    if (user.getType() != UserType.COMPANY) {
-      throw new BadRequestException(ONLY_COMPANY_USERS_CAN_CREATE_JOBS);
-    }
 
     CompanyEntity company = companyRepository.findByOwner(user)
         .orElseThrow(() -> new BadRequestException(USER_NOT_LINKED_TO_COMPANY));
@@ -262,10 +253,6 @@ public class JobService {
   public UserApplicationJobEntity applyToJob(String jobId, String resumeId) {
     UserEntity user = getAuthenticatedUser();
 
-    if (user.getType() != UserType.CANDIDATE) {
-      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_APPLY);
-    }
-
     JobPostEntity job = jobPostRepository.findById(jobId)
         .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
 
@@ -343,10 +330,6 @@ public class JobService {
       String outputLanguage) {
     UserEntity user = getAuthenticatedUser();
 
-    if (user.getType() != UserType.CANDIDATE) {
-      throw new BadRequestException(ONLY_CANDIDATE_USERS_CAN_GET_UPSKILLING);
-    }
-
     JobPostEntity job = jobPostRepository.findById(jobId)
         .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
 
@@ -395,10 +378,6 @@ public class JobService {
   public PagedRestResponse<GetJobRestResponse> searchOwnedJobs(Pageable pageable) {
     UserEntity user = getAuthenticatedUser();
 
-    if (user.getType() != UserType.COMPANY) {
-      throw new BadRequestException(ONLY_COMPANY_USERS_CAN_VIEW_OWNED_JOBS);
-    }
-
     Page<JobWithDetailsProjection> jobs =
         jobPostRepository.searchJobsOwnedByUser(user.getId(), pageable);
     Map<String, String> imageUrls = signProfileImages(jobs.getContent());
@@ -431,7 +410,7 @@ public class JobService {
    * rule {@link #calculateLyNQScore} follows for the score.
    */
   private boolean hasApplied(String jobId, UserEntity user) {
-    if (user == null || user.getType() != UserType.CANDIDATE) {
+    if (user == null || !callerIsCandidate()) {
       return false;
     }
 
@@ -575,7 +554,7 @@ public class JobService {
 
   private Integer calculateLyNQScore(List<String> jobSkillNames, List<String> jobSimilarityTagNames,
       UserEntity user) {
-    if (user == null || user.getType() != UserType.CANDIDATE) {
+    if (user == null || !callerIsCandidate()) {
       return null;
     }
 
@@ -598,12 +577,18 @@ public class JobService {
   }
 
   private UserEntity getAuthenticatedUser() {
-    LynqUserPrincipal principal = (LynqUserPrincipal) SecurityContextHolder.getContext()
+    return userRepository.findById(getAuthenticatedPrincipal().getId())
+        .orElseThrow(() -> new BadRequestException(AUTHENTICATED_USER_NOT_FOUND));
+  }
+
+  private boolean callerIsCandidate() {
+    return getAuthenticatedPrincipal().hasRole(Role.CANDIDATE);
+  }
+
+  private LynqUserPrincipal getAuthenticatedPrincipal() {
+    return (LynqUserPrincipal) SecurityContextHolder.getContext()
         .getAuthentication()
         .getPrincipal();
-
-    return userRepository.findById(principal.getId())
-        .orElseThrow(() -> new BadRequestException(AUTHENTICATED_USER_NOT_FOUND));
   }
 
 }

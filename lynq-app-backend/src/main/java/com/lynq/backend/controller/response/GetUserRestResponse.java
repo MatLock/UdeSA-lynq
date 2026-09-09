@@ -1,6 +1,5 @@
 package com.lynq.backend.controller.response;
 
-import com.lynq.backend.enums.UserType;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -13,7 +12,6 @@ import java.time.LocalDate;
 public class GetUserRestResponse {
 
   private String id;
-  private UserType userType;
   private String fullName;
   private String userProfileImageUrl;
   private String currentPosition;
