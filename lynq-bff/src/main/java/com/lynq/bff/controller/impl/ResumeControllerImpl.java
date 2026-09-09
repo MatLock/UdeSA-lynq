@@ -7,6 +7,8 @@ import com.lynq.bff.controller.request.UpdateResumeAliasRestRequest;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
 import com.lynq.bff.filter.JwtSignatureFilter;
+import com.lynq.bff.security.HasRole;
+import com.lynq.bff.security.Role;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.ResumeAliasService;
 import com.lynq.bff.service.ResumeDeletionService;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/resume")
+@HasRole(Role.CANDIDATE)
 public class ResumeControllerImpl implements ResumeController {
 
   private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";

@@ -196,7 +196,7 @@ public interface ResumeController {
       description = "Sets the alias the candidate uses to tell one of their resumes apart from "
           + "the others — assigning for the first time and renaming are the same operation, the "
           + "new alias simply overrides the previous one. The gateway validates the alias, checks "
-          + "the caller is a CANDIDATE, and relays to lynq-app-backend's "
+          + "the token carries the CANDIDATE role, and relays to lynq-app-backend's "
           + "PUT /user/resume/{resumeId}/alias, which enforces that the resume belongs to the "
           + "caller.")
   @ApiResponses({

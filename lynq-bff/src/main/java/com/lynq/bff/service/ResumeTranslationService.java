@@ -33,14 +33,11 @@ public class ResumeTranslationService {
   private static final String LANGUAGE_TAKEN = "A resume in language '%s' already exists";
   private static final String TRANSLATE_FAILED = "The resume could not be translated";
 
-  private final CandidateReader candidateReader;
   private final LynqBackendClient lynqBackendClient;
   private final LynqMlClient lynqMlClient;
 
-  public ResumeTranslationService(CandidateReader candidateReader,
-                                  LynqBackendClient lynqBackendClient,
+  public ResumeTranslationService(LynqBackendClient lynqBackendClient,
                                   LynqMlClient lynqMlClient) {
-    this.candidateReader = candidateReader;
     this.lynqBackendClient = lynqBackendClient;
     this.lynqMlClient = lynqMlClient;
   }
@@ -50,7 +47,6 @@ public class ResumeTranslationService {
       throw new BadRequestException(LANGUAGE_REQUIRED);
     }
 
-    candidateReader.read(caller);
     String language = targetLanguage.trim().toUpperCase(Locale.ROOT);
 
     List<UserResumeResponse> resumes = readResumes(caller);

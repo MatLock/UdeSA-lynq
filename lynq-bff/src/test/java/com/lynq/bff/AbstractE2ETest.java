@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.mockserver.client.MockServerClient;
@@ -67,12 +68,17 @@ public abstract class AbstractE2ETest {
   }
 
   protected static String accessToken(String secret, Instant expiration) {
+    return accessToken(secret, expiration, List.of("R_CANDIDATE"));
+  }
+
+  protected static String accessToken(String secret, Instant expiration, List<String> roles) {
     SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     return Jwts.builder()
         .id(UUID.randomUUID().toString())
         .subject("11111111-1111-1111-1111-111111111111")
         .claim("username", "janedoe")
         .claim("email", "jane@lynq.com")
+        .claim("roles", roles)
         .issuedAt(Date.from(Instant.now().minus(1, ChronoUnit.MINUTES)))
         .expiration(Date.from(expiration))
         .signWith(key)

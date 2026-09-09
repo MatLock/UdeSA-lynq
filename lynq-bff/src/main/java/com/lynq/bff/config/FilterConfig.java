@@ -3,6 +3,7 @@ package com.lynq.bff.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynq.bff.filter.AuthHeaderExistenceFilter;
 import com.lynq.bff.filter.JwtSignatureFilter;
+import com.lynq.bff.filter.RelayRoleFilter;
 import com.lynq.bff.filter.RequestUuidFilter;
 import com.lynq.bff.security.JwtSignatureVerifier;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -37,6 +38,15 @@ public class FilterConfig {
         registration.setFilter(new JwtSignatureFilter(jwtSignatureVerifier, objectMapper));
         registration.addUrlPatterns("/*");
         registration.setOrder(2);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<RelayRoleFilter> createRelayRoleFilter(ObjectMapper objectMapper) {
+        FilterRegistrationBean<RelayRoleFilter> registration = new FilterRegistrationBean<>();
+        registration.setFilter(new RelayRoleFilter(objectMapper));
+        registration.addUrlPatterns("/*");
+        registration.setOrder(3);
         return registration;
     }
 }

@@ -3,14 +3,22 @@ package com.lynq.bff.filter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynq.bff.controller.response.ErrorRestResponse;
 import com.lynq.bff.security.JwtSignatureVerifier;
+import com.lynq.bff.security.VerifiedCaller;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class JwtSignatureFilter extends OncePerRequestFilter {
@@ -38,10 +46,10 @@ public class JwtSignatureFilter extends OncePerRequestFilter {
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                   FilterChain filterChain) throws ServletException, IOException {
     String authHeader = request.getHeader(AUTHORIZATION_HEADER);
-    Optional<String> verifiedUserId =
-        jwtSignatureVerifier.verifiedSubject(stripBearerPrefix(authHeader));
+    Optional<VerifiedCaller> verifiedCaller =
+        jwtSignatureVerifier.verify(stripBearerPrefix(authHeader));
 
-    if (verifiedUserId.isEmpty()) {
+    if (verifiedCaller.isEmpty()) {
       response.setStatus(HttpStatus.UNAUTHORIZED.value());
       response.setContentType(MediaType.APPLICATION_JSON_VALUE);
       ErrorRestResponse<Void> errorResponse = new ErrorRestResponse<>(null, INVALID_TOKEN_ERROR);
@@ -49,8 +57,30 @@ public class JwtSignatureFilter extends OncePerRequestFilter {
       return;
     }
 
-    request.setAttribute(VERIFIED_USER_ID, verifiedUserId.get());
-    filterChain.doFilter(request, response);
+    VerifiedCaller caller = verifiedCaller.get();
+    request.setAttribute(VERIFIED_USER_ID, caller.userId());
+    loadSecurityContext(caller, request);
+
+    try {
+      filterChain.doFilter(request, response);
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  private void loadSecurityContext(VerifiedCaller caller, HttpServletRequest request) {
+    List<GrantedAuthority> authorities = toAuthorities(caller.roles());
+    UsernamePasswordAuthenticationToken authentication =
+        new UsernamePasswordAuthenticationToken(caller.userId(), null, authorities);
+    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+    SecurityContextHolder.getContext().setAuthentication(authentication);
+  }
+
+  private static List<GrantedAuthority> toAuthorities(List<String> roles) {
+    return roles == null ? List.of() : roles.stream()
+        .filter(Objects::nonNull)
+        .<GrantedAuthority>map(SimpleGrantedAuthority::new)
+        .toList();
   }
 
   private String stripBearerPrefix(String authHeader) {

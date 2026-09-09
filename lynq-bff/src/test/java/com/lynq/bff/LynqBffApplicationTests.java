@@ -13,6 +13,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockserver.model.MediaType;
@@ -32,12 +33,6 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
   private static final String USER_BODY = """
       {"success": true, "data": {"id": "11111111-1111-1111-1111-111111111111"}}""";
-
-  private static final String CANDIDATE_BODY = """
-      {"success": true, "data": {"id": "11111111-1111-1111-1111-111111111111", "userType": "CANDIDATE"}}""";
-
-  private static final String COMPANY_BODY = """
-      {"success": true, "data": {"id": "11111111-1111-1111-1111-111111111111", "userType": "COMPANY"}}""";
 
   private static final String RESUME_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
   private static final String RESUME_ALIAS_PATH = "/dmz/user/resume/" + RESUME_ID + "/alias";
@@ -127,6 +122,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
   @Test
   void passesThePostBodyThroughUnchanged() throws Exception {
+    useRoles("R_COMPANY");
     String requestBody = """
         {"title": "Senior Backend Engineer", "workType": "REMOTE"}""";
     lynqBackendMock.when(request().withMethod("POST").withPath("/dmz/job"))
@@ -250,10 +246,6 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
   @Test
   void relaysTheResumeAliasAssignmentToLynqBackend() throws Exception {
-    lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/user"))
-        .respond(response().withStatusCode(200)
-            .withContentType(MediaType.APPLICATION_JSON)
-            .withBody(CANDIDATE_BODY));
     lynqBackendMock.when(request().withMethod("PUT").withPath(RESUME_ALIAS_PATH))
         .respond(response().withStatusCode(200)
             .withContentType(MediaType.APPLICATION_JSON)
@@ -273,19 +265,15 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void refusesTheResumeAliasWhenTheCallerIsNotACandidate() throws Exception {
-    lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/user"))
-        .respond(response().withStatusCode(200)
-            .withContentType(MediaType.APPLICATION_JSON)
-            .withBody(COMPANY_BODY));
+  void refusesTheResumeAliasWhenTheTokenDoesNotCarryTheCandidateRole() throws Exception {
+    useRoles("R_COMPANY");
 
     HttpResponse<String> response = send(
         "PUT", CONTEXT_PATH + "/resume/" + RESUME_ID + "/alias", RESUME_ALIAS_BODY);
 
     assertThat(response.statusCode(), is(403));
     assertThat(response.body(), containsString("CANDIDATE"));
-    lynqBackendMock.verify(request().withMethod("PUT").withPath(RESUME_ALIAS_PATH),
-        VerificationTimes.exactly(0));
+    lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
   }
 
   @Test
@@ -301,10 +289,6 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
   @Test
   void answersBadGatewayWhenLynqBackendCannotSaveTheAlias() throws Exception {
-    lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/user"))
-        .respond(response().withStatusCode(200)
-            .withContentType(MediaType.APPLICATION_JSON)
-            .withBody(CANDIDATE_BODY));
     lynqBackendMock.when(request().withMethod("PUT").withPath(RESUME_ALIAS_PATH))
         .respond(response().withStatusCode(500));
 
@@ -480,6 +464,45 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
   private String baseUrl() {
     return "http://localhost:" + port;
+  }
+
+  @Test
+  void bouncesACompanyOnlyRelayedRouteWithoutTouchingLynqBackend() throws Exception {
+    HttpResponse<String> response = send("GET", CONTEXT_PATH + "/job/mine", null);
+
+    assertThat(response.statusCode(), is(403));
+    assertThat(response.body(), containsString("COMPANY"));
+    lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void bouncesACandidateOnlyRelayedRouteWithoutTouchingLynqBackend() throws Exception {
+    useRoles("R_COMPANY");
+
+    HttpResponse<String> response = send("GET", CONTEXT_PATH + "/user/resume", null);
+
+    assertThat(response.statusCode(), is(403));
+    assertThat(response.body(), containsString("CANDIDATE"));
+    lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void relaysARouteNoRuleCoversWhateverTheRoleIs() throws Exception {
+    useRoles("R_COMPANY");
+    lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/job/018f9c3a/details"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(USER_BODY));
+
+    HttpResponse<String> response = send("GET", CONTEXT_PATH + "/job/018f9c3a/details", null);
+
+    assertThat(response.statusCode(), is(200));
+    assertThat(response.body(), is(USER_BODY));
+  }
+
+  private void useRoles(String... roles) {
+    accessToken =
+        accessToken(JWT_SECRET, Instant.now().plus(15, ChronoUnit.MINUTES), List.of(roles));
   }
 
   private HttpResponse<String> send(String method, String path, String body) throws Exception {

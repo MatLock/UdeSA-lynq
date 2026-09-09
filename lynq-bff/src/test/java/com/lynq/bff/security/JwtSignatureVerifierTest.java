@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 import javax.crypto.SecretKey;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +23,7 @@ class JwtSignatureVerifierTest {
       "0000000000000000000000000000000000000000000000000000000000000000";
 
   private static final String SUBJECT = "11111111-1111-1111-1111-111111111111";
+  private static final List<String> ROLES = List.of("R_CANDIDATE");
   private static final String NOT_A_JWT = "definitely-not-a-jwt";
   private static final String BLANK_TOKEN = "   ";
 
@@ -36,21 +38,36 @@ class JwtSignatureVerifierTest {
   void returnsTheSubjectOfATokenSignedWithTheSharedSecret() {
     String token = token(SECRET, SUBJECT, Instant.now().plus(15, ChronoUnit.MINUTES));
 
-    assertThat(verifier.verifiedSubject(token), is(Optional.of(SUBJECT)));
+    assertThat(verifier.verify(token), is(Optional.of(new VerifiedCaller(SUBJECT, ROLES))));
+  }
+
+  @Test
+  void returnsTheRolesTheTokenCarries() {
+    String token = token(SECRET, SUBJECT, Instant.now().plus(15, ChronoUnit.MINUTES),
+        List.of("R_COMPANY"));
+
+    assertThat(verifier.verify(token).orElseThrow().roles(), is(List.of("R_COMPANY")));
+  }
+
+  @Test
+  void returnsNoRolesForATokenMintedWithoutTheRolesClaim() {
+    String token = token(SECRET, SUBJECT, Instant.now().plus(15, ChronoUnit.MINUTES), null);
+
+    assertThat(verifier.verify(token).orElseThrow().roles(), is(List.of()));
   }
 
   @Test
   void rejectsATokenSignedWithAnotherSecret() {
     String token = token(OTHER_SECRET, SUBJECT, Instant.now().plus(15, ChronoUnit.MINUTES));
 
-    assertThat(verifier.verifiedSubject(token).isEmpty(), is(true));
+    assertThat(verifier.verify(token).isEmpty(), is(true));
   }
 
   @Test
   void rejectsAnExpiredToken() {
     String token = token(SECRET, SUBJECT, Instant.now().minus(1, ChronoUnit.MINUTES));
 
-    assertThat(verifier.verifiedSubject(token).isEmpty(), is(true));
+    assertThat(verifier.verify(token).isEmpty(), is(true));
   }
 
   @Test
@@ -60,38 +77,47 @@ class JwtSignatureVerifierTest {
     String tampered = parts[0] + "." + parts[1].substring(0, parts[1].length() - 2) + "AA."
         + parts[2];
 
-    assertThat(verifier.verifiedSubject(tampered).isEmpty(), is(true));
+    assertThat(verifier.verify(tampered).isEmpty(), is(true));
   }
 
   @Test
   void rejectsAValidlySignedTokenThatCarriesNoSubject() {
     String token = token(SECRET, null, Instant.now().plus(15, ChronoUnit.MINUTES));
 
-    assertThat(verifier.verifiedSubject(token).isEmpty(), is(true));
+    assertThat(verifier.verify(token).isEmpty(), is(true));
   }
 
   @Test
   void rejectsSomethingThatIsNotAJwtAtAll() {
-    assertThat(verifier.verifiedSubject(NOT_A_JWT).isEmpty(), is(true));
+    assertThat(verifier.verify(NOT_A_JWT).isEmpty(), is(true));
   }
 
   @Test
   void rejectsANullToken() {
-    assertThat(verifier.verifiedSubject(null).isEmpty(), is(true));
+    assertThat(verifier.verify(null).isEmpty(), is(true));
   }
 
   @Test
   void rejectsABlankToken() {
-    assertThat(verifier.verifiedSubject(BLANK_TOKEN).isEmpty(), is(true));
+    assertThat(verifier.verify(BLANK_TOKEN).isEmpty(), is(true));
   }
 
   private static String token(String secret, String subject, Instant expiration) {
+    return token(secret, subject, expiration, ROLES);
+  }
+
+  private static String token(String secret, String subject, Instant expiration,
+      List<String> roles) {
     SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
-    return Jwts.builder()
+    var builder = Jwts.builder()
         .subject(subject)
         .issuedAt(Date.from(Instant.now().minus(1, ChronoUnit.MINUTES)))
-        .expiration(Date.from(expiration))
-        .signWith(key)
-        .compact();
+        .expiration(Date.from(expiration));
+
+    if (roles != null) {
+      builder.claim("roles", roles);
+    }
+
+    return builder.signWith(key).compact();
   }
 }
