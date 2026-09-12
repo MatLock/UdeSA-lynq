@@ -64,6 +64,9 @@ jobs:
       - name: Bump lynq-ml (python) version
         run: echo "${{ steps.resolve.outputs.version }}" > lynq-ml/VERSION
 
+      - name: Bump lynq-feeders (python) version
+        run: echo "${{ steps.resolve.outputs.version }}" > lynq-feeders/VERSION
+
       - name: Bump Helm chart appVersion
         run: |
           # Mirror the released tag into the Helm chart's appVersion, matching
@@ -88,7 +91,7 @@ jobs:
       - name: Commit version bump back to main
         uses: ./.github/actions/commit-to-main
         with:
-          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml .github/badges/version.svg
+          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-ml/VERSION lynq-feeders/VERSION infrastructure/helm/Chart.yaml .github/badges/version.svg
           message: "chore: set release version ${{ steps.resolve.outputs.version }} [skip ci]"
 
   # ===========================================================================
@@ -274,6 +277,45 @@ jobs:
           name: coverage-lynq-ml
           path: lynq-ml/coverage.xml
 
+  build-lynq-feeders:
+    name: "2 · Build & test: lynq-feeders"
+    runs-on: ubuntu-latest
+    needs: set-version
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Setup Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        working-directory: lynq-feeders
+        run: |
+          python -m pip install --upgrade "pip==26.1.2"
+          # requirements.txt is a full lock (pip-compile --generate-hashes from
+          # requirements.in); --require-hashes makes the install reproducible.
+          pip install --require-hashes --only-binary :all: -r requirements.txt
+          pip install --only-binary :all: "coverage==7.15.2"
+
+      - name: Run tests
+        working-directory: lynq-feeders
+        run: |
+          coverage run --branch -m unittest discover -s tests -t .
+          coverage report -m
+          coverage xml -o coverage.xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lynq-feeders
+          path: lynq-feeders/coverage.xml
+
   # ===========================================================================
   # Stage 3 — Run a SonarCloud analysis of the whole monorepo right after the
   # tests pass and BEFORE any image is built. The Quality Gate is blocking: a
@@ -283,7 +325,7 @@ jobs:
   sonar-scan:
     name: "3 · SonarCloud analysis (Quality Gate)"
     runs-on: ubuntu-latest
-    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-ml]
+    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-ml, build-lynq-feeders]
     outputs:
       gate: ${{ steps.results.outputs.gate }}
       bugs: ${{ steps.results.outputs.bugs }}
@@ -357,6 +399,16 @@ jobs:
           # produced it; rewrite it so the scanner resolves the files here.
           sed -i -E "s|<source>.*</source>|<source>${GITHUB_WORKSPACE}/lynq-ml</source>|" lynq-ml/coverage.xml
 
+      - name: Download lynq-feeders coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-lynq-feeders
+          path: lynq-feeders
+
+      - name: Point lynq-feeders coverage at this workspace
+        run: |
+          sed -i -E "s|<source>.*</source>|<source>${GITHUB_WORKSPACE}/lynq-feeders</source>|" lynq-feeders/coverage.xml
+
       - name: Verify coverage reports are present
         run: |
           # A missing report makes the scanner report 0% coverage silently and
@@ -367,7 +419,8 @@ jobs:
                    lynq-app-backend/target/site/jacoco/jacoco.xml \
                    lynq-file-storage/target/site/jacoco/jacoco.xml \
                    lynq-bff/target/site/jacoco/jacoco.xml \
-                   lynq-ml/coverage.xml; do
+                   lynq-ml/coverage.xml \
+                   lynq-feeders/coverage.xml; do
             if [ -s "$f" ]; then
               echo "✓ $f"
             else
@@ -430,7 +483,7 @@ jobs:
   push-images:
     name: "4 · Push Docker images"
     runs-on: ubuntu-latest
-    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-ml, sonar-scan]
+    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-ml, build-lynq-feeders, sonar-scan]
     steps:
       - name: Code Checkout
         uses: actions/checkout@v5
@@ -508,6 +561,14 @@ jobs:
           push: true
           tags: ${{ env.DOCKER_NAMESPACE }}:lynq-ml-${{ needs.set-version.outputs.version }}
 
+      - name: Build and push lynq-feeders image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: lynq-feeders
+          file: lynq-feeders/Dockerfile
+          push: true
+          tags: ${{ env.DOCKER_NAMESPACE }}:lynq-feeders-${{ needs.set-version.outputs.version }}
+
       - name: Build and push lynq-app-frontend image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
@@ -560,6 +621,12 @@ jobs:
           name: coverage-lynq-ml
           path: coverage/lynq-ml
 
+      - name: Download lynq-feeders coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-lynq-feeders
+          path: coverage/lynq-feeders
+
       - name: Extract coverage percentages
         id: coverage
         run: |
@@ -584,6 +651,8 @@ jobs:
           read BFF_INSTR BFF_LINE BFF_BRANCH <<<"$(extract_jacoco coverage/lynq-bff/jacoco.csv)"
           ML_LINE="$(rate coverage/lynq-ml/coverage.xml line-rate)"
           ML_BRANCH="$(rate coverage/lynq-ml/coverage.xml branch-rate)"
+          FEEDERS_LINE="$(rate coverage/lynq-feeders/coverage.xml line-rate)"
+          FEEDERS_BRANCH="$(rate coverage/lynq-feeders/coverage.xml branch-rate)"
           {
             echo "iam_instruction=$IAM_INSTR"
             echo "iam_line=$IAM_LINE"
@@ -599,6 +668,8 @@ jobs:
             echo "bff_branch=$BFF_BRANCH"
             echo "ml_line=$ML_LINE"
             echo "ml_branch=$ML_BRANCH"
+            echo "feeders_line=$FEEDERS_LINE"
+            echo "feeders_branch=$FEEDERS_BRANCH"
           } >> "$GITHUB_OUTPUT"
 
       - name: Append coverage & Sonar summary to release notes
@@ -619,6 +690,8 @@ jobs:
           BFF_BRANCH: ${{ steps.coverage.outputs.bff_branch }}
           ML_LINE: ${{ steps.coverage.outputs.ml_line }}
           ML_BRANCH: ${{ steps.coverage.outputs.ml_branch }}
+          FEEDERS_LINE: ${{ steps.coverage.outputs.feeders_line }}
+          FEEDERS_BRANCH: ${{ steps.coverage.outputs.feeders_branch }}
           SONAR_GATE: ${{ needs.sonar-scan.outputs.gate }}
           SONAR_BUGS: ${{ needs.sonar-scan.outputs.bugs }}
           SONAR_VULNS: ${{ needs.sonar-scan.outputs.vulnerabilities }}
@@ -673,7 +746,12 @@ jobs:
             printf '| Metric | Coverage |\n'
             printf '| --- | --- |\n'
             printf '| Lines | %s%% |\n' "$ML_LINE"
-            printf '| Branches | %s%% |\n' "$ML_BRANCH"
+            printf '| Branches | %s%% |\n\n' "$ML_BRANCH"
+            printf '## Test coverage (lynq-feeders)\n\n'
+            printf '| Metric | Coverage |\n'
+            printf '| --- | --- |\n'
+            printf '| Lines | %s%% |\n' "$FEEDERS_LINE"
+            printf '| Branches | %s%% |\n' "$FEEDERS_BRANCH"
           } > /tmp/notes.md
           gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file /tmp/notes.md
 
@@ -687,11 +765,13 @@ jobs:
           (cd coverage/lynq-file-storage && zip -qr /tmp/jacoco-report-file-storage.zip .)
           (cd coverage/lynq-bff && zip -qr /tmp/jacoco-report-bff.zip .)
           cp coverage/lynq-ml/coverage.xml /tmp/coverage-lynq-ml.xml
+          cp coverage/lynq-feeders/coverage.xml /tmp/coverage-lynq-feeders.xml
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-iam.zip --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-app-backend.zip --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-file-storage.zip --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-bff.zip --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/coverage-lynq-ml.xml --clobber
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/coverage-lynq-feeders.xml --clobber
 
   # ===========================================================================
   # Stage 6 — Point the Helm values at the images just built and pushed in
@@ -723,7 +803,7 @@ jobs:
           # image in both values files to the version pushed in stage 4.
           for f in infrastructure/helm/values/k8s_values-local.yaml \
                    infrastructure/helm/values/k8s_values-prod.yaml; do
-            sed -i -E "s#(image: ${DOCKER_NAMESPACE}:lynq-(iam|app-backend|app-frontend|file-storage|bff|ml)-).*#\1${VERSION}#" "$f"
+            sed -i -E "s#(image: ${DOCKER_NAMESPACE}:lynq-(iam|app-backend|app-frontend|file-storage|bff|ml|feeders)-).*#\1${VERSION}#" "$f"
           done
 
       - name: Commit Helm image tag bump to main
@@ -800,6 +880,9 @@ jobs:
       - name: Bump lynq-ml (python) version
         run: echo "${{ steps.next.outputs.version }}" > lynq-ml/VERSION
 
+      - name: Bump lynq-feeders (python) version
+        run: echo "${{ steps.next.outputs.version }}" > lynq-feeders/VERSION
+
       - name: Bump Helm chart appVersion
         run: |
           sed -i -E "s/^appVersion:.*/appVersion: \"${{ steps.next.outputs.version }}\"/" infrastructure/helm/Chart.yaml
@@ -807,5 +890,5 @@ jobs:
       - name: Commit next development version to main
         uses: ./.github/actions/commit-to-main
         with:
-          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-ml/VERSION infrastructure/helm/Chart.yaml
+          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-ml/VERSION lynq-feeders/VERSION infrastructure/helm/Chart.yaml
           message: "chore: prepare next development version ${{ steps.next.outputs.version }} [skip ci]"
