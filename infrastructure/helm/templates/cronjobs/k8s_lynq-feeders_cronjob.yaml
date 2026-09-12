@@ -1,0 +1,52 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: lynq-feeders-cronjob
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-feeders
+spec:
+  schedule: {{ .Values.lynq_feeders.cron.schedule | quote }}
+  timeZone: {{ .Values.lynq_feeders.cron.timeZone | quote }}
+  # A run is ~80 postings, each one an LLM generation, so it can outlast the
+  # interval on a slow model. Never let a second run pile onto a running one.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.lynq_feeders.cron.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.lynq_feeders.cron.failedJobsHistoryLimit }}
+  startingDeadlineSeconds: {{ .Values.lynq_feeders.cron.startingDeadlineSeconds }}
+  jobTemplate:
+    spec:
+      # The feed is scraped fresh every day: a failed run is better retried
+      # tomorrow than hammered at now.
+      backoffLimit: {{ .Values.lynq_feeders.cron.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.lynq_feeders.cron.activeDeadlineSeconds }}
+      template:
+        metadata:
+          # Deliberately NOT app: lynq-feeders. That is the lynq-feeders-service
+          # selector, and this pod listens on nothing — matching it would put a
+          # dead endpoint behind the Service for the length of the run.
+          labels:
+            app: lynq-feeders-cron
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: trigger-ingest
+              image: {{ .Values.lynq_feeders.cron.image }}
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 16Mi
+                limits:
+                  memory: 32Mi
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  REQUEST_UUID="$(cat /proc/sys/kernel/random/uuid)"
+                  echo "Triggering lynq-feeders ingest, lynq-request-uuid=${REQUEST_UUID}"
+                  curl -sS --fail-with-body \
+                    --max-time {{ .Values.lynq_feeders.cron.requestTimeoutSeconds }} \
+                    -X POST \
+                    -H "lynq-request-uuid: ${REQUEST_UUID}" \
+                    "http://lynq-feeders-service:8089/lynq-feeders/ingest"

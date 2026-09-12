@@ -55,6 +55,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-testpassword123}
       - LYNQ_IAM_URL=http://lynq-iam:8080/lynq-iam
       - LYNQ_FILE_STORAGE_URL=http://lynq-file-storage:8080/lynq-file-storage
+      - LYNQ_INTERNAL_TOKEN=${LYNQ_INTERNAL_TOKEN:-local-internal-token-not-a-secret}
     depends_on:
       mysql:
         condition: service_healthy
@@ -151,6 +152,33 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+
+  lynq-feeders:
+    build: ./lynq-feeders
+    ports:
+      - "8089:8089"
+    environment:
+      - PORT=8089
+      - LYNQ_ML_URL=http://lynq-ml:8084/lynq-ml
+      - LYNQ_BACKEND_URL=http://lynq-app-backend:8080/lynq-backend-app
+      - LYNQ_INTERNAL_TOKEN=${LYNQ_INTERNAL_TOKEN:-local-internal-token-not-a-secret}
+      - LYNQ_FEEDERS_SYSTEM_USER_ID=${LYNQ_FEEDERS_SYSTEM_USER_ID:-00000000-0000-0000-0000-00000000feed}
+      - FEEDER_RUBROS=${FEEDER_RUBROS:-ADMINISTRACION,TECNOLOGIA,CONTABILIDAD,RECURSOS_HUMANOS}
+      - FEEDER_SOURCES=${FEEDER_SOURCES:-bumeran,computrabajo}
+      - FEEDER_JOBS_PER_RUBRO=${FEEDER_JOBS_PER_RUBRO:-10}
+      - ML_CONCURRENCY=${ML_CONCURRENCY:-2}
+      - ML_TIMEOUT=${ML_TIMEOUT:-300}
+    depends_on:
+      lynq-app-backend:
+        condition: service_started
+      lynq-ml:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8089/lynq-feeders/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   mysql:
     image: mysql:9.0

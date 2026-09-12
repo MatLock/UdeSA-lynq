@@ -18,6 +18,7 @@ infrastructure/
 │   │   ├── ingress/
 │   │   ├── configmaps/
 │   │   ├── secrets/
+│   │   ├── cronjobs/         # Scheduled jobs (the daily lynq-feeders run)
 │   │   └── infra/            # Local-only MySQL / Redis / LocalStack / Ollama
 │   └── values/
 │       ├── k8s_values-local.yaml
@@ -47,6 +48,34 @@ The chart is driven by per-environment values files. A handful of flags decide w
 | `localFrontend` | `true` | `false` | Whether the frontend runs in-cluster. In prod it is served from Cloudflare (Wrangler). |
 
 All credentials live in a single `credentials` block in `k8s_values-local.yaml` (the single source of truth shared by the apps' Secrets and the local infra). Production carries no secret material at all: the required Secrets and their keys are documented at the top of `k8s_values-prod.yaml` and are provisioned by Terraform / External Secrets.
+
+
+## Scheduled jobs
+
+`lynq-feeders` is the only workload that is not driven by users. It scrapes Bumeran and Computrabajo, asks `lynq-ml` for skills and similarity tags, and hands the batch to `lynq-app-backend`. The Deployment serves the endpoint; a CronJob calls it.
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `lynq_feeders.cron.schedule` | `0 6 * * *` | One run a day, off-peak. |
+| `lynq_feeders.cron.timeZone` | `Etc/UTC` | Pinned so the run does not drift with DST. |
+| `concurrencyPolicy` | `Forbid` | A run is ~80 postings, each an LLM generation, and can outlast the interval on a slow model. Never stack two runs. |
+| `backoffLimit` | `1` | The feed is scraped fresh daily; a failed run is better retried tomorrow than hammered at now. |
+| `activeDeadlineSeconds` | `5400` | Kills a run that hangs instead of leaving it to block the next one. |
+
+Trigger a run by hand without waiting for the schedule:
+
+```bash
+kubectl -n lynq-local-namespace create job --from=cronjob/lynq-feeders-cronjob feeders-manual
+kubectl -n lynq-local-namespace logs -f job/feeders-manual
+```
+
+### The internal token
+
+`lynq-app-backend` exposes `/internal/job-posts/ingest` for the feeder. That route is exempt from the bearer-token filters — a cron has no user behind it — and is guarded instead by a shared secret in the `lynq-internal-token` header.
+
+**The same value must be in two Secrets**: `lynq-feeders-secret` (the caller presents it) and `lynq-app-backend-secret` (the callee checks it). Locally both come from `credentials.internal.token` in `k8s_values-local.yaml`, so they cannot drift. In prod both Secrets are created outside the chart and it is on whoever provisions them to keep them equal.
+
+If the values differ, the ingest fails closed: the backend answers `401` and the feeder's run ends with `502`. The same happens when the token is missing entirely — a deploy that forgets it fails loudly rather than accepting unauthenticated writes.
 
 
 ## Running locally

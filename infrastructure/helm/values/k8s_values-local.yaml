@@ -43,6 +43,10 @@ credentials:
   bedrock:
     accessKeyId: ""
     secretAccessKey: ""
+  # Shared secret for lynq-app-backend's /internal/** routes: lynq-feeders
+  # presents it, lynq-app-backend checks it. Local value only.
+  internal:
+    token: local-internal-token-not-a-secret
 
 
 docker:
@@ -108,6 +112,40 @@ lynq_ml:
     UDEMY_MAX_COURSES: "2"
     UDEMY_BASE_URL: https://www.udemy.com
     COURSE_SEARCH_TIMEOUT: "15"
+
+lynq_feeders:
+  replicas: 1
+  image: matlock0o/lynq:lynq-feeders-1.0.14-SNAPSHOT
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      memory: 384Mi
+  config:
+    PORT: "8089"
+    HOST: "0.0.0.0"
+    LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
+    LYNQ_BACKEND_URL: http://lynq-app-backend-service:8080/lynq-backend-app
+    LYNQ_FEEDERS_SYSTEM_USER_ID: 00000000-0000-0000-0000-00000000feed
+    FEEDER_RUBROS: ADMINISTRACION,TECNOLOGIA,CONTABILIDAD,RECURSOS_HUMANOS
+    FEEDER_SOURCES: bumeran,computrabajo
+    FEEDER_JOBS_PER_RUBRO: "10"
+    ML_CONCURRENCY: "2"
+    ML_TIMEOUT: "300"
+    HTTP_TIMEOUT: "30"
+    SCRAPE_TIMEOUT: "25"
+  cron:
+    schedule: "0 6 * * *"
+    timeZone: Etc/UTC
+    image: curlimages/curl:8.11.1
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    startingDeadlineSeconds: 600
+    backoffLimit: 1
+    activeDeadlineSeconds: 5400
+    requestTimeoutSeconds: 5400
 
 lynq_bff:
   replicas: 1

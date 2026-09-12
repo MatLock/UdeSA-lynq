@@ -17,7 +17,12 @@ k8s_namespace: prod
 #
 #   lynq-app-backend-secret     (Opaque)
 #     DB_USERNAME, DB_PASSWORD
+#     LYNQ_INTERNAL_TOKEN       -> shared secret guarding the /internal/** routes;
+#                                  must match the one in lynq-feeders-secret
 #     (no bucket credentials: files are delegated to lynq-file-storage)
+#
+#   lynq-feeders-secret         (Opaque)
+#     LYNQ_INTERNAL_TOKEN       -> same value as in lynq-app-backend-secret
 #
 #   lynq-file-storage-secret    (Opaque)
 #     DB_USERNAME, DB_PASSWORD
@@ -89,6 +94,40 @@ lynq_ml:
     UDEMY_MAX_COURSES: "2"
     UDEMY_BASE_URL: https://www.udemy.com
     COURSE_SEARCH_TIMEOUT: "15"
+
+lynq_feeders:
+  replicas: 1
+  image: matlock0o/lynq:lynq-feeders-1.0.14-SNAPSHOT
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      memory: 384Mi
+  config:
+    PORT: "8089"
+    HOST: "0.0.0.0"
+    LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
+    LYNQ_BACKEND_URL: http://lynq-app-backend-service:8080/lynq-backend-app
+    LYNQ_FEEDERS_SYSTEM_USER_ID: 00000000-0000-0000-0000-00000000feed
+    FEEDER_RUBROS: ADMINISTRACION,TECNOLOGIA,CONTABILIDAD,RECURSOS_HUMANOS
+    FEEDER_SOURCES: bumeran,computrabajo
+    FEEDER_JOBS_PER_RUBRO: "10"
+    ML_CONCURRENCY: "2"
+    ML_TIMEOUT: "300"
+    HTTP_TIMEOUT: "30"
+    SCRAPE_TIMEOUT: "25"
+  cron:
+    schedule: "0 6 * * *"
+    timeZone: Etc/UTC
+    image: curlimages/curl:8.11.1
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    startingDeadlineSeconds: 600
+    backoffLimit: 1
+    activeDeadlineSeconds: 5400
+    requestTimeoutSeconds: 5400
 
 lynq_bff:
   replicas: 1
