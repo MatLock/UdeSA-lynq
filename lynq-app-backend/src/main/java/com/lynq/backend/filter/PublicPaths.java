@@ -12,6 +12,8 @@ final class PublicPaths {
       "/webjars"
   };
 
+  private static final String INTERNAL_PATH_PREFIX = "/internal";
+
   private PublicPaths() {
   }
 
@@ -26,5 +28,13 @@ final class PublicPaths {
       }
     }
     return false;
+  }
+
+  static boolean isInternal(HttpServletRequest request) {
+    return request.getServletPath().startsWith(INTERNAL_PATH_PREFIX);
+  }
+
+  static boolean skipsUserAuthentication(HttpServletRequest request) {
+    return isPublic(request) || isInternal(request);
   }
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynq.backend.client.LynqIamClient;
 import com.lynq.backend.filter.AuthHeaderExistenceFilter;
 import com.lynq.backend.filter.IamAuthenticationFilter;
+import com.lynq.backend.filter.InternalTokenFilter;
 import com.lynq.backend.filter.RequestUuidFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,9 +25,13 @@ class FilterConfigTest {
 
   private static final String URL_PATTERN_ALL = "/*";
 
+  private static final String URL_PATTERN_INTERNAL = "/internal/*";
+  private static final String INTERNAL_TOKEN = "the-configured-internal-token";
+
   private static final int REQUEST_UUID_FILTER_ORDER = 0;
-  private static final int AUTH_HEADER_EXISTENCE_FILTER_ORDER = 1;
-  private static final int IAM_AUTHENTICATION_FILTER_ORDER = 2;
+  private static final int INTERNAL_TOKEN_FILTER_ORDER = 1;
+  private static final int AUTH_HEADER_EXISTENCE_FILTER_ORDER = 2;
+  private static final int IAM_AUTHENTICATION_FILTER_ORDER = 3;
 
   @Mock
   private LynqIamClient lynqIamClient;
@@ -112,5 +117,30 @@ class FilterConfigTest {
         filterConfig.createIamAuthenticationFilter(lynqIamClient, objectMapper);
 
     assertThat(registration.getOrder(), is(IAM_AUTHENTICATION_FILTER_ORDER));
+  }
+
+  @Test
+  void createInternalTokenFilterReturnsRegistrationBeanWithInternalTokenFilter() {
+    FilterRegistrationBean<InternalTokenFilter> registration =
+        filterConfig.createInternalTokenFilter(objectMapper, INTERNAL_TOKEN);
+
+    assertThat(registration, is(notNullValue()));
+    assertThat(registration.getFilter(), is(instanceOf(InternalTokenFilter.class)));
+  }
+
+  @Test
+  void createInternalTokenFilterAppliesOnlyToInternalUrlPatterns() {
+    FilterRegistrationBean<InternalTokenFilter> registration =
+        filterConfig.createInternalTokenFilter(objectMapper, INTERNAL_TOKEN);
+
+    assertThat(registration.getUrlPatterns(), contains(URL_PATTERN_INTERNAL));
+  }
+
+  @Test
+  void createInternalTokenFilterHasExpectedOrder() {
+    FilterRegistrationBean<InternalTokenFilter> registration =
+        filterConfig.createInternalTokenFilter(objectMapper, INTERNAL_TOKEN);
+
+    assertThat(registration.getOrder(), is(INTERNAL_TOKEN_FILTER_ORDER));
   }
 }

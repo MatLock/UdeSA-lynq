@@ -36,6 +36,8 @@ lynq:
     url: http://localhost:8084/lynq-ml
   file-storage:
     url: ${LYNQ_FILE_STORAGE_URL:http://localhost:8085/lynq-file-storage}
+  internal:
+    token: ${LYNQ_INTERNAL_TOKEN:}
 
 
 server:
