@@ -515,7 +515,6 @@ jobs:
           file: lynq-app-frontend/Dockerfile
           push: true
           build-args: |
-            LYNQ_IAM_BASE_URL=http://lynq.local/lynq-iam
             LYNQ_BFF_BASE_URL=http://lynq.local/lynq-bff
           tags: ${{ env.DOCKER_NAMESPACE }}:lynq-app-frontend-${{ needs.set-version.outputs.version }}
 

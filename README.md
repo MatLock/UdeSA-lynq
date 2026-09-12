@@ -16,11 +16,11 @@ This repository is the umbrella for all modules that make up the platform. Each 
 
 ### lynq-iam &nbsp; [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-iam-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-iam-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/jacoco.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-iam-test-workflow.yaml)
 
-The identity and access management module for Lynq. It handles user accounts and sign-in, keeps sessions secure, and acts as the gatekeeper that lets the rest of the platform know who is making each request.
+The identity and access management module for Lynq. It handles user accounts and sign-in, keeps sessions secure, and acts as the gatekeeper that lets the rest of the platform know who is making each request. It is reached only from inside the platform: the browser's auth calls arrive relayed by lynq-bff, and lynq-app-backend asks it who the caller is on every request.
 
 ### lynq-bff &nbsp; [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-bff-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-bff-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/jacoco-bff.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-bff-test-workflow.yaml)
 
-The gateway module for Lynq — the single entry point from the frontend into the platform. It verifies the signature of every access token and then relays the request, unchanged, to whichever service owns it: lynq-app-backend, lynq-ml or lynq-file-storage. Those three expose their APIs behind a `/dmz` prefix and are reached only through here, which is why none of them has to check the token's signature for itself.
+The gateway module for Lynq — the single entry point from the frontend into the platform. It verifies the signature of every access token and then relays the request, unchanged, to whichever service owns it: lynq-app-backend, lynq-ml or lynq-file-storage. Those three expose their APIs behind a `/dmz` prefix and are reached only through here, which is why none of them has to check the token's signature for itself. It also relays the auth endpoints to lynq-iam — sign-in, registration, refresh — so the browser has one origin and no service but this one is exposed to the internet.
 
 ### lynq-app-backend &nbsp; [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-app-backend-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-app-backend-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/jacoco-app-backend.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-app-backend-test-workflow.yaml)
 
@@ -32,7 +32,7 @@ The file service for Lynq. It owns every file the platform stores — profile im
 
 ### lynq-app-frontend
 
-The candidate-facing web app for Lynq, built with React 19 and Vite. It delivers the interactive experience — sign-in, the job feed, profiles, applications, and job creation — talking to lynq-iam for identity and to lynq-bff for everything else.
+The candidate-facing web app for Lynq, built with React 19 and Vite. It delivers the interactive experience — sign-in, the job feed, profiles, applications, and job creation — talking only to lynq-bff, which relays identity to lynq-iam and owns everything else.
 
 ### lynq-ml &nbsp; [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/coverage-ml.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-ml-test-workflow.yaml)
 

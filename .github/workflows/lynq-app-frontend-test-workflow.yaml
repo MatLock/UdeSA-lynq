@@ -40,10 +40,9 @@ jobs:
 
       - name: Build
         working-directory: lynq-app-frontend
-        # Vite bakes these at build time; CI only needs the compile to succeed,
-        # so placeholder URLs are enough (the real values are baked when the
+        # Vite bakes this at build time; CI only needs the compile to succeed,
+        # so a placeholder URL is enough (the real value is baked when the
         # release image is built).
         env:
-          LYNQ_IAM_BASE_URL: http://lynq.local/lynq-iam
           LYNQ_BFF_BASE_URL: http://lynq.local/lynq-bff
         run: npm run build

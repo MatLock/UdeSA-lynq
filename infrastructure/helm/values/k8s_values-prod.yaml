@@ -102,6 +102,7 @@ lynq_bff:
   path: /lynq-bff
   config:
     SPRING_PROFILES_ACTIVE: production
+    LYNQ_IAM_URL: http://lynq-iam-service:8080/lynq-iam
     LYNQ_BACKEND_URL: http://lynq-app-backend-service:8080/lynq-backend-app
     LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
     LYNQ_FILE_STORAGE_URL: http://lynq-file-storage-service:8080/lynq-file-storage
@@ -151,7 +152,9 @@ lynq_iam:
       memory: 512Mi
     limits:
       memory: 1Gi
-  path: /lynq-iam
+  # No `path` and no Ingress: lynq-iam is reached from inside the cluster only —
+  # by lynq-bff, which relays the browser's auth calls, and by lynq-app-backend,
+  # which resolves the caller on every request.
   config:
     SPRING_PROFILES_ACTIVE: production
     DB_URL: "jdbc:mysql://REPLACE_DB_HOST:3306/lynq_iam_db"

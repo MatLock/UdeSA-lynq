@@ -19,7 +19,7 @@ output "chart_version" {
 }
 
 output "ingress_host" {
-  description = "Public host for iam + backend (prod)."
+  description = "Public host of the gateway (lynq-bff) in prod — every call enters through it."
   value       = var.ingress_host
 }
 
