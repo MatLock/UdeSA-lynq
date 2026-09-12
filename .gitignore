@@ -15,3 +15,5 @@ aws_credentials.txt
 .aws/
 credentials
 .DS_Store
+trello.auth.txt
+openai_key.txt
