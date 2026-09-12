@@ -17,6 +17,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockserver.model.MediaType;
+import org.mockserver.model.NottableString;
 import org.mockserver.model.Parameter;
 import org.mockserver.verify.VerificationTimes;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -41,6 +42,21 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   private static final String RESUME_WITH_ALIAS_BODY = """
       {"success": true, "data": {"id": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60", "alias": "Backend roles"}}""";
 
+  private static final String LOGIN_BODY = """
+      {"email": "jane@lynq.com", "password": "s3cr3tpass"}""";
+  private static final String SESSION_BODY = """
+      {"success": true, "data": {"id": "11111111-1111-1111-1111-111111111111", "accessToken": "eyJhbGciOiJIUzI1NiJ9.access.token", "refreshToken": "opaque-refresh-token"}}""";
+  private static final String AVAILABILITY_BODY = """
+      {"success": true, "data": {"valid": false, "reason": "Username is already taken"}}""";
+  private static final String OPAQUE_REFRESH_TOKEN = "8f14e45f-ceea-467a-9ae4-9b3f4a1c2d3e";
+  private static final String REGISTER_BODY = """
+      {"username": "janedoe", "email": "jane@lynq.com", "password": "s3cr3tpass", \
+"role": "R_CANDIDATE"}""";
+  private static final String PASSWORD_UPDATE_BODY = """
+      {"newPassword": "an0th3rpass"}""";
+  private static final String INVALID_CREDENTIALS_BODY = """
+      {"success": false, "reason": "Invalid password"}""";
+
   private static final String USER_ID_HEADER = "user-id";
   private static final String COMPANY_ID_HEADER = "company-id";
 
@@ -55,6 +71,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
   @BeforeEach
   void setUp() {
+    lynqIamMock.reset();
     lynqBackendMock.reset();
     lynqMlMock.reset();
     lynqFileStorageMock.reset();
@@ -462,6 +479,192 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     lynqFileStorageMock.verify(request(), VerificationTimes.exactly(0));
   }
 
+  @Test
+  void relaysTheEmailLoginToLynqIamWithoutAnyAccessToken() throws Exception {
+    lynqIamMock.when(request().withMethod("POST").withPath("/auth/login/email"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(SESSION_BODY));
+
+    HttpResponse<String> response =
+        sendAnonymous("POST", CONTEXT_PATH + "/auth/login/email", LOGIN_BODY);
+
+    assertThat(response.statusCode(), is(200));
+    assertThat(response.body(), is(SESSION_BODY));
+    lynqIamMock.verify(request()
+        .withMethod("POST")
+        .withPath("/auth/login/email")
+        .withBody(json(LOGIN_BODY))
+        .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID), VerificationTimes.once());
+  }
+
+  @Test
+  void relaysTheRegistrationToLynqIam() throws Exception {
+    lynqIamMock.when(request().withMethod("POST").withPath("/auth/register"))
+        .respond(response().withStatusCode(201)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(SESSION_BODY));
+
+    HttpResponse<String> response =
+        sendAnonymous("POST", CONTEXT_PATH + "/auth/register", REGISTER_BODY);
+
+    assertThat(response.statusCode(), is(201));
+    assertThat(response.body(), is(SESSION_BODY));
+    lynqIamMock.verify(request().withMethod("POST").withPath("/auth/register")
+        .withBody(json(REGISTER_BODY)), VerificationTimes.once());
+  }
+
+  @Test
+  void relaysTheRefreshWithItsOpaqueCredentialUntouched() throws Exception {
+    lynqIamMock.when(request().withMethod("POST").withPath("/auth/refresh"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(SESSION_BODY));
+
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(baseUrl() + CONTEXT_PATH + "/auth/refresh"))
+        .header(AUTHORIZATION_HEADER, "Bearer " + OPAQUE_REFRESH_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .POST(HttpRequest.BodyPublishers.noBody())
+        .build();
+
+    HttpResponse<String> response =
+        httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(response.statusCode(), is(200));
+    lynqIamMock.verify(request()
+        .withMethod("POST")
+        .withPath("/auth/refresh")
+        .withHeader(AUTHORIZATION_HEADER, "Bearer " + OPAQUE_REFRESH_TOKEN),
+        VerificationTimes.once());
+  }
+
+  @Test
+  void returnsUnauthorizedWhenTheRefreshCarriesNoCredential() throws Exception {
+    HttpResponse<String> response =
+        sendAnonymous("POST", CONTEXT_PATH + "/auth/refresh", null);
+
+    assertThat(response.statusCode(), is(401));
+    assertThat(response.body(), containsString("Missing Authorization header"));
+    lynqIamMock.verify(request(), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void relaysTheUsernameAvailabilityCheckWithItsQueryParameter() throws Exception {
+    lynqIamMock.when(request().withMethod("GET").withPath("/auth/check-username"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(AVAILABILITY_BODY));
+
+    HttpResponse<String> response = sendAnonymous(
+        "GET", CONTEXT_PATH + "/auth/check-username?username=janedoe", null);
+
+    assertThat(response.statusCode(), is(200));
+    assertThat(response.body(), is(AVAILABILITY_BODY));
+    lynqIamMock.verify(request()
+        .withMethod("GET")
+        .withPath("/auth/check-username")
+        .withQueryStringParameter(new Parameter("username", "janedoe")), VerificationTimes.once());
+  }
+
+  @Test
+  void relaysThePasswordUpdateOnceTheAccessTokenSignatureChecksOut() throws Exception {
+    lynqIamMock.when(request().withMethod("PATCH").withPath("/auth/update-password"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(SESSION_BODY));
+
+    HttpResponse<String> response =
+        send("PATCH", CONTEXT_PATH + "/auth/update-password", PASSWORD_UPDATE_BODY);
+
+    assertThat(response.statusCode(), is(200));
+    assertThat(response.body(), is(SESSION_BODY));
+    lynqIamMock.verify(request()
+        .withMethod("PATCH")
+        .withPath("/auth/update-password")
+        .withHeader(AUTHORIZATION_HEADER, "Bearer " + accessToken), VerificationTimes.once());
+  }
+
+  @Test
+  void refusesThePasswordUpdateWhenTheTokenWasSignedWithAnotherSecret() throws Exception {
+    accessToken = accessToken(
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        Instant.now().plus(15, ChronoUnit.MINUTES));
+
+    HttpResponse<String> response =
+        send("PATCH", CONTEXT_PATH + "/auth/update-password", PASSWORD_UPDATE_BODY);
+
+    assertThat(response.statusCode(), is(401));
+    assertThat(response.body(), containsString("Invalid or expired access token"));
+    lynqIamMock.verify(request(), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void dropsAClientSuppliedUserIdHeaderInsteadOfRelayingItToLynqIam() throws Exception {
+    lynqIamMock.when(request().withMethod("POST").withPath("/auth/login/email"))
+        .respond(response().withStatusCode(200).withBody(SESSION_BODY));
+
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(baseUrl() + CONTEXT_PATH + "/auth/login/email"))
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(USER_ID_HEADER, SPOOFED_USER_ID)
+        .POST(HttpRequest.BodyPublishers.ofString(LOGIN_BODY))
+        .build();
+
+    httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+    lynqIamMock.verify(request()
+        .withPath("/auth/login/email")
+        .withHeader(NottableString.not(USER_ID_HEADER)), VerificationTimes.once());
+  }
+
+  @Test
+  void passesALynqIamErrorStatusAndBodyStraightBack() throws Exception {
+    lynqIamMock.when(request().withMethod("POST").withPath("/auth/login/email"))
+        .respond(response().withStatusCode(403)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(INVALID_CREDENTIALS_BODY));
+
+    HttpResponse<String> response =
+        sendAnonymous("POST", CONTEXT_PATH + "/auth/login/email", LOGIN_BODY);
+
+    assertThat(response.statusCode(), is(403));
+    assertThat(response.body(), is(INVALID_CREDENTIALS_BODY));
+  }
+
+  @Test
+  void doesNotRelayTheAuthRoutesNoBrowserCalls() throws Exception {
+    assertThat(send("GET", CONTEXT_PATH + "/auth/validate", null).statusCode(), is(404));
+    assertThat(send("GET", CONTEXT_PATH + "/auth/user-info", null).statusCode(), is(404));
+
+    lynqIamMock.verify(request(), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void doesNotRelayAMappedAuthPathUnderAVerbItDoesNotOpen() throws Exception {
+    HttpResponse<String> response =
+        sendAnonymous("GET", CONTEXT_PATH + "/auth/login/email", null);
+
+    assertThat(response.statusCode(), is(405));
+    lynqIamMock.verify(request(), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void stillRequiresTheRequestUuidHeaderOnAPublicAuthRoute() throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(baseUrl() + CONTEXT_PATH + "/auth/login/email"))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .POST(HttpRequest.BodyPublishers.ofString(LOGIN_BODY))
+        .build();
+
+    HttpResponse<String> response =
+        httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(response.statusCode(), is(403));
+    lynqIamMock.verify(request(), VerificationTimes.exactly(0));
+  }
+
   private String baseUrl() {
     return "http://localhost:" + port;
   }
@@ -503,6 +706,28 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   private void useRoles(String... roles) {
     accessToken =
         accessToken(JWT_SECRET, Instant.now().plus(15, ChronoUnit.MINUTES), List.of(roles));
+  }
+
+  /**
+   * Sends without an Authorization header, the way the browser calls the auth routes that mint a
+   * session: there is no token yet.
+   */
+  private HttpResponse<String> sendAnonymous(String method, String path, String body)
+      throws Exception {
+    HttpRequest.BodyPublisher publisher = body == null
+        ? HttpRequest.BodyPublishers.noBody()
+        : HttpRequest.BodyPublishers.ofString(body);
+
+    HttpRequest.Builder builder = HttpRequest.newBuilder()
+        .uri(URI.create(baseUrl() + path))
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .method(method, publisher);
+
+    if (body != null) {
+      builder.header(CONTENT_TYPE_HEADER, APPLICATION_JSON);
+    }
+
+    return httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
   }
 
   private HttpResponse<String> send(String method, String path, String body) throws Exception {

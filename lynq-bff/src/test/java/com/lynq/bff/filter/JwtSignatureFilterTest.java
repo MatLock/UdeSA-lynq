@@ -179,4 +179,25 @@ class JwtSignatureFilterTest {
 
     assertThat(filter.shouldNotFilter(request), is(false));
   }
+
+  @Test
+  void shouldNotFilterTheAuthRoutesThatMintASessionBecauseThereIsNoTokenYet() {
+    when(request.getServletPath()).thenReturn("/auth/register");
+
+    assertThat(filter.shouldNotFilter(request), is(true));
+  }
+
+  @Test
+  void shouldNotFilterTheRefreshBecauseItsCredentialIsNotAJwt() {
+    when(request.getServletPath()).thenReturn("/auth/refresh");
+
+    assertThat(filter.shouldNotFilter(request), is(true));
+  }
+
+  @Test
+  void shouldFilterThePasswordUpdateBecauseItCarriesAnAccessToken() {
+    when(request.getServletPath()).thenReturn("/auth/update-password");
+
+    assertThat(filter.shouldNotFilter(request), is(false));
+  }
 }

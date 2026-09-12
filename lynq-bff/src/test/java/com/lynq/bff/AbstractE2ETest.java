@@ -31,6 +31,9 @@ public abstract class AbstractE2ETest {
   protected static final String JWT_SECRET =
       "8d2b6d2a9c5e8f4f8f9d1c7a4e3b5f6d8c9a1e2f3a4b5c6d7e8f9a1b2c3d4e5";
 
+  protected static final MockServerContainer LYNQ_IAM =
+      new MockServerContainer(MOCKSERVER_IMAGE).withReuse(true);
+
   protected static final MockServerContainer LYNQ_BACKEND =
       new MockServerContainer(MOCKSERVER_IMAGE).withReuse(true);
 
@@ -40,11 +43,15 @@ public abstract class AbstractE2ETest {
   protected static final MockServerContainer LYNQ_FILE_STORAGE =
       new MockServerContainer(MOCKSERVER_IMAGE).withReuse(true);
 
+  protected static MockServerClient lynqIamMock;
   protected static MockServerClient lynqBackendMock;
   protected static MockServerClient lynqMlMock;
   protected static MockServerClient lynqFileStorageMock;
 
   static {
+    LYNQ_IAM.start();
+    lynqIamMock = new MockServerClient(LYNQ_IAM.getHost(), LYNQ_IAM.getServerPort());
+
     LYNQ_BACKEND.start();
     lynqBackendMock = new MockServerClient(LYNQ_BACKEND.getHost(), LYNQ_BACKEND.getServerPort());
 
@@ -58,6 +65,7 @@ public abstract class AbstractE2ETest {
 
   @DynamicPropertySource
   static void registerDynamicProperties(DynamicPropertyRegistry registry) {
+    registry.add("lynq.iam.url", LYNQ_IAM::getEndpoint);
     registry.add("lynq.backend.url", LYNQ_BACKEND::getEndpoint);
     registry.add("lynq.ml.url", LYNQ_ML::getEndpoint);
     registry.add("lynq.file-storage.url", LYNQ_FILE_STORAGE::getEndpoint);

@@ -80,7 +80,7 @@ variable "ec2_key_name" {
 # ---------------------------------------------------------------------------
 
 variable "ingress_host" {
-  description = "Public API host for iam + backend behind the ALB (e.g. api.lynqoficial.com)."
+  description = "Public host of the gateway (lynq-bff) behind the ALB — the only service exposed to the internet (e.g. api.lynqoficial.com)."
   type        = string
 }
 

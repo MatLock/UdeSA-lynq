@@ -8,12 +8,17 @@
  *   2. Registers a RECRUITER / COMPANY (4-step wizard) and completes their
  *      profile the same way.
  *   3. The recruiter publishes a job, letting the "Generar habilidades"
- *      (generate skills with AI) button fill in the skills, and logs out.
- *   4. The candidate logs back in, finds the job and applies to it.
- *   5. The candidate creates a resume by uploading a PDF (./files) — parsed by
+ *      (generate skills with AI) button fill in the skills.
+ *   4. The recruiter publishes a second job and deprecates it from the edit
+ *      form (status OPEN → CLOSE), then reviews every post they made under
+ *      "Mis publicaciones" — where the live post and the closed one are
+ *      contrasted: badge, card styling, and whether the public feed still
+ *      lists them. Then logs out.
+ *   5. The candidate logs back in, finds the open job and applies to it.
+ *   6. The candidate creates a resume by uploading a PDF (./files) — parsed by
  *      the ML service — then assigns an alias to it and overrides that alias,
  *      proving both writes stick.
- *   6. The candidate creates a second resume through the translation flow:
+ *   7. The candidate creates a second resume through the translation flow:
  *      runs the translation, picks a template, generates the live preview
  *      (asserting the PDF canvas actually draws content), and confirms —
  *      which stores the translated resume and adds it to the switcher.
@@ -23,10 +28,15 @@
  *
  * Usage:
  *   npm install
- *   npm test                     # visible browser
+ *   npm test                     # visible browser, paced for watching
  *   npm run test:headless        # no window
- *   npm run test:slow            # visible browser, paused between actions
+ *   npm run test:slow            # visible browser, paused further between actions
  *   BASE_URL=http://localhost:5173 npm test
+ *
+ * Every action is padded by BASE_ACTION_DELAY_MS (500 by default) and the run
+ * opens on the login screen and waits INTRO_PAUSE_MS (7000) there before it
+ * starts, so the walkthrough can be narrated live. Set either to 0 to strip the
+ * pacing out.
  */
 
 import fs from 'node:fs'
@@ -61,17 +71,30 @@ const EXTRA_LONG_TIMEOUT = Number(process.env.EXTRA_LONG_TIMEOUT_MS ?? 300000)
 // bit longer keeps us from acting on a slide that is still moving.
 const WIZARD_TRANSITION = 700
 
+// Padding added to every interaction on top of whatever the run asks for, so a
+// plain `npm test` is already slow enough to be shown to an audience rather
+// than flying past. Set BASE_ACTION_DELAY_MS=0 to get the old no-pause run back.
+const BASE_ACTION_DELAY = Number(process.env.BASE_ACTION_DELAY_MS ?? 500)
+
 // Pause after every interaction so a person watching the browser can follow the
-// navigation. Off by default; set --delay=800 or ACTION_DELAY_MS=800 to slow the
-// run down to a human pace.
-const ACTION_DELAY = Number(readArgument('delay') ?? process.env.ACTION_DELAY_MS ?? 0)
+// navigation. --delay=1000 or ACTION_DELAY_MS=1000 slows it down further still;
+// whatever is asked for is added on top of the padding above.
+const ACTION_DELAY =
+  BASE_ACTION_DELAY + Number(readArgument('delay') ?? process.env.ACTION_DELAY_MS ?? 0)
+
+// How long the run holds on the login screen before it starts, so the first
+// thing on screen can be introduced to the room while nothing is moving.
+const INTRO_PAUSE = Number(process.env.INTRO_PAUSE_MS ?? 7000)
 
 const IMAGES_DIR = path.join(__dirname, 'images')
 const CANDIDATE_IMAGE = path.join(IMAGES_DIR, 'candidate_mock.jpeg')
 const RECRUITER_IMAGE = path.join(IMAGES_DIR, 'recruiter_mock.jpeg')
 
 const FILES_DIR = path.join(__dirname, 'files')
-const RESUME_PDF = path.join(FILES_DIR, 'resume_mock.pdf')
+// The imported CV is written in English on purpose: the translation case asks
+// for Spanish, and the dialog only offers languages the candidate holds no
+// resume in — importing a Spanish CV would take Spanish off the list.
+const RESUME_PDF = path.join(FILES_DIR, 'resume_mock_en.pdf')
 
 // Unique suffix per run, so the test can be executed repeatedly without
 // colliding with data already in the database. IAM usernames are capped at 20
@@ -132,10 +155,54 @@ const RECRUITER = {
 
 const RESUME = {
   file: RESUME_PDF,
+  // The language lynq-ml should detect in the document, and the language the
+  // switcher must then show for it.
+  language: 'EN',
   // Assigned first, then overridden — assigning and renaming are the same
   // endpoint, so the test proves both writes stick.
   alias: 'CV principal',
   aliasOverride: `Perfil backend ${SUFFIX}`,
+}
+
+// The second resume: the imported one translated. Spanish is available because
+// the only resume on file at that point is the English import.
+const TRANSLATION = {
+  languageName: 'Español',
+  languageCode: 'ES',
+  alias: `CV traducido ${SUFFIX}`,
+}
+
+// The third resume, typed into the wizard's form path instead of imported. It is
+// stored in the UI's language (Spanish), and its name is the full name typed
+// here — which is how its tab is told apart from the other two, whose tabs show
+// their alias.
+const FORM_RESUME = {
+  personal: {
+    fullName: 'María Fernanda Gómez',
+    headline: 'Desarrolladora Backend Semi Senior',
+    email: `candidata.${SUFFIX}@lynq.test`,
+    phone: '+54 11 5555-0000',
+    location: 'Buenos Aires, Argentina',
+    summary:
+      'Desarrolladora backend con cinco años de experiencia construyendo APIs ' +
+      'REST en Java y Spring Boot para empresas de tecnología financiera. ' +
+      'Trabajo con MySQL, Docker y despliegues sobre AWS.',
+  },
+  education: {
+    institution: 'Universidad de Buenos Aires',
+    degree: 'Ingeniería en Sistemas',
+    field: 'Sistemas de información',
+  },
+  employment: {
+    position: 'Desarrolladora Backend Semi Senior',
+    company: 'FintechAr S.A.',
+    location: 'Buenos Aires, Argentina',
+    description:
+      'Diseño y mantenimiento de microservicios en Java 17 con Spring Boot 3, ' +
+      'modelado de datos sobre MySQL y despliegue continuo sobre contenedores.',
+  },
+  template: 'CLASSIC',
+  alias: `CV formulario ${SUFFIX}`,
 }
 
 const JOB = {
@@ -154,6 +221,27 @@ const JOB = {
   // Skills are not typed in: they come from the "Generar habilidades" button,
   // which asks the backend's ML endpoint for them. The exact list depends on
   // the model, so the test only requires that at least this many come back.
+  minSkills: 1,
+}
+
+// A second job, published by the same recruiter and then deprecated (moved to
+// CLOSE from the edit form). It exists so "Mis publicaciones" holds one post of
+// each lifecycle state at the same time, which is what makes the open/closed
+// comparison meaningful. The title starts differently from JOB's on purpose:
+// both lookups match by `contains`, so one must never be a substring of the
+// other.
+const DEPRECATED_JOB = {
+  title: `Analista de Datos ${SUFFIX}`,
+  description:
+    'Sumamos una persona analista de datos para trabajar con el equipo de ' +
+    'producto en el tablero de métricas de la compañía. Vas a modelar tablas ' +
+    'sobre MySQL, escribir consultas SQL de reporting y automatizar la carga ' +
+    'diaria de información. Buscamos experiencia con visualización de datos y ' +
+    'con herramientas de orquestación. Modalidad presencial en Buenos Aires, ' +
+    'con dos días de trabajo remoto por semana.',
+  workType: 'IN_OFFICE',
+  minSalary: '900000',
+  maxSalary: '1400000',
   minSkills: 1,
 }
 
@@ -280,11 +368,29 @@ const assert = (condition, message) => {
 // The carousel keeps every step in the DOM; the active one is the only slide
 // with aria-hidden="false". Waiting on that (plus the CSS transition) avoids
 // typing into a step that is still sliding in.
-const waitForActiveStep = async (driver, fieldId) => {
+const waitForActiveStep = async (driver, fieldId, slideClass = 'register-wizard-slide') => {
   const selector = By.xpath(
-    `//div[contains(@class,'register-wizard-slide')][@aria-hidden='false']//*[@id='${fieldId}']`,
+    `//div[contains(@class,'${slideClass}')][@aria-hidden='false']//*[@id='${fieldId}']`,
   )
   await waitVisible(driver, selector)
+  await sleep(WIZARD_TRANSITION)
+}
+
+// The resume wizard is the same carousel, so its steps are awaited the same way:
+// by an id for the steps that hold fields, by class for the ones that do not
+// (the method, template and preview steps).
+const waitForResumeStep = (driver, fieldId) =>
+  waitForActiveStep(driver, fieldId, 'resume-wizard-slide')
+
+const waitForResumeStepNamed = async (driver, stepClass, timeout = TIMEOUT) => {
+  await waitVisible(
+    driver,
+    By.xpath(
+      `//div[contains(@class,'resume-wizard-slide')][@aria-hidden='false']` +
+        `//div[contains(@class,'${stepClass}')]`,
+    ),
+    timeout,
+  )
   await sleep(WIZARD_TRANSITION)
 }
 
@@ -426,6 +532,17 @@ const logout = async (driver) => {
   detail('logged out, back on the login page')
 }
 
+// Opens the app on its login screen and holds there before the walkthrough
+// begins. Nothing is asserted here: it exists purely so the screen can be
+// pointed at and talked through while the run is still standing still.
+const showLoginScreen = async (driver) => {
+  log('Opening the login screen')
+  await navigate(driver, `${BASE_URL}/`)
+  await waitVisible(driver, By.css('#identifier'), LONG_TIMEOUT)
+  detail(`holding here for ${(INTRO_PAUSE / 1000).toFixed(0)}s before starting`)
+  await sleep(INTRO_PAUSE)
+}
+
 const login = async (driver, username, password) => {
   log(`Logging in as ${username}`)
   await navigate(driver, `${BASE_URL}/`)
@@ -519,47 +636,77 @@ const publishJob = async (driver, job) => {
 // Searching and applying
 // ---------------------------------------------------------------------------
 
-const jobCardFor = (title) =>
-  By.xpath(
-    `//article[contains(@class,'job-card')][.//h3[contains(normalize-space(.), "${title}")]]`,
-  )
+// The card for a job, addressed by its title. Kept as a string so the selectors
+// built on top of it (the detail link, the edit action) can extend the same
+// path instead of restating it.
+const jobCardXPath = (title) =>
+  `//article[contains(@class,'job-card')][.//h3[contains(normalize-space(.), "${title}")]]`
 
-// Looks the job up in the feed by title. The search is retried a few times
-// because the listing can lag behind a job that was just published.
-const findJobInFeed = async (driver, title, attempts = 5) => {
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    await navigate(driver, `${BASE_URL}/home`)
-    await waitVisible(driver, By.css('.home-search-input'), LONG_TIMEOUT)
-    await type(driver, By.css('.home-search-input'), title)
-    await click(driver, By.css('.home-search-button'))
+const jobCardFor = (title) => By.xpath(jobCardXPath(title))
 
-    // The feed shows a spinner while the results are loading.
-    await driver.wait(async () => {
-      const loading = await driver.findElements(By.css('.home-state .spinner'))
-      const cards = await driver.findElements(By.css('.job-card'))
-      const emptyState = await driver.findElements(By.css('.home-state'))
-      return loading.length === 0 && (cards.length > 0 || emptyState.length > 0)
-    }, LONG_TIMEOUT)
+// The "Ver detalles" link of the card for this job — addressed from the card
+// rather than held as an element, so it is located fresh at click time.
+const jobCardLinkFor = (title) =>
+  By.xpath(`${jobCardXPath(title)}//*[contains(@class,'job-card-actions')]`)
 
-    const found = await driver.findElements(jobCardFor(title))
-    if (found.length > 0) return found[0]
+// Runs one search on the public feed and waits for the results to settle
+// (spinner gone, either cards or the empty state on screen). Returns the cards
+// matching the title, which is empty when the feed does not carry the job —
+// either because it has not caught up yet, or because the post is closed and
+// the feed only ever lists OPEN ones.
+const searchFeedFor = async (driver, title) => {
+  await navigate(driver, `${BASE_URL}/home`)
+  await waitVisible(driver, By.css('.home-search-input'), LONG_TIMEOUT)
+  await type(driver, By.css('.home-search-input'), title)
+  await click(driver, By.css('.home-search-button'))
 
-    detail(`the job is not in the feed yet (attempt ${attempt}/${attempts})`)
-    await sleep(2000)
-  }
-  throw new Error(`Could not find the job «${title}» in the feed`)
+  // The feed shows a spinner while the results are loading.
+  await driver.wait(async () => {
+    const loading = await driver.findElements(By.css('.home-state .spinner'))
+    const cards = await driver.findElements(By.css('.job-card'))
+    const emptyState = await driver.findElements(By.css('.home-state'))
+    return loading.length === 0 && (cards.length > 0 || emptyState.length > 0)
+  }, LONG_TIMEOUT)
+
+  return driver.findElements(jobCardFor(title))
 }
 
-const applyToJob = async (driver, title) => {
-  log('Finding the published job and applying to it')
-  const card = await findJobInFeed(driver, title)
-  await scrollIntoView(driver, card)
+// Looks the job up in the feed by title and opens its detail page. Both halves
+// live in the same retry on purpose: the listing can lag behind a job that was
+// just published, and the feed re-renders often enough that an element found in
+// one tick is stale by the next — handing a card back to the caller to click
+// later is a race, so the click happens here, from the selector.
+const openJobFromFeed = async (driver, title, attempts = 5) => {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const found = await searchFeedFor(driver, title)
+      if (found.length === 0) {
+        detail(`the job is not in the feed yet (attempt ${attempt}/${attempts})`)
+      } else {
+        await click(driver, jobCardLinkFor(title))
+        await driver.wait(until.urlContains('/details'), TIMEOUT)
+        return
+      }
+    } catch (error) {
+      // A re-render between locating the card and opening it is the same lag
+      // this loop already retries for, so treat it as one more miss instead of
+      // an abort.
+      if (error.name !== 'StaleElementReferenceError') throw error
+      detail(`the feed re-rendered mid-search (attempt ${attempt}/${attempts})`)
+    }
 
-  // "Ver detalles" navigates to the job detail page.
-  const link = await card.findElement(By.css('.job-card-actions'))
-  await link.click()
-  await pause()
-  await driver.wait(until.urlContains('/details'), TIMEOUT)
+    await sleep(2000)
+  }
+  throw new Error(`Could not open the job «${title}» from the feed`)
+}
+
+// Applies to the job with a resume the candidate picks. Applying is never a bare
+// click: the button opens a dialog listing the stored resumes, because the
+// recruiter only ever sees the one chosen here. The pick is deliberately not the
+// one the dialog preselects, so the choice itself is what the test exercises.
+const applyToJob = async (driver, title, resumeName) => {
+  log('Finding the published job and applying to it')
+  await openJobFromFeed(driver, title)
 
   const detailTitle = await waitVisible(driver, By.css('.job-detail-title'), LONG_TIMEOUT)
   const titleText = await detailTitle.getText()
@@ -569,6 +716,44 @@ const applyToJob = async (driver, title) => {
   )
 
   await click(driver, By.css('.job-detail-apply'))
+
+  // The dialog loads the candidate's resumes and preselects the first one.
+  await waitVisible(driver, By.css('.apply-resume-dialog'), LONG_TIMEOUT)
+  await driver.wait(async () => {
+    const options = await driver.findElements(By.css('.apply-resume-option'))
+    return options.length > 0
+  }, LONG_TIMEOUT)
+  const offered = await driver.findElements(By.css('.apply-resume-option-name'))
+  const names = []
+  for (const option of offered) names.push((await option.getText()).trim())
+  detail(`the dialog offers ${names.length} resumes: ${names.join(', ')}`)
+  assert(
+    names.includes(resumeName),
+    `«${resumeName}» should be on offer, but the dialog lists ${names.join(', ')}`,
+  )
+
+  const preselected = await driver
+    .findElement(By.css('.apply-resume-option.is-selected .apply-resume-option-name'))
+    .getText()
+
+  const picked = await click(
+    driver,
+    By.xpath(
+      `//label[contains(@class,'apply-resume-option')]` +
+        `[.//span[contains(@class,'apply-resume-option-name')][normalize-space(.)="${resumeName}"]]`,
+    ),
+  )
+  const pickedClasses = await picked.getAttribute('class')
+  assert(
+    pickedClasses.includes('is-selected'),
+    `«${resumeName}» should be selected after clicking it, but the option reads «${pickedClasses}»`,
+  )
+  detail(
+    `resume picked: «${resumeName}»` +
+      (preselected.trim() === resumeName ? ' (also the default)' : ` (default was «${preselected.trim()}»)`),
+  )
+
+  await click(driver, By.css('.apply-resume-dialog button[type="submit"]'))
 
   const status = await driver.wait(
     until.elementLocated(By.css('.job-detail-apply-status.is-success')),
@@ -588,8 +773,217 @@ const applyToJob = async (driver, title) => {
 }
 
 // ---------------------------------------------------------------------------
+// Deprecating a job post and reviewing the publications
+// ---------------------------------------------------------------------------
+
+// The "Editar" action of the card for this job, which only the owner list
+// renders (the public feed shows "Ver detalles" in that slot instead).
+const jobCardEditFor = (title) =>
+  By.xpath(`${jobCardXPath(title)}//*[contains(@class,'job-card-edit')]`)
+
+// The lifecycle chip pinned to the card's top-right corner. Owner lists are the
+// only place it is rendered, since the feed only ever lists OPEN posts.
+const jobCardStatusChipFor = (title) =>
+  By.xpath(`${jobCardXPath(title)}//*[contains(@class,'job-card-status-chip')]`)
+
+const openMyJobPosts = async (driver) => {
+  await navigate(driver, `${BASE_URL}/job/mine`)
+  // The page fetches GET /job/mine before it can render anything, and its
+  // loading state reuses the same `.my-jobs-state` box as the empty and error
+  // ones — so the spinner has to be gone before the box means "no posts".
+  await driver.wait(async () => {
+    const loading = await driver.findElements(By.css('.my-jobs-state .spinner'))
+    const cards = await driver.findElements(By.css('.job-card'))
+    const state = await driver.findElements(By.css('.my-jobs-state'))
+    return loading.length === 0 && (cards.length > 0 || state.length > 0)
+  }, LONG_TIMEOUT)
+}
+
+// Everything the owner list says about one job post: the lifecycle chip's
+// label, and whether the card itself is rendered in its de-emphasized closed
+// styling (`.job-card.is-closed`).
+const readJobPostRow = async (driver, title) => {
+  const card = await waitVisible(driver, jobCardFor(title), LONG_TIMEOUT)
+  const classes = await card.getAttribute('class')
+  const chip = await waitVisible(driver, jobCardStatusChipFor(title), LONG_TIMEOUT)
+  const status = (await chip.getText()).trim()
+  const edits = await driver.findElements(jobCardEditFor(title))
+  return { status, isClosed: classes.includes('is-closed'), hasEdit: edits.length > 0 }
+}
+
+// Deprecates a post: opens it from "Mis publicaciones" through its own Edit
+// action — which is the only route the UI offers — flips the status select to
+// CLOSE and saves. The form lands back on the list on success, so waiting for
+// that URL is what proves the update went through.
+const deprecateJob = async (driver, title) => {
+  log(`Deprecating the job «${title}»`)
+  await openMyJobPosts(driver)
+
+  await click(driver, jobCardEditFor(title), LONG_TIMEOUT)
+  await driver.wait(until.urlContains('/edit'), LONG_TIMEOUT)
+
+  // The edit form prefills from the job handed over in router state; the status
+  // select is the field create-job does not expose at all.
+  const select = await waitVisible(driver, By.css('#edit-job-status'), LONG_TIMEOUT)
+  const before = await select.getAttribute('value')
+  assert(before === 'OPEN', `the job should start OPEN but the form reads «${before}»`)
+
+  await click(driver, By.css('#edit-job-status option[value="CLOSE"]'))
+  await click(driver, By.css('.create-job-submit'))
+  await waitForNoOverlay(driver)
+  await driver.wait(until.urlContains('/job/mine'), LONG_TIMEOUT)
+  detail('the job was saved as CLOSE and the form returned to the list')
+}
+
+// Walks the owner's publications and contrasts the two states side by side: the
+// live post and the deprecated one sit in the same list, so every difference
+// asserted here is a difference the list itself draws.
+const reviewMyJobPosts = async (driver, openTitle, closedTitle) => {
+  log('Reviewing every job post the recruiter published')
+  await openMyJobPosts(driver)
+
+  const live = await readJobPostRow(driver, openTitle)
+  const closed = await readJobPostRow(driver, closedTitle)
+
+  assert(
+    live.status === 'Abierto',
+    `«${openTitle}» should be badged "Abierto" but reads «${live.status}»`,
+  )
+  assert(
+    !live.isClosed,
+    `«${openTitle}» is still open, so its card must not carry the closed styling`,
+  )
+  assert(
+    closed.status === 'Cerrado',
+    `«${closedTitle}» should be badged "Cerrado" but reads «${closed.status}»`,
+  )
+  assert(
+    closed.isClosed,
+    `«${closedTitle}» was deprecated, so its card must carry the closed styling`,
+  )
+  // Editing stays available on both: closing a post is reversible from the very
+  // same form that closed it.
+  assert(
+    live.hasEdit && closed.hasEdit,
+    'both posts should keep their "Editar" action, whatever their status',
+  )
+  detail(`«${openTitle}» → ${live.status} (live card)`)
+  detail(`«${closedTitle}» → ${closed.status} (dimmed card)`)
+
+  // The list is the owner's full history, so the tally must count both.
+  const counter = await waitVisible(driver, By.css('.my-jobs-count'), LONG_TIMEOUT)
+  const counted = Number((await counter.getText()).match(/\d+/)?.[0] ?? 0)
+  assert(
+    counted >= 2,
+    `the list should count both publications but reports ${counted}`,
+  )
+  detail(`the list holds every post the recruiter made (${counted})`)
+}
+
+// The difference the candidates actually see: the public feed is built from
+// OPEN posts only, so a deprecated one drops out of it while the live one stays
+// searchable. Polled rather than read once, since the feed can lag a beat
+// behind the write.
+const assertFeedVisibility = async (driver, title, shouldBeListed, attempts = 5) => {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const found = await searchFeedFor(driver, title)
+      if (found.length > 0 === shouldBeListed) {
+        detail(
+          shouldBeListed
+            ? `«${title}» is listed in the feed, as an open post should be`
+            : `«${title}» is gone from the feed, as a closed post should be`,
+        )
+        return
+      }
+      detail(`the feed has not caught up yet (attempt ${attempt}/${attempts})`)
+    } catch (error) {
+      if (error.name !== 'StaleElementReferenceError') throw error
+      detail(`the feed re-rendered mid-search (attempt ${attempt}/${attempts})`)
+    }
+    await sleep(2000)
+  }
+  throw new Error(
+    shouldBeListed
+      ? `«${title}» never showed up in the feed`
+      : `«${title}» is closed but the feed still lists it`,
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Resume creation and alias
 // ---------------------------------------------------------------------------
+
+// A rendered resume has to actually draw: measure the fraction of non-white
+// pixels on the first page of the given canvas. A real document (text, headers,
+// the template's sidebar) sits far above a blank canvas's ~0, which is what a
+// failed render leaves behind.
+const assertCanvasDrawsContent = async (driver, canvasSelector, label) => {
+  // The canvas exists as soon as react-pdf mounts it; give the paint a moment.
+  await sleep(2000)
+  const stats = await driver.executeScript(`
+    const canvas = document.querySelector('${canvasSelector}');
+    if (!canvas) return { error: 'no canvas' };
+    const { width, height } = canvas;
+    const data = canvas.getContext('2d').getImageData(0, 0, width, height).data;
+    let nonWhite = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] > 0 && (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245)) {
+        nonWhite += 1;
+      }
+    }
+    return { nonWhite, total: data.length / 4, ratio: nonWhite / (data.length / 4) };
+  `)
+  assert(
+    !stats.error && stats.ratio > 0.02,
+    `the ${label} looks blank (non-white ratio: ${stats.error ?? stats.ratio})`,
+  )
+  detail(`${label} draws content: ${(stats.ratio * 100).toFixed(1)}% non-white pixels`)
+}
+
+// Switches the viewer to one of the candidate's resumes. Tabs only appear from
+// the second resume on, and they are told apart by what the page calls each
+// resume: its alias once it has one, its name until then.
+const selectResumeTab = async (driver, name) => {
+  await click(
+    driver,
+    By.xpath(
+      `//button[contains(@class,'resume-page-tab')]` +
+        `[.//span[contains(@class,'resume-page-tab-name')][normalize-space(.)="${name}"]]`,
+    ),
+    LONG_TIMEOUT,
+  )
+}
+
+// Switches the viewer by language instead of by name — used for the freshly
+// translated resume, which has no alias yet and carries the same name as the
+// one it was translated from.
+const selectResumeTabByLanguage = async (driver, code) => {
+  await click(
+    driver,
+    By.xpath(
+      `//button[contains(@class,'resume-page-tab')]` +
+        `[.//span[contains(@class,'resume-page-tab-language')][normalize-space(.)='${code}']]`,
+    ),
+    LONG_TIMEOUT,
+  )
+}
+
+// The language the switcher shows for the resume the viewer is on. Tabs are only
+// rendered from the second resume on, so with one resume there is nothing to
+// read and the check is skipped by the caller.
+const languagesInSwitcher = async (driver) => {
+  const tabs = await driver.findElements(By.css('.resume-page-tab-language'))
+  const languages = []
+  for (const tab of tabs) {
+    try {
+      languages.push((await tab.getText()).trim().toUpperCase())
+    } catch {
+      // Re-rendered mid-read; the caller polls.
+    }
+  }
+  return languages
+}
 
 // Creates the candidate's first resume through the upload path of the wizard:
 // with no resume on file, /my-resume opens straight into the method step, where
@@ -627,6 +1021,79 @@ const createResumeByUpload = async (driver, resume) => {
     label.includes('Asignar alias'),
     `the alias button should read "Asignar alias" before one exists, but reads «${label}»`,
   )
+}
+
+// Creates a resume through the other half of the wizard: the form path, where
+// the candidate types the document instead of importing it. With a resume
+// already on file the page opens on the viewer, so the wizard is reached from
+// the header action rather than being the whole page.
+//
+// The steps are Personal → Education → Employment → Template → Preview, each
+// driven by the same shared footer button. Only the full name is required, but a
+// resume with nothing else in it renders an empty preview, so one study and one
+// job are filled in as well — and those are the two lists whose entries are
+// validated (institution; company plus position).
+const createResumeFromForm = async (driver, resume) => {
+  log('Creating a resume by filling in the form')
+  await navigate(driver, `${BASE_URL}/my-resume`)
+
+  await click(driver, By.css('.resume-page-action:not(.resume-page-action--ghost)'))
+  await waitForResumeStepNamed(driver, 'resume-method-step', LONG_TIMEOUT)
+  await click(
+    driver,
+    By.xpath(`//label[contains(@class,'resume-option-card')][.//input[@value='form']]`),
+  )
+  await click(driver, By.css('.resume-footer-next'))
+
+  await waitForResumeStep(driver, 'resume-full-name')
+  await type(driver, By.css('#resume-full-name'), resume.personal.fullName)
+  await type(driver, By.css('#resume-headline'), resume.personal.headline)
+  await type(driver, By.css('#resume-email'), resume.personal.email)
+  await type(driver, By.css('#resume-phone'), resume.personal.phone)
+  await type(driver, By.css('#resume-location'), resume.personal.location)
+  await type(driver, By.css('#resume-summary'), resume.personal.summary)
+  detail(`personal details typed in for ${resume.personal.fullName}`)
+  await click(driver, By.css('.resume-footer-next'))
+
+  // Each list opens with one blank card already expanded, so the first entry is
+  // there to be typed into.
+  await waitForResumeStep(driver, 'resume-institution-0')
+  await type(driver, By.css('#resume-institution-0'), resume.education.institution)
+  await type(driver, By.css('#resume-degree-0'), resume.education.degree)
+  await type(driver, By.css('#resume-field-0'), resume.education.field)
+  detail(`education added: ${resume.education.institution}`)
+  await click(driver, By.css('.resume-footer-next'))
+
+  await waitForResumeStep(driver, 'resume-position-0')
+  await type(driver, By.css('#resume-position-0'), resume.employment.position)
+  await type(driver, By.css('#resume-company-0'), resume.employment.company)
+  await type(driver, By.css('#resume-job-location-0'), resume.employment.location)
+  await type(driver, By.css('#resume-job-description-0'), resume.employment.description)
+  detail(`experience added: ${resume.employment.position} · ${resume.employment.company}`)
+  await click(driver, By.css('.resume-footer-next'))
+
+  // The template choice is the same pair of radio cards as the method step.
+  await waitForResumeStepNamed(driver, 'resume-template-step')
+  await click(
+    driver,
+    By.xpath(
+      `//label[contains(@class,'resume-option-card')][.//input[@value='${resume.template}']]`,
+    ),
+  )
+  detail(`template chosen: ${resume.template}`)
+
+  // Advancing renders the document server-side (the gateway signs the URLs and
+  // lynq-ml draws the PDF), so the preview step can take a while to arrive.
+  await click(driver, By.css('.resume-footer-next'))
+  await waitForResumeStepNamed(driver, 'resume-preview-step', EXTRA_LONG_TIMEOUT)
+  await waitVisible(driver, By.css('.resume-preview-page canvas'), EXTRA_LONG_TIMEOUT)
+  await assertCanvasDrawsContent(driver, '.resume-preview-page canvas', 'the form preview')
+
+  // Only this last action stores the resume.
+  log('Finishing the form (stores the resume)')
+  await click(driver, By.css('.resume-footer-next'))
+  await waitVisible(driver, By.css('.resume-page-doc-rename'), EXTRA_LONG_TIMEOUT)
+  detail('resume created, the viewer is showing it')
 }
 
 // Opens the alias dialog, saves the given alias, and waits for the save to be
@@ -687,15 +1154,48 @@ const assignAndOverrideAlias = async (driver, resume) => {
 // Translation: translate → template → preview → confirm
 // ---------------------------------------------------------------------------
 
-// Creates a second resume by translating the uploaded one. The flow is split on
-// purpose (mirroring the UI): the translation runs first, then the candidate
-// picks a template over a live preview, and only the confirmation stores the
-// resume. Source and target language keep the dialog's defaults — the only
-// resume, and the first language the candidate holds no resume in.
-const translateResume = async (driver) => {
-  log('Translating the resume (LLM — can take a while)')
+// Creates a second resume by translating the imported one into Spanish. The flow
+// is split on purpose (mirroring the UI): the translation runs first, then the
+// candidate picks a template over a live preview, and only the confirmation
+// stores the resume.
+//
+// The target language is chosen explicitly rather than left on the dialog's
+// default. The dialog offers only the languages the candidate holds no resume in
+// yet, so Spanish is on the list exactly because the imported CV is English.
+const translateResume = async (driver, target) => {
+  log(`Translating the resume into ${target.languageName} (LLM — can take a while)`)
   await click(driver, By.css('.resume-page-action--ghost'))
   await waitVisible(driver, By.css('.translate-resume-dialog'))
+
+  // The dialog asks the backend for the supported languages as it opens, and
+  // renders a spinner until that answers — so the selects are not in the DOM
+  // yet. With no language left to translate into it says so instead, which is
+  // the other outcome worth waiting for.
+  await driver.wait(async () => {
+    const selects = await driver.findElements(By.css('.translate-resume-select'))
+    const empty = await driver.findElements(By.css('.translate-resume-empty'))
+    return selects.length > 0 || empty.length > 0
+  }, LONG_TIMEOUT)
+
+  // Two selects: the resume to translate and the language to translate it into.
+  const selects = await driver.findElements(By.css('.translate-resume-select'))
+  assert(
+    selects.length === 2,
+    `the dialog should offer a source and a target, but has ${selects.length} selects` +
+      ' — with no language left to translate into it shows a message instead',
+  )
+
+  const targetOption = await selects[1].findElement(
+    By.xpath(`./option[normalize-space(.)='${target.languageName}']`),
+  )
+  await targetOption.click()
+  const chosen = await selects[1].getAttribute('value')
+  assert(
+    chosen === target.languageCode,
+    `the target language should be ${target.languageCode} but the select holds «${chosen}»`,
+  )
+  detail(`target language chosen: ${target.languageName} (${target.languageCode})`)
+
   await click(driver, By.css('.translate-resume-dialog button[type="submit"]'))
 
   await waitVisible(driver, By.css('.translate-template-overlay'), EXTRA_LONG_TIMEOUT)
@@ -708,30 +1208,11 @@ const translateResume = async (driver) => {
     const canvases = await driver.findElements(By.css('.translate-template-column canvas'))
     return canvases.length > 0
   }, EXTRA_LONG_TIMEOUT)
-  // The canvas exists as soon as react-pdf mounts it; give the paint a moment.
-  await sleep(2000)
-
-  // The preview must actually draw the document: measure the fraction of
-  // non-white pixels on the first page. A rendered resume (text, headers, the
-  // MODERN sidebar) sits far above a blank canvas's ~0.
-  const stats = await driver.executeScript(`
-    const canvas = document.querySelector('.translate-template-column canvas');
-    if (!canvas) return { error: 'no canvas' };
-    const { width, height } = canvas;
-    const data = canvas.getContext('2d').getImageData(0, 0, width, height).data;
-    let nonWhite = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i + 3] > 0 && (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245)) {
-        nonWhite += 1;
-      }
-    }
-    return { nonWhite, total: data.length / 4, ratio: nonWhite / (data.length / 4) };
-  `)
-  assert(
-    !stats.error && stats.ratio > 0.02,
-    `the preview canvas looks blank (non-white ratio: ${stats.error ?? stats.ratio})`,
+  await assertCanvasDrawsContent(
+    driver,
+    '.translate-template-column canvas',
+    'the translation preview',
   )
-  detail(`preview draws content: ${(stats.ratio * 100).toFixed(1)}% non-white pixels`)
 
   log('Confirming the template (stores the translated resume)')
   await click(driver, By.xpath(
@@ -739,12 +1220,13 @@ const translateResume = async (driver) => {
   const message = await waitForToast(driver, 'success')
   detail(`translation stored: «${message}»`)
 
-  // With two resumes on file the viewer shows the switcher, one tab each.
+  // With two resumes on file the viewer shows the switcher, one tab each — and
+  // the new tab must carry the language that was asked for.
   await driver.wait(async () => {
-    const tabs = await driver.findElements(By.css('.resume-page-tab'))
-    return tabs.length >= 2
+    const languages = await languagesInSwitcher(driver)
+    return languages.length >= 2 && languages.includes(target.languageCode)
   }, LONG_TIMEOUT)
-  detail('the switcher now offers both resumes')
+  detail(`the switcher now offers both resumes, one of them in ${target.languageCode}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -762,6 +1244,13 @@ const createDriver = async () => {
     'profile.password_manager_enabled': false,
   })
   if (HEADLESS) options.addArguments('--headless=new', '--disable-gpu')
+  // Under docker compose the pre-signed S3 URLs come back with the compose
+  // hostname, which the browser on the host cannot resolve — every upload and
+  // every PDF preview hangs. `MAP localstack 127.0.0.1` points them at the
+  // published port instead. Unset, this changes nothing.
+  if (process.env.CHROME_HOST_RESOLVER_RULES) {
+    options.addArguments(`--host-resolver-rules=${process.env.CHROME_HOST_RESOLVER_RULES}`)
+  }
 
   const driver = await new Builder()
     .forBrowser('chrome')
@@ -774,11 +1263,13 @@ const createDriver = async () => {
 
 const run = async () => {
   const delayLabel = ACTION_DELAY > 0 ? `${ACTION_DELAY}ms per action` : 'none'
+  const introLabel = INTRO_PAUSE > 0 ? `${INTRO_PAUSE}ms on the login screen` : 'none'
   console.log('═══════════════════════════════════════════════════════════')
-  console.log('  LYNQ — E2E test: registration, publication and application')
+  console.log('  LYNQ — E2E test: registration, publication, deprecation, resumes and application')
   console.log(`  Base URL : ${BASE_URL}`)
   console.log(`  Headless : ${HEADLESS ? 'yes' : 'no'}`)
   console.log(`  Delay    : ${delayLabel}`)
+  console.log(`  Intro    : ${introLabel}`)
   console.log(`  Suffix   : ${SUFFIX}`)
   console.log('═══════════════════════════════════════════════════════════')
 
@@ -791,6 +1282,10 @@ const run = async () => {
   const driver = await createDriver()
 
   try {
+    // 0. The login screen, held on purpose: it is the first thing the audience
+    //    sees, and the run waits there before anything starts moving.
+    await showLoginScreen(driver)
+
     // 1. Candidate: registration and full profile.
     await registerCandidate(driver, CANDIDATE)
     await completeProfile(driver, CANDIDATE)
@@ -800,28 +1295,62 @@ const run = async () => {
     await registerRecruiter(driver, RECRUITER)
     await completeProfile(driver, RECRUITER)
 
-    // 3. The recruiter publishes the job and logs out.
+    // 3. The recruiter publishes the job the candidate will apply to, then a
+    //    second one that is deprecated right away, so "Mis publicaciones" holds
+    //    a live post and a closed post at once and the two can be contrasted.
     await publishJob(driver, JOB)
+    await publishJob(driver, DEPRECATED_JOB)
+
+    // 3a. The second post is live before it is closed — checking that first is
+    //     what makes its later absence from the feed mean something.
+    await assertFeedVisibility(driver, DEPRECATED_JOB.title, true)
+    await deprecateJob(driver, DEPRECATED_JOB.title)
+
+    // 3b. Side by side in the owner's list: badge, styling and the feed.
+    await reviewMyJobPosts(driver, JOB.title, DEPRECATED_JOB.title)
+    await assertFeedVisibility(driver, DEPRECATED_JOB.title, false)
+    await assertFeedVisibility(driver, JOB.title, true)
+
     await logout(driver)
 
-    // 4. The candidate logs back in and applies.
+    // 4. The candidate logs back in and builds up their resumes. They come
+    //    before the application on purpose: applying asks which resume to send,
+    //    so there is nothing to apply with until at least one exists.
     await login(driver, CANDIDATE.username, CANDIDATE.password)
-    await applyToJob(driver, JOB.title)
 
-    // 5. The candidate creates a resume and manages its alias.
+    // 4a. First resume: imported from a PDF, then named.
     await createResumeByUpload(driver, RESUME)
     await assignAndOverrideAlias(driver, RESUME)
 
-    // 6. The candidate creates a second resume through the translation flow.
-    await translateResume(driver)
+    // 4b. Second resume: the imported one translated into Spanish. The viewer
+    //     lands on the translation (it is the one in the UI's language), and it
+    //     is named so the picker can tell the three apart later.
+    await translateResume(driver, TRANSLATION)
+    await selectResumeTabByLanguage(driver, TRANSLATION.languageCode)
+    await saveAlias(driver, TRANSLATION.alias)
+    detail(`translated resume named: «${TRANSLATION.alias}»`)
+
+    // 4c. Third resume: typed into the form. Its tab shows the name typed in,
+    //     since the other two now show their alias.
+    await createResumeFromForm(driver, FORM_RESUME)
+    await selectResumeTab(driver, FORM_RESUME.personal.fullName)
+    await saveAlias(driver, FORM_RESUME.alias)
+    detail(`form resume named: «${FORM_RESUME.alias}»`)
+
+    // 5. The candidate applies, choosing which of the three resumes to send.
+    await applyToJob(driver, JOB.title, FORM_RESUME.alias)
 
     console.log('\n═══════════════════════════════════════════════════════════')
     console.log('  ✅ TEST PASSED')
     console.log(`  Candidate : ${CANDIDATE.username} / ${CANDIDATE.email}`)
     console.log(`  Recruiter : ${RECRUITER.username} / ${RECRUITER.email}`)
     console.log(`  Password  : ${PASSWORD}`)
-    console.log(`  Job       : ${JOB.title}`)
-    console.log(`  Alias     : ${RESUME.aliasOverride}`)
+    console.log(`  Jobs      : ${JOB.title} (OPEN)`)
+    console.log(`              ${DEPRECATED_JOB.title} (CLOSE)`)
+    console.log(`  Resumes   : ${RESUME.aliasOverride} (${RESUME.language}, imported)`)
+    console.log(`              ${TRANSLATION.alias} (${TRANSLATION.languageCode}, translated)`)
+    console.log(`              ${FORM_RESUME.alias} (form)`)
+    console.log(`  Applied   : ${JOB.title} with «${FORM_RESUME.alias}»`)
     console.log('═══════════════════════════════════════════════════════════')
   } catch (error) {
     console.error('\n═══════════════════════════════════════════════════════════')

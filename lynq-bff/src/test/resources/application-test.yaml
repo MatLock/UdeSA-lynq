@@ -7,6 +7,8 @@ lynq:
   security:
     jwt:
       secret: 8d2b6d2a9c5e8f4f8f9d1c7a4e3b5f6d8c9a1e2f3a4b5c6d7e8f9a1b2c3d4e5
+  iam:
+    url: http://localhost:9999/lynq-iam
   backend:
     url: http://localhost:9999/lynq-backend-app
   ml:

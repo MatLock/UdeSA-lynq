@@ -118,4 +118,32 @@ class AuthHeaderExistenceFilterTest {
 
     assertThat(filter.shouldNotFilter(request), is(false));
   }
+
+  @Test
+  void shouldNotFilterTheAuthRoutesThatMintASessionBecauseTheyCarryNoToken() {
+    when(request.getServletPath()).thenReturn("/auth/login/email");
+
+    assertThat(filter.shouldNotFilter(request), is(true));
+  }
+
+  @Test
+  void shouldNotFilterTheAvailabilityChecksThatRunBeforeAnAccountExists() {
+    when(request.getServletPath()).thenReturn("/auth/check-email");
+
+    assertThat(filter.shouldNotFilter(request), is(true));
+  }
+
+  @Test
+  void shouldFilterTheRefreshBecauseItsOpaqueCredentialStillHasToBeThere() {
+    when(request.getServletPath()).thenReturn("/auth/refresh");
+
+    assertThat(filter.shouldNotFilter(request), is(false));
+  }
+
+  @Test
+  void shouldFilterAnAuthPathOutsideTheAllowlistSoAPrefixIsNeverOpenedByAccident() {
+    when(request.getServletPath()).thenReturn("/auth/validate");
+
+    assertThat(filter.shouldNotFilter(request), is(false));
+  }
 }

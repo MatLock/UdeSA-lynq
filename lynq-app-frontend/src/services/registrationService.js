@@ -1,5 +1,6 @@
 // Registration orchestration — composes the lynq-iam auth call with the
-// lynq-backend-app profile/company calls.
+// lynq-backend-app profile/company calls. Both leave through the lynq-bff
+// gateway, which is the only origin the app talks to.
 //
 // Both flows first create the auth identity (username/password/email/role) via
 // authService, which returns an access token carrying the role, then use that
@@ -10,10 +11,8 @@
 //                                        company in a single call)
 
 import authService from './authService';
+import apiBaseUrl from '../utils/apiBaseUrl';
 import requestUuidUtil from '../utils/requestUuid';
-
-const APP_BASE_URL =
-  import.meta.env.LYNQ_BFF_BASE_URL ?? 'http://localhost:8087/lynq-bff';
 
 const CANDIDATE_ROLE = 'R_CANDIDATE';
 const COMPANY_ROLE = 'R_COMPANY';
@@ -32,7 +31,7 @@ const COMPANY_ROLE = 'R_COMPANY';
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
 const postSecured = async (path, body, accessToken, requestUuid = requestUuidUtil.newRequestUuid()) => {
-  const response = await fetch(`${APP_BASE_URL}${path}`, {
+  const response = await fetch(apiBaseUrl.url(path), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -12,11 +12,21 @@ spring:
           lynqMl:
             connectTimeout: 10000
             readTimeout: 310000
+          # The relayed lynq-ml endpoints are generations too — skill-enhance
+          # takes a minute on a local model — and Feign resolves this config by
+          # client name, so the typed client's timeout above does not cover the
+          # relay client. Without this, the gateway cuts the request at 60s and
+          # answers 502 while lynq-ml is still producing a good answer.
+          lynqMlDmz:
+            connectTimeout: 10000
+            readTimeout: 310000
 
 lynq:
   security:
     jwt:
       secret: ${JWT_SECRET:8d2b6d2a9c5e8f4f8f9d1c7a4e3b5f6d8c9a1e2f3a4b5c6d7e8f9a1b2c3d4e5}
+  iam:
+    url: ${LYNQ_IAM_URL:http://localhost:8080/lynq-iam}
   backend:
     url: ${LYNQ_BACKEND_URL:http://localhost:8082/lynq-backend-app}
   ml:

@@ -2,7 +2,7 @@
 
 The backend-for-frontend gateway: the single entry point from the browser into the Lynq platform.
 
-It does four things.
+It does five things.
 
 1. **Verifies the access token's signature.** lynq-iam mints access tokens signed with an HMAC-SHA
    key derived from a shared secret, so the same secret is enough to check a token's integrity —
@@ -16,7 +16,13 @@ It does four things.
    request body, status code and response body all cross unchanged. Relaying deliberately has no
    request or response model: re-serializing what merely passes through would be a second copy of
    three APIs to keep in sync.
-4. **Orchestrates the flows no single service can answer.** Where a screen needs several services
+4. **Relays the auth calls to lynq-iam.** Registration, both logins, the token refresh, the
+   password update and the two pre-registration availability checks cross from here, under the same
+   paths, so the browser has a single origin and lynq-iam needs no public route of its own. These
+   are the routes where there is no verified caller yet — that is the point of them — so they are
+   the one opening in the rule above, listed as exact paths in `PublicPaths` rather than as an
+   `/auth` prefix. lynq-iam keeps checking every credential it is handed; the gateway adds nothing.
+5. **Orchestrates the flows no single service can answer.** Where a screen needs several services
    in a fixed order — with a rollback when a step in the middle fails — that sequence lives here,
    behind one endpoint, and the browser never learns it. This is the part that makes the gateway a
    BFF rather than a proxy: see [Flows the gateway owns](#flows-the-gateway-owns). Downstream
@@ -26,18 +32,25 @@ Everything behind it — lynq-app-backend, lynq-ml, lynq-file-storage — expose
 `/dmz` prefix and is reached only through here. That is why none of them checks the token's
 signature for itself.
 
+lynq-iam is the exception in both directions: it is not behind a `/dmz` prefix and it validates
+every credential itself, because it is the service that mints them. It has no Ingress either — the
+gateway reaches it inside the cluster, and so does lynq-app-backend, which resolves the caller
+against `/auth/user-info` on every request.
+
 ---
 
 ## Routing
 
 Routing is **by resource, not by service**. The path a caller writes is the path the owning service
-sees below its `/dmz` prefix; which service that is never appears in the URL.
+sees below its prefix — `/dmz` for the three DMZ services, `/auth` for lynq-iam; which service that
+is never appears in the URL.
 
 | Gateway path                                              | Owner              |
 | --------------------------------------------------------- | ------------------ |
 | `/lynq-bff/user/**`, `/lynq-bff/company/**`, `/lynq-bff/job/**` | lynq-app-backend   |
 | `/lynq-bff/files/**`                                      | lynq-file-storage  |
 | `/lynq-bff/skill-enhance`, `/lynq-bff/translate`, `/lynq-bff/detect-language` | lynq-ml |
+| `/lynq-bff/auth/register`, `/lynq-bff/auth/login/username`, `/lynq-bff/auth/login/email`, `/lynq-bff/auth/refresh`, `/lynq-bff/auth/update-password`, `/lynq-bff/auth/check-username`, `/lynq-bff/auth/check-email` | lynq-iam |
 
 For example:
 
@@ -50,20 +63,28 @@ POST /lynq-bff/skill-enhance
 
 POST /lynq-bff/files/upload-url
   -> POST /lynq-file-storage/dmz/files/upload-url
+
+POST /lynq-bff/auth/login/email
+  -> POST /lynq-iam/auth/login/email
 ```
 
 Nothing is rewritten: the gateway only picks who to talk to. That keeps the topology out of the URL,
 so a resource can move between services without every caller having to change.
 
-The mappings are an **allowlist**. A downstream endpoint not named in `DmzProxyControllerImpl` is
-unreachable from the browser and answers `404`, so a new endpoint is closed by default — the right
-way round for a gateway. The price is that a genuinely new top-level resource has to be added here
-too.
+The mappings are an **allowlist**. A downstream endpoint not named in `DmzProxyControllerImpl` — or,
+for the auth routes, in `IamAuthProxyControllerImpl` — is unreachable from the browser and answers
+`404`, so a new endpoint is closed by default: the right way round for a gateway. The price is that
+a genuinely new top-level resource has to be added here too. The auth mappings are stricter still:
+exact paths, one exact verb each, so `GET /auth/login/email` is a `405` rather than a relay.
 
 ### What is not routed
 
-- **lynq-iam.** Sign-in, registration and token refresh are public by definition and there is
-  nothing for this service to verify yet, so the frontend keeps talking to lynq-iam directly.
+- **lynq-iam's `/auth/validate` and `/auth/user-info`.** No browser flow calls them:
+  lynq-app-backend resolves the caller against `/auth/user-info` from inside the cluster, and the
+  frontend learns whether a token is still good from the answer to the request it just made. They
+  are not in the allowlist, so they are a plain `404` here. Every other route lynq-iam grows is
+  closed the same way until it is named — the auth relay is an allowlist of exact paths, one exact
+  verb each, not an `/auth` prefix.
 - **lynq-ml's `/health`.** It sits outside the DMZ so infra probes can reach it without a token.
 - **lynq-ml's evaluations** — `upskilling_suggestion` and `candidate-explanation`. Their payload is
   a job post plus a candidate, assembled from lynq-app-backend's database once it has checked the
@@ -213,9 +234,23 @@ letting anyone confirm or delete that file.
 | ----- | -------------------------- | ------------------------------ | ---------------------------------------------------------------------- |
 | -1    | `CorsFilter`               | all routes                     | Answers browser preflights. Runs first on purpose: a preflight carries neither header below, so the filters after it would reject it and the real request would never be sent. |
 | 0     | `RequestUuidFilter`        | all routes except Swagger      | 403 if `lynq-request-uuid` is missing/blank; echoes it back and binds it to the logging context (MDC). |
-| 1     | `AuthHeaderExistenceFilter`| all routes except Swagger      | 401 if the `Authorization` header is missing.                          |
-| 2     | `JwtSignatureFilter`       | all routes except Swagger      | 401 if the token's signature does not verify, it has expired, or it carries no subject. Publishes the verified subject for the proxy to forward as `user-id`, and loads it — with the token's `roles` claim as authorities — into the `SecurityContext`. |
-| 3     | `RelayRoleFilter`          | all routes except Swagger      | 403 for the relayed routes whose role is structural (`RelayRoleRules`). **Default allow**: a route no rule covers is relayed untouched. |
+| 1     | `AuthHeaderExistenceFilter`| all routes except Swagger and the anonymous auth routes | 401 if the `Authorization` header is missing.                          |
+| 2     | `JwtSignatureFilter`       | as above, and also not `/auth/refresh` | 401 if the token's signature does not verify, it has expired, or it carries no subject. Publishes the verified subject for the proxy to forward as `user-id`, and loads it — with the token's `roles` claim as authorities — into the `SecurityContext`. |
+| 3     | `RelayRoleFilter`          | as `JwtSignatureFilter`        | 403 for the relayed routes whose role is structural (`RelayRoleRules`). **Default allow**: a route no rule covers is relayed untouched. |
+
+`PublicPaths` holds those two exceptions, and the difference between them matters:
+
+- **Anonymous** — `/auth/register`, `/auth/login/username`, `/auth/login/email`,
+  `/auth/check-username`, `/auth/check-email`. No `Authorization` header at all: the first three
+  carry a password in the body, the checks run before an account exists.
+- **Signature-exempt but not anonymous** — `/auth/refresh`. Its bearer credential is the opaque,
+  Redis-backed refresh token, so the header has to be there (401 without it), but it is not a JWT
+  and no secret here could check it. Only lynq-iam can, so it crosses untouched.
+- `/auth/update-password` is in neither list: it carries an access token, so the signature is
+  verified here first and lynq-iam validates it again before rotating the password.
+
+`lynq-request-uuid` is still required on every one of them — the correlation id is what ties a login
+across the two services in the logs.
 
 Authorization is method security on top of those authorities (`SecurityConfig`,
 `@EnableMethodSecurity`): `@HasRole(Role.CANDIDATE)` on `ResumeControllerImpl` is what makes the whole
@@ -257,11 +292,11 @@ in these cases:
 | Status | When                                                                    |
 | ------ | ----------------------------------------------------------------------- |
 | 400    | A flow's request is missing something it needs (e.g. a preview with no resume or no template). |
-| 401    | Missing `Authorization` header, or an invalid/expired token signature. A correctly signed token with no `sub` claim is rejected here too: the caller id is forwarded downstream, so an anonymous one is no good. |
+| 401    | Missing `Authorization` header — including on `/auth/refresh`, whose credential is not verified here but must be present — or an invalid/expired token signature. A correctly signed token with no `sub` claim is rejected here too: the caller id is forwarded downstream, so an anonymous one is no good. |
 | 403    | Missing `lynq-request-uuid` header, a lynq-ml endpoint the gateway does not relay (see above), or a flow the caller's role may not run (`@HasRole`). |
 | 404    | A resource the gateway does not route — the mappings are an allowlist.  |
 | 405    | An HTTP verb the gateway does not relay (only GET/POST/PUT/PATCH/DELETE).|
-| 502    | A DMZ service could not be reached at all, or a step of a flow failed — in which case the flow has already undone what it had done. |
+| 502    | A relayed service could not be reached at all — a DMZ one or lynq-iam — or a step of a flow failed — in which case the flow has already undone what it had done. |
 
 ---
 
@@ -270,6 +305,7 @@ in these cases:
 | Property / env var                        | Default (local)                              | Purpose                                       |
 | ----------------------------------------- | -------------------------------------------- | --------------------------------------------- |
 | `JWT_SECRET`                              | the shared development secret                | Must be **the same secret lynq-iam signs with**. |
+| `LYNQ_IAM_URL`                            | `http://localhost:8080/lynq-iam`             | lynq-iam base URL, for the relayed auth routes. |
 | `LYNQ_BACKEND_URL`                        | `http://localhost:8082/lynq-backend-app`     | lynq-app-backend base URL, context path included. |
 | `LYNQ_ML_URL`                             | `http://localhost:8084/lynq-ml`              | lynq-ml base URL.                             |
 | `LYNQ_FILE_STORAGE_URL`                   | `http://localhost:8085/lynq-file-storage`    | lynq-file-storage base URL.                   |
@@ -288,6 +324,19 @@ the `production` profile those become `8080` and `8081`, matching the other Java
   what relaying wants. The flow clients (`LynqBackendClient`, `LynqFileStorageClient`,
   `LynqMlClient`) are typed, one method per endpoint the gateway actually calls, and a non-2xx
   answer raises — a flow needs to know a step failed so it can roll back.
+- **The auth relay is its own client, not a `DmzClient` sibling.** `LynqIamAuthClient` repeats the
+  five-argument shape against `/auth/{path}` instead of inheriting it: lynq-iam is not behind the
+  `/dmz` prefix, and Feign allows a client interface a single level of inheritance, so
+  `LynqIamAuthClient extends DmzClient`-style reuse would break the relay clients that already do.
+  It declares only the verbs the relayed routes use (GET, POST, PATCH). The copying both relays do —
+  body, query string, headers, response — lives once in `RelayExchange`; what stays in each service
+  is who to call, and whether the verified caller id is injected. The DMZ relay injects it; the auth
+  relay deliberately does not, because lynq-iam reads the credential rather than a header.
+- **Feign timeouts are per client name, so the relay clients need their own.** The lynq-ml
+  endpoints are LLM generations either way, whether a flow calls them or the browser's request is
+  relayed to them — but `spring.cloud.openfeign.client.config.lynqMl` only covers the typed client.
+  `lynqMlDmz` carries the same 310s read timeout, or the gateway answers `502` at 60s while lynq-ml
+  is still writing a perfectly good answer.
 - **Apache HttpClient 5, explicitly.** Feign's default client is backed by `HttpURLConnection`,
   which throws on PATCH — and lynq-app-backend exposes PATCH on profiles, companies and job posts.
   `FeignConfig` wires in `ApacheHttp5Client` rather than leaving it to classpath detection.

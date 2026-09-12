@@ -1,4 +1,4 @@
-// Secured-fetch primitive shared by every authenticated app-backend/IAM call.
+// Secured-fetch primitive shared by every authenticated call to the gateway.
 //
 // A single request that attaches the bearer token + `lynq-request-uuid`
 // correlation header, parses the JSON body, and throws an Error carrying
@@ -12,15 +12,11 @@
 //    pre-session flows (login, registration, remembered-session bootstrap) where
 //    there is no session to refresh from yet.
 
+import apiBaseUrl from './apiBaseUrl';
 import requestUuidUtil from './requestUuid';
 
-const APP_BASE_URL =
-  import.meta.env.LYNQ_BFF_BASE_URL ?? 'http://localhost:8087/lynq-bff';
-
 const sendSecured = async (token, path, options = {}, requestUuid = requestUuidUtil.newRequestUuid()) => {
-  const url = path.startsWith('http') ? path : `${APP_BASE_URL}${path}`;
-
-  const response = await fetch(url, {
+  const response = await fetch(apiBaseUrl.url(path), {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -47,7 +43,7 @@ const sendSecured = async (token, path, options = {}, requestUuid = requestUuidU
 // Build a fixed-token fetcher matching authFetch's `(path, options) => payload`
 // shape, for pre-session flows where the token was just minted and there is no
 // session to refresh from. An optional shared `requestUuid` lets a multi-call
-// flow (e.g. login: IAM auth + profile fetch) trace as one.
+// flow (e.g. login: the auth call + the profile fetch) trace as one.
 const tokenFetcher = (token, requestUuid) => (path, options) =>
   sendSecured(token, path, options, requestUuid);
 

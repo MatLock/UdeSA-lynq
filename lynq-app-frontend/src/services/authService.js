@@ -1,17 +1,18 @@
-// Auth service — talks to the lynq-iam API.
+// Auth service — talks to the lynq-iam auth API through the lynq-bff gateway,
+// which relays these endpoints verbatim under the same paths. lynq-iam has no
+// public route of its own, so the browser has a single origin (see
+// utils/apiBaseUrl).
 // Spec: lynq-iam/iam_openapi.yaml
 
+import apiBaseUrl from '../utils/apiBaseUrl';
 import requestUuidUtil from '../utils/requestUuid';
-
-const IAM_BASE_URL =
-  import.meta.env.LYNQ_IAM_BASE_URL ?? 'http://localhost:8080/lynq-iam';
 
 /**
  * Shared login request against the lynq-iam auth endpoints. All login endpoints
  * accept a JSON body, require the `lynq-request-uuid` correlation header, and
  * return the same UserRestResponse payload, so this centralizes that contract.
  *
- * @param {string} path - Endpoint path relative to the IAM base URL.
+ * @param {string} path - Endpoint path relative to the gateway base URL.
  * @param {object} body - JSON request body for the endpoint.
  * @param {string} [requestUuid] - Correlation id for the `lynq-request-uuid`
  *   header; defaults to a fresh id. Pass a shared id to trace a multi-call
@@ -20,7 +21,7 @@ const IAM_BASE_URL =
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
 const login = async (path, body, requestUuid = requestUuidUtil.newRequestUuid()) => {
-  const response = await fetch(`${IAM_BASE_URL}${path}`, {
+  const response = await fetch(apiBaseUrl.url(path), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -114,7 +115,7 @@ const email_authenticate = async (email, password, requestUuid) =>
  *   The thrown error carries `status` (HTTP code) and `reason` (server message).
  */
 const user_register = async (userInfo, requestUuid = requestUuidUtil.newRequestUuid()) => {
-  const response = await fetch(`${IAM_BASE_URL}/auth/register`, {
+  const response = await fetch(apiBaseUrl.url('/auth/register'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -147,8 +148,8 @@ const user_register = async (userInfo, requestUuid = requestUuidUtil.newRequestU
  * user with a freshly generated access and refresh token.
  *
  * Goes through the caller's `authFetch` (see useApi) so an expired access token
- * is refreshed and the request retried once. This is an IAM endpoint, so the
- * absolute IAM URL is passed — securedFetch resolves absolute URLs as-is.
+ * is refreshed and the request retried once. Like every other secured call it
+ * takes a path relative to the gateway, which relays it to lynq-iam.
  *
  * @param {(path: string, options?: object) => Promise<object>} authFetch - The
  *   secured fetcher (useApi's authFetch).
@@ -165,7 +166,7 @@ const user_register = async (userInfo, requestUuid = requestUuidUtil.newRequestU
  *   not found (403). The thrown error carries `status` and `reason`.
  */
 const user_update_password = async (authFetch, newPassword) => {
-  const payload = await authFetch(`${IAM_BASE_URL}/auth/update-password`, {
+  const payload = await authFetch('/auth/update-password', {
     method: 'PATCH',
     body: JSON.stringify({ newPassword }),
   });
@@ -187,7 +188,7 @@ const user_update_password = async (authFetch, newPassword) => {
  *   refresh token (403). The thrown error carries `status` and `reason`.
  */
 const refresh_access_token = async (refresh_token, requestUuid = requestUuidUtil.newRequestUuid()) => {
-  const response = await fetch(`${IAM_BASE_URL}/auth/refresh`, {
+  const response = await fetch(apiBaseUrl.url('/auth/refresh'), {
     method: 'POST',
     headers: {
       'lynq-request-uuid': requestUuid,
@@ -211,76 +212,6 @@ const refresh_access_token = async (refresh_token, requestUuid = requestUuidUtil
 }
 
 /**
- * Check whether an access token is valid and not expired.
- *
- * Calls GET /auth/validate (operationId: isAccessTokenValid). The token to
- * check is sent as the Bearer credential.
- *
- * @param {string} accessToken - The access token to validate (Bearer auth).
- * @returns {Promise<boolean>} True if the token is valid, false otherwise.
- * @throws {Error} On a missing Authorization header (401). The thrown error
- *   carries `status` and `reason`.
- */
-const validate_access_token = async (accessToken, requestUuid = requestUuidUtil.newRequestUuid()) => {
-  const response = await fetch(`${IAM_BASE_URL}/auth/validate`, {
-    method: 'GET',
-    headers: {
-      'lynq-request-uuid': requestUuid,
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const error = new Error(
-      payload?.reason ??
-        `Token validation failed with status ${response.status}`
-    );
-    error.status = response.status;
-    error.reason = payload?.reason;
-    throw error;
-  }
-  return Boolean(payload?.data);
-}
-
-/**
- * Extract the user identity carried by a valid access token.
- *
- * Calls GET /auth/user-info (operationId: obtainUserInfoFromToken). The token
- * is sent as the Bearer credential.
- *
- * @param {string} accessToken - A valid access token (Bearer auth).
- * @returns {Promise<{ id: string, username: string, email: string }>} The user
- *   identity extracted from the token (UserInfoRestResponse).
- * @throws {Error} On a missing or invalid access token (401). The thrown error
- *   carries `status` and `reason`.
- */
-const user_info = async (accessToken, requestUuid = requestUuidUtil.newRequestUuid()) => {
-  const response = await fetch(`${IAM_BASE_URL}/auth/user-info`, {
-    method: 'GET',
-    headers: {
-      'lynq-request-uuid': requestUuid,
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-
-  const payload = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const error = new Error(
-      payload?.reason ?? `Fetching user info failed with status ${response.status}`
-    );
-    error.status = response.status;
-    error.reason = payload?.reason;
-    throw error;
-  }
-
-  // Unwrap the GlobalRestResponse envelope ({ success, data }).
-  return payload?.data;
-}
-
-/**
  * Check whether a username has a valid format and is still available.
  *
  * Calls GET /auth/check-username?username=<username> (operationId: checkUsername).
@@ -296,7 +227,7 @@ const user_info = async (accessToken, requestUuid = requestUuidUtil.newRequestUu
  */
 const check_username = async (username, requestUuid = requestUuidUtil.newRequestUuid()) => {
   const query = new URLSearchParams({ username });
-  const response = await fetch(`${IAM_BASE_URL}/auth/check-username?${query}`, {
+  const response = await fetch(apiBaseUrl.url(`/auth/check-username?${query}`), {
     method: 'GET',
     headers: {
       'lynq-request-uuid': requestUuid,
@@ -334,7 +265,7 @@ const check_username = async (username, requestUuid = requestUuidUtil.newRequest
  */
 const check_email = async (email, requestUuid = requestUuidUtil.newRequestUuid()) => {
   const query = new URLSearchParams({ email });
-  const response = await fetch(`${IAM_BASE_URL}/auth/check-email?${query}`, {
+  const response = await fetch(apiBaseUrl.url(`/auth/check-email?${query}`), {
     method: 'GET',
     headers: {
       'lynq-request-uuid': requestUuid,
@@ -362,8 +293,6 @@ export default {
   user_register,
   user_update_password,
   refresh_access_token,
-  validate_access_token,
-  user_info,
   check_username,
   check_email,
 };

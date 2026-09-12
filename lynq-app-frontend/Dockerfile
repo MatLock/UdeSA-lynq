@@ -3,9 +3,9 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 # Vite bakes env vars at build time, so they must be present during `vite build`.
-ARG LYNQ_IAM_BASE_URL
+# One base URL is enough: every call leaves through the lynq-bff gateway, the
+# relayed lynq-iam auth endpoints included.
 ARG LYNQ_BFF_BASE_URL
-ENV LYNQ_IAM_BASE_URL=${LYNQ_IAM_BASE_URL}
 ENV LYNQ_BFF_BASE_URL=${LYNQ_BFF_BASE_URL}
 
 COPY package*.json ./
