@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lynq-feeders-config
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-feeders
+data:
+{{- range $key, $value := .Values.lynq_feeders.config }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}

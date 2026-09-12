@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lynq-feeders-service
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-feeders
+spec:
+  type: ClusterIP
+  selector:
+    app: lynq-feeders
+  ports:
+    - name: http
+      port: 8089
+      targetPort: http
