@@ -5,6 +5,8 @@
 
 Identity and Access Management service for the Lynq platform. Issues short-lived JWT access tokens and opaque, Redis-backed refresh tokens, and exposes endpoints for registration, login (by username or email), token refresh, token validation, password update, and pre-registration availability checks for usernames and emails.
 
+It has no public route of its own. The browser's auth calls arrive relayed by `lynq-bff` — same paths, same bodies, same headers — and `lynq-app-backend` calls `/auth/user-info` from inside the cluster to resolve the caller on every request. Nothing about the API below changes because of that: every credential is still checked here, by the filters and the service, exactly as if the caller were the browser.
+
 ---
 
 ## Table of contents
@@ -49,7 +51,9 @@ Identity and Access Management service for the Lynq platform. Issues short-lived
 
 ```
                             ┌───────────────────────────┐
-                            │       Client (HTTP)       │
+                            │  Client (HTTP): lynq-bff  │
+                            │  relaying the browser, or │
+                            │  lynq-app-backend         │
                             └─────────────┬─────────────┘
                                           │  Authorization, lynq-request-uuid
                                           ▼
