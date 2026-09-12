@@ -173,6 +173,20 @@ class RelayRoleFilterTest {
     assertThat(filter.shouldNotFilter(request), is(false));
   }
 
+  @Test
+  void shouldNotFilterTheAuthRoutesWhereThereIsNoVerifiedCallerToBounce() {
+    when(request.getServletPath()).thenReturn("/auth/login/username");
+
+    assertThat(filter.shouldNotFilter(request), is(true));
+  }
+
+  @Test
+  void shouldNotFilterTheRefreshWhoseCredentialCarriesNoRoles() {
+    when(request.getServletPath()).thenReturn("/auth/refresh");
+
+    assertThat(filter.shouldNotFilter(request), is(true));
+  }
+
   private static void authenticateWith(String role) {
     List<GrantedAuthority> authorities =
         List.of(new SimpleGrantedAuthority(Role.PREFIX + role));

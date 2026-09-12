@@ -30,7 +30,9 @@ public class RelayRoleFilter extends OncePerRequestFilter {
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    return PublicPaths.isPublic(request);
+    // The role table only covers relayed routes, and reading it needs the security context the
+    // signature check loads: a route without one has nothing to bounce early.
+    return PublicPaths.isSignatureExempt(request);
   }
 
   @Override

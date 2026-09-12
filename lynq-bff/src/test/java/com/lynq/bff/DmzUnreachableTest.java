@@ -23,7 +23,8 @@ import org.springframework.test.context.TestPropertySource;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
-    "lynq.backend.url=http://localhost:1/lynq-backend-app"
+    "lynq.backend.url=http://localhost:1/lynq-backend-app",
+    "lynq.iam.url=http://localhost:1/lynq-iam"
 })
 class DmzUnreachableTest {
 
@@ -45,6 +46,23 @@ class DmzUnreachableTest {
         .header(AUTHORIZATION_HEADER, "Bearer " + validAccessToken())
         .header(REQUEST_UUID_HEADER, REQUEST_UUID)
         .GET()
+        .build();
+
+    HttpResponse<String> response =
+        httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(response.statusCode(), is(502));
+    assertThat(response.body(), containsString("Downstream service is unavailable"));
+  }
+
+  @Test
+  void returnsBadGatewayWhenLynqIamCannotBeReached() throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create("http://localhost:" + port + "/lynq-bff/auth/login/email"))
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .header("Content-Type", "application/json")
+        .POST(HttpRequest.BodyPublishers.ofString(
+            "{\"email\": \"jane@lynq.com\", \"password\": \"s3cr3tpass\"}"))
         .build();
 
     HttpResponse<String> response =
