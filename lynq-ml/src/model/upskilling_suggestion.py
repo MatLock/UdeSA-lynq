@@ -45,8 +45,8 @@ class UpskillingResponse(BaseModel):
     ``reasons`` lists the concrete gaps that keep the candidate from being a
     perfect match — one short reason per entry — so the caller can show *why*
     rather than a bare "not a perfect match". When the candidate is a perfect
-    match, ``outcome`` is the fixed "You are perfect for this role." string and
-    both ``reasons`` and ``suggestions`` are empty.
+    match, ``outcome`` is a short "you are a perfect fit" sentence written in the
+    requested language and both ``reasons`` and ``suggestions`` are empty.
     """
 
     outcome: str

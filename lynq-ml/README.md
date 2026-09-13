@@ -321,7 +321,7 @@ The LLM returns a verdict plus 0–5 search queries (one per missing competency)
 }
 ```
 
-A perfect match yields `outcome: "You are perfect for this role."` and an empty `suggestions` array (no course lookup is made).
+A perfect match yields a short "you are a perfect fit for this role" `outcome`, written in the requested `output-language`, and an empty `suggestions` array (no course lookup is made). Callers that render UI copy for that case should key off the empty `reasons`/`suggestions` rather than the sentence itself.
 
 **Course lookup requires no API key.** Each search query is resolved by a keyless provider that finds real Udemy course links via a public web search and, when that is rate-limited or unavailable, falls back to a deterministic Udemy search deep-link for the topic — so the endpoint always returns useful links. Results are capped at `UDEMY_MAX_COURSES` (default **2**) per topic. (The Udemy Affiliate API is deprecated and is not used.)
 
