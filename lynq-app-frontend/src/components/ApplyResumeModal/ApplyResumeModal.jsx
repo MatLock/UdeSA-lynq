@@ -21,7 +21,13 @@ import './ApplyResumeModal.css'
 //
 // The list is loaded here rather than by the page: it is only ever needed once
 // the dialog opens, and the page has no other use for it.
-const ApplyResumeModal = ({ busy = false, onConfirm, onCancel }) => {
+const ApplyResumeModal = ({
+  busy = false,
+  external = false,
+  sourceLabel = '',
+  onConfirm,
+  onCancel,
+}) => {
   const t = strings.jobDetail.applyDialog
   const { authFetch } = useApi()
 
@@ -56,12 +62,14 @@ const ApplyResumeModal = ({ busy = false, onConfirm, onCancel }) => {
   const empty = !loading && resumes.length === 0
   const ready = !busy && !loading && selectedId !== ''
 
+  const applyingLabel = external ? t.externalApplying : t.applying
+
   const attachDialog = useModalDialog(onCancel)
 
   const handleSubmit = (event) => {
     event.preventDefault()
     if (!ready) return
-    onConfirm(selectedId)
+    onConfirm(resumes.find((resume) => resume.id === selectedId))
   }
 
   const renderBody = () => {
@@ -130,7 +138,9 @@ const ApplyResumeModal = ({ busy = false, onConfirm, onCancel }) => {
           </h3>
         </header>
 
-        <p className="apply-resume-subtitle">{t.subtitle}</p>
+        <p className="apply-resume-subtitle">
+          {external ? t.externalSubtitle.replace('{source}', sourceLabel) : t.subtitle}
+        </p>
 
         {renderBody()}
 
@@ -144,7 +154,7 @@ const ApplyResumeModal = ({ busy = false, onConfirm, onCancel }) => {
             {t.cancel}
           </button>
           <button type="submit" className="apply-resume-button" disabled={!ready}>
-            {busy ? t.applying : t.confirm}
+            {busy ? applyingLabel : t.confirm}
           </button>
         </div>
       </form>

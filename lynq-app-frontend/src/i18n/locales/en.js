@@ -172,11 +172,22 @@ const en = {
     applied: 'You have applied to this job.',
     alreadyApplied: 'You have already applied to this job.',
     applyError: 'Could not apply. Please try again.',
+    applyExternal: 'Apply on {source}',
+    applyingExternal: 'Preparing…',
+    externalNoUrl: 'This posting has no link to its original source.',
+    externalRedirected:
+      'We downloaded your resume and opened the posting on {source}. Finish applying there — the application is already saved under "My applications".',
+    externalRegisterError:
+      'We opened the posting on {source} and downloaded your resume, but could not save the application on LYNQ.',
+    externalDownloadError:
+      'We opened the posting on {source}, but could not download your resume. Get it from "My resume".',
     // The dialog that opens on "Apply now": the candidate keeps several resumes
     // and the recruiter only ever sees the one they applied with.
     applyDialog: {
       title: 'Which resume do you want to apply with?',
       subtitle: 'The recruiter will only see the one you choose here.',
+      externalSubtitle:
+        'This job is published on {source}. We will download the resume you pick, save the application, and take you there to finish it.',
       untitled: 'Untitled resume',
       loading: 'Loading your resumes…',
       loadError: 'We could not load your resumes. Please close and try again.',
@@ -185,6 +196,7 @@ const en = {
       cancel: 'Cancel',
       confirm: 'Apply with this resume',
       applying: 'Applying…',
+      externalApplying: 'Downloading…',
     },
     stopSeeking: 'Stop seeking candidates',
     stopping: 'Stopping…',

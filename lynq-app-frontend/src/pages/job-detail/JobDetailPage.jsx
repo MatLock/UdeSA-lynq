@@ -10,6 +10,8 @@ import CompanyIcon from '../../components/CompanyIcon/CompanyIcon.jsx'
 import UserIcon from '../../components/UserIcon/UserIcon.jsx'
 import Spinner from '../../components/Spinner/Spinner.jsx'
 import formatRelativeDate from '../../utils/formatRelativeDate'
+import downloadFile from '../../utils/downloadFile'
+import resumeLabel from '../../utils/resumeLabel'
 import './JobDetailPage.css'
 
 
@@ -132,6 +134,9 @@ const JobHeroSide = ({
   onOwnerAction,
   hasScore,
   job,
+  isExternal,
+  sourceLabel,
+  hasExternalUrl,
   applyState,
   applyDisabled,
   onApply,
@@ -177,6 +182,8 @@ const JobHeroSide = ({
     )
   }
   if (!isCompany) {
+    const applyLabel = isExternal ? t.applyExternal.replace('{source}', sourceLabel) : t.apply
+    const applyBusyLabel = isExternal ? t.applyingExternal : t.applying
     return (
       <div className="job-detail-hero-side">
         {/* LYNQ score pinned to the hero's top-right corner. */}
@@ -200,20 +207,41 @@ const JobHeroSide = ({
         <div className="job-detail-hero-actions">
           <button
             type="button"
-            className="job-detail-apply"
+            className={
+              isExternal ? 'job-detail-apply job-detail-apply--external' : 'job-detail-apply'
+            }
             onClick={onApply}
             disabled={applyDisabled}
           >
-            {applyState === 'applying' ? t.applying : t.apply}
+            {applyState === 'applying' ? applyBusyLabel : applyLabel}
+            {isExternal && <span aria-hidden="true"> ↗</span>}
           </button>
+          {isExternal && !hasExternalUrl && (
+            <p className="job-detail-apply-status is-info">{t.externalNoUrl}</p>
+          )}
           {applyState === 'applied' && (
             <p className="job-detail-apply-status is-success">
               {t.applied}
             </p>
           )}
+          {applyState === 'redirected' && (
+            <p className="job-detail-apply-status is-success">
+              {t.externalRedirected.replace('{source}', sourceLabel)}
+            </p>
+          )}
           {applyState === 'already' && (
             <p className="job-detail-apply-status is-info">
               {t.alreadyApplied}
+            </p>
+          )}
+          {applyState === 'downloadError' && (
+            <p className="job-detail-apply-status is-error">
+              {t.externalDownloadError.replace('{source}', sourceLabel)}
+            </p>
+          )}
+          {applyState === 'externalRegisterError' && (
+            <p className="job-detail-apply-status is-error">
+              {t.externalRegisterError.replace('{source}', sourceLabel)}
             </p>
           )}
           {applyState === 'error' && (
@@ -522,8 +550,10 @@ const JobDetailPage = () => {
   // already applied to this job, so seed the apply state accordingly to disable
   // the button and show the "already applied" legend without needing an attempt.
   const alreadyApplied = location.state?.alreadyApplied === true
+  const isExternal = Boolean(job?.jobPostSource) && job?.jobPostSource !== 'LYNQ'
+  const externalUrl = job?.jobUrl ?? null
   // What the user has done to the apply action *in this session*.
-  const [applyAttempt, setApplyAttempt] = useState(alreadyApplied ? 'already' : 'idle') // idle|applying|applied|already|error
+  const [applyAttempt, setApplyAttempt] = useState(alreadyApplied ? 'already' : 'idle') // idle|applying|applied|already|redirected|downloadError|externalRegisterError|error
 
   // The details endpoint reports whether this candidate applied before, so the
   // legend is there on arrival instead of appearing only after an attempt that
@@ -536,11 +566,12 @@ const JobDetailPage = () => {
   // is not offered — otherwise the button paints enabled over the feed's
   // placeholder and only disables a moment later, long enough to click it and be
   // refused.
-  const applyDisabled =
-    !detailsSettled ||
-    applyState === 'applying' ||
-    applyState === 'applied' ||
-    applyState === 'already'
+  const applyDisabled = isExternal
+    ? !detailsSettled || !externalUrl || applyState === 'applying'
+    : !detailsSettled ||
+      applyState === 'applying' ||
+      applyState === 'applied' ||
+      applyState === 'already'
   // Owner-only close/re-open action. The button shown (and which endpoint it
   // hits) is derived from the job's live status; this only tracks the in-flight
   // request so the button can disable and surface an error.
@@ -557,11 +588,39 @@ const JobDetailPage = () => {
     setPickingResume(true)
   }
 
-  const handleApplyWithResume = async (resumeId) => {
-    if (applyAttempt === 'applying') return
+  const registerExternalApplication = async (resume) => {
+    try {
+      await jobService.apply_to_job(authFetch, jobId, resume.id)
+      return true
+    } catch (error) {
+      return error?.status === 400
+    }
+  }
+
+  const handleApplyExternally = async (resume) => {
+    window.open(externalUrl, '_blank', 'noopener,noreferrer')
     setApplyAttempt('applying')
     try {
-      await jobService.apply_to_job(authFetch, jobId, resumeId)
+      await downloadFile(resume.pdfUrl, `${resumeLabel(resume, t.applyDialog.untitled)}.pdf`)
+    } catch {
+      setApplyAttempt('downloadError')
+      setPickingResume(false)
+      return
+    }
+    const registered = await registerExternalApplication(resume)
+    setApplyAttempt(registered ? 'redirected' : 'externalRegisterError')
+    setPickingResume(false)
+  }
+
+  const handleApplyWithResume = async (resume) => {
+    if (applyAttempt === 'applying') return
+    if (isExternal) {
+      await handleApplyExternally(resume)
+      return
+    }
+    setApplyAttempt('applying')
+    try {
+      await jobService.apply_to_job(authFetch, jobId, resume.id)
       setApplyAttempt('applied')
     } catch (error) {
       // The backend replies 400 when the user has already applied — surface that
@@ -634,7 +693,6 @@ const JobDetailPage = () => {
   const salary = formatSalary(job.salaryRangeDown, job.salaryRangeTop)
   const hasScore = !isCompany && job.lynqScore != null
   const skills = job.skills ?? []
-  const isExternal = job.jobPostSource && job.jobPostSource !== 'LYNQ'
   const company = job.company ?? null
   const companyLogo = isExternal ? null : company?.profileImageUrl
   const recruiter = job.postedBy ?? null
@@ -671,6 +729,9 @@ const JobDetailPage = () => {
               onOwnerAction={handleOwnerAction}
               hasScore={hasScore}
               job={job}
+              isExternal={isExternal}
+              sourceLabel={prettySource(job.jobPostSource)}
+              hasExternalUrl={Boolean(externalUrl)}
               applyState={applyState}
               applyDisabled={applyDisabled}
               onApply={handleApply}
@@ -714,6 +775,8 @@ const JobDetailPage = () => {
       {pickingResume && (
         <ApplyResumeModal
           busy={applyState === 'applying'}
+          external={isExternal}
+          sourceLabel={prettySource(job.jobPostSource)}
           onConfirm={handleApplyWithResume}
           onCancel={() => setPickingResume(false)}
         />

@@ -172,11 +172,22 @@ const es = {
     applied: 'Te postulaste a este empleo.',
     alreadyApplied: 'Ya te postulaste a este empleo.',
     applyError: 'No se pudo postular. Intentá de nuevo.',
+    applyExternal: 'Postularme en {source}',
+    applyingExternal: 'Preparando…',
+    externalNoUrl: 'Esta oferta no tiene enlace a su fuente original.',
+    externalRedirected:
+      'Descargamos tu CV y abrimos la oferta en {source}. Terminá la postulación ahí — ya quedó guardada en "Mis postulaciones".',
+    externalRegisterError:
+      'Abrimos la oferta en {source} y descargamos tu CV, pero no pudimos guardar la postulación en LYNQ.',
+    externalDownloadError:
+      'Abrimos la oferta en {source}, pero no pudimos descargar tu CV. Bajalo desde "Mi CV".',
     // The dialog that opens on "Apply now": the candidate keeps several resumes
     // and the recruiter only ever sees the one they applied with.
     applyDialog: {
       title: '¿Con qué CV querés postularte?',
       subtitle: 'El reclutador solo va a ver el que elijas acá.',
+      externalSubtitle:
+        'Este empleo está publicado en {source}. Vamos a descargar el CV que elijas, guardar la postulación y llevarte ahí para que la termines.',
       untitled: 'CV sin nombre',
       loading: 'Cargando tus CVs…',
       loadError: 'No pudimos cargar tus CVs. Cerrá y probá de nuevo.',
@@ -185,6 +196,7 @@ const es = {
       cancel: 'Cancelar',
       confirm: 'Postularme con este CV',
       applying: 'Postulando…',
+      externalApplying: 'Descargando…',
     },
     stopSeeking: 'Dejar de buscar candidatos',
     stopping: 'Deteniendo…',
