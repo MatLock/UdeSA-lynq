@@ -26,7 +26,7 @@ class Listing(BaseModel):
     external_id: str
     title: str
     source: str
-    rubro: str
+    category: str
     company: Optional[str] = None
     location: Optional[str] = None
     remote: bool = False
@@ -45,7 +45,7 @@ class Listing(BaseModel):
 class Scraper(Protocol):
     source: str
 
-    def fetch(self, rubro: str, limit: int) -> list[Listing]:
+    def fetch(self, category: str, limit: int) -> list[Listing]:
         ...
 
 

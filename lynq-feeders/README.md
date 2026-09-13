@@ -1,6 +1,6 @@
 # lynq-feeders
 
-Job-listing feeder service for the Lynq platform. A FastAPI app that scrapes the Argentine job portals, asks `lynq-ml` to extract skills and similarity tags from each posting, and hands the batch to `lynq-app-backend` for persistence. A daily Kubernetes CronJob calls it; the same endpoint can be invoked on demand from inside the cluster, optionally scoped to a subset of portals and rubros.
+Job-listing feeder service for the Lynq platform. A FastAPI app that scrapes the Argentine job portals, asks `lynq-ml` to extract skills and similarity tags from each posting, and hands the batch to `lynq-app-backend` for persistence. A daily Kubernetes CronJob calls it; the same endpoint can be invoked on demand from inside the cluster, optionally scoped to a subset of portals and categories.
 
 It replaces a set of standalone scripts that wrote scraped JSON to disk and then inserted it straight into MySQL. Those are gone: this service is the only thing that feeds external listings into the platform, and it does so through `lynq-app-backend` rather than by touching the database.
 
@@ -10,7 +10,7 @@ It replaces a set of standalone scripts that wrote scraped JSON to disk and then
 
 - [Technologies](#technologies)
 - [Architecture](#architecture)
-- [Rubros](#rubros)
+- [Categories](#categories)
 - [API reference](#api-reference)
 - [Running locally](#running-locally)
 - [Running with Docker](#running-with-docker)
@@ -70,20 +70,20 @@ The service never touches the database. `lynq-app-backend` owns `lynq_backend_db
 
 ### Run sequence
 
-1. For every configured source and rubro, scrape the latest `FEEDER_JOBS_PER_RUBRO` postings.
-2. Drop duplicates by `(source, external_id)` — Bumeran merges administración and contabilidad into one area, so the same posting can surface under two rubros.
+1. For every configured source and category, scrape the latest `FEEDER_JOBS_PER_CATEGORY` postings.
+2. Drop duplicates by `(source, external_id)` — Bumeran merges administración and contabilidad into one area, so the same posting can surface under two categories.
 3. For every posting with a description, call `lynq-ml` `/dmz/skill-enhance` to get `skills` and `similarity_tags`. Calls are bounded by `ML_CONCURRENCY`.
 4. Post the whole batch to `lynq-app-backend`.
 
-A posting whose skill extraction fails is still ingested, with empty skills and tags. A scraper that fails for one rubro does not abort the others — the failure is reported per source in the response.
+A posting whose skill extraction fails is still ingested, with empty skills and tags. A scraper that fails for one category does not abort the others — the failure is reported per source in the response.
 
 ---
 
-## Rubros
+## Categories
 
-Four rubros are scraped by default. The mappings were verified against both portals' live responses:
+Four categories are scraped by default. The mappings were verified against both portals' live responses:
 
-| Rubro               | Bumeran area (`idSemantico`)               | Bumeran query  | Computrabajo slug  |
+| Category               | Bumeran area (`idSemantico`)               | Bumeran query  | Computrabajo slug  |
 | ------------------- | ------------------------------------------ | -------------- | ------------------ |
 | `ADMINISTRACION`    | `administracion-contabilidad-y-finanzas`   | `administracion` | `administracion` |
 | `TECNOLOGIA`        | `tecnologia-sistemas-y-telecomunicaciones` | —              | `sistemas`         |
@@ -92,7 +92,7 @@ Four rubros are scraped by default. The mappings were verified against both port
 
 Bumeran has no separate accounting area, so `ADMINISTRACION` and `CONTABILIDAD` share area id 1 and are narrowed by a query. Computrabajo has no category API at all, so it is searched by keyword slug — `sistemas` rather than `tecnologia`, because the latter matches maintenance technicians.
 
-A rubro that is not in the table falls back to a keyword derived from its name, so `FEEDER_RUBROS` can name one that was never mapped.
+A category that is not in the table falls back to a keyword derived from its name, so `FEEDER_CATEGORIES` can name one that was never mapped.
 
 ---
 
@@ -120,14 +120,14 @@ An on-demand call can scope the run with an optional body. Every field is option
 curl -X POST http://localhost:8089/lynq-feeders/ingest \
   -H "lynq-request-uuid: $(uuidgen)" \
   -H "Content-Type: application/json" \
-  -d '{"sources": ["computrabajo"], "rubros": ["TECNOLOGIA"], "jobs_per_rubro": 2}'
+  -d '{"sources": ["computrabajo"], "categories": ["TECNOLOGIA"], "jobs_per_category": 2}'
 ```
 
 | Field | Default | Notes |
 | ----- | ------- | ----- |
 | `sources` | `FEEDER_SOURCES` | `bumeran` and/or `computrabajo`. An unknown source is a `400`. |
-| `rubros` | `FEEDER_RUBROS` | A rubro with no mapping falls back to a keyword search. |
-| `jobs_per_rubro` | `FEEDER_JOBS_PER_RUBRO` | Between 1 and 50. |
+| `categories` | `FEEDER_CATEGORIES` | A category with no mapping falls back to a keyword search. |
+| `jobs_per_category` | `FEEDER_JOBS_PER_CATEGORY` | Between 1 and 50. |
 
 The response's `plan` echoes what actually ran, so a scoped call is self-documenting.
 
@@ -137,8 +137,8 @@ The response's `plan` echoes what actually ran, so a scoped call is self-documen
   "data": {
     "plan": {
       "sources": ["bumeran", "computrabajo"],
-      "rubros": ["ADMINISTRACION", "TECNOLOGIA", "CONTABILIDAD", "RECURSOS_HUMANOS"],
-      "jobs_per_rubro": 10
+      "categories": ["ADMINISTRACION", "TECNOLOGIA", "CONTABILIDAD", "RECURSOS_HUMANOS"],
+      "jobs_per_category": 10
     },
     "fetched": 80,
     "deduplicated": 6,
@@ -146,7 +146,7 @@ The response's `plan` echoes what actually ran, so a scoped call is self-documen
     "enrichment_failed": 3,
     "ingested": { "jobs": 74, "companies": 41, "skills": 612, "similarity_tags": 388, "skipped": 0 },
     "per_source": [
-      { "source": "bumeran", "rubro": "TECNOLOGIA", "fetched": 10, "error": null }
+      { "source": "bumeran", "category": "TECNOLOGIA", "fetched": 10, "error": null }
     ]
   }
 }
@@ -172,10 +172,10 @@ PYTHONPATH=src .venv/bin/python src/main.py
 
 The service listens on `8089`. It needs `lynq-ml` on `8084` and `lynq-app-backend` on `8082` to do anything useful; `docker compose up lynq-ml lynq-app-backend` brings both up.
 
-To exercise one rubro against one portal without waiting for a full run:
+To exercise one category against one portal without waiting for a full run:
 
 ```bash
-FEEDER_SOURCES=computrabajo FEEDER_RUBROS=TECNOLOGIA FEEDER_JOBS_PER_RUBRO=2 \
+FEEDER_SOURCES=computrabajo FEEDER_CATEGORIES=TECNOLOGIA FEEDER_JOBS_PER_CATEGORY=2 \
   source ./set_env.sh
 ```
 
@@ -204,18 +204,18 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 | ------------------------------ | -------------------------------------------------- | -------------------------------------------------------------- |
 | `LYNQ_ML_URL`                  | `http://localhost:8084/lynq-ml`                    | Base URL of the skill-extraction service.                      |
 | `LYNQ_BACKEND_URL`             | `http://localhost:8082/lynq-backend-app`           | Base URL of the service that owns the database.                |
-| `LYNQ_INTERNAL_TOKEN`          | — (empty)                                          | Shared secret for the backend's `/internal/**` routes.         |
+| `LYNQ_INTERNAL_TOKEN`          | `local-internal-token-not-a-secret`                | Shared secret for the backend's `/internal/**` routes.         |
 | `LYNQ_FEEDERS_SYSTEM_USER_ID`  | `00000000-0000-0000-0000-00000000feed`             | Sent as `user-id` to `lynq-ml`; only reaches its logs.         |
-| `FEEDER_RUBROS`                | `ADMINISTRACION,TECNOLOGIA,CONTABILIDAD,RECURSOS_HUMANOS` | Rubros scraped per run.                                 |
+| `FEEDER_CATEGORIES`                | `ADMINISTRACION,TECNOLOGIA,CONTABILIDAD,RECURSOS_HUMANOS` | Categories scraped per run.                                 |
 | `FEEDER_SOURCES`               | `bumeran,computrabajo`                             | Portals scraped per run.                                       |
-| `FEEDER_JOBS_PER_RUBRO`        | `10`                                               | Postings kept per rubro per portal, newest first.              |
+| `FEEDER_JOBS_PER_CATEGORY`        | `10`                                               | Postings kept per category per portal, newest first.              |
 | `ML_CONCURRENCY`               | `2`                                                | Concurrent skill-enhance calls.                                |
 | `ML_TIMEOUT`                   | `300`                                              | Skill-enhance timeout, in seconds.                             |
 | `HTTP_TIMEOUT`                 | `30`                                               | Timeout for the backend ingest call, in seconds.               |
 | `SCRAPE_TIMEOUT`               | `25`                                               | Per-request scraping timeout, in seconds.                      |
 | `HOST` / `PORT`                | `0.0.0.0` / `8089`                                 | Bind address.                                                  |
 
-`LYNQ_INTERNAL_TOKEN` is empty by default on purpose: a deploy that forgets it fails loudly on the first ingest instead of silently posting unauthenticated. Never commit a value — it belongs in the cluster Secret, or in `~/.config/mendel/credentials` locally.
+`LYNQ_INTERNAL_TOKEN` defaults to the same throwaway value `lynq-app-backend` falls back to outside its `production` profile, so the local stack ingests with no setup. That value is deliberately worthless: `application-production.yaml` leaves the token empty, and an empty expected token rejects every `/internal/**` call, so a deploy that forgets the real secret still fails loudly on the first ingest. Never commit a real value — it belongs in the cluster Secret, or in `~/.config/mendel/credentials` locally.
 
 ---
 
@@ -239,7 +239,7 @@ kubectl -n lynq-local-namespace port-forward svc/lynq-feeders-service 8089:8089
 curl -X POST http://localhost:8089/lynq-feeders/ingest \
   -H "lynq-request-uuid: $(uuidgen)" \
   -H "Content-Type: application/json" \
-  -d '{"rubros": ["TECNOLOGIA"], "jobs_per_rubro": 2}'
+  -d '{"categories": ["TECNOLOGIA"], "jobs_per_category": 2}'
 ```
 
 From inside the cluster, without a port-forward:
@@ -288,7 +288,7 @@ lynq-feeders/
 │   ├── model/                  ingest request overrides and run plan
 │   ├── response/               GlobalRestResponse envelopes
 │   ├── router/                 health + ingest routes
-│   ├── scraper/                base model, rubro mapping, one module per portal
+│   ├── scraper/                base model, category mapping, one module per portal
 │   └── service/                run orchestration
 └── tests/
 ```

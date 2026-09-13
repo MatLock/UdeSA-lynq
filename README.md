@@ -40,7 +40,7 @@ The machine-learning service for Lynq, a FastAPI app that augments the platform 
 
 ### lynq-feeders &nbsp; [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-feeders-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-feeders-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/coverage-feeders.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-feeders-test-workflow.yaml)
 
-The job-ingestion service for Lynq, a FastAPI app that keeps the feed stocked with real listings. Once a day a Kubernetes CronJob calls it; it scrapes Bumeran and Computrabajo for the administración, tecnología, contabilidad and recursos humanos rubros, asks lynq-ml to extract each posting's skills and similarity tags, and hands the batch to lynq-app-backend's internal ingest endpoint. It is the only module driven by a schedule rather than by users, and it never touches the database itself.
+The job-ingestion service for Lynq, a FastAPI app that keeps the feed stocked with real listings. Once a day a Kubernetes CronJob calls it; it scrapes Bumeran and Computrabajo for the administración, tecnología, contabilidad and recursos humanos categories, asks lynq-ml to extract each posting's skills and similarity tags, and hands the batch to lynq-app-backend's internal ingest endpoint. It is the only module driven by a schedule rather than by users, and it never touches the database itself.
 
 ### lynq-home
 

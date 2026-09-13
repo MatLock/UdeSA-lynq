@@ -21,8 +21,8 @@ REQUEST_UUID = HEADERS["lynq-request-uuid"]
 def _settings() -> Settings:
     settings = Settings()
     settings.sources = ["bumeran", "computrabajo"]
-    settings.rubros = ["ADMINISTRACION", "TECNOLOGIA", "CONTABILIDAD", "RECURSOS_HUMANOS"]
-    settings.jobs_per_rubro = 10
+    settings.categories = ["ADMINISTRACION", "TECNOLOGIA", "CONTABILIDAD", "RECURSOS_HUMANOS"]
+    settings.jobs_per_category = 10
     return settings
 
 
@@ -31,7 +31,7 @@ def _listing(external_id="1", source="bumeran") -> Listing:
         external_id=external_id,
         title="Backend Developer",
         source=source,
-        rubro="TECNOLOGIA",
+        category="TECNOLOGIA",
         description="Python y FastAPI.",
     )
 
@@ -64,27 +64,27 @@ class PlanTest(unittest.TestCase):
         plan = self.service.plan_for(None)
 
         self.assertEqual(plan.sources, ["bumeran", "computrabajo"])
-        self.assertEqual(len(plan.rubros), 4)
-        self.assertEqual(plan.jobs_per_rubro, 10)
+        self.assertEqual(len(plan.categories), 4)
+        self.assertEqual(plan.jobs_per_category, 10)
 
     def test_an_empty_body_is_the_same_as_no_body(self):
         self.assertEqual(self.service.plan_for(IngestOverrides()), self.service.plan_for(None))
 
     def test_each_field_can_be_overridden_on_its_own(self):
-        plan = self.service.plan_for(IngestOverrides(rubros=["TECNOLOGIA"]))
+        plan = self.service.plan_for(IngestOverrides(categories=["TECNOLOGIA"]))
 
-        self.assertEqual(plan.rubros, ["TECNOLOGIA"])
+        self.assertEqual(plan.categories, ["TECNOLOGIA"])
         self.assertEqual(plan.sources, ["bumeran", "computrabajo"])
-        self.assertEqual(plan.jobs_per_rubro, 10)
+        self.assertEqual(plan.jobs_per_category, 10)
 
     def test_a_fully_scoped_run(self):
         plan = self.service.plan_for(
-            IngestOverrides(sources=["computrabajo"], rubros=["TECNOLOGIA"], jobs_per_rubro=2)
+            IngestOverrides(sources=["computrabajo"], categories=["TECNOLOGIA"], jobs_per_category=2)
         )
 
         self.assertEqual(plan.sources, ["computrabajo"])
-        self.assertEqual(plan.rubros, ["TECNOLOGIA"])
-        self.assertEqual(plan.jobs_per_rubro, 2)
+        self.assertEqual(plan.categories, ["TECNOLOGIA"])
+        self.assertEqual(plan.jobs_per_category, 2)
 
 
 class ScopedRunTest(unittest.IsolatedAsyncioTestCase):
@@ -94,7 +94,7 @@ class ScopedRunTest(unittest.IsolatedAsyncioTestCase):
         service = IngestService(_settings(), _ml(), _backend(), scrapers=[scraper])
 
         await service.run(
-            REQUEST_UUID, IngestOverrides(rubros=["TECNOLOGIA"], jobs_per_rubro=3)
+            REQUEST_UUID, IngestOverrides(categories=["TECNOLOGIA"], jobs_per_category=3)
         )
 
         self.assertEqual(scraper.fetch.call_count, 1)
@@ -105,19 +105,19 @@ class ScopedRunTest(unittest.IsolatedAsyncioTestCase):
             _settings(), _ml(), _backend(), scrapers=[_scraper(listings=[_listing()])]
         )
 
-        report = await service.run(REQUEST_UUID, IngestOverrides(rubros=["CONTABILIDAD"]))
+        report = await service.run(REQUEST_UUID, IngestOverrides(categories=["CONTABILIDAD"]))
 
-        self.assertEqual(report.plan.rubros, ["CONTABILIDAD"])
-        self.assertEqual(report.plan.jobs_per_rubro, 10)
+        self.assertEqual(report.plan.categories, ["CONTABILIDAD"])
+        self.assertEqual(report.plan.jobs_per_category, 10)
 
-    async def test_the_default_run_still_covers_every_rubro(self):
+    async def test_the_default_run_still_covers_every_category(self):
         scraper = _scraper(listings=[_listing()])
         service = IngestService(_settings(), _ml(), _backend(), scrapers=[scraper])
 
         report = await service.run(REQUEST_UUID)
 
         self.assertEqual(scraper.fetch.call_count, 4)
-        self.assertEqual(len(report.plan.rubros), 4)
+        self.assertEqual(len(report.plan.categories), 4)
 
 
 class OnDemandEndpointTest(unittest.TestCase):
@@ -139,14 +139,14 @@ class OnDemandEndpointTest(unittest.TestCase):
 
     def test_an_on_demand_call_can_scope_the_run(self):
         service = self._service()
-        body = {"sources": ["computrabajo"], "rubros": ["TECNOLOGIA"], "jobs_per_rubro": 2}
+        body = {"sources": ["computrabajo"], "categories": ["TECNOLOGIA"], "jobs_per_category": 2}
         with patch("router.ingest.build_service", return_value=service):
             self.client.post(INGEST, headers=HEADERS, json=body)
 
         overrides = service.run.await_args.args[1]
         self.assertEqual(overrides.sources, ["computrabajo"])
-        self.assertEqual(overrides.rubros, ["TECNOLOGIA"])
-        self.assertEqual(overrides.jobs_per_rubro, 2)
+        self.assertEqual(overrides.categories, ["TECNOLOGIA"])
+        self.assertEqual(overrides.jobs_per_category, 2)
 
     def test_an_unknown_source_is_a_400_not_a_500(self):
         service = AsyncMock()
@@ -161,13 +161,13 @@ class OnDemandEndpointTest(unittest.TestCase):
     def test_an_out_of_range_limit_is_rejected_before_anything_runs(self):
         service = self._service()
         with patch("router.ingest.build_service", return_value=service):
-            response = self.client.post(INGEST, headers=HEADERS, json={"jobs_per_rubro": 5000})
+            response = self.client.post(INGEST, headers=HEADERS, json={"jobs_per_category": 5000})
 
         self.assertEqual(response.status_code, 400)
         service.run.assert_not_awaited()
 
     def test_on_demand_still_requires_the_request_uuid(self):
-        response = self.client.post(INGEST, json={"rubros": ["TECNOLOGIA"]})
+        response = self.client.post(INGEST, json={"categories": ["TECNOLOGIA"]})
 
         self.assertEqual(response.status_code, 403)
 

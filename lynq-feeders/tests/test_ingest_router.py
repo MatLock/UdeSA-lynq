@@ -20,7 +20,7 @@ def _report() -> IngestReport:
         enriched=9,
         enrichment_failed=1,
         ingested=IngestStats(jobs=10, companies=4, skills=30, similarityTags=18, skipped=0),
-        per_source=[SourceReport(source="bumeran", rubro="TECNOLOGIA", fetched=10)],
+        per_source=[SourceReport(source="bumeran", category="TECNOLOGIA", fetched=10)],
     )
 
 

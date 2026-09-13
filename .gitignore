@@ -17,3 +17,4 @@ credentials
 .DS_Store
 trello.auth.txt
 openai_key.txt
+import_external_jobs.txt

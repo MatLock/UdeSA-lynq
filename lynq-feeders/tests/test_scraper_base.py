@@ -10,7 +10,7 @@ def _listing(external_id: str, posted_at: int | None) -> Listing:
         external_id=external_id,
         title="Title",
         source="bumeran",
-        rubro="TECNOLOGIA",
+        category="TECNOLOGIA",
         posted_at=posted_at,
     )
 

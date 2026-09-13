@@ -104,7 +104,7 @@ class ParseCardTest(unittest.TestCase):
         self.assertEqual(listing.company, "Lectus - Soluciones en RRHH")
         self.assertEqual(listing.location, "Córdoba, Córdoba")
         self.assertEqual(listing.source, "computrabajo")
-        self.assertEqual(listing.rubro, "TECNOLOGIA")
+        self.assertEqual(listing.category, "TECNOLOGIA")
         self.assertTrue(listing.remote)
         self.assertEqual(listing.salary_min, 1500000.0)
         self.assertEqual(listing.currency, "ARS")
@@ -134,7 +134,7 @@ class FetchTest(unittest.TestCase):
     def _listing_page(self, cards=1):
         return f"<html><body>{CARD_HTML * cards}</body></html>"
 
-    def test_uses_the_rubro_slug_and_enriches_from_the_detail_page(self):
+    def test_uses_the_category_slug_and_enriches_from_the_detail_page(self):
         self.scraper._get = MagicMock(side_effect=[self._listing_page(), DETAIL_HTML])
 
         found = self.scraper.fetch("TECNOLOGIA", 10)

@@ -173,6 +173,13 @@
   cursor: default;
 }
 
+.job-detail-apply--external {
+  padding: 11px 20px;
+  max-width: 220px;
+  white-space: normal;
+  line-height: 1.35;
+}
+
 /* Owner "stop seeking candidates" action — an outlined counterpart to the
    filled Apply button so a destructive-ish close reads distinctly on-brand. */
 .job-detail-stop {
