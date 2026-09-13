@@ -57,7 +57,7 @@ class ToListingTest(unittest.TestCase):
         self.assertEqual(listing.title, "DevSecOps Senior")
         self.assertEqual(listing.company, "KPMG")
         self.assertEqual(listing.source, "bumeran")
-        self.assertEqual(listing.rubro, "TECNOLOGIA")
+        self.assertEqual(listing.category, "TECNOLOGIA")
         self.assertTrue(listing.remote)
         self.assertEqual(listing.work_type, "Full-time")
         self.assertIn("devsecops-senior-1118437287", listing.apply_url)
@@ -93,7 +93,7 @@ class FetchTest(unittest.TestCase):
         self.assertNotIn("query", body)
         self.assertIn("sort=RECIENTES", self.session.post.call_args.args[0])
 
-    def test_sends_a_query_for_rubros_that_share_an_area(self):
+    def test_sends_a_query_for_categories_that_share_an_area(self):
         self.session.post.return_value = _response({"content": []})
 
         self.scraper.fetch("CONTABILIDAD", 10)

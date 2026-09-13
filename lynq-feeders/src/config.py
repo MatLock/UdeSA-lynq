@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import os
 
-DEFAULT_RUBROS = "ADMINISTRACION,TECNOLOGIA,CONTABILIDAD,RECURSOS_HUMANOS"
+DEFAULT_CATEGORIES = "ADMINISTRACION,TECNOLOGIA,CONTABILIDAD,RECURSOS_HUMANOS"
 DEFAULT_SOURCES = "bumeran,computrabajo"
 DEFAULT_SYSTEM_USER_ID = "00000000-0000-0000-0000-00000000feed"
+DEFAULT_INTERNAL_TOKEN = "local-internal-token-not-a-secret"
 
 
 def _int(name: str, default: int) -> int:
@@ -39,10 +40,12 @@ class Settings:
         self.system_user_id: str = os.getenv(
             "LYNQ_FEEDERS_SYSTEM_USER_ID", DEFAULT_SYSTEM_USER_ID
         )
-        self.internal_token: str = os.getenv("LYNQ_INTERNAL_TOKEN", "")
+        self.internal_token: str = os.getenv(
+            "LYNQ_INTERNAL_TOKEN", DEFAULT_INTERNAL_TOKEN
+        )
 
-        self.jobs_per_rubro: int = _int("FEEDER_JOBS_PER_RUBRO", 10)
-        self.rubros: list[str] = _csv("FEEDER_RUBROS", DEFAULT_RUBROS)
+        self.jobs_per_category: int = _int("FEEDER_JOBS_PER_CATEGORY", 10)
+        self.categories: list[str] = _csv("FEEDER_CATEGORIES", DEFAULT_CATEGORIES)
         self.sources: list[str] = _csv("FEEDER_SOURCES", DEFAULT_SOURCES)
 
         self.http_timeout: float = _float("HTTP_TIMEOUT", 30.0)

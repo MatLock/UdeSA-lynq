@@ -18,7 +18,7 @@ from scraper.base import (
     sort_latest_first,
     strip_accents,
 )
-from scraper.rubros import computrabajo_rubro
+from scraper.categories import computrabajo_category
 
 log = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ def _card_salary_text(card) -> Optional[str]:
     return None
 
 
-def parse_card(card, rubro: str, now: datetime) -> Optional[Listing]:
+def parse_card(card, category: str, now: datetime) -> Optional[Listing]:
     title_link = card.select_one("h2 a.js-o-link")
     title = _text(title_link)
     external_id = card.get("data-id")
@@ -129,7 +129,7 @@ def parse_card(card, rubro: str, now: datetime) -> Optional[Listing]:
         external_id=external_id,
         title=title,
         source=SOURCE,
-        rubro=rubro,
+        category=category,
         company=_text(card.select_one("a.fc_base.t_ellipsis")),
         location=_card_location(card),
         remote=bool(modality and "remoto" in modality.lower()),
@@ -213,14 +213,14 @@ class ComputrabajoScraper:
         if match:
             listing.experience_level = f"{match.group(1)} años de experiencia"
 
-    def fetch(self, rubro: str, limit: int) -> list[Listing]:
-        config = computrabajo_rubro(rubro)
+    def fetch(self, category: str, limit: int) -> list[Listing]:
+        config = computrabajo_category(category)
         now = datetime.now(timezone.utc)
 
         html = self._get(f"{BASE}/trabajo-de-{config.slug}")
         cards = BeautifulSoup(html, "lxml").select("article.box_offer")
 
-        parsed = [parse_card(card, rubro, now) for card in cards]
+        parsed = [parse_card(card, category, now) for card in cards]
         found = sort_latest_first([listing for listing in parsed if listing is not None])[:limit]
 
         for listing in found:
@@ -228,8 +228,8 @@ class ComputrabajoScraper:
             time.sleep(random.uniform(1.0, 2.5))  # NOSONAR
 
         log.info(
-            "message= Fetched Computrabajo listings, rubro=%s, received=%s, usable=%s",
-            rubro,
+            "message= Fetched Computrabajo listings, category=%s, received=%s, usable=%s",
+            category,
             len(cards),
             len(found),
         )

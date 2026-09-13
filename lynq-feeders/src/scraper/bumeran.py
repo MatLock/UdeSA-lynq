@@ -15,7 +15,7 @@ from scraper.base import (
     slugify,
     sort_latest_first,
 )
-from scraper.rubros import bumeran_rubro
+from scraper.categories import bumeran_category
 
 log = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ def _is_challenge(text: str) -> bool:
     return head.startswith("<!DOCTYPE") or "Attention Required" in head or "cf-error" in head
 
 
-def _to_listing(aviso: dict, rubro: str) -> Optional[Listing]:
+def _to_listing(aviso: dict, category: str) -> Optional[Listing]:
     aviso_id = aviso.get("id")
     title = aviso.get("titulo")
     if aviso_id is None or not title:
@@ -60,7 +60,7 @@ def _to_listing(aviso: dict, rubro: str) -> Optional[Listing]:
         external_id=str(aviso_id),
         title=title,
         source=SOURCE,
-        rubro=rubro,
+        category=category,
         company=aviso.get("empresa"),
         location=aviso.get("localizacion"),
         remote="remoto" in modalidad,
@@ -96,9 +96,9 @@ class BumeranScraper:
     def _warmup(self, session: requests.Session) -> None:
         session.get(WARMUP_URL, headers={"User-Agent": pick_user_agent()}, timeout=self.timeout)
 
-    def _search(self, rubro: str, page: int, page_size: int) -> dict:
+    def _search(self, category: str, page: int, page_size: int) -> dict:
         session = self._ensure_session()
-        config = bumeran_rubro(rubro)
+        config = bumeran_category(category)
 
         body: dict = {"filtros": []}
         if config.area:
@@ -116,9 +116,9 @@ class BumeranScraper:
             wait = backoff_seconds(attempt)
             log.warning(
                 "message= Bumeran challenged the search, re-warming and backing off, "
-                "status=%s, rubro=%s, page=%s, wait_seconds=%.1f",
+                "status=%s, category=%s, page=%s, wait_seconds=%.1f",
                 response.status_code,
-                rubro,
+                category,
                 page,
                 wait,
             )
@@ -126,19 +126,19 @@ class BumeranScraper:
             self._warmup(session)
 
         raise RuntimeError(
-            f"Bumeran search failed for rubro={rubro} page={page} after {MAX_RETRIES} retries"
+            f"Bumeran search failed for category={category} page={page} after {MAX_RETRIES} retries"
         )
 
-    def fetch(self, rubro: str, limit: int) -> list[Listing]:
+    def fetch(self, category: str, limit: int) -> list[Listing]:
         page_size = max(limit, PAGE_SIZE)
-        content = self._search(rubro, 0, page_size).get("content") or []
+        content = self._search(category, 0, page_size).get("content") or []
 
-        listings = [_to_listing(aviso, rubro) for aviso in content]
+        listings = [_to_listing(aviso, category) for aviso in content]
         found = [listing for listing in listings if listing is not None]
 
         log.info(
-            "message= Fetched Bumeran listings, rubro=%s, received=%s, usable=%s",
-            rubro,
+            "message= Fetched Bumeran listings, category=%s, received=%s, usable=%s",
+            category,
             len(content),
             len(found),
         )

@@ -20,7 +20,7 @@ IN_OFFICE = "IN_OFFICE"
 
 class SourceReport(BaseModel):
     source: str
-    rubro: str
+    category: str
     fetched: int = 0
     error: Optional[str] = None
 
@@ -65,8 +65,8 @@ class IngestService:
         overrides = overrides or IngestOverrides()
         return RunPlan(
             sources=overrides.sources or self.settings.sources,
-            rubros=overrides.rubros or self.settings.rubros,
-            jobs_per_rubro=overrides.jobs_per_rubro or self.settings.jobs_per_rubro,
+            categories=overrides.categories or self.settings.categories,
+            jobs_per_category=overrides.jobs_per_category or self.settings.jobs_per_category,
         )
 
     def scrapers_for(self, plan: RunPlan) -> list[Scraper]:
@@ -77,19 +77,19 @@ class IngestService:
     async def _scrape_all(self, plan: RunPlan, report: IngestReport) -> list[Listing]:
         collected: list[Listing] = []
         for scraper in self.scrapers_for(plan):
-            for rubro in plan.rubros:
-                entry = SourceReport(source=scraper.source, rubro=rubro)
+            for category in plan.categories:
+                entry = SourceReport(source=scraper.source, category=category)
                 try:
-                    found = await asyncio.to_thread(scraper.fetch, rubro, plan.jobs_per_rubro)
+                    found = await asyncio.to_thread(scraper.fetch, category, plan.jobs_per_category)
                     collected.extend(found)
                     entry.fetched = len(found)
                 except Exception as exc:  # NOSONAR
                     entry.error = str(exc)
                     log.error(
-                        "message= Scraper failed, continuing with the other rubros, "
-                        "source=%s, rubro=%s",
+                        "message= Scraper failed, continuing with the other categories, "
+                        "source=%s, category=%s",
                         scraper.source,
-                        rubro,
+                        category,
                         exc_info=exc,
                     )
                 report.per_source.append(entry)
@@ -134,10 +134,10 @@ class IngestService:
         report = IngestReport(plan=plan)
 
         log.info(
-            "message= Started feeder run, sources=%s, rubros=%s, jobs_per_rubro=%s",
+            "message= Started feeder run, sources=%s, categories=%s, jobs_per_category=%s",
             plan.sources,
-            plan.rubros,
-            plan.jobs_per_rubro,
+            plan.categories,
+            plan.jobs_per_category,
         )
 
         collected = await self._scrape_all(plan, report)

@@ -14,9 +14,9 @@ REQUEST_UUID = "11111111-2222-3333-4444-555555555555"
 
 def _settings(**overrides) -> Settings:
     settings = Settings()
-    settings.rubros = overrides.get("rubros", ["TECNOLOGIA"])
+    settings.categories = overrides.get("categories", ["TECNOLOGIA"])
     settings.sources = overrides.get("sources", ["bumeran"])
-    settings.jobs_per_rubro = overrides.get("jobs_per_rubro", 10)
+    settings.jobs_per_category = overrides.get("jobs_per_category", 10)
     settings.ml_concurrency = overrides.get("ml_concurrency", 2)
     return settings
 
@@ -26,7 +26,7 @@ def _listing(external_id="1", source="bumeran", description="Python y FastAPI.")
         external_id=external_id,
         title="Backend Developer",
         source=source,
-        rubro="TECNOLOGIA",
+        category="TECNOLOGIA",
         description=description,
     )
 
@@ -82,10 +82,10 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(listing.skills, ["Python", "FastAPI"])
         self.assertEqual(listing.similarity_tags, ["Backend Development"])
 
-    async def test_scrapes_every_rubro_for_every_source(self):
+    async def test_scrapes_every_category_for_every_source(self):
         bumeran = _scraper("bumeran", [_listing("1")])
         computrabajo = _scraper("computrabajo", [_listing("2", "computrabajo")])
-        settings = _settings(rubros=["TECNOLOGIA", "CONTABILIDAD"], sources=["bumeran"])
+        settings = _settings(categories=["TECNOLOGIA", "CONTABILIDAD"], sources=["bumeran"])
         service = IngestService(
             settings, _ml(), _backend(), scrapers=[bumeran, computrabajo]
         )
@@ -96,18 +96,18 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(computrabajo.fetch.call_count, 2)
         self.assertEqual(len(report.per_source), 4)
 
-    async def test_passes_the_per_rubro_limit_to_the_scraper(self):
+    async def test_passes_the_per_category_limit_to_the_scraper(self):
         scraper = _scraper(listings=[_listing()])
         service = IngestService(
-            _settings(jobs_per_rubro=3), _ml(), _backend(), scrapers=[scraper]
+            _settings(jobs_per_category=3), _ml(), _backend(), scrapers=[scraper]
         )
 
         await service.run(REQUEST_UUID)
 
         self.assertEqual(scraper.fetch.call_args.args, ("TECNOLOGIA", 3))
 
-    async def test_duplicates_across_rubros_are_collapsed(self):
-        settings = _settings(rubros=["TECNOLOGIA", "CONTABILIDAD"])
+    async def test_duplicates_across_categories_are_collapsed(self):
+        settings = _settings(categories=["TECNOLOGIA", "CONTABILIDAD"])
         scraper = _scraper(listings=[_listing("same")])
         backend = _backend()
         service = IngestService(settings, _ml(), backend, scrapers=[scraper])
@@ -156,7 +156,7 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
         ml.skill_enhance.assert_not_awaited()
         self.assertEqual(report.enrichment_failed, 1)
 
-    async def test_a_failing_scraper_does_not_abort_the_other_rubros(self):
+    async def test_a_failing_scraper_does_not_abort_the_other_categories(self):
         failing = _scraper("bumeran", error=RuntimeError("cloudflare"))
         working = _scraper("computrabajo", [_listing("2", "computrabajo")])
         service = IngestService(_settings(), _ml(), _backend(), scrapers=[failing, working])

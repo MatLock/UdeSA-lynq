@@ -19,7 +19,7 @@ def _listing(**overrides) -> Listing:
         external_id="ABC123",
         title="Backend Developer",
         source="computrabajo",
-        rubro="TECNOLOGIA",
+        category="TECNOLOGIA",
         company="Lectus",
         description="Python y FastAPI.",
         remote=True,
