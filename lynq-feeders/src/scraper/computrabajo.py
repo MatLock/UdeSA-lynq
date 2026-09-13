@@ -29,11 +29,11 @@ SKILLS_SECTION_MARKER = "Aptitudes asociadas"
 DESCRIPTION_HEADING = "Descripción de la oferta"
 
 _DIGIT_RE = re.compile(r"(\d+)")
-_HOURS_RE = re.compile(r"(\d++)\s{0,3}hora")
-_MINUTES_RE = re.compile(r"(\d++)\s{0,3}minuto")
+_HOURS_RE = re.compile(r"(\d{1,3})\s{0,3}hora")
+_MINUTES_RE = re.compile(r"(\d{1,3})\s{0,3}minuto")
 _WHITESPACE_RE = re.compile(r"\s+")
 _AMOUNT_RE = re.compile(r"\d[\d.,]*")
-_EXPERIENCE_RE = re.compile(r"(\d++)\s{1,3}a[nñ]os?\s{1,3}de\s{1,3}experiencia", re.I)
+_EXPERIENCE_RE = re.compile(r"(\d{1,2})\s{1,3}a[nñ]os?\s{1,3}de\s{1,3}experiencia", re.I)
 
 
 def _text(node) -> Optional[str]:
