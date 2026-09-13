@@ -603,6 +603,7 @@ const es = {
       explanationLoading: 'Analizando tu score…',
       explanationError: 'No pudimos cargar la explicación de tu score. Intentá de nuevo.',
       explanationSummary: 'Resumen',
+      explanationPerfectMatch: 'Sos perfecto para este puesto.',
       explanationReasons: 'Por qué no sos un match perfecto',
       recommendedCourses: 'Cursos recomendados',
       explanationNoCourses: 'No hay cursos para recomendar — sos un buen match para este puesto.',
