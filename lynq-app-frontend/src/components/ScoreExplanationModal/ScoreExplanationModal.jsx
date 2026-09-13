@@ -26,6 +26,10 @@ const ScoreExplanationModal = ({ jobTitle, result, loading, error, onClose }) =>
     (suggestion) => suggestion.courses?.length > 0,
   )
 
+  const perfectMatch =
+    !!result && !result.reasons?.length && !result.suggestions?.length
+  const summary = perfectMatch ? t.explanationPerfectMatch : result?.outcome
+
   const renderBody = () => {
     if (loading) {
       return (
@@ -41,10 +45,10 @@ const ScoreExplanationModal = ({ jobTitle, result, loading, error, onClose }) =>
 
     return (
       <div className="score-modal-body">
-        {result?.outcome && (
+        {summary && (
           <div className="score-modal-section">
             <h4 className="score-modal-section-title">{t.explanationSummary}</h4>
-            <p className="score-modal-explanation">{result.outcome}</p>
+            <p className="score-modal-explanation">{summary}</p>
           </div>
         )}
 

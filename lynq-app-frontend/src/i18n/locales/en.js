@@ -603,6 +603,7 @@ const en = {
       explanationLoading: 'Analyzing your score…',
       explanationError: 'We could not load your score explanation. Please try again.',
       explanationSummary: 'Summary',
+      explanationPerfectMatch: 'You are perfect for this role.',
       explanationReasons: 'Why you are not a perfect match',
       recommendedCourses: 'Recommended courses',
       explanationNoCourses: 'No courses to recommend — you are a strong match for this role.',
