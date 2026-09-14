@@ -1,0 +1,88 @@
+name: lynq-agent CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Two runs of this workflow must never push the badge at the same time;
+# the older run's badge is stale anyway once a newer commit lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lynq-agent:
+    name: "lynq-agent: Test & Coverage"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+
+      - name: Setup Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        working-directory: lynq-agent
+        run: |
+          python -m pip install --upgrade "pip==26.1.2"
+          # requirements.txt is a full lock (pip-compile --generate-hashes from
+          # requirements.in); --require-hashes makes the install reproducible.
+          pip install --require-hashes --only-binary :all: -r requirements.txt
+          # aiosqlite is test-only: the suite runs the repository against an
+          # SQLite file so it never needs a MySQL container.
+          pip install --only-binary :all: "coverage==7.15.2" "genbadge[coverage]==1.1.3" "aiosqlite==0.22.1"
+
+      - name: Run tests with coverage
+        working-directory: lynq-agent
+        run: |
+          coverage run -m unittest discover -s tests -t .
+          coverage report -m
+          coverage xml -o coverage.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-agent
+          path: lynq-agent/coverage.xml
+
+      - name: Render coverage table
+        id: coverage
+        if: always()
+        working-directory: lynq-agent
+        run: |
+          coverage report -m --format=markdown > coverage.md || true
+          echo "total=$(coverage report --format=total || true)" >> "$GITHUB_OUTPUT"
+
+      - name: Comment coverage on the PR
+        if: always()
+        uses: ./.github/actions/coverage-pr-comment
+        with:
+          module: lynq-agent
+          icon: "🎯"
+          language: python
+          format: markdown
+          path: lynq-agent/coverage.md
+          total: ${{ steps.coverage.outputs.total }}
+
+      - name: Generate coverage badge
+        if: github.ref == 'refs/heads/main'
+        working-directory: lynq-agent
+        run: genbadge coverage -i coverage.xml -o ../.github/badges/coverage-agent.svg
+
+      - name: Commit badge back to main
+        if: github.ref == 'refs/heads/main'
+        uses: ./.github/actions/commit-to-main
+        with:
+          files: .github/badges/coverage-agent.svg
+          message: "chore: update lynq-agent coverage badge [skip ci]"

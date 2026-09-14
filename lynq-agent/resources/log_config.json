@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "filters": {
+    "request_uuid": {"()": "logging_context.RequestUuidFilter"}
+  },
+  "formatters": {
+    "default": {
+      "()": "uvicorn.logging.DefaultFormatter",
+      "fmt": "%(asctime)s %(levelprefix)s [%(lynq_request_uuid)s] %(name)s - %(message)s",
+      "use_colors": true
+    },
+    "access": {
+      "()": "uvicorn.logging.AccessFormatter",
+      "fmt": "%(asctime)s %(levelprefix)s [%(lynq_request_uuid)s] %(client_addr)s - %(request_line)s %(status_code)s",
+      "use_colors": true
+    }
+  },
+  "handlers": {
+    "default": {
+      "class": "logging.StreamHandler",
+      "formatter": "default",
+      "filters": ["request_uuid"],
+      "stream": "ext://sys.stdout"
+    },
+    "access": {
+      "class": "logging.StreamHandler",
+      "formatter": "access",
+      "filters": ["request_uuid"],
+      "stream": "ext://sys.stdout"
+    }
+  },
+  "loggers": {
+    "uvicorn": {"handlers": ["default"], "level": "INFO", "propagate": false},
+    "uvicorn.error": {"level": "INFO"},
+    "uvicorn.access": {"handlers": ["access"], "level": "INFO", "propagate": false}
+  },
+  "root": {"handlers": ["default"], "level": "INFO"}
+}
