@@ -112,7 +112,26 @@ python src/main.py
 ```
 
 Or `docker compose up lynq-agent` from the repo root. The schema is migrated on
-startup (`DB_MIGRATE_ON_STARTUP`, alembic); `alembic upgrade head` is idempotent.
+startup (`DB_MIGRATE_ON_STARTUP`, Liquibase); `liquibase update` is idempotent, so
+several replicas booting at once is safe.
+
+The changelog lives in `changelog/`, laid out like the one in lynq-app-backend: a
+master `db.changelog-config.xml` that `includeAll`s `changelog/ddl`, and one
+formatted-SQL file per change. A new change is a new numbered file in `ddl`;
+never edit a file that has already run, because Liquibase checksums it.
+
+Liquibase is a Java tool, so the image carries a headless JRE on top of
+`python:3.12-slim` and the Liquibase distribution under `/opt/liquibase`, pinned
+by version and sha256 in the Dockerfile. The distribution ships no MySQL driver,
+so `mysql-connector-j` is fetched into `/opt/liquibase/lib` in the same step. To
+run the service outside Docker you need `java` plus either `LIQUIBASE_HOME` or
+`liquibase` on the `PATH`; `DB_MIGRATE_ON_STARTUP=false` skips the whole thing.
+
+Credentials reach Liquibase through `LIQUIBASE_COMMAND_USERNAME` and
+`LIQUIBASE_COMMAND_PASSWORD`, never as arguments, so the password stays out of
+the process list. `DB_URL` stays the single source of truth: the JDBC URL is
+derived from it, schema name included, so pointing the service at another
+database moves the migration with it.
 
 Tests:
 
@@ -123,7 +142,7 @@ python -m unittest discover -s tests -t .
 
 They run on SQLite, so no database is needed (`aiosqlite` is test-only and is
 therefore not in `requirements.in`). Two MySQL-only details do not
-show up there: `short_id` is `AUTO_INCREMENT` in the migration and stays `NULL`
+show up there: `short_id` is `AUTO_INCREMENT` in the changelog and stays `NULL`
 on SQLite, and `DECIMAL` is exact in MySQL while SQLite goes through float.
 
 ## Thesis

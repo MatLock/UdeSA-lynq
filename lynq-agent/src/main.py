@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
 
-from db.migrations import upgrade_to_head
+from db.migrations import update_to_latest
 from db.session import dispose_engine
 from exception_handlers import register_exception_handlers
 from middleware.request_uuid import require_request_uuid
@@ -40,7 +40,7 @@ logging.config.dictConfig(LOGGING_CONFIG)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     if os.getenv("DB_MIGRATE_ON_STARTUP", "true").lower() == "true":
-        await upgrade_to_head()
+        await update_to_latest()
     yield
     await dispose_engine()
 

@@ -32,6 +32,11 @@ export BEDROCK_TEMPERATURE="${BEDROCK_TEMPERATURE:-0}"
 export DB_URL="${DB_URL:-mysql+aiomysql://root:root@localhost:3306/lynq_agent_db}"
 export DB_MIGRATE_ON_STARTUP="${DB_MIGRATE_ON_STARTUP:-true}"
 
+# Liquibase migrates the schema on startup. The image ships it under
+# /opt/liquibase; outside Docker it needs java plus either LIQUIBASE_HOME or
+# liquibase on the PATH. Set DB_MIGRATE_ON_STARTUP=false to skip it.
+export LIQUIBASE_HOME="${LIQUIBASE_HOME:-/opt/liquibase}"
+
 # ----------------------------------------------------------------------------
 # Downstream services.
 # ----------------------------------------------------------------------------
