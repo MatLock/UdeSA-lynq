@@ -196,50 +196,6 @@ public class JobService {
     return jobPostRepository.save(job);
   }
 
-  private void updateStatus(JobPostEntity job, JobStatus status) {
-    if (job.getJobStatus() == status) {
-      return;
-    }
-
-    job.setJobStatus(status);
-    job.setClosedOn(status == JobStatus.CLOSE ? LocalDate.now(ZoneOffset.UTC) : null);
-  }
-
-  private void updateSkills(JobPostEntity job, List<String> skills) {
-    List<String> desired = clean(skills);
-
-    List<JobPostSkillEntity> toRemove = job.getSkills().stream()
-        .filter(existing -> !desired.contains(existing.getSkill()))
-        .toList();
-    job.getSkills().removeAll(toRemove);
-    jobPostSkillRepository.deleteAll(toRemove);
-
-    Set<String> existingSkills = job.getSkills().stream()
-        .map(JobPostSkillEntity::getSkill)
-        .collect(Collectors.toSet());
-
-    desired.stream()
-        .filter(skill -> !existingSkills.contains(skill))
-        .map(skill -> JobPostSkillEntity.builder()
-            .id(Generators.timeBasedEpochGenerator().generate().toString())
-            .jobPost(job)
-            .skill(skill)
-            .build())
-        .forEach(job.getSkills()::add);
-  }
-
-  private JobPostEntity getOwnedJob(String jobId, UserEntity user, String forbiddenMessage) {
-    JobPostEntity job = jobPostRepository.findById(jobId)
-        .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
-
-    if (job.getCreatedByUser() == null
-        || !job.getCreatedByUser().getId().equals(user.getId())) {
-      throw new ForbiddenException(forbiddenMessage);
-    }
-
-    return job;
-  }
-
   @AuditLog
   @Transactional
   /**
@@ -283,8 +239,7 @@ public class JobService {
     Page<JobCandidateProjection> candidates =
         userApplicationJobRepository.findCandidatesByJobId(jobId, pageable);
 
-    // Avatars and applied-with resumes are signed in one round trip: the map is
-    // keyed by file id, so the two kinds of document share it without clashing.
+
     Map<String, String> downloadUrls = fileStorageService.obtainDownloadUrls(
         candidates.getContent().stream()
             .flatMap(candidate -> Stream.of(
@@ -341,26 +296,6 @@ public class JobService {
     return response.getData();
   }
 
-  private static CandidateEvaluationRequest toEvaluationRequest(JobPostEntity job,
-      UserEntity candidate) {
-    return CandidateEvaluationRequest.builder()
-        .job(JobSpec.builder()
-            .description(describe(job.getTitle(), job.getDescription()))
-            .skills(job.getSkills().stream().map(JobPostSkillEntity::getSkill).toList())
-            .build())
-        .candidate(CandidateSpec.builder()
-            .description(describe(candidate.getCurrentPosition(), candidate.getAbout()))
-            .skills(skillNamesOf(candidate))
-            .build())
-        .build();
-  }
-
-  private static String describe(String... parts) {
-    return Stream.of(parts)
-        .filter(value -> value != null && !value.isBlank())
-        .collect(Collectors.joining("\n\n"));
-  }
-
   @AuditLog
   @Transactional(readOnly = true)
   public PagedRestResponse<GetJobRestResponse> searchAvailableJobs(JobFilter filter,
@@ -402,6 +337,84 @@ public class JobService {
         toResponse(projection, user, signProfileImages(List.of(projection))),
         userApplicationJobRepository.countByJobId(jobId),
         hasApplied(jobId, user));
+  }
+
+  static List<String> skillNamesOf(UserEntity user) {
+    List<UserSkillsEntity> skills = user.getSkills();
+    return skills == null ? List.of() : skills.stream()
+        .map(UserSkillsEntity::getSkill)
+        .toList();
+  }
+
+  static List<String> similarityTagNamesOf(UserEntity user) {
+    List<UserSimilarityTagEntity> tags = user.getSimilarityTags();
+    return tags == null ? List.of() : tags.stream()
+        .map(UserSimilarityTagEntity::getSimilarityTag)
+        .toList();
+  }
+
+  private void updateStatus(JobPostEntity job, JobStatus status) {
+    if (job.getJobStatus() == status) {
+      return;
+    }
+
+    job.setJobStatus(status);
+    job.setClosedOn(status == JobStatus.CLOSE ? LocalDate.now(ZoneOffset.UTC) : null);
+  }
+
+  private void updateSkills(JobPostEntity job, List<String> skills) {
+    List<String> desired = clean(skills);
+
+    List<JobPostSkillEntity> toRemove = job.getSkills().stream()
+        .filter(existing -> !desired.contains(existing.getSkill()))
+        .toList();
+    job.getSkills().removeAll(toRemove);
+    jobPostSkillRepository.deleteAll(toRemove);
+
+    Set<String> existingSkills = job.getSkills().stream()
+        .map(JobPostSkillEntity::getSkill)
+        .collect(Collectors.toSet());
+
+    desired.stream()
+        .filter(skill -> !existingSkills.contains(skill))
+        .map(skill -> JobPostSkillEntity.builder()
+            .id(Generators.timeBasedEpochGenerator().generate().toString())
+            .jobPost(job)
+            .skill(skill)
+            .build())
+        .forEach(job.getSkills()::add);
+  }
+
+  private JobPostEntity getOwnedJob(String jobId, UserEntity user, String forbiddenMessage) {
+    JobPostEntity job = jobPostRepository.findById(jobId)
+        .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
+
+    if (job.getCreatedByUser() == null
+        || !job.getCreatedByUser().getId().equals(user.getId())) {
+      throw new ForbiddenException(forbiddenMessage);
+    }
+
+    return job;
+  }
+
+  private static CandidateEvaluationRequest toEvaluationRequest(JobPostEntity job,
+      UserEntity candidate) {
+    return CandidateEvaluationRequest.builder()
+        .job(JobSpec.builder()
+            .description(describe(job.getTitle(), job.getDescription()))
+            .skills(job.getSkills().stream().map(JobPostSkillEntity::getSkill).toList())
+            .build())
+        .candidate(CandidateSpec.builder()
+            .description(describe(candidate.getCurrentPosition(), candidate.getAbout()))
+            .skills(skillNamesOf(candidate))
+            .build())
+        .build();
+  }
+
+  private static String describe(String... parts) {
+    return Stream.of(parts)
+        .filter(value -> value != null && !value.isBlank())
+        .collect(Collectors.joining("\n\n"));
   }
 
   /**
@@ -560,20 +573,6 @@ public class JobService {
 
     return LyNQScoreCalculator.score(jobSkillNames, jobSimilarityTagNames, skillNamesOf(user),
         similarityTagNamesOf(user));
-  }
-
-  static List<String> skillNamesOf(UserEntity user) {
-    List<UserSkillsEntity> skills = user.getSkills();
-    return skills == null ? List.of() : skills.stream()
-        .map(UserSkillsEntity::getSkill)
-        .toList();
-  }
-
-  static List<String> similarityTagNamesOf(UserEntity user) {
-    List<UserSimilarityTagEntity> tags = user.getSimilarityTags();
-    return tags == null ? List.of() : tags.stream()
-        .map(UserSimilarityTagEntity::getSimilarityTag)
-        .toList();
   }
 
   private UserEntity getAuthenticatedUser() {

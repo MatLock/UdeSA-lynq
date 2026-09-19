@@ -855,359 +855,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(response.statusCode(), is(401));
   }
 
-  private UserEntity seedCompanyUser(String id, String fullName, String currentPosition,
-      String lynqFileStorageId) {
-    return userRepository.save(UserEntity.builder()
-        .id(id)
-        .fullName(fullName)
-        .currentPosition(currentPosition)
-        .lynqFileStorageId(lynqFileStorageId)
-        .createdOn(LocalDate.now())
-        .build());
-  }
-
-  private CompanyEntity seedCompany(String companyId, String name, UserEntity owner) {
-    return companyRepository.save(CompanyEntity.builder()
-        .id(companyId)
-        .name(name)
-        .about(COMPANY_ABOUT)
-        .size(COMPANY_SIZE)
-        .lynqFileStorageId(COMPANY_FILE_ID)
-        .createdOn(LocalDate.now())
-        .owner(owner)
-        .build());
-  }
-
-  private JobPostEntity seedJob(String id, String title, String description, WorkType workType,
-      LocalDate createdOn, JobStatus jobStatus, CompanyEntity company, UserEntity poster,
-      List<String> skills) {
-    JobPostEntity job = JobPostEntity.builder()
-        .id(id)
-        .title(title)
-        .description(description)
-        .workType(workType)
-        .jobPostSource(JOB_POST_TYPE)
-        .createdOn(createdOn)
-        .jobStatus(jobStatus)
-        .company(company)
-        .createdByUser(poster)
-        .build();
-    if (skills != null) {
-      skills.forEach(skill -> job.getSkills().add(JobPostSkillEntity.builder()
-          .id(UUID.randomUUID().toString())
-          .jobPost(job)
-          .skill(skill)
-          .build()));
-    }
-    return jobPostRepository.save(job);
-  }
-
-  private HttpResponse<String> getJobs(String queryString) throws Exception {
-    String url = createJobUrl()
-        + (queryString == null || queryString.isBlank() ? "" : "?" + queryString);
-    HttpRequest httpRequest = HttpRequest.newBuilder()
-        .uri(URI.create(url))
-        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
-        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .GET()
-        .build();
-    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-  }
-
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> dataOf(Map<String, Object> body) {
-    return (Map<String, Object>) body.get("data");
-  }
-
-  @SuppressWarnings("unchecked")
-  private List<Map<String, Object>> contentOf(Map<String, Object> data) {
-    return (List<Map<String, Object>>) data.get("content");
-  }
-
-  private List<String> jobIdsOf(List<Map<String, Object>> content) {
-    return content.stream().map(item -> (String) item.get("jobId")).toList();
-  }
-
-  private void seedCompanyOwnerWithCompany() {
-    UserEntity owner = userRepository.save(UserEntity.builder()
-        .id(USER_ID)
-        .createdOn(LocalDate.now())
-        .build());
-    companyRepository.save(CompanyEntity.builder()
-        .id(COMPANY_ID)
-        .name(COMPANY_NAME)
-        .createdOn(LocalDate.now())
-        .owner(owner)
-        .build());
-  }
-
-  private void seedCandidateUser() {
-    userRepository.save(UserEntity.builder()
-        .id(USER_ID)
-        .fullName(FULL_NAME)
-        .lynqFileStorageId(PROFILE_FILE_ID)
-        .currentPosition(CURRENT_POSITION)
-        .about(ABOUT)
-        .githubUrl(GITHUB_URL)
-        .linkedinUrl(LINKEDIN_URL)
-        .birthDate(BIRTH_DATE)
-        .createdOn(LocalDate.now())
-        .build());
-  }
-
-  private HttpResponse<String> getUser() throws Exception {
-    HttpRequest httpRequest = HttpRequest.newBuilder()
-        .uri(URI.create(createUserUrl()))
-        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
-        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .GET()
-        .build();
-    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-  }
-
-  private HttpResponse<String> getGenerateUploadImageUrl(String fileName) throws Exception {
-    HttpRequest httpRequest = HttpRequest.newBuilder()
-        .uri(URI.create(generateUploadImageUrl(fileName)))
-        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
-        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .GET()
-        .build();
-    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-  }
-
-  private HttpResponse<String> patchUserProfile(UpdateUserProfileRequest updateRequest) throws Exception {
-    HttpRequest httpRequest = HttpRequest.newBuilder()
-        .uri(URI.create(createUserUrl()))
-        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
-        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
-        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .method("PATCH", HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(updateRequest)))
-        .build();
-    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-  }
-
-  private HttpResponse<String> postCreateUser() throws Exception {
-    HttpRequest httpRequest = HttpRequest.newBuilder()
-        .uri(URI.create(createUserUrl()))
-        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
-        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
-        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(validRequest())))
-        .build();
-    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-  }
-
-  private HttpResponse<String> postCreateUserWithCompany() throws Exception {
-    HttpRequest httpRequest = HttpRequest.newBuilder()
-        .uri(URI.create(createCompanyUrl()))
-        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
-        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
-        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(validCompanyRequest())))
-        .build();
-    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-  }
-
-  private HttpResponse<String> patchCompany(UpdateCompanyRequest updateRequest) throws Exception {
-    HttpRequest httpRequest = HttpRequest.newBuilder()
-        .uri(URI.create(createCompanyUrl()))
-        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
-        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
-        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .method("PATCH", HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(updateRequest)))
-        .build();
-    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-  }
-
-  private HttpResponse<String> postCreateJob() throws Exception {
-    return postCreateJob(null);
-  }
-
-  private HttpResponse<String> postCreateJob(List<String> skills) throws Exception {
-    HttpRequest httpRequest = HttpRequest.newBuilder()
-        .uri(URI.create(createJobUrl()))
-        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
-        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
-        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(validJobRequest(skills))))
-        .build();
-    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-  }
-
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> parse(String json) {
-    return objectMapper.readValue(json, Map.class);
-  }
-
-  private void stubIamUserInfo() {
-    stubIamUserInfo(Role.CANDIDATE);
-  }
-
-  private void stubIamUserInfo(String role) {
-    lynqIamMock.when(request().withMethod("GET").withPath(USERINFO_PATH))
-        .respond(response()
-            .withStatusCode(200)
-            .withContentType(MediaType.APPLICATION_JSON)
-            .withBody("""
-                {
-                  "success": true,
-                  "data": {
-                    "id": "%s",
-                    "username": "%s",
-                    "email": "%s",
-                    "roles": ["%s"]
-                  }
-                }""".formatted(USER_ID, USERNAME, EMAIL, Role.PREFIX + role)));
-  }
-
-  private void stubFileStorageDownloadUrls() {
-    lynqFileStorageMock.when(request().withMethod("POST").withPath(FILE_STORAGE_DOWNLOAD_URLS_PATH))
-        .respond(response()
-            .withStatusCode(200)
-            .withContentType(MediaType.APPLICATION_JSON)
-            .withBody("""
-                {
-                  "success": true,
-                  "data": {
-                    "%s": "%s",
-                    "%s": "%s",
-                    "%s": "%s"
-                  }
-                }""".formatted(PROFILE_FILE_ID, PROFILE_IMAGE_URL,
-                COMPANY_FILE_ID, COMPANY_PROFILE_IMAGE_URL,
-                RESUME_FILE_ID, RESUME_PDF_URL)));
-    lynqFileStorageMock.when(request().withMethod("GET").withPath("/dmz/files/" + PROFILE_FILE_ID + "/download-url"))
-        .respond(downloadUrlResponse(PROFILE_FILE_ID, PROFILE_IMAGE_URL));
-    lynqFileStorageMock.when(request().withMethod("GET").withPath("/dmz/files/" + COMPANY_FILE_ID + "/download-url"))
-        .respond(downloadUrlResponse(COMPANY_FILE_ID, COMPANY_PROFILE_IMAGE_URL));
-    lynqFileStorageMock.when(request().withMethod("GET").withPath("/dmz/files/" + RESUME_FILE_ID + "/download-url"))
-        .respond(downloadUrlResponse(RESUME_FILE_ID, RESUME_PDF_URL));
-  }
-
-  private org.mockserver.model.HttpResponse downloadUrlResponse(String fileId, String downloadUrl) {
-    return response()
-        .withStatusCode(200)
-        .withContentType(MediaType.APPLICATION_JSON)
-        .withBody("""
-            {
-              "success": true,
-              "data": {
-                "fileId": "%s",
-                "s3Key": "lynq/%s/file",
-                "downloadUrl": "%s"
-              }
-            }""".formatted(fileId, fileId, downloadUrl));
-  }
-
-  private void stubFileStorageCreateUpload() {
-    lynqFileStorageMock.when(request().withMethod("POST").withPath(FILE_STORAGE_UPLOAD_URL_PATH))
-        .respond(response()
-            .withStatusCode(201)
-            .withContentType(MediaType.APPLICATION_JSON)
-            .withBody("""
-                {
-                  "success": true,
-                  "data": {
-                    "fileId": "%s",
-                    "s3Key": "lynq/%s/%s",
-                    "uploadUrl": "%s"
-                  }
-                }""".formatted(NEW_FILE_ID, NEW_FILE_ID, UPLOAD_FILE_NAME, NEW_UPLOAD_URL)));
-  }
-
-  private void stubFileStorageConfirm(String fileId) {
-    lynqFileStorageMock.when(request().withMethod("POST").withPath("/dmz/files/" + fileId + "/confirm"))
-        .respond(response()
-            .withStatusCode(200)
-            .withContentType(MediaType.APPLICATION_JSON)
-            .withBody("""
-                {
-                  "success": true,
-                  "data": {
-                    "fileId": "%s",
-                    "fileName": "%s",
-                    "status": "AVAILABLE"
-                  }
-                }""".formatted(fileId, UPLOAD_FILE_NAME)));
-  }
-
-  private void stubFileStorageDelete(String fileId) {
-    lynqFileStorageMock.when(request().withMethod("DELETE").withPath("/dmz/files/" + fileId))
-        .respond(response().withStatusCode(204));
-  }
-
-  private void stubIamInvalidToken() {
-    lynqIamMock.when(request().withMethod("GET").withPath(USERINFO_PATH))
-        .respond(response()
-            .withStatusCode(401)
-            .withContentType(MediaType.APPLICATION_JSON)
-            .withBody("""
-                {"success": false, "reason": "Invalid or expired access token"}"""));
-  }
-
-  private HttpResponse<String> postConfirmUploadImage(String fileId) throws Exception {
-    HttpRequest httpRequest = HttpRequest.newBuilder()
-        .uri(URI.create("http://localhost:" + port + CONTEXT_PATH + CONFIRM_UPLOAD_IMAGE_PATH
-            + "?file-id=" + fileId))
-        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
-        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .POST(HttpRequest.BodyPublishers.noBody())
-        .build();
-    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
-  }
-
-  private String createUserUrl() {
-    return "http://localhost:" + port + CONTEXT_PATH + CREATE_USER_PATH;
-  }
-
-  private String generateUploadImageUrl(String fileName) {
-    return "http://localhost:" + port + CONTEXT_PATH + GENERATE_UPLOAD_IMAGE_PATH + "?file-name=" + fileName;
-  }
-
-  private String createCompanyUrl() {
-    return "http://localhost:" + port + CONTEXT_PATH + CREATE_COMPANY_PATH;
-  }
-
-  private String createJobUrl() {
-    return "http://localhost:" + port + CONTEXT_PATH + CREATE_JOB_PATH;
-  }
-
-  private CreateUserRequest validRequest() {
-    CreateUserRequest request = new CreateUserRequest();
-    request.setFullName(FULL_NAME);
-    request.setCurrentPosition(CURRENT_POSITION);
-    request.setAbout(ABOUT);
-    request.setGithubUrl(GITHUB_URL);
-    request.setLinkedinUrl(LINKEDIN_URL);
-    request.setBirthDate(BIRTH_DATE);
-    return request;
-  }
-
-  private CreateUserWithCompanyRequest validCompanyRequest() {
-    CreateUserWithCompanyRequest request = new CreateUserWithCompanyRequest();
-    request.setFullName(FULL_NAME);
-    request.setCurrentPosition(CURRENT_POSITION);
-    request.setUserAbout(ABOUT);
-    request.setLinkedinUrl(LINKEDIN_URL);
-    request.setBirthDate(BIRTH_DATE);
-    request.setCompanyName(COMPANY_NAME);
-    request.setCompanyAbout(COMPANY_ABOUT);
-    request.setCompanySize(COMPANY_SIZE);
-    return request;
-  }
-
-  private CreateJobRequest validJobRequest(List<String> skills) {
-    CreateJobRequest request = new CreateJobRequest();
-    request.setTitle(JOB_TITLE);
-    request.setDescription(JOB_DESCRIPTION);
-    request.setWorkType(JOB_WORK_TYPE);
-    request.setSalaryRangeDown(JOB_SALARY_RANGE_DOWN);
-    request.setSalaryRangeTop(JOB_SALARY_RANGE_TOP);
-    request.setJobPostSource(JOB_POST_TYPE);
-    request.setSkills(skills);
-    return request;
-  }
-
   @Test
   void upskillingSuggestionBuildsRequestFromDbProxiesToMlWithHeadersAndReturnsSuggestions()
       throws Exception {
@@ -1767,6 +1414,359 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(parse(response.body()).get("success"), is(false));
     UserResumeEntity persisted = userResumeRepository.findById(RESUME_ID).orElseThrow();
     assertThat(persisted.getAlias(), is(nullValue()));
+  }
+
+  private UserEntity seedCompanyUser(String id, String fullName, String currentPosition,
+      String lynqFileStorageId) {
+    return userRepository.save(UserEntity.builder()
+        .id(id)
+        .fullName(fullName)
+        .currentPosition(currentPosition)
+        .lynqFileStorageId(lynqFileStorageId)
+        .createdOn(LocalDate.now())
+        .build());
+  }
+
+  private CompanyEntity seedCompany(String companyId, String name, UserEntity owner) {
+    return companyRepository.save(CompanyEntity.builder()
+        .id(companyId)
+        .name(name)
+        .about(COMPANY_ABOUT)
+        .size(COMPANY_SIZE)
+        .lynqFileStorageId(COMPANY_FILE_ID)
+        .createdOn(LocalDate.now())
+        .owner(owner)
+        .build());
+  }
+
+  private JobPostEntity seedJob(String id, String title, String description, WorkType workType,
+      LocalDate createdOn, JobStatus jobStatus, CompanyEntity company, UserEntity poster,
+      List<String> skills) {
+    JobPostEntity job = JobPostEntity.builder()
+        .id(id)
+        .title(title)
+        .description(description)
+        .workType(workType)
+        .jobPostSource(JOB_POST_TYPE)
+        .createdOn(createdOn)
+        .jobStatus(jobStatus)
+        .company(company)
+        .createdByUser(poster)
+        .build();
+    if (skills != null) {
+      skills.forEach(skill -> job.getSkills().add(JobPostSkillEntity.builder()
+          .id(UUID.randomUUID().toString())
+          .jobPost(job)
+          .skill(skill)
+          .build()));
+    }
+    return jobPostRepository.save(job);
+  }
+
+  private HttpResponse<String> getJobs(String queryString) throws Exception {
+    String url = createJobUrl()
+        + (queryString == null || queryString.isBlank() ? "" : "?" + queryString);
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(url))
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .GET()
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> dataOf(Map<String, Object> body) {
+    return (Map<String, Object>) body.get("data");
+  }
+
+  @SuppressWarnings("unchecked")
+  private List<Map<String, Object>> contentOf(Map<String, Object> data) {
+    return (List<Map<String, Object>>) data.get("content");
+  }
+
+  private List<String> jobIdsOf(List<Map<String, Object>> content) {
+    return content.stream().map(item -> (String) item.get("jobId")).toList();
+  }
+
+  private void seedCompanyOwnerWithCompany() {
+    UserEntity owner = userRepository.save(UserEntity.builder()
+        .id(USER_ID)
+        .createdOn(LocalDate.now())
+        .build());
+    companyRepository.save(CompanyEntity.builder()
+        .id(COMPANY_ID)
+        .name(COMPANY_NAME)
+        .createdOn(LocalDate.now())
+        .owner(owner)
+        .build());
+  }
+
+  private void seedCandidateUser() {
+    userRepository.save(UserEntity.builder()
+        .id(USER_ID)
+        .fullName(FULL_NAME)
+        .lynqFileStorageId(PROFILE_FILE_ID)
+        .currentPosition(CURRENT_POSITION)
+        .about(ABOUT)
+        .githubUrl(GITHUB_URL)
+        .linkedinUrl(LINKEDIN_URL)
+        .birthDate(BIRTH_DATE)
+        .createdOn(LocalDate.now())
+        .build());
+  }
+
+  private HttpResponse<String> getUser() throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(createUserUrl()))
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .GET()
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> getGenerateUploadImageUrl(String fileName) throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(generateUploadImageUrl(fileName)))
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .GET()
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> patchUserProfile(UpdateUserProfileRequest updateRequest) throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(createUserUrl()))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .method("PATCH", HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(updateRequest)))
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> postCreateUser() throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(createUserUrl()))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(validRequest())))
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> postCreateUserWithCompany() throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(createCompanyUrl()))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(validCompanyRequest())))
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> patchCompany(UpdateCompanyRequest updateRequest) throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(createCompanyUrl()))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .method("PATCH", HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(updateRequest)))
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> postCreateJob() throws Exception {
+    return postCreateJob(null);
+  }
+
+  private HttpResponse<String> postCreateJob(List<String> skills) throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create(createJobUrl()))
+        .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(validJobRequest(skills))))
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  @SuppressWarnings("unchecked")
+  private Map<String, Object> parse(String json) {
+    return objectMapper.readValue(json, Map.class);
+  }
+
+  private void stubIamUserInfo() {
+    stubIamUserInfo(Role.CANDIDATE);
+  }
+
+  private void stubIamUserInfo(String role) {
+    lynqIamMock.when(request().withMethod("GET").withPath(USERINFO_PATH))
+        .respond(response()
+            .withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody("""
+                {
+                  "success": true,
+                  "data": {
+                    "id": "%s",
+                    "username": "%s",
+                    "email": "%s",
+                    "roles": ["%s"]
+                  }
+                }""".formatted(USER_ID, USERNAME, EMAIL, Role.PREFIX + role)));
+  }
+
+  private void stubFileStorageDownloadUrls() {
+    lynqFileStorageMock.when(request().withMethod("POST").withPath(FILE_STORAGE_DOWNLOAD_URLS_PATH))
+        .respond(response()
+            .withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody("""
+                {
+                  "success": true,
+                  "data": {
+                    "%s": "%s",
+                    "%s": "%s",
+                    "%s": "%s"
+                  }
+                }""".formatted(PROFILE_FILE_ID, PROFILE_IMAGE_URL,
+                COMPANY_FILE_ID, COMPANY_PROFILE_IMAGE_URL,
+                RESUME_FILE_ID, RESUME_PDF_URL)));
+    lynqFileStorageMock.when(request().withMethod("GET").withPath("/dmz/files/" + PROFILE_FILE_ID + "/download-url"))
+        .respond(downloadUrlResponse(PROFILE_FILE_ID, PROFILE_IMAGE_URL));
+    lynqFileStorageMock.when(request().withMethod("GET").withPath("/dmz/files/" + COMPANY_FILE_ID + "/download-url"))
+        .respond(downloadUrlResponse(COMPANY_FILE_ID, COMPANY_PROFILE_IMAGE_URL));
+    lynqFileStorageMock.when(request().withMethod("GET").withPath("/dmz/files/" + RESUME_FILE_ID + "/download-url"))
+        .respond(downloadUrlResponse(RESUME_FILE_ID, RESUME_PDF_URL));
+  }
+
+  private org.mockserver.model.HttpResponse downloadUrlResponse(String fileId, String downloadUrl) {
+    return response()
+        .withStatusCode(200)
+        .withContentType(MediaType.APPLICATION_JSON)
+        .withBody("""
+            {
+              "success": true,
+              "data": {
+                "fileId": "%s",
+                "s3Key": "lynq/%s/file",
+                "downloadUrl": "%s"
+              }
+            }""".formatted(fileId, fileId, downloadUrl));
+  }
+
+  private void stubFileStorageCreateUpload() {
+    lynqFileStorageMock.when(request().withMethod("POST").withPath(FILE_STORAGE_UPLOAD_URL_PATH))
+        .respond(response()
+            .withStatusCode(201)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody("""
+                {
+                  "success": true,
+                  "data": {
+                    "fileId": "%s",
+                    "s3Key": "lynq/%s/%s",
+                    "uploadUrl": "%s"
+                  }
+                }""".formatted(NEW_FILE_ID, NEW_FILE_ID, UPLOAD_FILE_NAME, NEW_UPLOAD_URL)));
+  }
+
+  private void stubFileStorageConfirm(String fileId) {
+    lynqFileStorageMock.when(request().withMethod("POST").withPath("/dmz/files/" + fileId + "/confirm"))
+        .respond(response()
+            .withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody("""
+                {
+                  "success": true,
+                  "data": {
+                    "fileId": "%s",
+                    "fileName": "%s",
+                    "status": "AVAILABLE"
+                  }
+                }""".formatted(fileId, UPLOAD_FILE_NAME)));
+  }
+
+  private void stubFileStorageDelete(String fileId) {
+    lynqFileStorageMock.when(request().withMethod("DELETE").withPath("/dmz/files/" + fileId))
+        .respond(response().withStatusCode(204));
+  }
+
+  private void stubIamInvalidToken() {
+    lynqIamMock.when(request().withMethod("GET").withPath(USERINFO_PATH))
+        .respond(response()
+            .withStatusCode(401)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody("""
+                {"success": false, "reason": "Invalid or expired access token"}"""));
+  }
+
+  private HttpResponse<String> postConfirmUploadImage(String fileId) throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create("http://localhost:" + port + CONTEXT_PATH + CONFIRM_UPLOAD_IMAGE_PATH
+            + "?file-id=" + fileId))
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .POST(HttpRequest.BodyPublishers.noBody())
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private String createUserUrl() {
+    return "http://localhost:" + port + CONTEXT_PATH + CREATE_USER_PATH;
+  }
+
+  private String generateUploadImageUrl(String fileName) {
+    return "http://localhost:" + port + CONTEXT_PATH + GENERATE_UPLOAD_IMAGE_PATH + "?file-name=" + fileName;
+  }
+
+  private String createCompanyUrl() {
+    return "http://localhost:" + port + CONTEXT_PATH + CREATE_COMPANY_PATH;
+  }
+
+  private String createJobUrl() {
+    return "http://localhost:" + port + CONTEXT_PATH + CREATE_JOB_PATH;
+  }
+
+  private CreateUserRequest validRequest() {
+    CreateUserRequest request = new CreateUserRequest();
+    request.setFullName(FULL_NAME);
+    request.setCurrentPosition(CURRENT_POSITION);
+    request.setAbout(ABOUT);
+    request.setGithubUrl(GITHUB_URL);
+    request.setLinkedinUrl(LINKEDIN_URL);
+    request.setBirthDate(BIRTH_DATE);
+    return request;
+  }
+
+  private CreateUserWithCompanyRequest validCompanyRequest() {
+    CreateUserWithCompanyRequest request = new CreateUserWithCompanyRequest();
+    request.setFullName(FULL_NAME);
+    request.setCurrentPosition(CURRENT_POSITION);
+    request.setUserAbout(ABOUT);
+    request.setLinkedinUrl(LINKEDIN_URL);
+    request.setBirthDate(BIRTH_DATE);
+    request.setCompanyName(COMPANY_NAME);
+    request.setCompanyAbout(COMPANY_ABOUT);
+    request.setCompanySize(COMPANY_SIZE);
+    return request;
+  }
+
+  private CreateJobRequest validJobRequest(List<String> skills) {
+    CreateJobRequest request = new CreateJobRequest();
+    request.setTitle(JOB_TITLE);
+    request.setDescription(JOB_DESCRIPTION);
+    request.setWorkType(JOB_WORK_TYPE);
+    request.setSalaryRangeDown(JOB_SALARY_RANGE_DOWN);
+    request.setSalaryRangeTop(JOB_SALARY_RANGE_TOP);
+    request.setJobPostSource(JOB_POST_TYPE);
+    request.setSkills(skills);
+    return request;
   }
 
   private void seedUser() {
