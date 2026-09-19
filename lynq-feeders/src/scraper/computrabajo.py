@@ -149,6 +149,28 @@ class ComputrabajoScraper:
         self.timeout = timeout
         self._session: Optional[requests.Session] = None
 
+    def fetch(self, category: str, limit: int) -> list[Listing]:
+        config = computrabajo_category(category)
+        now = datetime.now(timezone.utc)
+
+        html = self._get(f"{BASE}/trabajo-de-{config.slug}")
+        cards = BeautifulSoup(html, "lxml").select("article.box_offer")
+
+        parsed = [parse_card(card, category, now) for card in cards]
+        found = sort_latest_first([listing for listing in parsed if listing is not None])[:limit]
+
+        for listing in found:
+            self._fetch_detail(listing)
+            time.sleep(random.uniform(1.0, 2.5))  # NOSONAR
+
+        log.info(
+            "message= Fetched Computrabajo listings, category=%s, received=%s, usable=%s",
+            category,
+            len(cards),
+            len(found),
+        )
+        return found
+
     def _ensure_session(self) -> requests.Session:
         if self._session is None:
             self._session = new_session(
@@ -212,25 +234,3 @@ class ComputrabajoScraper:
         match = _EXPERIENCE_RE.search(block.get_text(" ", strip=True))
         if match:
             listing.experience_level = f"{match.group(1)} años de experiencia"
-
-    def fetch(self, category: str, limit: int) -> list[Listing]:
-        config = computrabajo_category(category)
-        now = datetime.now(timezone.utc)
-
-        html = self._get(f"{BASE}/trabajo-de-{config.slug}")
-        cards = BeautifulSoup(html, "lxml").select("article.box_offer")
-
-        parsed = [parse_card(card, category, now) for card in cards]
-        found = sort_latest_first([listing for listing in parsed if listing is not None])[:limit]
-
-        for listing in found:
-            self._fetch_detail(listing)
-            time.sleep(random.uniform(1.0, 2.5))  # NOSONAR
-
-        log.info(
-            "message= Fetched Computrabajo listings, category=%s, received=%s, usable=%s",
-            category,
-            len(cards),
-            len(found),
-        )
-        return found

@@ -19,7 +19,7 @@ class ResumeEditorTest(unittest.TestCase):
         )
 
         self.assertFalse(result.accepted)
-        self.assertIn("inmutable", result.message)
+        self.assertIn("is immutable", result.message)
         self.assertEqual(
             self.editor.resume["personal_info"]["full_name"], "Ada Lovelace"
         )
@@ -41,7 +41,7 @@ class ResumeEditorTest(unittest.TestCase):
         )
 
         self.assertFalse(result.accepted)
-        self.assertIn("no hay evidencia de Go", result.message)
+        self.assertIn("no evidence of Go", result.message)
         self.assertNotIn("Go", self.editor.resume["skills"]["technical"])
 
     def test_the_posting_spelling_of_an_owned_technology_is_allowed(self):
@@ -63,7 +63,7 @@ class ResumeEditorTest(unittest.TestCase):
         )
 
         self.assertFalse(result.accepted)
-        self.assertIn("no hay evidencia de React Native", result.message)
+        self.assertIn("no evidence of React Native", result.message)
 
     def test_work_experience_can_be_reordered_but_not_grown(self):
         reordered = self.editor.apply(
@@ -76,7 +76,7 @@ class ResumeEditorTest(unittest.TestCase):
 
         grown = self.editor.apply("work_experience", "reorder", {"order": [0, 1, 2]})
         self.assertFalse(grown.accepted)
-        self.assertIn("permutacion", grown.message)
+        self.assertIn("permutation", grown.message)
 
     def test_hard_facts_of_an_entry_stay_frozen(self):
         result = self.editor.apply(
@@ -86,7 +86,7 @@ class ResumeEditorTest(unittest.TestCase):
         )
 
         self.assertFalse(result.accepted)
-        self.assertIn("datos duros", result.message)
+        self.assertIn("hard facts", result.message)
         self.assertEqual(
             self.editor.resume["work_experience"][0]["position"], "Backend Engineer"
         )
@@ -121,11 +121,50 @@ class ResumeEditorTest(unittest.TestCase):
         self.assertEqual(len(self.editor.rejections), 2)
         self.assertEqual(self.editor.applied_changes, [])
 
+    def test_what_the_model_reads_is_english_whatever_the_conversation_speaks(self):
+        editor = ResumeEditor(self.base, base_resume(), "es")
+
+        result = editor.apply("skills", "add", {"bucket": "technical", "name": "Go"})
+
+        self.assertTrue(result.message.startswith("REJECTED: "))
+        self.assertIn("no evidence of Go", result.message)
+
+    def test_what_the_candidate_reads_follows_the_conversation_language(self):
+        spanish = ResumeEditor(self.base, base_resume(), "es")
+        english = ResumeEditor(self.base, base_resume(), "en")
+
+        spanish.apply("skills", "add", {"bucket": "technical", "name": "Go"})
+        english.apply("skills", "add", {"bucket": "technical", "name": "Go"})
+
+        self.assertIn("no hay evidencia de Go", spanish.rejections[0])
+        self.assertIn("no evidence of Go", english.rejections[0])
+
+    def test_an_applied_change_is_described_in_the_conversation_language(self):
+        spanish = ResumeEditor(self.base, base_resume(), "es")
+        english = ResumeEditor(self.base, base_resume(), "en")
+
+        spanish.apply("skills", "add", {"bucket": "tools", "name": "Jenkins"})
+        english.apply("skills", "add", {"bucket": "tools", "name": "Jenkins"})
+
+        self.assertEqual(
+            spanish.applied_changes[0]["detail"], "Jenkins agregada a skills.tools"
+        )
+        self.assertEqual(
+            english.applied_changes[0]["detail"], "Jenkins added to skills.tools"
+        )
+
+    def test_an_unsupported_language_falls_back_instead_of_failing(self):
+        editor = ResumeEditor(self.base, base_resume(), "pt")
+
+        editor.apply("skills", "add", {"bucket": "technical", "name": "Go"})
+
+        self.assertIn("no hay evidencia de Go", editor.rejections[0])
+
     def test_an_unknown_section_is_refused(self):
         result = self.editor.apply("salary", "rewrite", {"text": "mucho"})
 
         self.assertFalse(result.accepted)
-        self.assertIn("seccion desconocida", result.message)
+        self.assertIn("unknown section", result.message)
 
     def test_the_summary_is_rewritten_in_place(self):
         result = self.editor.apply(

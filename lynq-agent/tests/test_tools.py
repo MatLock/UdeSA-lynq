@@ -74,7 +74,7 @@ class ToolsTest(unittest.IsolatedAsyncioTestCase):
     async def test_find_evidence_says_plainly_when_there_is_none(self):
         raw = await self.tools["find_evidence"].ainvoke({"claim": "Go"})
 
-        self.assertTrue(raw.startswith("SIN EVIDENCIA"))
+        self.assertTrue(raw.startswith("NO_EVIDENCE"))
         self.assertEqual(self.context.evidence_log[0]["paths"], [])
 
     async def test_apply_edit_reports_the_rejection_reason_back_to_the_model(self):
@@ -82,8 +82,8 @@ class ToolsTest(unittest.IsolatedAsyncioTestCase):
             {"section": "skills", "op": "add", "payload": {"name": "Go"}}
         )
 
-        self.assertTrue(raw.startswith("RECHAZADO"))
-        self.assertIn("no hay evidencia", raw)
+        self.assertTrue(raw.startswith("REJECTED"))
+        self.assertIn("no evidence", raw)
 
     async def test_apply_edit_answers_ok_when_it_lands(self):
         raw = await self.tools["apply_edit"].ainvoke(

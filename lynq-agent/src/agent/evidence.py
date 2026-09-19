@@ -8,24 +8,6 @@ from agent.skill_aliases import aliases_of, normalize
 EXCLUDED_TOP_LEVEL_SECTIONS = frozenset({"personal_info"})
 
 
-def _walk(node: Any, path: str):
-    if isinstance(node, dict):
-        for key, value in node.items():
-            yield from _walk(value, f"{path}.{key}")
-    elif isinstance(node, list):
-        for index, value in enumerate(node):
-            yield from _walk(value, f"{path}[{index}]")
-    elif isinstance(node, str):
-        yield path, node
-
-
-def _contains(haystack: str, needle: str) -> bool:
-    if not needle:
-        return False
-    pattern = r"(?<![0-9a-z])" + re.escape(needle) + r"(?![0-9a-z])"
-    return re.search(pattern, haystack) is not None
-
-
 def find_evidence(resume: dict, claim: str) -> list[str]:
     candidates = aliases_of(claim)
     if not any(candidates):
@@ -66,3 +48,21 @@ def is_evidenced(resume: dict, claim: str) -> bool:
     if normalize(claim) in evidenced_vocabulary(resume):
         return True
     return bool(find_evidence(resume, claim))
+
+
+def _walk(node: Any, path: str):
+    if isinstance(node, dict):
+        for key, value in node.items():
+            yield from _walk(value, f"{path}.{key}")
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            yield from _walk(value, f"{path}[{index}]")
+    elif isinstance(node, str):
+        yield path, node
+
+
+def _contains(haystack: str, needle: str) -> bool:
+    if not needle:
+        return False
+    pattern = r"(?<![0-9a-z])" + re.escape(needle) + r"(?![0-9a-z])"
+    return re.search(pattern, haystack) is not None

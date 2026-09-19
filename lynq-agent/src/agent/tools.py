@@ -12,8 +12,8 @@ from client import LynqMlClient, MlError
 log = logging.getLogger(__name__)
 
 NO_EVIDENCE = (
-    "SIN EVIDENCIA: el CV base no respalda esta afirmacion. No la agregues; "
-    "decile al candidato que no encontraste respaldo."
+    "NO_EVIDENCE: the base resume does not back this claim. Do not add it; "
+    "tell the candidate you found no backing for it."
 )
 
 
@@ -92,31 +92,31 @@ def build_tools(
             coroutine=job_requirements,
             name="job_requirements",
             description=(
-                "Devuelve la lista de skills y capacidades que pide el aviso. "
-                "Llamala una sola vez, al principio del turno."
+                "Returns the list of skills and capabilities the posting asks "
+                "for. Call it once, at the start of the turn."
             ),
         ),
         StructuredTool.from_function(
             coroutine=find_evidence_tool,
             name="find_evidence",
             description=(
-                "Busca en el CV base respaldo para una afirmacion (por ejemplo el "
-                "nombre de una tecnologia). Devuelve las rutas JSON donde aparece, "
-                "o SIN EVIDENCIA. Usala antes de agregar cualquier skill."
+                "Looks in the base resume for backing of a claim (a technology "
+                "name, for instance). Returns the JSON paths where it appears, or "
+                "NO_EVIDENCE. Use it before adding any skill."
             ),
         ),
         StructuredTool.from_function(
             coroutine=apply_edit,
             name="apply_edit",
             description=(
-                "Aplica un cambio al CV y devuelve OK o RECHAZADO con el motivo. "
-                "Secciones y operaciones: summary/rewrite {text}; "
+                "Applies a change to the resume and returns OK, or REJECTED "
+                "with the reason. Sections and operations: summary/rewrite {text}; "
                 "skills/add {bucket,name}; skills/remove {bucket,name}; "
                 "skills/reorder {bucket,order}; "
                 "work_experience|education|projects|certifications|languages/reorder "
                 "{order}; work_experience|education|projects/rewrite "
                 "{index,description,achievements,technologies}. "
-                "El CV se edita SOLO con esta tool."
+                "The resume is edited ONLY through this tool."
             ),
         ),
     ]

@@ -45,16 +45,6 @@ class TraceCollector(AsyncCallbackHandler):
         self._step = 0
         self._started: dict[str, float] = {}
 
-    def _next_step(self) -> int:
-        self._step += 1
-        return self._step
-
-    def _elapsed_ms(self, run_id: Any) -> int | None:
-        started = self._started.pop(str(run_id), None)
-        if started is None:
-            return None
-        return int((time.monotonic() - started) * 1000)
-
     async def on_llm_start(self, serialized, prompts, *, run_id=None, **kwargs):
         self._started[str(run_id)] = time.monotonic()
 
@@ -158,3 +148,13 @@ class TraceCollector(AsyncCallbackHandler):
                 created_on=now(),
             )
         )
+
+    def _next_step(self) -> int:
+        self._step += 1
+        return self._step
+
+    def _elapsed_ms(self, run_id: Any) -> int | None:
+        started = self._started.pop(str(run_id), None)
+        if started is None:
+            return None
+        return int((time.monotonic() - started) * 1000)

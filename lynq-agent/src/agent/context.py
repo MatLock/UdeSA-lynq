@@ -6,8 +6,8 @@ from decimal import Decimal
 from agent.editor import ResumeEditor
 
 STEP_LIMIT_MESSAGE = (
-    "LIMITE ALCANZADO: no podes hacer mas ediciones en este turno. "
-    "Responde al usuario con lo que ya aplicaste."
+    "STEP_LIMIT_REACHED: you cannot make any more edits in this turn. "
+    "Answer the user with what you have already applied."
 )
 
 

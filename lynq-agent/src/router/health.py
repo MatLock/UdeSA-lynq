@@ -14,16 +14,6 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _database_is_reachable() -> bool:
-    try:
-        async with get_session_factory()() as session:
-            await session.execute(text("SELECT 1"))
-        return True
-    except Exception as exc:
-        log.warning("message= Database health probe failed", exc_info=exc)
-        return False
-
-
 @router.get("/health")
 async def health() -> dict:
     settings = get_settings()
@@ -41,3 +31,13 @@ async def health() -> dict:
         "database": {"status": "UP" if database_up else "DOWN"},
         "ml": {"status": "UP" if ml_up else "DOWN"},
     }
+
+
+async def _database_is_reachable() -> bool:
+    try:
+        async with get_session_factory()() as session:
+            await session.execute(text("SELECT 1"))
+        return True
+    except Exception as exc:
+        log.warning("message= Database health probe failed", exc_info=exc)
+        return False

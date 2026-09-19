@@ -38,15 +38,6 @@ class GreetingTest(unittest.TestCase):
 
 class SystemPromptTest(unittest.TestCase):
 
-    def _render(self, provider: str, turns_left: int = 5) -> str:
-        return render_system_prompt(
-            provider,
-            job=JOB,
-            resume=base_resume(),
-            language="es",
-            turns_left=turns_left,
-        )
-
     def test_both_provider_variants_render(self):
         for provider in PROVIDERS:
             with self.subTest(provider=provider):
@@ -80,10 +71,23 @@ class SystemPromptTest(unittest.TestCase):
                 self.assertIn("last turn", self._render(provider, turns_left=1))
                 self.assertNotIn("last turn", self._render(provider, turns_left=5))
 
-    def test_the_conversation_language_is_stated(self):
+    def test_the_conversation_language_is_named_not_coded(self):
         for provider in PROVIDERS:
             with self.subTest(provider=provider):
-                self.assertIn("es", self._render(provider))
+                self.assertIn("Spanish", self._render(provider))
+
+    def test_an_english_conversation_asks_for_an_english_reply(self):
+        for provider in PROVIDERS:
+            with self.subTest(provider=provider):
+                prompt = render_system_prompt(
+                    provider,
+                    job=JOB,
+                    resume=base_resume(),
+                    language="en",
+                    turns_left=5,
+                )
+                self.assertIn("English", prompt)
+                self.assertNotIn("Spanish", prompt)
 
     def test_stripping_personal_info_leaves_the_rest_untouched(self):
         stripped = without_personal_info(base_resume())
@@ -96,6 +100,15 @@ class SystemPromptTest(unittest.TestCase):
         without_personal_info(resume)
 
         self.assertIn("personal_info", resume)
+
+    def _render(self, provider: str, turns_left: int = 5) -> str:
+        return render_system_prompt(
+            provider,
+            job=JOB,
+            resume=base_resume(),
+            language="es",
+            turns_left=turns_left,
+        )
 
 
 if __name__ == "__main__":

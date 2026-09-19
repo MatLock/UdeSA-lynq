@@ -34,24 +34,6 @@ RequestUuid = Annotated[str, Header(alias="lynq-request-uuid")]
 UserId = Annotated[str, Header(alias="user-id")]
 
 
-def _translate(exc: Exception) -> HTTPException:
-    if isinstance(exc, ConversationNotFound):
-        return HTTPException(status_code=404, detail="Conversation not found")
-    if isinstance(exc, ConversationNotOwned):
-        return HTTPException(
-            status_code=403, detail="The conversation belongs to another user"
-        )
-    if isinstance(exc, TurnAlreadyRunning):
-        return HTTPException(
-            status_code=409, detail="A turn is already running on this conversation"
-        )
-    if isinstance(exc, ConversationExhausted):
-        return HTTPException(
-            status_code=409, detail="The conversation ran out of turns"
-        )
-    return HTTPException(status_code=500, detail=str(exc))
-
-
 @router.post("/conversation", status_code=201)
 async def create_conversation(
     body: CreateConversationRequest,
@@ -154,3 +136,21 @@ async def mark_applied(
     except (ConversationNotFound, ConversationNotOwned) as exc:
         raise _translate(exc) from exc
     return GlobalRestResponse(data=AppliedResponse(status=status))
+
+
+def _translate(exc: Exception) -> HTTPException:
+    if isinstance(exc, ConversationNotFound):
+        return HTTPException(status_code=404, detail="Conversation not found")
+    if isinstance(exc, ConversationNotOwned):
+        return HTTPException(
+            status_code=403, detail="The conversation belongs to another user"
+        )
+    if isinstance(exc, TurnAlreadyRunning):
+        return HTTPException(
+            status_code=409, detail="A turn is already running on this conversation"
+        )
+    if isinstance(exc, ConversationExhausted):
+        return HTTPException(
+            status_code=409, detail="The conversation ran out of turns"
+        )
+    return HTTPException(status_code=500, detail=str(exc))

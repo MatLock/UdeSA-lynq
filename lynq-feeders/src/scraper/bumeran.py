@@ -78,6 +78,21 @@ class BumeranScraper:
         self.timeout = timeout
         self._session: Optional[requests.Session] = None
 
+    def fetch(self, category: str, limit: int) -> list[Listing]:
+        page_size = max(limit, PAGE_SIZE)
+        content = self._search(category, 0, page_size).get("content") or []
+
+        listings = [_to_listing(aviso, category) for aviso in content]
+        found = [listing for listing in listings if listing is not None]
+
+        log.info(
+            "message= Fetched Bumeran listings, category=%s, received=%s, usable=%s",
+            category,
+            len(content),
+            len(found),
+        )
+        return sort_latest_first(found)[:limit]
+
     def _ensure_session(self) -> requests.Session:
         if self._session is None:
             self._session = new_session(
@@ -128,18 +143,3 @@ class BumeranScraper:
         raise RuntimeError(
             f"Bumeran search failed for category={category} page={page} after {MAX_RETRIES} retries"
         )
-
-    def fetch(self, category: str, limit: int) -> list[Listing]:
-        page_size = max(limit, PAGE_SIZE)
-        content = self._search(category, 0, page_size).get("content") or []
-
-        listings = [_to_listing(aviso, category) for aviso in content]
-        found = [listing for listing in listings if listing is not None]
-
-        log.info(
-            "message= Fetched Bumeran listings, category=%s, received=%s, usable=%s",
-            category,
-            len(content),
-            len(found),
-        )
-        return sort_latest_first(found)[:limit]

@@ -65,11 +65,6 @@ _DDG_HTML = """
 
 
 class UdemySearchClientTests(unittest.IsolatedAsyncioTestCase):
-    def _client(self, max_courses=2):
-        return UdemySearchClient(
-            base_url="https://www.udemy.com", max_courses=max_courses
-        )
-
     async def test_extracts_real_course_links_and_caps(self) -> None:
         with _patch_search(response=_FakeResponse(text=_DDG_HTML)):
             courses = await self._client(max_courses=2).search_courses("kubernetes")
@@ -114,6 +109,11 @@ class UdemySearchClientTests(unittest.IsolatedAsyncioTestCase):
         with _patch_search(error=httpx.ReadTimeout("t")):
             courses = await self._client().search_courses("x")
         self.assertTrue(courses)  # always returns at least the fallback link
+
+    def _client(self, max_courses=2):
+        return UdemySearchClient(
+            base_url="https://www.udemy.com", max_courses=max_courses
+        )
 
 
 # --------------------------------------------------------------------------- #

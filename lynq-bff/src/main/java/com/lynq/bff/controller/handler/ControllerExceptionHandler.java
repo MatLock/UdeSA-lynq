@@ -60,17 +60,6 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
         .body(new ErrorRestResponse<>(null, accessDeniedReason(ex)));
   }
 
-  private static String accessDeniedReason(AccessDeniedException ex) {
-    if (ex instanceof AuthorizationDeniedException denied
-        && denied.getAuthorizationResult() instanceof ExpressionAuthorizationDecision decision) {
-      Matcher requiredRole = REQUIRED_ROLE.matcher(decision.getExpression().getExpressionString());
-      if (requiredRole.find()) {
-        return String.format(ONLY_ROLE_CAN_PERFORM, requiredRole.group(1));
-      }
-    }
-    return ACCESS_DENIED;
-  }
-
   @ExceptionHandler(MethodNotAllowedException.class)
   public ResponseEntity<ErrorRestResponse<Void>> handleMethodNotAllowed(MethodNotAllowedException ex) {
     log.error("message= Method not proxied", ex);
@@ -85,5 +74,16 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
     return ResponseEntity
         .status(HttpStatus.INTERNAL_SERVER_ERROR)
         .body(new ErrorRestResponse<>(null, UNEXPECTED_ERROR));
+  }
+
+  private static String accessDeniedReason(AccessDeniedException ex) {
+    if (ex instanceof AuthorizationDeniedException denied
+        && denied.getAuthorizationResult() instanceof ExpressionAuthorizationDecision decision) {
+      Matcher requiredRole = REQUIRED_ROLE.matcher(decision.getExpression().getExpressionString());
+      if (requiredRole.find()) {
+        return String.format(ONLY_ROLE_CAN_PERFORM, requiredRole.group(1));
+      }
+    }
+    return ACCESS_DENIED;
   }
 }

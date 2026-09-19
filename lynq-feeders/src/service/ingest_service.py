@@ -74,6 +74,50 @@ class IngestService:
             return self._scrapers
         return get_scrapers(plan.sources, self.settings.scrape_timeout)
 
+    async def run(
+        self, request_uuid: str, overrides: Optional[IngestOverrides] = None
+    ) -> IngestReport:
+        plan = self.plan_for(overrides)
+        report = IngestReport(plan=plan)
+
+        log.info(
+            "message= Started feeder run, sources=%s, categories=%s, jobs_per_category=%s",
+            plan.sources,
+            plan.categories,
+            plan.jobs_per_category,
+        )
+
+        collected = await self._scrape_all(plan, report)
+        report.fetched = len(collected)
+
+        listings = _dedupe(collected)
+        report.deduplicated = report.fetched - len(listings)
+
+        if not listings:
+            log.info("message= Nothing to ingest, the run found no listings")
+            return report
+
+        report.enriched = await self._enrich_all(request_uuid, listings)
+        report.enrichment_failed = len(listings) - report.enriched
+
+        try:
+            report.ingested = await self.backend_client.ingest(request_uuid, listings)
+        except BackendError as exc:
+            log.error("message= Job post ingest failed", exc_info=exc)
+            raise
+
+        log.info(
+            "message= Finished feeder run, fetched=%s, deduplicated=%s, enriched=%s, "
+            "ingested_jobs=%s, ingested_skills=%s, ingested_similarity_tags=%s",
+            report.fetched,
+            report.deduplicated,
+            report.enriched,
+            report.ingested.jobs,
+            report.ingested.skills,
+            report.ingested.similarity_tags,
+        )
+        return report
+
     async def _scrape_all(self, plan: RunPlan, report: IngestReport) -> list[Listing]:
         collected: list[Listing] = []
         for scraper in self.scrapers_for(plan):
@@ -126,47 +170,3 @@ class IngestService:
 
         outcomes = await asyncio.gather(*(guarded(listing) for listing in listings))
         return sum(1 for enriched in outcomes if enriched)
-
-    async def run(
-        self, request_uuid: str, overrides: Optional[IngestOverrides] = None
-    ) -> IngestReport:
-        plan = self.plan_for(overrides)
-        report = IngestReport(plan=plan)
-
-        log.info(
-            "message= Started feeder run, sources=%s, categories=%s, jobs_per_category=%s",
-            plan.sources,
-            plan.categories,
-            plan.jobs_per_category,
-        )
-
-        collected = await self._scrape_all(plan, report)
-        report.fetched = len(collected)
-
-        listings = _dedupe(collected)
-        report.deduplicated = report.fetched - len(listings)
-
-        if not listings:
-            log.info("message= Nothing to ingest, the run found no listings")
-            return report
-
-        report.enriched = await self._enrich_all(request_uuid, listings)
-        report.enrichment_failed = len(listings) - report.enriched
-
-        try:
-            report.ingested = await self.backend_client.ingest(request_uuid, listings)
-        except BackendError as exc:
-            log.error("message= Job post ingest failed", exc_info=exc)
-            raise
-
-        log.info(
-            "message= Finished feeder run, fetched=%s, deduplicated=%s, enriched=%s, "
-            "ingested_jobs=%s, ingested_skills=%s, ingested_similarity_tags=%s",
-            report.fetched,
-            report.deduplicated,
-            report.enriched,
-            report.ingested.jobs,
-            report.ingested.skills,
-            report.ingested.similarity_tags,
-        )
-        return report

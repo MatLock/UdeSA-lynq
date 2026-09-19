@@ -125,11 +125,6 @@ class OnDemandEndpointTest(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
 
-    def _service(self):
-        service = AsyncMock()
-        service.run = AsyncMock(return_value=MagicMock())
-        return service
-
     def test_the_cron_calls_it_with_no_body_at_all(self):
         service = self._service()
         with patch("router.ingest.build_service", return_value=service):
@@ -170,6 +165,11 @@ class OnDemandEndpointTest(unittest.TestCase):
         response = self.client.post(INGEST, json={"categories": ["TECNOLOGIA"]})
 
         self.assertEqual(response.status_code, 403)
+
+    def _service(self):
+        service = AsyncMock()
+        service.run = AsyncMock(return_value=MagicMock())
+        return service
 
 
 if __name__ == "__main__":

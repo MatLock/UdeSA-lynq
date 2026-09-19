@@ -27,13 +27,6 @@ class LynqMlClient:
         self.system_user_id = system_user_id
         self.timeout = timeout
 
-    def _headers(self, request_uuid: str) -> dict[str, str]:
-        return {
-            "lynq-request-uuid": request_uuid,
-            "user-id": self.system_user_id,
-            "Content-Type": "application/json",
-        }
-
     async def job_skills(
         self, request_uuid: str, title: str, description: str, work_type: str
     ) -> list[str]:
@@ -65,3 +58,10 @@ class LynqMlClient:
                 return response.status_code == 200
         except httpx.HTTPError:
             return False
+
+    def _headers(self, request_uuid: str) -> dict[str, str]:
+        return {
+            "lynq-request-uuid": request_uuid,
+            "user-id": self.system_user_id,
+            "Content-Type": "application/json",
+        }

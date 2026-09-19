@@ -49,20 +49,6 @@ _RECOMMENDATION_ALIASES = {
 }
 
 
-def _normalize_recommendation(recommendation: str) -> str:
-    """Snap the model's recommendation to a canonical ``hire|no_hire|maybe`` key.
-
-    Slugifies the value (lowercase, spaces/hyphens to underscores) and, when it
-    is not already canonical, resolves it through the alias table. Unknown values
-    are returned as their slug so the client falls back to showing them verbatim
-    rather than losing the recommendation entirely.
-    """
-    slug = re.sub(r"[\s-]+", "_", recommendation.strip().lower())
-    if slug in _CANONICAL_RECOMMENDATIONS:
-        return slug
-    return _RECOMMENDATION_ALIASES.get(slug, slug)
-
-
 @router.post(
     "/candidate-explanation",
     responses={
@@ -111,6 +97,20 @@ async def candidate_explanation(
         company_id,
     )
     return GlobalRestResponse(data=explanation)
+
+
+def _normalize_recommendation(recommendation: str) -> str:
+    """Snap the model's recommendation to a canonical ``hire|no_hire|maybe`` key.
+
+    Slugifies the value (lowercase, spaces/hyphens to underscores) and, when it
+    is not already canonical, resolves it through the alias table. Unknown values
+    are returned as their slug so the client falls back to showing them verbatim
+    rather than losing the recommendation entirely.
+    """
+    slug = re.sub(r"[\s-]+", "_", recommendation.strip().lower())
+    if slug in _CANONICAL_RECOMMENDATIONS:
+        return slug
+    return _RECOMMENDATION_ALIASES.get(slug, slug)
 
 
 def _parse_llm_output(

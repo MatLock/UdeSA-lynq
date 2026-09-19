@@ -52,15 +52,6 @@ class ComputrabajoGetTest(unittest.TestCase):
         sleep.start()
         self.addCleanup(sleep.stop)
 
-    def _response(self, status_code, text="<html></html>"):
-        response = MagicMock()
-        response.status_code = status_code
-        response.text = text
-        response.raise_for_status = MagicMock(
-            side_effect=requests.HTTPError(str(status_code)) if status_code >= 400 else None
-        )
-        return response
-
     def test_returns_the_body_on_success(self):
         self.session.get.return_value = self._response(200, "<html>ok</html>")
         self.assertEqual(self.scraper._get("https://example.com"), "<html>ok</html>")
@@ -91,6 +82,15 @@ class ComputrabajoGetTest(unittest.TestCase):
         scraper = RawComputrabajoScraper(timeout=1.0)
         first = scraper._ensure_session()
         self.assertIs(first, scraper._ensure_session())
+
+    def _response(self, status_code, text="<html></html>"):
+        response = MagicMock()
+        response.status_code = status_code
+        response.text = text
+        response.raise_for_status = MagicMock(
+            side_effect=requests.HTTPError(str(status_code)) if status_code >= 400 else None
+        )
+        return response
 
 
 class BumeranSessionTest(unittest.TestCase):

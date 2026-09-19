@@ -26,12 +26,12 @@ class ScriptedChatModel(BaseChatModel):
     calls: int = 0
     stops_on_limit: bool = False
 
+    def bind_tools(self, tools, **kwargs):
+        return self
+
     @property
     def _llm_type(self) -> str:
         return "scripted"
-
-    def bind_tools(self, tools, **kwargs):
-        return self
 
     def _generate(
         self,
@@ -43,7 +43,7 @@ class ScriptedChatModel(BaseChatModel):
         last = messages[-1] if messages else None
         was_told_to_stop = self.stops_on_limit and isinstance(
             getattr(last, "content", None), str
-        ) and last.content.startswith("LIMITE ALCANZADO")
+        ) and last.content.startswith("STEP_LIMIT_REACHED")
 
         index = len(self.replies) - 1 if was_told_to_stop else self.calls
         index = min(index, len(self.replies) - 1)
@@ -95,23 +95,6 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
             output_price_per_1m=Decimal("3.2"),
         )
 
-    async def _run(
-        self, replies: list[AIMessage], max_steps: int = 12, stops_on_limit=False
-    ):
-        self.context.max_steps = max_steps
-        model = ScriptedChatModel(replies=replies, stops_on_limit=stops_on_limit)
-        return await run_turn(
-            context=self.context,
-            handle=ModelHandle(
-                model=model, provider="bedrock", model_id="amazon.nova-pro-v1:0"
-            ),
-            ml_client=LynqMlClient("http://ml", "system", 1.0),
-            request_uuid="uuid-1",
-            message="Adaptá mi CV",
-            history=[],
-            turns_left=5,
-        )
-
     async def test_the_loop_runs_the_tools_and_leaves_a_trace(self):
         outcome = await self._run(
             [
@@ -160,7 +143,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
         )
 
         rejection = [s for s in outcome.spans if s.name == "apply_edit"][0]
-        self.assertTrue(rejection.output.startswith("RECHAZADO"))
+        self.assertTrue(rejection.output.startswith("REJECTED"))
         self.assertIsNone(outcome.resume)
         self.assertTrue(any("Go" in w for w in outcome.warnings))
 
@@ -201,6 +184,23 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(limit_spans[0].name, "max_steps")
         self.assertEqual(self.context.tool_steps, 2)
         self.assertEqual(outcome.reply, "Corté acá.")
+
+    async def _run(
+        self, replies: list[AIMessage], max_steps: int = 12, stops_on_limit=False
+    ):
+        self.context.max_steps = max_steps
+        model = ScriptedChatModel(replies=replies, stops_on_limit=stops_on_limit)
+        return await run_turn(
+            context=self.context,
+            handle=ModelHandle(
+                model=model, provider="bedrock", model_id="amazon.nova-pro-v1:0"
+            ),
+            ml_client=LynqMlClient("http://ml", "system", 1.0),
+            request_uuid="uuid-1",
+            message="Adaptá mi CV",
+            history=[],
+            turns_left=5,
+        )
 
 
 if __name__ == "__main__":

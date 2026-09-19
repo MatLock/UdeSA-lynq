@@ -8,10 +8,6 @@ from config import DEFAULT_INTERNAL_TOKEN, DEFAULT_SYSTEM_USER_ID, get_settings
 
 class SettingsTest(unittest.TestCase):
 
-    def _settings(self, env):
-        with patch.dict("os.environ", env, clear=True):
-            return get_settings()
-
     def test_defaults_target_the_local_stack(self):
         settings = self._settings({})
 
@@ -60,6 +56,10 @@ class SettingsTest(unittest.TestCase):
         self.assertEqual(settings.sources, ["computrabajo"])
         self.assertEqual(settings.ml_concurrency, 5)
         self.assertEqual(settings.internal_token, "configured")
+
+    def _settings(self, env):
+        with patch.dict("os.environ", env, clear=True):
+            return get_settings()
 
 
 if __name__ == "__main__":

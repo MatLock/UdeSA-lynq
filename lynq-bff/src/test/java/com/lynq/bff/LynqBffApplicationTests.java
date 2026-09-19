@@ -665,10 +665,6 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     lynqIamMock.verify(request(), VerificationTimes.exactly(0));
   }
 
-  private String baseUrl() {
-    return "http://localhost:" + port;
-  }
-
   @Test
   void bouncesACompanyOnlyRelayedRouteWithoutTouchingLynqBackend() throws Exception {
     HttpResponse<String> response = send("GET", CONTEXT_PATH + "/job/mine", null);
@@ -701,6 +697,10 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
     assertThat(response.statusCode(), is(200));
     assertThat(response.body(), is(USER_BODY));
+  }
+
+  private String baseUrl() {
+    return "http://localhost:" + port;
   }
 
   private void useRoles(String... roles) {

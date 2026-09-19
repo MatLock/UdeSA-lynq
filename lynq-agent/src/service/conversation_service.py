@@ -144,30 +144,6 @@ class ConversationService:
         )
         return _as_turn_response(replay)
 
-    async def _run(self, claim: TurnClaim, request_uuid: str) -> TurnOutcome:
-        context = TurnContext(
-            conversation_id=claim.conversation_id,
-            job_snapshot=claim.job_snapshot,
-            base_resume=claim.base_resume,
-            editor=ResumeEditor(claim.base_resume, claim.current_resume),
-            max_steps=claim.max_steps,
-            language=claim.language,
-            input_price_per_1m=claim.input_price_per_1m,
-            output_price_per_1m=claim.output_price_per_1m,
-            job_requirements=claim.job_requirements,
-        )
-        turns_left = max(claim.max_turns - claim.turn_count - 1, 0)
-
-        return await self._turn_runner(
-            context=context,
-            handle=self._model_builder(),
-            ml_client=self._ml_client,
-            request_uuid=request_uuid,
-            message=claim.pending_message,
-            history=claim.history,
-            turns_left=turns_left,
-        )
-
     async def view(self, conversation_id: str, user_id: str) -> ConversationView:
         conversation, messages, versions = (
             await self._repository.load_conversation_view(conversation_id, user_id)
@@ -223,6 +199,32 @@ class ConversationService:
             conversation.score_after,
         )
         return conversation.status
+
+    async def _run(self, claim: TurnClaim, request_uuid: str) -> TurnOutcome:
+        context = TurnContext(
+            conversation_id=claim.conversation_id,
+            job_snapshot=claim.job_snapshot,
+            base_resume=claim.base_resume,
+            editor=ResumeEditor(
+                claim.base_resume, claim.current_resume, claim.language
+            ),
+            max_steps=claim.max_steps,
+            language=claim.language,
+            input_price_per_1m=claim.input_price_per_1m,
+            output_price_per_1m=claim.output_price_per_1m,
+            job_requirements=claim.job_requirements,
+        )
+        turns_left = max(claim.max_turns - claim.turn_count - 1, 0)
+
+        return await self._turn_runner(
+            context=context,
+            handle=self._model_builder(),
+            ml_client=self._ml_client,
+            request_uuid=request_uuid,
+            message=claim.pending_message,
+            history=claim.history,
+            turns_left=turns_left,
+        )
 
 
 def _as_turn_response(replay: TurnReplay) -> TurnResponse:
