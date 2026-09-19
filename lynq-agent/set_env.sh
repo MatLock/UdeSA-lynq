@@ -8,6 +8,16 @@
 
 export PORT="${PORT:-8090}"
 
+export DB_URL="${DB_URL:-mysql+aiomysql://root:root@localhost:3306/lynq_agent_db}"
+export DB_ECHO="${DB_ECHO:-false}"
+export DB_MIGRATE_ON_STARTUP="${DB_MIGRATE_ON_STARTUP:-true}"
+
+export AGENT_HOUSEKEEPING_ENABLED="${AGENT_HOUSEKEEPING_ENABLED:-true}"
+export AGENT_HOUSEKEEPING_INTERVAL="${AGENT_HOUSEKEEPING_INTERVAL:-3600}"
+export AGENT_ABANDON_AFTER_DAYS="${AGENT_ABANDON_AFTER_DAYS:-7}"
+export AGENT_TRACE_TTL_DAYS="${AGENT_TRACE_TTL_DAYS:-30}"
+export AGENT_CONVERSATION_TTL_DAYS="${AGENT_CONVERSATION_TTL_DAYS:-180}"
+
 export LLM_PROVIDER="${LLM_PROVIDER:-ollama}"
 export LLM_TIMEOUT="${LLM_TIMEOUT:-300}"
 
@@ -23,4 +33,4 @@ if [[ "$LLM_PROVIDER" == "bedrock" ]] && [[ -z "$BEDROCK_MODEL_ID" ]]; then
   echo "WARNING: LLM_PROVIDER=bedrock but BEDROCK_MODEL_ID is empty." >&2
 fi
 
-echo "lynq-agent env set: PORT=$PORT LLM_PROVIDER=$LLM_PROVIDER"
+echo "lynq-agent env set: PORT=$PORT LLM_PROVIDER=$LLM_PROVIDER DB_URL=$DB_URL"

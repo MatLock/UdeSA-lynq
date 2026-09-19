@@ -1,9 +1,16 @@
+from contextlib import asynccontextmanager, suppress
+
 from fastapi import APIRouter, FastAPI
 
+from config import get_settings
+from db.housekeeping import housekeeping_loop
+from db.migrations import update_to_latest
+from db.session import dispose_engine
 from exception_handlers import register_exception_handlers
 from middleware.request_uuid import require_request_uuid
 from router.health import router as health_router
 
+import asyncio
 import logging.config
 import os
 import uvicorn
@@ -31,7 +38,29 @@ def _read_version() -> str:
 LOGGING_CONFIG = _build_logging_config()
 logging.config.dictConfig(LOGGING_CONFIG)
 
-app = FastAPI(version=_read_version())
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+  settings = get_settings()
+
+  if settings.db_migrate_on_startup:
+    await update_to_latest()
+
+  housekeeping = None
+  if settings.housekeeping_enabled:
+    housekeeping = asyncio.create_task(housekeeping_loop())
+
+  yield
+
+  if housekeeping is not None:
+    housekeeping.cancel()
+    with suppress(asyncio.CancelledError):
+      await housekeeping
+
+  await dispose_engine()
+
+
+app = FastAPI(version=_read_version(), lifespan=lifespan)
 
 app.middleware("http")(require_request_uuid)
 register_exception_handlers(app)
