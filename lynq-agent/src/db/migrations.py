@@ -67,6 +67,15 @@ def liquibase_executable() -> str:
     )
 
 
+async def update_to_latest() -> None:
+    try:
+        await asyncio.to_thread(_update_blocking, get_settings().db_url)
+        log.info("message= Database schema is up to date")
+    except Exception as exc:
+        log.error("message= Database migration failed", exc_info=exc)
+        raise
+
+
 def _command_environment(target: JdbcTarget) -> dict[str, str]:
     return {
         **os.environ,
@@ -96,12 +105,3 @@ def _update_blocking(db_url: str) -> None:
             f"(exit {result.returncode}): {result.stderr.strip() or result.stdout.strip()}"
         )
     log.debug("message= %s", result.stdout.strip())
-
-
-async def update_to_latest() -> None:
-    try:
-        await asyncio.to_thread(_update_blocking, get_settings().db_url)
-        log.info("message= Database schema is up to date")
-    except Exception as exc:
-        log.error("message= Database migration failed", exc_info=exc)
-        raise

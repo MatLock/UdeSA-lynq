@@ -66,10 +66,10 @@ WHERE s.conversation_id = '3f8a1c2e-...' GROUP BY m.seq ORDER BY m.seq;
 -- How much the model tries to invent. A quality metric for the prompt: if it
 -- falls as the prompt is iterated, the prompt is getting better.
 -- ---------------------------------------------------------------------------
-SELECT COUNT(*) AS rechazos,
-       SUBSTRING_INDEX(SUBSTRING_INDEX(output, ': ', -1), ' ', 3) AS motivo
-FROM trace_span WHERE name = 'apply_edit' AND output LIKE 'RECHAZADO%'
-GROUP BY motivo ORDER BY rechazos DESC;
+SELECT COUNT(*) AS rejections,
+       SUBSTRING_INDEX(SUBSTRING_INDEX(output, ': ', -1), ' ', 3) AS reason
+FROM trace_span WHERE name = 'apply_edit' AND output LIKE 'REJECTED%'
+GROUP BY reason ORDER BY rejections DESC;
 
 -- Where the soft cap cut a turn short, and why it looks unfinished.
 SELECT conversation_id, message_id, output, created_on
@@ -85,13 +85,13 @@ SELECT short_id, llm_model, turn_count, llm_calls,
 FROM conversation WHERE id = '3f8a1c2e-...';
 
 -- What a conversation costs, by model.
-SELECT llm_model, COUNT(*) AS convs, ROUND(AVG(cost_usd), 4) AS promedio,
-       ROUND(MAX(cost_usd), 4) AS peor, ROUND(SUM(cost_usd), 2) AS total
+SELECT llm_model, COUNT(*) AS convs, ROUND(AVG(cost_usd), 4) AS average,
+       ROUND(MAX(cost_usd), 4) AS worst, ROUND(SUM(cost_usd), 2) AS total
 FROM conversation WHERE llm_provider <> 'ollama' GROUP BY llm_model;
 
 -- What an application costs: APPLIED against ABANDONED/EXHAUSTED tells how
 -- much of the spend ends up in something.
-SELECT status, COUNT(*) AS convs, ROUND(AVG(cost_usd), 4) AS promedio,
+SELECT status, COUNT(*) AS convs, ROUND(AVG(cost_usd), 4) AS average,
        ROUND(SUM(cost_usd), 2) AS total
 FROM conversation WHERE llm_provider <> 'ollama' GROUP BY status;
 
@@ -125,17 +125,17 @@ SELECT c.short_id,
        c.turn_count,
        (SELECT COUNT(*) FROM trace_span s
          WHERE s.conversation_id = c.id AND s.name = 'find_evidence'
-           AND s.output NOT LIKE 'SIN EVIDENCIA%')   AS evidencias_ok,
+           AND s.output NOT LIKE 'NO_EVIDENCE%')     AS evidence_found,
        (SELECT COUNT(*) FROM trace_span s
          WHERE s.conversation_id = c.id AND s.name = 'apply_edit'
-           AND s.output LIKE 'RECHAZADO%')           AS ediciones_rechazadas
+           AND s.output LIKE 'REJECTED%')            AS rejected_edits
 FROM conversation c
 WHERE c.status = 'APPLIED'
 ORDER BY delta DESC;
 
 -- Conversations that honestly moved nothing: the agent found no evidence and
 -- said so. Their frequency says how much of the flow is honest.
-SELECT COUNT(*) AS sin_movimiento
+SELECT COUNT(*) AS unmoved
 FROM conversation
 WHERE status = 'APPLIED' AND score_after = score_before;
 

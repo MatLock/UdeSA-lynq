@@ -6,6 +6,8 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
+from agent.messages import DEFAULT_LANGUAGE
+
 _PROMPTS_DIR = Path(__file__).resolve().parents[2] / "resources" / "prompts"
 
 _env = Environment(
@@ -31,9 +33,15 @@ GREETINGS = {
 
 _COMPANY_SUFFIX = {"es": " en {company}", "en": " at {company}"}
 
+LANGUAGE_NAMES = {"es": "Spanish", "en": "English"}
+
+
+def language_name(language: str) -> str:
+    return LANGUAGE_NAMES.get(language, LANGUAGE_NAMES[DEFAULT_LANGUAGE])
+
 
 def render_greeting(language: str, *, title: str, company: str | None) -> str:
-    lang = language if language in GREETINGS else "es"
+    lang = language if language in GREETINGS else DEFAULT_LANGUAGE
     suffix = ""
     if company:
         suffix = _COMPANY_SUFFIX[lang].format(company=company)
@@ -64,7 +72,7 @@ def render_system_prompt(
         resume_json=json.dumps(
             without_personal_info(resume), ensure_ascii=False, indent=2
         ),
-        language=language,
+        language=language_name(language),
         turns_left=turns_left,
         is_last_turn=turns_left <= 1,
     )

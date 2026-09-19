@@ -94,13 +94,6 @@ public class FileService {
     });
   }
 
-  private void requireOwner(StoredFileEntity storedFile, String callerUserId) {
-    String owner = storedFile.getOwnerUserId();
-    if (owner != null && !owner.equals(callerUserId)) {
-      throw new ForbiddenException(String.format(NOT_THE_OWNER_MSG, storedFile.getId()));
-    }
-  }
-
   @AuditLog
   public String createDownloadUrl(StoredFileEntity storedFile) {
     return storageService.createDownloadPreSignedUrl(storedFile.getS3Key());
@@ -113,6 +106,13 @@ public class FileService {
         .collect(Collectors.toMap(
             StoredFileEntity::getId,
             storedFile -> storageService.createDownloadPreSignedUrl(storedFile.getS3Key())));
+  }
+
+  private void requireOwner(StoredFileEntity storedFile, String callerUserId) {
+    String owner = storedFile.getOwnerUserId();
+    if (owner != null && !owner.equals(callerUserId)) {
+      throw new ForbiddenException(String.format(NOT_THE_OWNER_MSG, storedFile.getId()));
+    }
   }
 
 }

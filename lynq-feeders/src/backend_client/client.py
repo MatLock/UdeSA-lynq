@@ -64,13 +64,6 @@ class BackendClient:
         self.internal_token = internal_token
         self.timeout = timeout
 
-    def _headers(self, request_uuid: str) -> dict[str, str]:
-        return {
-            "lynq-request-uuid": request_uuid,
-            INTERNAL_TOKEN_HEADER: self.internal_token,
-            "Content-Type": "application/json",
-        }
-
     async def ingest(self, request_uuid: str, listings: list[Listing]) -> IngestStats:
         body = {"jobPosts": [to_ingest_payload(listing) for listing in listings]}
         try:
@@ -97,3 +90,10 @@ class BackendClient:
             return True
         except httpx.HTTPError:
             return False
+
+    def _headers(self, request_uuid: str) -> dict[str, str]:
+        return {
+            "lynq-request-uuid": request_uuid,
+            INTERNAL_TOKEN_HEADER: self.internal_token,
+            "Content-Type": "application/json",
+        }

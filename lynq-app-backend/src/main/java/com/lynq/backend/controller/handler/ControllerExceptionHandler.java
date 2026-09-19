@@ -50,17 +50,6 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
         .body(new ErrorRestResponse<>(null, accessDeniedReason(ex)));
   }
 
-  private static String accessDeniedReason(AccessDeniedException ex) {
-    if (ex instanceof AuthorizationDeniedException denied
-        && denied.getAuthorizationResult() instanceof ExpressionAuthorizationDecision decision) {
-      Matcher requiredRole = REQUIRED_ROLE.matcher(decision.getExpression().getExpressionString());
-      if (requiredRole.find()) {
-        return String.format(ONLY_ROLE_CAN_PERFORM, requiredRole.group(1));
-      }
-    }
-    return ACCESS_DENIED;
-  }
-
   @ExceptionHandler(BadRequestException.class)
   public ResponseEntity<ErrorRestResponse<Void>> handleBadRequest(BadRequestException ex) {
     log.error("message= Bad request", ex);
@@ -113,5 +102,16 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
     });
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .body(new ErrorRestResponse<>(errors,INVALID_FIELDS_ERROR_MSG ));
+  }
+
+  private static String accessDeniedReason(AccessDeniedException ex) {
+    if (ex instanceof AuthorizationDeniedException denied
+        && denied.getAuthorizationResult() instanceof ExpressionAuthorizationDecision decision) {
+      Matcher requiredRole = REQUIRED_ROLE.matcher(decision.getExpression().getExpressionString());
+      if (requiredRole.find()) {
+        return String.format(ONLY_ROLE_CAN_PERFORM, requiredRole.group(1));
+      }
+    }
+    return ACCESS_DENIED;
   }
 }

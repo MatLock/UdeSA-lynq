@@ -31,48 +31,6 @@ class ConversationRepositoryTest(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         await self.database.dispose()
 
-    async def _create(self, **overrides):
-        defaults = dict(
-            user_id=USER,
-            job_id=JOB["id"],
-            job_snapshot=JOB,
-            base_resume_id="resume-1",
-            base_resume=base_resume(),
-            language="es",
-            status=ConversationStatus.AWAITING_CONFIRMATION,
-            llm_provider="bedrock",
-            llm_model="amazon.nova-pro-v1:0",
-            input_price_per_1m=Decimal("0.8"),
-            output_price_per_1m=Decimal("3.2"),
-            max_turns=10,
-            max_steps=12,
-            score_before=62,
-            greeting="Miré el aviso.",
-        )
-        defaults.update(overrides)
-        return await self.repository.create_conversation(**defaults)
-
-    async def _claim(self, conversation_id, turn_key="turn-1", message="Dale"):
-        return await self.repository.claim_turn(
-            conversation_id=conversation_id,
-            user_id=USER,
-            message=message,
-            turn_key=turn_key,
-            turn_timeout_seconds=600,
-            history_pairs=4,
-        )
-
-    async def _finish(self, claim, *, resume=None, changes=None, spans=None):
-        return await self.repository.finish_turn(
-            claim=claim,
-            reply="Listo",
-            warnings=[],
-            resume=resume,
-            changes=changes or [],
-            spans=spans or [],
-            job_requirements=["Kubernetes"],
-        )
-
     async def test_creating_a_conversation_seeds_the_base_version_and_greeting(self):
         conversation = await self._create()
 
@@ -287,6 +245,48 @@ class ConversationRepositoryTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertLessEqual(len(claim.history), 8)
         self.assertEqual(claim.history[-1]["role"], "assistant")
+
+    async def _create(self, **overrides):
+        defaults = dict(
+            user_id=USER,
+            job_id=JOB["id"],
+            job_snapshot=JOB,
+            base_resume_id="resume-1",
+            base_resume=base_resume(),
+            language="es",
+            status=ConversationStatus.AWAITING_CONFIRMATION,
+            llm_provider="bedrock",
+            llm_model="amazon.nova-pro-v1:0",
+            input_price_per_1m=Decimal("0.8"),
+            output_price_per_1m=Decimal("3.2"),
+            max_turns=10,
+            max_steps=12,
+            score_before=62,
+            greeting="Miré el aviso.",
+        )
+        defaults.update(overrides)
+        return await self.repository.create_conversation(**defaults)
+
+    async def _claim(self, conversation_id, turn_key="turn-1", message="Dale"):
+        return await self.repository.claim_turn(
+            conversation_id=conversation_id,
+            user_id=USER,
+            message=message,
+            turn_key=turn_key,
+            turn_timeout_seconds=600,
+            history_pairs=4,
+        )
+
+    async def _finish(self, claim, *, resume=None, changes=None, spans=None):
+        return await self.repository.finish_turn(
+            claim=claim,
+            reply="Listo",
+            warnings=[],
+            resume=resume,
+            changes=changes or [],
+            spans=spans or [],
+            job_requirements=["Kubernetes"],
+        )
 
 
 if __name__ == "__main__":

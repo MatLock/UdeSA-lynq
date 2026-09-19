@@ -30,7 +30,7 @@ class AgentError(RuntimeError):
 
 
 class TurnAnswer(BaseModel):
-    reply: str = Field(description="El mensaje para el candidato")
+    reply: str = Field(description="The message for the candidate")
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -43,61 +43,6 @@ class TurnOutcome:
     spans: list[SpanRecord] = field(default_factory=list)
     job_requirements: list[str] | None = None
     evidence_log: list[dict] = field(default_factory=list)
-
-
-def _history_messages(history: list[dict]) -> list[tuple[str, str]]:
-    mapped: list[tuple[str, str]] = []
-    for entry in history:
-        role = "assistant" if entry.get("role") == "assistant" else "user"
-        content = entry.get("content") or ""
-        if content:
-            mapped.append((role, content))
-    return mapped
-
-
-def _as_answer(payload: dict) -> TurnAnswer:
-    return TurnAnswer(
-        reply=str(payload.get("reply") or ""),
-        warnings=[str(warning) for warning in (payload.get("warnings") or [])],
-    )
-
-
-def _answer_shaped_json(text: str) -> TurnAnswer | None:
-    stripped = text.strip()
-    if not stripped.startswith("{"):
-        return None
-    try:
-        payload = json.loads(stripped)
-    except json.JSONDecodeError:
-        return None
-    if isinstance(payload, dict) and isinstance(payload.get("reply"), str):
-        return _as_answer(payload)
-    return None
-
-
-def _answer_from(result) -> TurnAnswer:
-    structured = result.get("structured_response") if isinstance(result, dict) else None
-    if isinstance(structured, TurnAnswer):
-        return structured
-    if isinstance(structured, dict) and "reply" in structured:
-        return _as_answer(structured)
-
-    messages = (result or {}).get("messages") or []
-    for message in reversed(messages):
-        content = getattr(message, "content", None)
-        if isinstance(content, list):
-            content = " ".join(
-                part.get("text", "") for part in content if isinstance(part, dict)
-            )
-        if isinstance(content, str) and content.strip():
-            # A model that answers in text instead of calling the response tool
-            # often pastes the JSON it was asked for. Unwrap it, or the candidate
-            # reads raw JSON in the chat.
-            return _answer_shaped_json(content) or TurnAnswer(
-                reply=content.strip(), warnings=[]
-            )
-
-    raise AgentError("the agent produced no reply")
 
 
 async def run_turn(
@@ -162,3 +107,58 @@ async def run_turn(
         job_requirements=context.job_requirements,
         evidence_log=context.evidence_log,
     )
+
+
+def _history_messages(history: list[dict]) -> list[tuple[str, str]]:
+    mapped: list[tuple[str, str]] = []
+    for entry in history:
+        role = "assistant" if entry.get("role") == "assistant" else "user"
+        content = entry.get("content") or ""
+        if content:
+            mapped.append((role, content))
+    return mapped
+
+
+def _as_answer(payload: dict) -> TurnAnswer:
+    return TurnAnswer(
+        reply=str(payload.get("reply") or ""),
+        warnings=[str(warning) for warning in (payload.get("warnings") or [])],
+    )
+
+
+def _answer_shaped_json(text: str) -> TurnAnswer | None:
+    stripped = text.strip()
+    if not stripped.startswith("{"):
+        return None
+    try:
+        payload = json.loads(stripped)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(payload, dict) and isinstance(payload.get("reply"), str):
+        return _as_answer(payload)
+    return None
+
+
+def _answer_from(result) -> TurnAnswer:
+    structured = result.get("structured_response") if isinstance(result, dict) else None
+    if isinstance(structured, TurnAnswer):
+        return structured
+    if isinstance(structured, dict) and "reply" in structured:
+        return _as_answer(structured)
+
+    messages = (result or {}).get("messages") or []
+    for message in reversed(messages):
+        content = getattr(message, "content", None)
+        if isinstance(content, list):
+            content = " ".join(
+                part.get("text", "") for part in content if isinstance(part, dict)
+            )
+        if isinstance(content, str) and content.strip():
+            # A model that answers in text instead of calling the response tool
+            # often pastes the JSON it was asked for. Unwrap it, or the candidate
+            # reads raw JSON in the chat.
+            return _answer_shaped_json(content) or TurnAnswer(
+                reply=content.strip(), warnings=[]
+            )
+
+    raise AgentError("the agent produced no reply")

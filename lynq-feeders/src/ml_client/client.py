@@ -41,13 +41,6 @@ class MlClient:
         self.system_user_id = system_user_id
         self.timeout = timeout
 
-    def _headers(self, request_uuid: str) -> dict[str, str]:
-        return {
-            "lynq-request-uuid": request_uuid,
-            "user-id": self.system_user_id,
-            "Content-Type": "application/json",
-        }
-
     async def skill_enhance(
         self, request_uuid: str, title: str, description: str, work_type: str
     ) -> SkillEnhanceResult:
@@ -82,3 +75,10 @@ class MlClient:
             return response.status_code < 500
         except httpx.HTTPError:
             return False
+
+    def _headers(self, request_uuid: str) -> dict[str, str]:
+        return {
+            "lynq-request-uuid": request_uuid,
+            "user-id": self.system_user_id,
+            "Content-Type": "application/json",
+        }

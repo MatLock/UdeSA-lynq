@@ -136,22 +136,6 @@ public class UserService {
     return response.build();
   }
 
-  private UserProfileCompanyRestResponse toCompanyResponse(CompanyEntity company) {
-    return UserProfileCompanyRestResponse.builder()
-        .name(company.getName())
-        .profileImageUrl(fileStorageService.obtainDownloadUrl(company.getLynqFileStorageId()))
-        .build();
-  }
-
-  private UserProfileJobRestResponse toJobResponse(JobPostEntity job) {
-    return UserProfileJobRestResponse.builder()
-        .id(job.getId())
-        .title(job.getTitle())
-        .description(job.getDescription())
-        .jobStatus(job.getJobStatus())
-        .build();
-  }
-
   @AuditLog
   @Transactional
   public UserEntity updateUserProfile(String userId, UpdateUserProfileRequest request) {
@@ -290,6 +274,86 @@ public class UserService {
     return toResponse(resume, fileStorageService.obtainDownloadUrl(request.getFileId()));
   }
 
+  @AuditLog
+  @Transactional
+  public GetUserResumeRestResponse updateResumeAlias(String userId, String resumeId, String alias) {
+    userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
+
+    UserResumeEntity resume = userResumeRepository.findByUserId(userId).stream()
+        .filter(owned -> owned.getId().equals(resumeId))
+        .findFirst()
+        .orElseThrow(() -> new NotFoundException(String.format(RESUME_NOT_FOUND, resumeId)));
+
+    resume.setAlias(alias.trim());
+    userResumeRepository.save(resume);
+
+    return toResponse(resume, fileStorageService.obtainDownloadUrl(resume.getLynqFileStorageId()));
+  }
+
+  @AuditLog
+  @Transactional
+  public DeleteResumeRestResponse deleteResume(String userId, String resumeId) {
+    userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
+
+    UserResumeEntity resume = userResumeRepository.findByUserId(userId).stream()
+        .filter(owned -> owned.getId().equals(resumeId))
+        .findFirst()
+        .orElseThrow(() -> new NotFoundException(String.format(RESUME_NOT_FOUND, resumeId)));
+
+    userResumeRepository.delete(resume);
+
+    return DeleteResumeRestResponse.builder()
+        .id(resume.getId())
+        .fileId(resume.getLynqFileStorageId())
+        .build();
+  }
+
+  @AuditLog
+  @Transactional(readOnly = true)
+  public PagedRestResponse<UserApplicationResponse> getUserApplications(String userId,
+      Pageable pageable) {
+    UserEntity user = userRepository.findById(userId)
+        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
+
+    List<String> candidateSkills = user.getSkills() == null ? List.of() : user.getSkills().stream()
+        .map(UserSkillsEntity::getSkill)
+        .toList();
+    List<String> candidateSimilarityTags = user.getSimilarityTags() == null ? List.of()
+        : user.getSimilarityTags().stream()
+            .map(UserSimilarityTagEntity::getSimilarityTag)
+            .toList();
+
+    Page<UserApplicationProjection> applications =
+        userApplicationJobRepository.findApplicationsByUserId(userId, pageable);
+
+    Map<String, String> logoUrls = fileStorageService.obtainDownloadUrls(
+        applications.getContent().stream()
+            .map(UserApplicationProjection::companyFileStorageId)
+            .toList());
+
+    return PagedRestResponse.from(applications
+        .map(projection ->
+            toApplicationResponse(projection, candidateSkills, candidateSimilarityTags, logoUrls)));
+  }
+
+  private UserProfileCompanyRestResponse toCompanyResponse(CompanyEntity company) {
+    return UserProfileCompanyRestResponse.builder()
+        .name(company.getName())
+        .profileImageUrl(fileStorageService.obtainDownloadUrl(company.getLynqFileStorageId()))
+        .build();
+  }
+
+  private UserProfileJobRestResponse toJobResponse(JobPostEntity job) {
+    return UserProfileJobRestResponse.builder()
+        .id(job.getId())
+        .title(job.getTitle())
+        .description(job.getDescription())
+        .jobStatus(job.getJobStatus())
+        .build();
+  }
+
   private void syncCandidateSkills(UserEntity user, CreateResumeRequest request) {
     Map<String, Object> skills = resumeSkills(request.getResume());
 
@@ -356,73 +420,9 @@ public class UserService {
         .toList();
   }
 
-  @AuditLog
-  @Transactional
-  public GetUserResumeRestResponse updateResumeAlias(String userId, String resumeId, String alias) {
-    userRepository.findById(userId)
-        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
-
-    UserResumeEntity resume = userResumeRepository.findByUserId(userId).stream()
-        .filter(owned -> owned.getId().equals(resumeId))
-        .findFirst()
-        .orElseThrow(() -> new NotFoundException(String.format(RESUME_NOT_FOUND, resumeId)));
-
-    resume.setAlias(alias.trim());
-    userResumeRepository.save(resume);
-
-    return toResponse(resume, fileStorageService.obtainDownloadUrl(resume.getLynqFileStorageId()));
-  }
-
-  @AuditLog
-  @Transactional
-  public DeleteResumeRestResponse deleteResume(String userId, String resumeId) {
-    userRepository.findById(userId)
-        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
-
-    UserResumeEntity resume = userResumeRepository.findByUserId(userId).stream()
-        .filter(owned -> owned.getId().equals(resumeId))
-        .findFirst()
-        .orElseThrow(() -> new NotFoundException(String.format(RESUME_NOT_FOUND, resumeId)));
-
-    userResumeRepository.delete(resume);
-
-    return DeleteResumeRestResponse.builder()
-        .id(resume.getId())
-        .fileId(resume.getLynqFileStorageId())
-        .build();
-  }
-
   private boolean holdsResumeFile(String userId, String fileId) {
     return userResumeRepository.findByUserId(userId).stream()
         .anyMatch(resume -> fileId.equals(resume.getLynqFileStorageId()));
-  }
-
-  @AuditLog
-  @Transactional(readOnly = true)
-  public PagedRestResponse<UserApplicationResponse> getUserApplications(String userId,
-      Pageable pageable) {
-    UserEntity user = userRepository.findById(userId)
-        .orElseThrow(() -> new NotFoundException(String.format(USER_NOT_FOUND, userId)));
-
-    List<String> candidateSkills = user.getSkills() == null ? List.of() : user.getSkills().stream()
-        .map(UserSkillsEntity::getSkill)
-        .toList();
-    List<String> candidateSimilarityTags = user.getSimilarityTags() == null ? List.of()
-        : user.getSimilarityTags().stream()
-            .map(UserSimilarityTagEntity::getSimilarityTag)
-            .toList();
-
-    Page<UserApplicationProjection> applications =
-        userApplicationJobRepository.findApplicationsByUserId(userId, pageable);
-
-    Map<String, String> logoUrls = fileStorageService.obtainDownloadUrls(
-        applications.getContent().stream()
-            .map(UserApplicationProjection::companyFileStorageId)
-            .toList());
-
-    return PagedRestResponse.from(applications
-        .map(projection ->
-            toApplicationResponse(projection, candidateSkills, candidateSimilarityTags, logoUrls)));
   }
 
   private UserApplicationResponse toApplicationResponse(UserApplicationProjection projection,

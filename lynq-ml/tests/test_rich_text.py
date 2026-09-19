@@ -93,18 +93,6 @@ class RichTextTemplateTests(unittest.TestCase):
 
     DESCRIPTION = "Led the payments team.\n- Cut p99 latency by 40%\n- Migrated to Kafka"
 
-    def _render(self, variant: str) -> str:
-        resume = Resume.model_validate({
-            "personal_info": {"full_name": "Jane Doe"},
-            "summary": "Backend engineer.\n- Payments\n- Event-driven systems",
-            "work_experience": [{
-                "company": "LYNQ",
-                "position": "Senior Backend Engineer",
-                "description": self.DESCRIPTION,
-            }],
-        })
-        return _env.get_template(f"{variant}/index.html").render(resume=resume, photo_url=None)
-
     def test_a_bulleted_description_becomes_a_list(self) -> None:
         for variant in ("classic", "modern"):
             with self.subTest(variant=variant):
@@ -139,6 +127,18 @@ class RichTextTemplateTests(unittest.TestCase):
 
         self.assertNotIn("<script>", html)
         self.assertIn("&lt;script&gt;", html)
+
+    def _render(self, variant: str) -> str:
+        resume = Resume.model_validate({
+            "personal_info": {"full_name": "Jane Doe"},
+            "summary": "Backend engineer.\n- Payments\n- Event-driven systems",
+            "work_experience": [{
+                "company": "LYNQ",
+                "position": "Senior Backend Engineer",
+                "description": self.DESCRIPTION,
+            }],
+        })
+        return _env.get_template(f"{variant}/index.html").render(resume=resume, photo_url=None)
 
 
 if __name__ == "__main__":

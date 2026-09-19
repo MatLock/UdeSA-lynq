@@ -79,24 +79,6 @@ class ConversationRouterTest(unittest.IsolatedAsyncioTestCase):
         app.dependency_overrides.clear()
         await self.database.dispose()
 
-    def _create(self, **overrides):
-        body = {
-            "job": JOB,
-            "baseResumeId": "resume-1",
-            "baseResume": base_resume(),
-            "scoreBefore": 62,
-            "language": "es",
-        }
-        body.update(overrides)
-        return self.client.post(f"{BASE}/conversation", json=body, headers=HEADERS)
-
-    def _turn(self, conversation_id, message="Dale", turn_key="turn-1"):
-        return self.client.post(
-            f"{BASE}/conversation/{conversation_id}/turn",
-            json={"message": message, "turnKey": turn_key},
-            headers=HEADERS,
-        )
-
     def test_creating_a_conversation_returns_a_templated_greeting(self):
         response = self._create()
 
@@ -241,6 +223,24 @@ class ConversationRouterTest(unittest.IsolatedAsyncioTestCase):
         from prompt.resume_tailor import without_personal_info
 
         self.assertNotIn("personal_info", without_personal_info(context.resume))
+
+    def _create(self, **overrides):
+        body = {
+            "job": JOB,
+            "baseResumeId": "resume-1",
+            "baseResume": base_resume(),
+            "scoreBefore": 62,
+            "language": "es",
+        }
+        body.update(overrides)
+        return self.client.post(f"{BASE}/conversation", json=body, headers=HEADERS)
+
+    def _turn(self, conversation_id, message="Dale", turn_key="turn-1"):
+        return self.client.post(
+            f"{BASE}/conversation/{conversation_id}/turn",
+            json={"message": message, "turnKey": turn_key},
+            headers=HEADERS,
+        )
 
 
 if __name__ == "__main__":

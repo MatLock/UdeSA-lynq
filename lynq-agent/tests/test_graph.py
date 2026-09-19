@@ -85,21 +85,6 @@ class AnswerParsingTest(unittest.TestCase):
 
 class RunTurnTest(unittest.IsolatedAsyncioTestCase):
 
-    async def _run(self, agent, context=None, turns_left=5):
-        context = context or _context()
-        with patch.object(graph, "create_agent", return_value=agent):
-            return await run_turn(
-                context=context,
-                handle=ModelHandle(
-                    model=object(), provider="ollama", model_id="qwen2.5:7b"
-                ),
-                ml_client=LynqMlClient("http://ml", "system", 1.0),
-                request_uuid="uuid-1",
-                message="Dale",
-                history=[],
-                turns_left=turns_left,
-            )
-
     async def test_the_resume_comes_from_the_edits_not_from_the_model(self):
         context = _context()
         agent = FakeAgent(
@@ -151,6 +136,21 @@ class RunTurnTest(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(AgentError):
             await self._run(Exploding())
+
+    async def _run(self, agent, context=None, turns_left=5):
+        context = context or _context()
+        with patch.object(graph, "create_agent", return_value=agent):
+            return await run_turn(
+                context=context,
+                handle=ModelHandle(
+                    model=object(), provider="ollama", model_id="qwen2.5:7b"
+                ),
+                ml_client=LynqMlClient("http://ml", "system", 1.0),
+                request_uuid="uuid-1",
+                message="Dale",
+                history=[],
+                turns_left=turns_left,
+            )
 
 
 if __name__ == "__main__":

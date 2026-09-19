@@ -132,11 +132,6 @@ class BedrockClientTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         bedrock_module._boto_client.cache_clear()
 
-    def _client(self):
-        return BedrockClient(
-            model="amazon.nova-pro-v1:0", region="us-east-1", max_tokens=2048
-        )
-
     async def test_generate_sends_single_user_turn_and_returns_text(self) -> None:
         patcher, boto = _fake_boto(
             converse=_converse_response('{"skills": ["Python"]}')
@@ -226,6 +221,11 @@ class BedrockClientTests(unittest.IsolatedAsyncioTestCase):
         patcher, _ = _fake_boto(list_raises=NoCredentialsError())
         with patcher:
             self.assertFalse(await self._client().health_check())
+
+    def _client(self):
+        return BedrockClient(
+            model="amazon.nova-pro-v1:0", region="us-east-1", max_tokens=2048
+        )
 
 
 if __name__ == "__main__":

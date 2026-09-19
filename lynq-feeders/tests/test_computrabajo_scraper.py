@@ -131,9 +131,6 @@ class FetchTest(unittest.TestCase):
         self.sleep_patch.start()
         self.addCleanup(self.sleep_patch.stop)
 
-    def _listing_page(self, cards=1):
-        return f"<html><body>{CARD_HTML * cards}</body></html>"
-
     def test_uses_the_category_slug_and_enriches_from_the_detail_page(self):
         self.scraper._get = MagicMock(side_effect=[self._listing_page(), DETAIL_HTML])
 
@@ -165,6 +162,9 @@ class FetchTest(unittest.TestCase):
     def test_a_page_without_cards_yields_nothing(self):
         self.scraper._get = MagicMock(return_value="<html><body></body></html>")
         self.assertEqual(self.scraper.fetch("TECNOLOGIA", 10), [])
+
+    def _listing_page(self, cards=1):
+        return f"<html><body>{CARD_HTML * cards}</body></html>"
 
 
 if __name__ == "__main__":
