@@ -1,1 +1,10 @@
 date,prompt
+"19-09-2026","create the lynq-agent module from scratch following the same layout as lynq-ml: python microservice on FastAPI, a Dockerfile with no Pango/Cairo since there is no WeasyPrint here, and the service listening on port 8090"
+"19-09-2026","write requirements.in with fastapi, uvicorn, pydantic, langchain, langchain-core, langgraph, langchain-aws, langchain-ollama, sqlalchemy[asyncio], aiomysql, alembic, httpx, jinja2, boto3 and langdetect, and lock it into requirements.txt with pip-compile --generate-hashes"
+"19-09-2026","copy from lynq-ml the pieces every service shares: resources/log_config.json printing the request uuid on each log line, exception_handlers.py, logging_context.py, middleware/request_uuid.py with EXEMPT_PATHS pointing at /lynq-agent/health, and response/models.py with the GlobalRestResponse envelope"
+"19-09-2026","lay out the src/ tree the service will grow into: db/, model/, agent/ with graph, tools, callbacks, context and language, plus prompt/, llm/, client/ and router/"
+"19-09-2026","check the module comes up with docker compose and that GET /lynq-agent/health answers"
+"19-09-2026","write the Dockerfile on the same python base image as lynq-ml, with no Pango/Cairo, installing requirements.txt with --require-hashes, running as a non-root user, serving uvicorn src.main:app on 0.0.0.0:8090 and with a HEALTHCHECK hitting /lynq-agent/health"
+"19-09-2026","add a .dockerignore leaving out tests, .venv, __pycache__, migrations/versions/*.pyc and .git, and a .gitignore for the module"
+"19-09-2026","add a minimal lynq-agent entry to docker-compose.yaml so the checkpoint can run: port 8090, depends_on mysql healthy and LLM_PROVIDER=ollama; the full env config and Helm go somewhere else"
+"19-09-2026","add the VERSION file, a README for the module explaining how to run it and which environment variables it reads, and the skeleton of tests/ with its conftest"

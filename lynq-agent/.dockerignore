@@ -1,12 +1,9 @@
-# Version control
 .git
 .gitignore
 
-# Virtual environments
 .venv
 venv
 
-# Python caches / build artifacts
 __pycache__
 **/__pycache__
 *.py[cod]
@@ -15,19 +12,21 @@ __pycache__
 .mypy_cache
 .ruff_cache
 
-# Local tooling / IDE
 .idea
 .vscode
 .claude
 
-# Docker
 Dockerfile
 .dockerignore
 
-# Secrets and local env
 aws_credentials.txt
 .env
 *.env
 
-# Docs not needed at runtime
+.coverage
+coverage.xml
+coverage.md
+
+tests
 prompt-documentation
+migrations/versions/*.pyc

@@ -1,9 +1,6 @@
 fastapi
 uvicorn
 pydantic
-# langchain is here for langchain.agents.create_agent: the langgraph.prebuilt
-# create_react_agent it replaces is deprecated since LangGraph 1.0 and goes away
-# in 2.0.
 langchain
 langchain-core
 langgraph
@@ -11,6 +8,8 @@ langchain-aws
 langchain-ollama
 sqlalchemy[asyncio]
 aiomysql
+alembic
 httpx
 jinja2
 boto3
+langdetect
