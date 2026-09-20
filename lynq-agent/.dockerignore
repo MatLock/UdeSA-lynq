@@ -29,4 +29,3 @@ coverage.md
 
 tests
 prompt-documentation
-migrations/versions/*.pyc

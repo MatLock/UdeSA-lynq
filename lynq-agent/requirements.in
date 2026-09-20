@@ -8,7 +8,6 @@ langchain-aws
 langchain-ollama
 sqlalchemy[asyncio]
 aiomysql
-alembic
 httpx
 jinja2
 boto3
