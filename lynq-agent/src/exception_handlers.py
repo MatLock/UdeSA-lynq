@@ -4,6 +4,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from model.errors import ConversationError
 from response import ErrorRestResponse
 
 
@@ -27,6 +28,15 @@ def validation_exception_handler(
     )
 
 
+def conversation_exception_handler(
+    request: Request, exc: ConversationError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=ErrorRestResponse(reason=exc.reason, code=exc.code).model_dump(),
+    )
+
+
 def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(
         status_code=500,
@@ -35,6 +45,7 @@ def unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespons
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(ConversationError, conversation_exception_handler)
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)

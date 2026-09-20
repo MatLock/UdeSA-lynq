@@ -8,6 +8,7 @@ from db.migrations import update_to_latest
 from db.session import dispose_engine
 from exception_handlers import register_exception_handlers
 from middleware.request_uuid import require_request_uuid
+from router.conversation import router as conversation_router
 from router.health import router as health_router
 
 import asyncio
@@ -68,6 +69,10 @@ register_exception_handlers(app)
 health = APIRouter(prefix="/lynq-agent")
 health.include_router(health_router)
 app.include_router(health)
+
+dmz = APIRouter(prefix="/lynq-agent/dmz")
+dmz.include_router(conversation_router)
+app.include_router(dmz)
 
 
 if __name__ == "__main__":
