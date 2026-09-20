@@ -16,3 +16,4 @@ class ErrorRestResponse(BaseModel):
     success: bool = False
     data: Optional[object] = None
     reason: str
+    code: Optional[str] = None

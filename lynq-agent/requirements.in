@@ -12,3 +12,4 @@ httpx
 jinja2
 boto3
 langdetect
+cryptography          # aiomysql needs it to authenticate against MySQL 9 (caching_sha2_password)

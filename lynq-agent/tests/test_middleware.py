@@ -39,7 +39,8 @@ class RequestUuidMiddlewareTests(unittest.TestCase):
             headers={REQUEST_UUID_HEADER: "req-1", "user-id": "u1"},
         )
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["reason"], "Invalid Fields Found")
 
 
 if __name__ == "__main__":
