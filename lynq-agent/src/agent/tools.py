@@ -302,21 +302,19 @@ def _edit_skills(state: TurnState, op: str, payload: dict[str, Any]) -> str:
     )
 
 
-@tool
+FIND_EVIDENCE_DESCRIPTION = """Look in the candidate's base resume for wording that backs a claim.
+
+Call it before putting any skill into the resume. It never judges: it is a literal
+search over the resume the candidate already wrote.
+
+claim: the skill or statement to look for, for example "PostgreSQL".
+
+It answers a list of {"path", "matched"} objects, where "matched" is the text the
+resume itself uses, and an empty list when the resume does not back the claim."""
+
+
+@tool(description=FIND_EVIDENCE_DESCRIPTION)
 async def find_evidence(claim: str) -> Any:
-    """Look for wording in the candidate's base resume that backs a claim.
-
-    Use it before putting any skill into the resume. It never judges: it is a
-    literal search over the resume the candidate already wrote, and it returns
-    the matching text so the resume keeps the candidate's own wording.
-
-    Args:
-        claim: the skill or statement to look for, e.g. "PostgreSQL".
-
-    Returns:
-        A list of {"path", "matched"} objects, empty when the resume does not
-        back the claim.
-    """
     state = current_turn_state()
     if _step_limit_hit(state, "find_evidence"):
         return STEP_LIMIT_MESSAGE
@@ -343,26 +341,21 @@ async def find_evidence(claim: str) -> Any:
     return hits
 
 
-@tool
+APPLY_EDIT_DESCRIPTION = """Apply one change to the resume that is being tailored.
+
+It is the only way the resume changes. section is the part to change, op is what to
+do with it and payload is the change itself:
+  - summary: op "rewrite", payload {"text": "..."}
+  - work_experience, education, projects: op "rewrite", payload
+    {"index": 0, "description": "...", "achievements": ["..."]}; or op "reorder",
+    payload {"order": [2, 0, 1]}
+  - skills: op "replace", payload {"technical": [...], "tools": [...], "soft": [...]}
+
+It answers "OK", or "REJECTED: <reason>" when a rule of the resume forbids it."""
+
+
+@tool(description=APPLY_EDIT_DESCRIPTION)
 async def apply_edit(section: str, op: str, payload: dict[str, Any]) -> str:
-    """Apply one change to the resume that is being tailored.
-
-    Sections and ops:
-      - summary: op "rewrite", payload {"text": "..."}
-      - work_experience, education, projects: op "rewrite", payload
-        {"index": 0, "description": "...", "achievements": ["..."]}; or op
-        "reorder", payload {"order": [2, 0, 1]}
-      - skills: op "replace", payload {"technical": [...], "tools": [...],
-        "soft": [...]}
-
-    Args:
-        section: the resume section to change.
-        op: what to do with it.
-        payload: the change itself.
-
-    Returns:
-        "OK", or "REJECTED: <reason>" when a rule of the resume forbids it.
-    """
     state = current_turn_state()
     if _step_limit_hit(state, "apply_edit"):
         return STEP_LIMIT_MESSAGE
