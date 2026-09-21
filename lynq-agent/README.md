@@ -27,11 +27,47 @@ A 409 carries a `code` in the envelope so the front can tell the three cases apa
 apply button) and `ALREADY_APPLIED` (the `PATCH` arrived with a second resume). A 502
 means the turn itself failed — it does not cost the candidate a turn.
 
-> **The agent does not talk to a language model yet.** The loop in `src/agent/graph.py`
-> returns the resume untouched with a fixed reply, and writes its spans like the real
-> one will. Everything around it — the two transactions, the run token, the idempotency
-> by `turn_key`, the rescue of a stuck `RUNNING` and the `max_turns` rejection — is the
-> definitive implementation. Stage 3 replaces `run_turn` and nothing else.
+## The turn, inside
+
+`src/agent/graph.py` builds a ReAct loop with `langchain.agents.create_agent` over two
+tools, a system prompt rendered from `resources/prompts/resume_tailor/{bedrock,ollama}.jinja`
+and `response_format=TurnAnswer`, which LangChain binds as one more tool with
+`tool_choice="any"`, so the turn ends with the model calling it. When a model breaks
+that format — Ollama does, now and then — the JSON is unwrapped from the text before the
+candidate sees it, and plain prose becomes the reply as it is.
+
+| Tool | What it does |
+| --- | --- |
+| `find_evidence(claim)` | Lexical search **in code** over the base resume, never the model judging itself: normalised (lowercase, no accents, no symbols), by prefix for claims of four characters or more and by exact word for the short ones (`Go`, `C#`, `AWS`). It returns `{path, matched}` with the wording the resume already uses, and it never looks at `personal_info` |
+| `apply_edit(section, op, payload)` | The only way the resume changes. Answers `OK` or `REJECTED: <reason>`, and the reasons are literal and stable because `docs/queries.sql` groups by them |
+
+The guardrails live in `apply_edit`, in code, not in the prompt: `personal_info is
+immutable`, `dates are immutable`, `new entries are not allowed`, `no evidence in base
+resume` — a skill only enters if `find_evidence` backs it, and it enters with the
+wording of the resume, so a posting asking for `PostgreSQL` over a resume saying
+`Postgres` adds `Postgres` — and `payload language (es) does not match resume language
+(en)`, a `langdetect` check bounded to prose longer than 80 characters once the skill
+names are taken out.
+
+**The model never sees `personal_info`.** The code splits it off before rendering the
+prompt and pins it back when each version is serialized (§13.2 of the plan: it is the
+bias channel that gets closed by construction, not by asking the model nicely).
+
+The answer's `resume` comes from what `apply_edit` left behind, never from the text of
+the model, which only contributes `reply` and `warnings`.
+
+`AGENT_MAX_STEPS` is a **soft** cap: `agent/callbacks.py` counts the steps, and once the
+budget is spent the tools answer `STEP LIMIT REACHED ...` and a `kind='limit'` span is
+written, so the candidate gets a partial but valid answer instead of a 502. The hard cap
+is LangGraph's `recursion_limit = 2 * max_steps + 6` — a ReAct cycle costs two graph
+steps, so anything tighter makes the hard cap fire first.
+
+The tokens of each call come from the `usage_metadata` of the `AIMessage`, never
+estimated, and the tariff of the model lives in `src/llm/pricing.py` and is frozen onto
+the conversation when it is created; a model that is not in the sheet costs zero and
+logs a warning. The LLM span does **not** store the system prompt: it stores the
+messages of the turn, the `resume_version_id` and the hash of the template
+(`resume_tailor/bedrock@<hash>`), which is enough to rebuild it exactly.
 
 ## The database
 
@@ -126,6 +162,21 @@ coverage report -m
 `aiosqlite` is test-only: the suite runs against a throwaway SQLite file, so it never
 needs a MySQL container.
 
+Two tests talk to a real model and are skipped unless `AGENT_LIVE_LLM=true`:
+
+```bash
+AGENT_LIVE_LLM=true LLM_PROVIDER=ollama python -m unittest tests.test_structured_output
+AGENT_LIVE_LLM=true LLM_PROVIDER=bedrock BEDROCK_MODEL_ID=amazon.nova-pro-v1:0 \
+  python -m unittest tests.test_structured_output
+```
+
+`tests/test_structured_output.py` is the one bet of the plan: that Nova Pro honours
+`tool_choice="any"` and closes the turn with the `TurnAnswer` tool call. Only the
+Bedrock run proves it — Ollama breaks the tool call format often enough that the test
+is skipped there on purpose, and the loop leans on the JSON fallback instead. If the
+Bedrock run fails, the fallback is already decided: drop `response_format`, ask for the
+JSON in the prompt and validate it with Pydantic plus one retry.
+
 ## Environment
 
 | Variable | Default | Meaning |
@@ -143,8 +194,6 @@ needs a MySQL container.
 | `AGENT_MAX_STEPS` | `12` | Steps the loop may take in one turn; copied onto the row at creation |
 | `AGENT_TURN_TIMEOUT` | `600` | Seconds before a `RUNNING` turn is treated as a dead process. Operational, never copied onto the row |
 | `AGENT_JOB_DESCRIPTION_MAX_CHARS` | `6000` | The posting is truncated to this before it is frozen into the snapshot |
-| `AGENT_INPUT_PRICE_PER_1M` | `0` | USD per million prompt tokens, frozen onto the conversation. Forced to 0 on `ollama` |
-| `AGENT_OUTPUT_PRICE_PER_1M` | `0` | USD per million completion tokens, same treatment |
 | `LYNQ_ML_URL` | `http://localhost:8084/lynq-ml` | Where the skill extraction of the posting is asked for |
 | `ML_TIMEOUT` | `300` | Seconds allowed for the lynq-ml call |
 | `LYNQ_AGENT_SYSTEM_USER_ID` | — | The `user-id` the agent presents to lynq-ml; the caller's own is forwarded when empty |
@@ -156,6 +205,11 @@ needs a MySQL container.
 | `BEDROCK_REGION` | `us-east-1` | Bedrock region |
 | `BEDROCK_MAX_TOKENS` | `4096` | Cap on a single completion |
 | `BEDROCK_TEMPERATURE` | `0` | Sampling temperature |
+| `AGENT_LIVE_LLM` | `false` | Tests only: `true` runs the turns that need a real model |
+
+Token prices are not an environment variable: they live in `src/llm/pricing.py` per
+model and are copied onto the conversation when it is created, so changing the sheet
+never rewrites what an old conversation cost.
 
 ## Dependencies
 

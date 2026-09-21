@@ -38,10 +38,8 @@ export BEDROCK_REGION="${BEDROCK_REGION:-${AWS_REGION:-us-east-1}}"
 export BEDROCK_MAX_TOKENS="${BEDROCK_MAX_TOKENS:-4096}"
 export BEDROCK_TEMPERATURE="${BEDROCK_TEMPERATURE:-0}"
 
-# USD per million tokens, frozen onto every conversation when it is created.
-# Forced to zero while LLM_PROVIDER=ollama, which is free.
-export AGENT_INPUT_PRICE_PER_1M="${AGENT_INPUT_PRICE_PER_1M:-0.8}"
-export AGENT_OUTPUT_PRICE_PER_1M="${AGENT_OUTPUT_PRICE_PER_1M:-3.2}"
+# The USD per million tokens of each model live in src/llm/pricing.py and are
+# frozen onto every conversation when it is created. Ollama is billed at zero.
 
 if [[ "$LLM_PROVIDER" == "bedrock" ]] && [[ -z "$BEDROCK_MODEL_ID" ]]; then
   echo "WARNING: LLM_PROVIDER=bedrock but BEDROCK_MODEL_ID is empty." >&2
