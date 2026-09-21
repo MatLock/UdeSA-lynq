@@ -206,11 +206,9 @@ services:
       # Feign read timeout in lynq-bff.
       - AGENT_TURN_TIMEOUT=${AGENT_TURN_TIMEOUT:-600}
       - AGENT_JOB_DESCRIPTION_MAX_CHARS=${AGENT_JOB_DESCRIPTION_MAX_CHARS:-6000}
-      # USD per million tokens, frozen onto each conversation at creation so a
-      # price change never rewrites what an old conversation cost. Zeroed while
-      # LLM_PROVIDER=ollama.
-      - AGENT_INPUT_PRICE_PER_1M=${AGENT_INPUT_PRICE_PER_1M:-0.8}
-      - AGENT_OUTPUT_PRICE_PER_1M=${AGENT_OUTPUT_PRICE_PER_1M:-3.2}
+      # Token prices are not configuration: src/llm/pricing.py keeps one tariff
+      # per model and each conversation freezes the one in force when it was
+      # created, so a price change never rewrites what an old conversation cost.
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:7b}

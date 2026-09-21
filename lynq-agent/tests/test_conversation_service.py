@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import unittest
 from decimal import Decimal
 from unittest.mock import AsyncMock
 
 from sqlalchemy import func, select
 
-from tests.support import JOB, RESUME, TemporaryDatabase
+from tests.support import JOB, RESUME, STUB_REPLY, TemporaryDatabase, stub_loop
 
 from agent.context import SpanRecord, TurnOutcome
-from agent.graph import STUB_REPLY, run_turn
 from client.lynq_ml_client import SkillExtractionFailed
 from config import Settings, reset_settings
 from db import repository
@@ -71,7 +71,7 @@ class ConversationServiceTest(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self) -> None:
         await self.database.dispose()
 
-    def service(self, loop_runner=run_turn, **settings):
+    def service(self, loop_runner=stub_loop, **settings):
         from service.conversation_service import ConversationService
 
         return ConversationService(
@@ -328,6 +328,38 @@ class ConversationServiceTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(spans), 2)
         self.assertTrue(all(span.message_id is None for span in spans))
         self.assertEqual(spans[-1].kind, SpanKind.ERROR)
+
+    async def test_a_loop_that_never_returns_is_killed_before_the_timeout(self) -> None:
+        async def hang(context):
+            context.spans.append(
+                SpanRecord(
+                    step=1, kind=SpanKind.LLM, name="model", output="half an answer"
+                )
+            )
+            await asyncio.sleep(30)
+
+        service = self.service(loop_runner=hang, turn_timeout_seconds=31)
+        created = await self._create(service)
+
+        with self.assertRaises(ConversationError) as raised:
+            await service.turn(
+                created.conversation_id, TurnRequest(message="Go", turnKey="k1"), USER
+            )
+
+        self.assertEqual(raised.exception.status_code, 502)
+
+        conversation = await self._conversation(created.conversation_id)
+        self.assertEqual(conversation.turn_count, 0)
+        self.assertEqual(conversation.status, ConversationStatus.ACTIVE)
+
+        spans = await self._spans(created.conversation_id)
+        self.assertEqual([span.kind for span in spans], [SpanKind.LLM, SpanKind.ERROR])
+        self.assertEqual(spans[-1].name, "TimeoutError")
+
+    async def test_the_loop_is_given_the_turn_timeout_minus_its_margin(self) -> None:
+        service = self.service(turn_timeout_seconds=600)
+
+        self.assertEqual(service._loop_timeout(), 570)
 
     async def test_a_retry_after_a_failure_runs_again(self) -> None:
         async def explode(context):

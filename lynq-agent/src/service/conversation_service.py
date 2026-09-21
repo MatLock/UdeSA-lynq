@@ -377,6 +377,7 @@ class ConversationService:
             message=request.message,
             max_steps=conversation.max_steps,
             turns_left=self._turns_left(conversation),
+            resume_version_id=current.id if current else None,
         )
 
     async def _replay(

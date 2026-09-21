@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import os
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
+
+from llm.pricing import FREE, prices_for
 
 DEFAULT_DB_URL = "mysql+aiomysql://root:root@localhost:3306/lynq_agent_db"
 DEFAULT_LYNQ_ML_URL = "http://localhost:8084/lynq-ml"
 DEFAULT_OLLAMA_MODEL = "qwen2.5:7b"
+DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
+DEFAULT_BEDROCK_REGION = "us-east-1"
 
 OLLAMA = "ollama"
 BEDROCK = "bedrock"
@@ -22,11 +26,11 @@ def _bool(name: str, default: bool) -> bool:
     return os.getenv(name, str(default)).strip().lower() == "true"
 
 
-def _decimal(name: str, default: str) -> Decimal:
+def _float(name: str, default: float) -> float:
     try:
-        return Decimal(os.getenv(name, default).strip() or default)
-    except (InvalidOperation, AttributeError):
-        return Decimal(default)
+        return float(os.getenv(name, str(default)))
+    except ValueError:
+        return default
 
 
 class Settings:
@@ -57,17 +61,27 @@ class Settings:
             if self.llm_provider == BEDROCK
             else os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
         )
-        self.input_price_per_1m: Decimal = self._price("AGENT_INPUT_PRICE_PER_1M")
-        self.output_price_per_1m: Decimal = self._price("AGENT_OUTPUT_PRICE_PER_1M")
+        self.ollama_base_url: str = os.getenv(
+            "OLLAMA_BASE_URL", DEFAULT_OLLAMA_BASE_URL
+        )
+        self.bedrock_region: str = (
+            os.getenv("BEDROCK_REGION")
+            or os.getenv("AWS_REGION")
+            or DEFAULT_BEDROCK_REGION
+        )
+        self.bedrock_max_tokens: int = _int("BEDROCK_MAX_TOKENS", 4096)
+        self.bedrock_temperature: float = _float("BEDROCK_TEMPERATURE", 0.0)
+
+        self.input_price_per_1m, self.output_price_per_1m = self._prices()
 
         self.lynq_ml_url: str = os.getenv("LYNQ_ML_URL", DEFAULT_LYNQ_ML_URL).rstrip("/")
         self.lynq_ml_timeout_seconds: int = _int("ML_TIMEOUT", 300)
         self.system_user_id: str = os.getenv("LYNQ_AGENT_SYSTEM_USER_ID", "").strip()
 
-    def _price(self, name: str) -> Decimal:
+    def _prices(self) -> tuple[Decimal, Decimal]:
         if self.llm_provider == OLLAMA:
-            return Decimal("0")
-        return _decimal(name, "0")
+            return FREE
+        return prices_for(self.llm_model)
 
 
 _settings: Settings | None = None

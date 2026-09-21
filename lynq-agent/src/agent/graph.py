@@ -1,25 +1,22 @@
 from __future__ import annotations
 
-import json
 import logging
 
-from agent.context import SpanRecord, TurnContext, TurnOutcome
-from db.models import SpanKind
+from langchain.agents import create_agent
+from langchain_core.messages import AIMessage, HumanMessage
+
+from agent.answer import TurnAnswer, from_result
+from agent.callbacks import TraceCollector
+from agent.context import TurnContext, TurnOutcome, build_turn_state, use_turn_state
+from agent.tools import apply_edit, find_evidence
+from config import BEDROCK, OLLAMA, get_settings
+from db.models import MessageRole
+from llm.factory import build_model
+from prompt.resume_tailor import reference, render
 
 log = logging.getLogger(__name__)
 
-STUB_REPLY = (
-    "I kept your resume as it is. The language model is wired in stage 3; "
-    "for now every turn is recorded end to end without editing anything."
-)
-
-STUB_CHANGE = {
-    "section": "summary",
-    "kind": "noop",
-    "detail": "the stubbed agent did not modify the resume",
-}
-
-_TOKENS_PER_CHAR = 4
+RECURSION_HEADROOM = 6
 
 
 def build_greeting(job_snapshot: dict, language: str) -> str:
@@ -32,52 +29,76 @@ def build_greeting(job_snapshot: dict, language: str) -> str:
     )
 
 
-async def run_turn(context: TurnContext) -> TurnOutcome:
-    prompt = json.dumps(
-        {
-            "job": context.job_snapshot,
-            "resume": context.current_resume,
-            "history": context.history,
-            "message": context.message,
-            "language": context.language,
-            "resumeLanguage": context.resume_language,
-        },
-        ensure_ascii=False,
+def template_provider(provider: str) -> str:
+    return BEDROCK if provider == BEDROCK else OLLAMA
+
+
+def recursion_limit(max_steps: int) -> int:
+    return 2 * max_steps + RECURSION_HEADROOM
+
+
+def build_agent(system_prompt: str, model=None):
+    return create_agent(
+        model=model if model is not None else build_model(),
+        tools=[find_evidence, apply_edit],
+        system_prompt=system_prompt,
+        response_format=TurnAnswer,
     )
 
-    context.spans.append(
-        SpanRecord(
-            step=1,
-            kind=SpanKind.LLM,
-            name="tailor",
-            input=prompt,
-            output=STUB_REPLY,
-            prompt_tokens=len(prompt) // _TOKENS_PER_CHAR,
-            completion_tokens=len(STUB_REPLY) // _TOKENS_PER_CHAR,
-            latency_ms=0,
-        )
-    )
-    context.spans.append(
-        SpanRecord(
-            step=2,
-            kind=SpanKind.TOOL,
-            name="apply_edit",
-            input=json.dumps(STUB_CHANGE, ensure_ascii=False),
-            output="OK",
-            latency_ms=0,
-        )
-    )
 
+def turn_messages(context: TurnContext) -> list:
+    history = list(context.history)
+    if history and history[-1] == (MessageRole.USER, context.message):
+        history = history[:-1]
+
+    messages = [
+        HumanMessage(content) if role == MessageRole.USER else AIMessage(content)
+        for role, content in history
+    ]
+    messages.append(HumanMessage(context.message))
+    return messages
+
+
+async def run_turn(context: TurnContext, model=None) -> TurnOutcome:
+    settings = get_settings()
+    provider = template_provider(settings.llm_provider)
+    state = build_turn_state(context)
+
+    system_prompt = render(
+        provider,
+        job=context.job_snapshot,
+        resume=state.resume,
+        language=context.language,
+        resume_language=context.resume_language,
+        max_steps=context.max_steps,
+        turns_left=context.turns_left,
+    )
+    collector = TraceCollector(
+        state, reference(provider), context.resume_version_id
+    )
+    agent = build_agent(system_prompt, model)
+
+    with use_turn_state(state):
+        result = await agent.ainvoke(
+            {"messages": turn_messages(context)},
+            config={
+                "callbacks": [collector],
+                "recursion_limit": recursion_limit(context.max_steps),
+            },
+        )
+
+    answer = from_result(result)
     log.info(
-        "message= Stubbed turn finished, conversationId=%s, steps=%s",
+        "message= Turn finished, conversationId=%s, steps=%s, edits=%s, warnings=%s",
         context.conversation_id,
-        len(context.spans),
+        state.steps,
+        len(state.changes),
+        len(answer.warnings),
     )
-
     return TurnOutcome(
-        reply=STUB_REPLY,
-        resume=context.current_resume,
-        changes=[dict(STUB_CHANGE)],
-        warnings=[],
-        spans=context.spans,
+        reply=answer.reply,
+        resume=state.serialize_resume(),
+        changes=state.changes,
+        warnings=answer.warnings,
+        spans=state.spans,
     )
