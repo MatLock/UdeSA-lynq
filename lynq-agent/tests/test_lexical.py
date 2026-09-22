@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 
+from tests.fixtures.spanish import ACCENTED_SKILL, NORMALIZED_SKILL
+
 from agent.lexical import claim_words, find_match, matches, normalize
 
 
@@ -10,7 +12,7 @@ class NormalizeTest(unittest.TestCase):
     def test_it_drops_accents_case_and_symbols(self) -> None:
         self.assertEqual(normalize("Node.js"), "nodejs")
         self.assertEqual(normalize("C#"), "c")
-        self.assertEqual(normalize("Programación"), "programacion")
+        self.assertEqual(normalize(ACCENTED_SKILL), NORMALIZED_SKILL)
 
 
 class MatchesTest(unittest.TestCase):

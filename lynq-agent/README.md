@@ -22,6 +22,12 @@ Creating a conversation calls lynq-ml's `POST /dmz/skill-enhance` once and freez
 answer into `job_snapshot.extractedSkills`; if lynq-ml is unavailable the skills the
 posting already declares are used instead, and the conversation still opens.
 
+The greeting it answers with costs nothing: it is a Jinja template per language,
+`resources/greetings/{en,es}.jinja`, chosen by the conversation's `language` and falling
+back to English when the locale has no template of its own. It is the one place in the
+module where Spanish is allowed, because it is the only text the candidate reads that
+the model did not write.
+
 A 409 carries a `code` in the envelope so the front can tell the three cases apart:
 `TURN_IN_PROGRESS` (spin and retry), `CONVERSATION_EXHAUSTED` (hide the input, keep the
 apply button) and `ALREADY_APPLIED` (the `PATCH` arrived with a second resume). A 502
@@ -124,8 +130,11 @@ gets a 409 instead of blocking on the row lock for as long as the loop runs:
 3. **Persist.** `SELECT ... FOR UPDATE` again and compare the `run_token`: if it
    changed, this process is a zombie that another turn already superseded — its orphan
    user message is deleted, a `stale_run` span is written and it answers 502 without
-   persisting a thing. Otherwise the spans, the new `resume_version` (with the
-   `is_current` flip), the assistant message and the cost rollup all land together.
+   persisting a thing. Otherwise the spans, the assistant message and the cost rollup
+   all land together, and so does a new `resume_version` — but **only when the turn
+   applied at least one edit**. A turn that answered a question without touching the
+   resume writes no version and answers with the one that already stands, which is `0`
+   while the base resume is still the current one.
 
 `turn_key` makes a retry safe: with its assistant message already stored the previous
 answer is replayed, and with only the user message stored — the orphan of a process
@@ -176,6 +185,13 @@ Bedrock run proves it — Ollama breaks the tool call format often enough that t
 is skipped there on purpose, and the loop leans on the JSON fallback instead. If the
 Bedrock run fails, the fallback is already decided: drop `response_format`, ask for the
 JSON in the prompt and validate it with Pydantic plus one retry.
+
+Running the checkpoint turn of the prompt — a candidate asking for a skill the resume
+does not back — against the local models (`qwen2.5:7b`, `llama3.1`) shows the split
+clearly: the guardrails hold every time, the skill never enters the resume and
+`personal_info` is untouched, but neither model closes the turn with the `TurnAnswer`
+tool call and the reply they write is rough. That is the dev-only trade of the plan, not
+something to fix in the prompt: the loop is aimed at Nova Pro.
 
 ## Environment
 

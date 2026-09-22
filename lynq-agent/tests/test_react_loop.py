@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from langchain_core.messages import AIMessage
 
+from tests.fixtures.spanish import ASK_FOR_GO, GO_AHEAD, GREETING, REPLY, WARNING
 from tests.support import scripted, tool_call
 
 from agent.context import TurnContext
@@ -47,13 +48,10 @@ RESUME = {
     "skills": {"technical": ["Java", "Postgres"], "tools": ["Jenkins"], "soft": []},
 }
 
-ANSWER = {
-    "reply": "Reordené tu experiencia para que Kubernetes aparezca primero.",
-    "warnings": ["Pediste Go; tu CV no lo respalda, no lo inventé."],
-}
+ANSWER = {"reply": REPLY, "warnings": [WARNING]}
 
 
-def context_for(max_steps: int = 12, message: str = "Dale, y poné que sé Go") -> TurnContext:
+def context_for(max_steps: int = 12, message: str = ASK_FOR_GO) -> TurnContext:
     return TurnContext(
         conversation_id="conversation-1",
         run_token="token-1",
@@ -63,7 +61,7 @@ def context_for(max_steps: int = 12, message: str = "Dale, y poné que sé Go") 
         base_resume=RESUME,
         current_resume=RESUME,
         history=[
-            (MessageRole.ASSISTANT, "Miré el aviso. ¿Armo una versión apuntada?"),
+            (MessageRole.ASSISTANT, GREETING),
             (MessageRole.USER, message),
         ],
         message=message,
@@ -167,10 +165,10 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome.warnings, ANSWER["warnings"])
 
     async def test_the_last_user_message_is_not_repeated(self) -> None:
-        messages = turn_messages(context_for(message="Dale"))
+        messages = turn_messages(context_for(message=GO_AHEAD))
 
         self.assertEqual([message.type for message in messages], ["ai", "human"])
-        self.assertEqual(messages[-1].content, "Dale")
+        self.assertEqual(messages[-1].content, GO_AHEAD)
 
 
 class RecursionLimitTest(unittest.TestCase):

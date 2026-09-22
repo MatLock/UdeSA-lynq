@@ -24,9 +24,34 @@ from db.models import (
 )
 from model.conversation import AppliedRequest, CreateConversationRequest, TurnRequest
 from model.errors import ConversationError, ErrorCode
+from prompt import greeting as greeting_template
 
 USER = "user-1"
 REQUEST_UUID = "req-1"
+
+NO_EDIT_REPLY = "Your resume already says everything this posting asks for."
+
+
+async def no_edit_loop(context) -> TurnOutcome:
+    context.spans.append(
+        SpanRecord(
+            step=1,
+            kind=SpanKind.LLM,
+            name="model",
+            input='{"messages": []}',
+            output=NO_EDIT_REPLY,
+            prompt_tokens=900,
+            completion_tokens=40,
+            latency_ms=9,
+        )
+    )
+    return TurnOutcome(
+        reply=NO_EDIT_REPLY,
+        resume=context.current_resume,
+        changes=[],
+        warnings=[],
+        spans=context.spans,
+    )
 
 
 def settings_with(**overrides) -> Settings:
@@ -120,6 +145,17 @@ class ConversationServiceTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([m.role for m in messages], [MessageRole.ASSISTANT])
         self.assertEqual(messages[0].content, created.greeting)
 
+    async def test_the_greeting_comes_from_the_template_of_the_conversation_language(
+        self,
+    ) -> None:
+        spanish = await self._create()
+        english = await self._create(language="en")
+
+        snapshot = (await self._conversation(spanish.conversation_id)).job_snapshot
+        self.assertEqual(spanish.greeting, greeting_template.render(snapshot, "es"))
+        self.assertEqual(english.greeting, greeting_template.render(snapshot, "en"))
+        self.assertNotEqual(spanish.greeting, english.greeting)
+
     async def test_create_truncates_the_job_description(self) -> None:
         long_description = "x" * 9000
         created = await self._create(
@@ -175,6 +211,43 @@ class ConversationServiceTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(s.message_id == messages[1].id for s in spans))
 
         self.assertEqual(await self._count(ResumeVersion), 1)
+
+    async def test_a_turn_that_applied_no_edit_writes_no_version(self) -> None:
+        service = self.service(loop_runner=no_edit_loop)
+        created = await self._create(service)
+
+        answer = await service.turn(
+            created.conversation_id,
+            TurnRequest(message="Just look at it", turnKey="k1"),
+            USER,
+        )
+
+        self.assertEqual(await self._count(ResumeVersion), 0)
+        self.assertEqual(answer.version, 0)
+        self.assertEqual(answer.changes, [])
+        self.assertEqual(answer.resume, RESUME)
+
+    async def test_a_turn_with_no_edit_leaves_the_version_that_stands(self) -> None:
+        created = await self._create()
+        await self.service().turn(
+            created.conversation_id, TurnRequest(message="Tailor it", turnKey="k1"), USER
+        )
+
+        quiet = self.service(loop_runner=no_edit_loop)
+        answer = await quiet.turn(
+            created.conversation_id, TurnRequest(message="Thanks", turnKey="k2"), USER
+        )
+        replayed = await quiet.turn(
+            created.conversation_id, TurnRequest(message="Thanks", turnKey="k2"), USER
+        )
+
+        self.assertEqual(await self._count(ResumeVersion), 1)
+        self.assertEqual(answer.version, 1)
+        self.assertEqual(replayed.version, 1)
+        self.assertEqual(replayed.reply, NO_EDIT_REPLY)
+
+        conversation = await self._conversation(created.conversation_id)
+        self.assertEqual(conversation.turn_count, 2)
 
     async def test_the_second_turn_flips_is_current(self) -> None:
         service = self.service()

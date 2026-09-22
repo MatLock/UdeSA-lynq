@@ -19,16 +19,6 @@ log = logging.getLogger(__name__)
 RECURSION_HEADROOM = 6
 
 
-def build_greeting(job_snapshot: dict, language: str) -> str:
-    title = job_snapshot.get("title") or "this job"
-    company = job_snapshot.get("company")
-    where = f" at {company}" if company else ""
-    return (
-        f"I read the posting for {title}{where}. "
-        "Should I put together a version of your resume aimed at it?"
-    )
-
-
 def template_provider(provider: str) -> str:
     return BEDROCK if provider == BEDROCK else OLLAMA
 

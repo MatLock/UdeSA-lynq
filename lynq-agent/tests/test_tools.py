@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import unittest
 
+from tests.fixtures.spanish import PROSE
+
 from agent.context import TurnContext, build_turn_state, use_turn_state
 from agent.tools import STEP_LIMIT_MESSAGE, apply_edit, find_evidence
 from db.models import SpanKind
@@ -41,10 +43,7 @@ RESUME = {
     "skills": {"technical": ["Java", "Postgres"], "tools": ["Jenkins"], "soft": []},
 }
 
-SPANISH = (
-    "Ingeniero backend con ocho anios construyendo servicios distribuidos y bases "
-    "de datos relacionales para equipos grandes de producto."
-)
+SPANISH = PROSE
 
 
 def state_for(language: str = "es", resume_language: str = "es", max_steps: int = 12):
