@@ -4,6 +4,8 @@ import unittest
 
 from langchain_core.messages import AIMessage
 
+from tests.fixtures.spanish import SHORT_REPLY
+
 from agent.answer import TurnAnswer, from_result, unwrap
 
 
@@ -21,9 +23,9 @@ class UnwrapTest(unittest.TestCase):
         self.assertEqual(answer.reply, "listo")
 
     def test_plain_prose_becomes_the_reply(self) -> None:
-        answer = unwrap("Reordené tu experiencia.")
+        answer = unwrap(SHORT_REPLY)
 
-        self.assertEqual(answer.reply, "Reordené tu experiencia.")
+        self.assertEqual(answer.reply, SHORT_REPLY)
         self.assertEqual(answer.warnings, [])
 
     def test_a_json_that_is_not_a_turn_answer_is_kept_as_prose(self) -> None:

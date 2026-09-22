@@ -7,12 +7,19 @@ from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agent.context import SpanRecord, TurnContext, TurnOutcome, apply_pricing, utc_now
-from agent.graph import build_greeting, run_turn
+from agent.graph import run_turn
 from agent.language import verify_resume_language
 from client.lynq_ml_client import SkillExtractionFailed
 from config import Settings
 from db import repository
-from db.models import Conversation, ConversationStatus, Message, MessageRole, SpanKind
+from db.models import (
+    Conversation,
+    ConversationStatus,
+    Message,
+    MessageRole,
+    ResumeVersion,
+    SpanKind,
+)
 from model.conversation import (
     AppliedRequest,
     AppliedResponse,
@@ -33,11 +40,16 @@ from model.errors import (
     NotTheOwner,
     TurnInProgress,
 )
+from prompt import greeting as greeting_template
 
 log = logging.getLogger(__name__)
 
 HISTORY_PAIRS = 4
 TIMEOUT_MARGIN_SECONDS = 30
+
+
+def _number_of(version: ResumeVersion | None) -> int:
+    return version.version if version is not None else 0
 
 
 class ConversationService:
@@ -64,7 +76,7 @@ class ConversationService:
         resume_language = verify_resume_language(
             request.base_resume, request.resume_language
         )
-        greeting = build_greeting(job, request.language)
+        greeting = greeting_template.render(job, request.language)
         now = utc_now()
 
         conversation = Conversation(
@@ -264,12 +276,8 @@ class ConversationService:
                 outcome.reply,
                 warnings=outcome.warnings or None,
             )
-            version = await repository.save_version(
-                session,
-                conversation_id,
-                outcome.resume,
-                outcome.changes,
-                produced_by=assistant.id,
+            version = await self._version_of(
+                session, conversation_id, outcome, assistant.id
             )
             await repository.save_spans(
                 session, conversation_id, user_message_id, outcome.spans
@@ -280,7 +288,7 @@ class ConversationService:
             log.info(
                 "message= Turn persisted, conversationId=%s, version=%s, status=%s",
                 conversation_id,
-                version.version,
+                _number_of(version),
                 conversation.status,
             )
             return TurnResponse(
@@ -288,10 +296,33 @@ class ConversationService:
                 resume=outcome.resume,
                 changes=outcome.changes,
                 warnings=outcome.warnings,
-                version=version.version,
+                version=_number_of(version),
                 status=conversation.status,
                 turns_left=self._turns_left(conversation),
             )
+
+    async def _version_of(
+        self,
+        session: AsyncSession,
+        conversation_id: str,
+        outcome: TurnOutcome,
+        produced_by: str,
+    ) -> ResumeVersion | None:
+        if outcome.changes:
+            return await repository.save_version(
+                session,
+                conversation_id,
+                outcome.resume,
+                outcome.changes,
+                produced_by=produced_by,
+            )
+
+        log.info(
+            "message= The turn applied no edit, the current version stands, "
+            "conversationId=%s",
+            conversation_id,
+        )
+        return await repository.current_version(session, conversation_id)
 
     async def _discard_zombie(
         self, session: AsyncSession, conversation_id: str, user_message_id: str
@@ -396,7 +427,7 @@ class ConversationService:
             resume=current.resume if current else conversation.base_resume,
             changes=version.changes if version else [],
             warnings=reply.warnings or [],
-            version=version.version if version else 0,
+            version=_number_of(current),
             status=conversation.status,
             turns_left=self._turns_left(conversation),
         )

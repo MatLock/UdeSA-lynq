@@ -7,6 +7,8 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
+from prompt import bare_language
+
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TEMPLATE_DIR = os.path.join(_REPO_ROOT, "resources", "prompts", "resume_tailor")
 FAMILY = "resume_tailor"
@@ -23,7 +25,7 @@ _environment = Environment(
 
 
 def language_name(code: str) -> str:
-    bare = code.split("-")[0].split("_")[0].strip().lower()
+    bare = bare_language(code)
     return f"{LANGUAGE_NAMES.get(bare, bare)} ({bare})"
 
 
