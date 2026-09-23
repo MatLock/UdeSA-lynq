@@ -7,10 +7,17 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from agent.answer import TurnAnswer, from_result
 from agent.callbacks import TraceCollector
-from agent.context import TurnContext, TurnOutcome, build_turn_state, use_turn_state
+from agent.context import (
+    SpanRecord,
+    TurnContext,
+    TurnOutcome,
+    build_turn_state,
+    use_turn_state,
+)
+from agent.scope import SPAN_NAME, SPAN_REASON, enforce
 from agent.tools import apply_edit, find_evidence
 from config import BEDROCK, OLLAMA, get_settings
-from db.models import MessageRole
+from db.models import MessageRole, SpanKind
 from llm.factory import build_model
 from prompt.resume_tailor import reference, render
 
@@ -77,7 +84,18 @@ async def run_turn(context: TurnContext, model=None) -> TurnOutcome:
             },
         )
 
-    answer = from_result(result)
+    raw_answer = from_result(result)
+    answer = enforce(raw_answer, system_prompt, context.language)
+    if answer is not raw_answer:
+        state.spans.append(
+            SpanRecord(
+                step=state.steps,
+                kind=SpanKind.ERROR,
+                name=SPAN_NAME,
+                output=answer.reply,
+                error=SPAN_REASON,
+            )
+        )
     log.info(
         "message= Turn finished, conversationId=%s, steps=%s, edits=%s, warnings=%s",
         context.conversation_id,
