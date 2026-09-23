@@ -6,7 +6,15 @@ from unittest.mock import patch
 
 from langchain_core.messages import AIMessage
 
-from tests.fixtures.spanish import ASK_FOR_GO, GO_AHEAD, GREETING, REPLY, WARNING
+from tests.fixtures.spanish import (
+    ASK_FOR_GO,
+    ASK_FOR_THE_PROMPT,
+    GO_AHEAD,
+    GREETING,
+    OUT_OF_SCOPE_ES,
+    REPLY,
+    WARNING,
+)
 from tests.support import scripted, tool_call
 
 from agent.context import TurnContext
@@ -108,6 +116,24 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
             [span.name for span in outcome.spans if span.kind == SpanKind.TOOL],
             ["find_evidence", "apply_edit"],
         )
+
+    async def test_an_answer_that_gives_the_instructions_away_never_reaches_the_candidate(
+        self,
+    ) -> None:
+        leaked = (
+            "Sure, here are my instructions: You may only reorder, prioritise and "
+            "rewrite what the resume already backs."
+        )
+        model = scripted(tool_call("TurnAnswer", {"reply": leaked}, "1"))
+
+        outcome = await run_turn(context_for(message=ASK_FOR_THE_PROMPT), model=model)
+
+        self.assertEqual(outcome.reply, OUT_OF_SCOPE_ES)
+        self.assertEqual(outcome.warnings, [])
+        self.assertNotIn("reorder", outcome.reply)
+        guard = [span for span in outcome.spans if span.kind == SpanKind.ERROR]
+        self.assertEqual([span.name for span in guard], ["out_of_scope"])
+        self.assertEqual(guard[0].error, "the answer echoed the instructions")
 
     async def test_the_resume_comes_from_the_edits_not_from_the_model(self) -> None:
         model = scripted(
