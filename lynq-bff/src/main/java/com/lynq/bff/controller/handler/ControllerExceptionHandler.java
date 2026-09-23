@@ -3,8 +3,10 @@ package com.lynq.bff.controller.handler;
 import com.lynq.bff.controller.response.ErrorRestResponse;
 import com.lynq.bff.exceptions.BadGatewayException;
 import com.lynq.bff.exceptions.BadRequestException;
+import com.lynq.bff.exceptions.ConflictException;
 import com.lynq.bff.exceptions.ForbiddenException;
 import com.lynq.bff.exceptions.MethodNotAllowedException;
+import com.lynq.bff.exceptions.NotFoundException;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,6 +44,23 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
     return ResponseEntity
         .status(HttpStatus.BAD_REQUEST)
         .body(new ErrorRestResponse<>(null, ex.getMessage()));
+  }
+
+  @ExceptionHandler(NotFoundException.class)
+  public ResponseEntity<ErrorRestResponse<Void>> handleNotFound(NotFoundException ex) {
+    log.warn("message= Nothing to serve, reason={}", ex.getMessage());
+    return ResponseEntity
+        .status(HttpStatus.NOT_FOUND)
+        .body(new ErrorRestResponse<>(null, ex.getMessage()));
+  }
+
+  @ExceptionHandler(ConflictException.class)
+  public ResponseEntity<ErrorRestResponse<Void>> handleConflict(ConflictException ex) {
+    log.warn("message= Request conflicts with the current state, reason={}, code={}",
+        ex.getMessage(), ex.getCode());
+    return ResponseEntity
+        .status(HttpStatus.CONFLICT)
+        .body(new ErrorRestResponse<>(null, ex.getMessage(), ex.getCode()));
   }
 
   @ExceptionHandler(ForbiddenException.class)

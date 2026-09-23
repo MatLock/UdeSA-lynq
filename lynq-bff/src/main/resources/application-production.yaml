@@ -20,6 +20,13 @@ spring:
           lynqMlDmz:
             connectTimeout: 10000
             readTimeout: 310000
+          # A CV Tailor turn is an LLM loop of several steps, so it is longer
+          # than a single generation and far past OpenFeign's 60s default read
+          # timeout. Kept above lynq-agent's own AGENT_TURN_TIMEOUT so the
+          # agent, not this gateway, decides the cutoff.
+          lynqAgent:
+            connectTimeout: 10000
+            readTimeout: 310000
 
 lynq:
   security:
@@ -33,6 +40,8 @@ lynq:
     url: ${LYNQ_ML_URL:http://lynq-ml:8084/lynq-ml}
   file-storage:
     url: ${LYNQ_FILE_STORAGE_URL:http://lynq-file-storage:8080/lynq-file-storage}
+  agent:
+    url: ${LYNQ_AGENT_URL:http://lynq-agent:8090/lynq-agent}
 
 server:
   port: 8080

@@ -1,8 +1,10 @@
 package com.lynq.bff.client;
 
+import com.lynq.bff.client.request.ApplyJobRequest;
 import com.lynq.bff.client.request.CreateResumeRequest;
 import com.lynq.bff.client.request.UpdateResumeAliasRequest;
 import com.lynq.bff.client.response.DeletedResumeResponse;
+import com.lynq.bff.client.response.JobDetailsResponse;
 import com.lynq.bff.client.response.SupportedLanguageResponse;
 import com.lynq.bff.client.response.UserResumeResponse;
 import com.lynq.bff.client.response.UserResponse;
@@ -32,6 +34,19 @@ public interface LynqBackendClient {
   @PostMapping("/dmz/user/confirm-upload-resume")
   void confirmResumeUpload(
       @RequestParam("file-id") String fileId,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
+
+  @GetMapping("/dmz/job/{jobId}/details")
+  GlobalRestResponse<JobDetailsResponse> getJobDetails(
+      @PathVariable("jobId") String jobId,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
+
+  @PostMapping("/dmz/job/{jobId}/apply")
+  GlobalRestResponse<Object> applyToJob(
+      @PathVariable("jobId") String jobId,
+      @RequestBody ApplyJobRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
       @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 

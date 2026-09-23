@@ -2,10 +2,13 @@ package com.lynq.bff.controller.impl;
 
 import com.lynq.bff.controller.ResumeController;
 import com.lynq.bff.controller.request.PreviewResumeRequest;
+import com.lynq.bff.controller.request.TailorApplyRestRequest;
+import com.lynq.bff.controller.request.TailorTurnRestRequest;
 import com.lynq.bff.controller.request.TranslateResumeRestRequest;
 import com.lynq.bff.controller.request.UpdateResumeAliasRestRequest;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
+import com.lynq.bff.controller.response.ResumeTailorApplyRestResponse;
 import com.lynq.bff.filter.JwtSignatureFilter;
 import com.lynq.bff.security.HasRole;
 import com.lynq.bff.security.Role;
@@ -13,11 +16,14 @@ import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.ResumeAliasService;
 import com.lynq.bff.service.ResumeDeletionService;
 import com.lynq.bff.service.ResumeImportService;
+import com.lynq.bff.service.ResumeTailorService;
 import com.lynq.bff.service.ResumeTranslationService;
 import com.lynq.bff.service.ResumePreviewService;
+import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -41,17 +47,20 @@ public class ResumeControllerImpl implements ResumeController {
   private final ResumeDeletionService resumeDeletionService;
   private final ResumeTranslationService resumeTranslationService;
   private final ResumeAliasService resumeAliasService;
+  private final ResumeTailorService resumeTailorService;
 
   public ResumeControllerImpl(ResumePreviewService resumePreviewService,
                               ResumeImportService resumeImportService,
                               ResumeDeletionService resumeDeletionService,
                               ResumeTranslationService resumeTranslationService,
-                              ResumeAliasService resumeAliasService) {
+                              ResumeAliasService resumeAliasService,
+                              ResumeTailorService resumeTailorService) {
     this.resumePreviewService = resumePreviewService;
     this.resumeImportService = resumeImportService;
     this.resumeDeletionService = resumeDeletionService;
     this.resumeTranslationService = resumeTranslationService;
     this.resumeAliasService = resumeAliasService;
+    this.resumeTailorService = resumeTailorService;
   }
 
   @Override
@@ -138,5 +147,69 @@ public class ResumeControllerImpl implements ResumeController {
     resumeDeletionService.delete(resumeId, new Caller(userId, requestUuid, authorization));
 
     return ResponseEntity.noContent().build();
+  }
+
+  @Override
+  @PostMapping("/{resumeId}/tailor/{jobId}")
+  public ResponseEntity<GlobalRestResponse<Object>> startResumeTailoring(
+      @PathVariable String resumeId,
+      @PathVariable String jobId,
+      @RequestParam(defaultValue = "EN") String language,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
+      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+    Object conversation = resumeTailorService.start(resumeId, jobId, language,
+        new Caller(userId, requestUuid, authorization));
+
+    return ResponseEntity
+        .status(HttpStatus.CREATED)
+        .body(new GlobalRestResponse<>(true, conversation));
+  }
+
+  @Override
+  @PostMapping("/tailor/{conversationId}/turn")
+  public ResponseEntity<GlobalRestResponse<Object>> takeResumeTailoringTurn(
+      @PathVariable String conversationId,
+      @RequestBody TailorTurnRestRequest request,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
+      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+    Object turn = resumeTailorService.turn(conversationId, request.getMessage(),
+        request.getTurnKey(), new Caller(userId, requestUuid, authorization));
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, turn));
+  }
+
+  @Override
+  @GetMapping("/tailor/{conversationId}")
+  public ResponseEntity<GlobalRestResponse<Map<String, Object>>> getResumeTailoringConversation(
+      @PathVariable String conversationId,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
+      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+    Map<String, Object> conversation = resumeTailorService.view(conversationId,
+        new Caller(userId, requestUuid, authorization));
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, conversation));
+  }
+
+  @Override
+  @PostMapping("/tailor/{conversationId}/apply")
+  public ResponseEntity<GlobalRestResponse<ResumeTailorApplyRestResponse>> applyWithTailoredResume(
+      @PathVariable String conversationId,
+      @RequestBody TailorApplyRestRequest request,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
+      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+    ResumeTailorApplyRestResponse applied = resumeTailorService.apply(conversationId,
+        request.getResumeId(), new Caller(userId, requestUuid, authorization));
+
+    return ResponseEntity
+        .status(HttpStatus.CREATED)
+        .body(new GlobalRestResponse<>(true, applied));
   }
 }

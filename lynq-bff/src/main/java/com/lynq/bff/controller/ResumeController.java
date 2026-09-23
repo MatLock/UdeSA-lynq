@@ -1,10 +1,14 @@
 package com.lynq.bff.controller;
 
 import com.lynq.bff.controller.request.PreviewResumeRequest;
+import com.lynq.bff.controller.request.TailorApplyRestRequest;
+import com.lynq.bff.controller.request.TailorTurnRestRequest;
 import com.lynq.bff.controller.request.TranslateResumeRestRequest;
 import com.lynq.bff.controller.request.UpdateResumeAliasRestRequest;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
+import com.lynq.bff.controller.response.ResumeTailorApplyRestResponse;
+import java.util.Map;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -261,6 +265,193 @@ public interface ResumeController {
   })
   ResponseEntity<Void> deleteResume(
       @Parameter(description = "Id of the resume to delete.") String resumeId,
+      @Parameter(hidden = true) String requestUuid,
+      @Parameter(hidden = true) String authorization,
+      @Parameter(hidden = true) String userId);
+
+  @Operation(
+      summary = "Start a CV Tailor conversation for a job posting",
+      description = "Opens the conversation in which the agent adapts one of the candidate's "
+          + "stored resumes to a job posting. The gateway reads the posting from "
+          + "lynq-app-backend itself — the browser never supplies it, or anyone could push an "
+          + "arbitrary description into the agent's prompt — checks the resume belongs to the "
+          + "caller, and sends lynq-agent the posting, the frozen resume, the language the agent "
+          + "replies in (the caller's UI locale) and the language the resume is written in, which "
+          + "is the resume's own and never guessed. The agent answers with the conversation id "
+          + "and its greeting; adapting the resume takes a turn.")
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "201",
+          description = "Conversation started.",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Conversation",
+                  value = """
+                      {
+                        "success": true,
+                        "data": {
+                          "conversationId": "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42",
+                          "greeting": "Miré el aviso de Senior Backend Engineer en Acme. ¿Armo una versión de tu CV apuntada a este puesto?",
+                          "status": "AWAITING_CONFIRMATION"
+                        }
+                      }"""))),
+      @ApiResponse(responseCode = "400", description = "No such resume belongs to the caller."),
+      @ApiResponse(responseCode = "401", description = "The Authorization header is missing, or the "
+          + "access token's signature is invalid or expired."),
+      @ApiResponse(responseCode = "403", description = "The lynq-request-uuid header is missing, or "
+          + "the caller is not a CANDIDATE."),
+      @ApiResponse(responseCode = "404", description = "No such job posting."),
+      @ApiResponse(responseCode = "502", description = "A service the flow depends on failed.")
+  })
+  ResponseEntity<GlobalRestResponse<Object>> startResumeTailoring(
+      @Parameter(
+          name = "resumeId",
+          in = ParameterIn.PATH,
+          required = true,
+          description = "Id of the stored resume the agent adapts.",
+          example = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60")
+      String resumeId,
+      @Parameter(
+          name = "jobId",
+          in = ParameterIn.PATH,
+          required = true,
+          description = "Id of the job posting the resume is adapted to.",
+          example = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a61")
+      String jobId,
+      @Parameter(
+          name = "language",
+          in = ParameterIn.QUERY,
+          description = "The caller's UI language: the one the agent replies in. The resume is "
+              + "edited in its own language regardless.",
+          example = "ES")
+      String language,
+      @Parameter(hidden = true) String requestUuid,
+      @Parameter(hidden = true) String authorization,
+      @Parameter(hidden = true) String userId);
+
+  @Operation(
+      summary = "Take a turn in a CV Tailor conversation",
+      description = "Sends the candidate's message to the agent and returns the resume as it "
+          + "stands after it, with what changed, what the agent refused to invent and how many "
+          + "turns are left. The turnKey is the caller's idempotency key: repeating a turn with "
+          + "the same key returns the same answer instead of spending another one. A turn runs an "
+          + "LLM loop and can take minutes.")
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Turn completed."),
+      @ApiResponse(responseCode = "400", description = "The message or the turn key is missing."),
+      @ApiResponse(responseCode = "401", description = "The Authorization header is missing, or the "
+          + "access token's signature is invalid or expired."),
+      @ApiResponse(responseCode = "403", description = "The lynq-request-uuid header is missing, "
+          + "the caller is not a CANDIDATE, or the conversation belongs to another user."),
+      @ApiResponse(responseCode = "404", description = "No such conversation."),
+      @ApiResponse(
+          responseCode = "409",
+          description = "A turn is already running (TURN_IN_PROGRESS) or the conversation has run "
+              + "out of turns (CONVERSATION_EXHAUSTED). The envelope carries the code.",
+          content = @Content(
+              examples = @ExampleObject(
+                  name = "Turn in progress",
+                  value = """
+                      {
+                        "success": false,
+                        "data": null,
+                        "reason": "A turn is already running on this conversation",
+                        "code": "TURN_IN_PROGRESS"
+                      }"""))),
+      @ApiResponse(responseCode = "502", description = "The agent could not finish the turn.")
+  })
+  ResponseEntity<GlobalRestResponse<Object>> takeResumeTailoringTurn(
+      @Parameter(
+          name = "conversationId",
+          in = ParameterIn.PATH,
+          required = true,
+          description = "Id of the conversation, as returned when it was started.",
+          example = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42")
+      String conversationId,
+      TailorTurnRestRequest request,
+      @Parameter(hidden = true) String requestUuid,
+      @Parameter(hidden = true) String authorization,
+      @Parameter(hidden = true) String userId);
+
+  @Operation(
+      summary = "Read a CV Tailor conversation",
+      description = "Returns the conversation as it stands — its status, the thread, the resume "
+          + "currently in force and the versions behind it — so the modal can be reopened where "
+          + "the candidate left it. The agent serves it only to the user it belongs to.")
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "Conversation returned."),
+      @ApiResponse(responseCode = "401", description = "The Authorization header is missing, or the "
+          + "access token's signature is invalid or expired."),
+      @ApiResponse(responseCode = "403", description = "The lynq-request-uuid header is missing, "
+          + "the caller is not a CANDIDATE, or the conversation belongs to another user."),
+      @ApiResponse(responseCode = "404", description = "No such conversation."),
+      @ApiResponse(responseCode = "502", description = "lynq-agent could not be reached.")
+  })
+  ResponseEntity<GlobalRestResponse<Map<String, Object>>> getResumeTailoringConversation(
+      @Parameter(
+          name = "conversationId",
+          in = ParameterIn.PATH,
+          required = true,
+          description = "Id of the conversation to read.",
+          example = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42")
+      String conversationId,
+      @Parameter(hidden = true) String requestUuid,
+      @Parameter(hidden = true) String authorization,
+      @Parameter(hidden = true) String userId);
+
+  @Operation(
+      summary = "Apply with the tailored resume and close the conversation",
+      description = "The orchestrated close of the flow. The candidate has already stored the "
+          + "tailored resume through POST /user/resume; this checks it belongs to the caller, "
+          + "reads from the conversation which posting it was started for, applies to that "
+          + "posting with it against lynq-app-backend and tells lynq-agent the conversation is "
+          + "applied. Having already applied to the posting is not an error: the conversation is "
+          + "closed all the same and the response says so, which is the meaning the browser "
+          + "already gives that case on external postings. The application is what comes back, so "
+          + "the browser never calls the apply endpoint by itself and leaves the conversation "
+          + "open behind it.")
+  @ApiResponses({
+      @ApiResponse(
+          responseCode = "201",
+          description = "Applied and conversation closed.",
+          content = @Content(
+              schema = @Schema(implementation = ResumeTailorApplyRestResponse.class),
+              examples = @ExampleObject(
+                  name = "Application",
+                  value = """
+                      {
+                        "success": true,
+                        "data": {
+                          "application": {
+                            "applicationId": "018fa1b2-2b1d-7c4e-9a6f-1e2d3c4b5a62",
+                            "jobId": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a61",
+                            "userId": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a11",
+                            "appliedOn": "2026-09-23"
+                          },
+                          "alreadyApplied": false,
+                          "conversationStatus": "APPLIED"
+                        }
+                      }"""))),
+      @ApiResponse(responseCode = "400", description = "The resume id is missing, or no such "
+          + "resume belongs to the caller."),
+      @ApiResponse(responseCode = "401", description = "The Authorization header is missing, or the "
+          + "access token's signature is invalid or expired."),
+      @ApiResponse(responseCode = "403", description = "The lynq-request-uuid header is missing, "
+          + "the caller is not a CANDIDATE, or the conversation belongs to another user."),
+      @ApiResponse(responseCode = "404", description = "No such conversation."),
+      @ApiResponse(responseCode = "409", description = "The conversation was already closed with a "
+          + "different resume (ALREADY_APPLIED). The envelope carries the code."),
+      @ApiResponse(responseCode = "502", description = "A service the close depends on failed.")
+  })
+  ResponseEntity<GlobalRestResponse<ResumeTailorApplyRestResponse>> applyWithTailoredResume(
+      @Parameter(
+          name = "conversationId",
+          in = ParameterIn.PATH,
+          required = true,
+          description = "Id of the conversation being closed.",
+          example = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42")
+      String conversationId,
+      TailorApplyRestRequest request,
       @Parameter(hidden = true) String requestUuid,
       @Parameter(hidden = true) String authorization,
       @Parameter(hidden = true) String userId);

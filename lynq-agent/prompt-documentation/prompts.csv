@@ -64,3 +64,4 @@ date,prompt
 "22-09-2026","in the system prompt, forbid copying what a tool answered into the reply and asking the candidate what to do next: the agent decides, acts and reports what it did"
 "22-09-2026","run the checkpoint turn against the local Ollama models and write down what they do: the guardrails hold and nothing is invented, but they do not close the turn with the TurnAnswer tool call"
 "22-09-2026","insert a resume_version only when the turn actually applied an edit: a turn that answered without touching the resume must write no version and answer with the version that already stands, 0 while the base resume is still the current one"
+"23-09-2026","expose jobId and baseResumeId in GET /conversation/{id}, so whoever reopens a conversation knows which job posting and which resume it was started from without having to be told"
