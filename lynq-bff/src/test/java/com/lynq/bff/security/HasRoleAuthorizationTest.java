@@ -14,6 +14,7 @@ import com.lynq.bff.service.ResumeAliasService;
 import com.lynq.bff.service.ResumeDeletionService;
 import com.lynq.bff.service.ResumeImportService;
 import com.lynq.bff.service.ResumePreviewService;
+import com.lynq.bff.service.ResumeTailorService;
 import com.lynq.bff.service.ResumeTranslationService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,8 @@ class HasRoleAuthorizationTest {
   private static final String AUTHORIZATION = "Bearer access-token";
   private static final String RESUME_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
   private static final String FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
+  private static final String JOB_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a61";
+  private static final String CONVERSATION_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42";
 
   private static final String ONLY_CANDIDATES =
       "Only users of type CANDIDATE can perform this action";
@@ -75,6 +78,9 @@ class HasRoleAuthorizationTest {
   private ResumeAliasService resumeAliasService;
 
   @MockitoBean
+  private ResumeTailorService resumeTailorService;
+
+  @MockitoBean
   private DmzProxyService dmzProxyService;
 
   @MockitoBean
@@ -96,7 +102,13 @@ class HasRoleAuthorizationTest {
         Arguments.of(HttpMethod.DELETE, "/resume/preview/" + FILE_ID, null),
         Arguments.of(HttpMethod.PUT, "/resume/" + RESUME_ID + "/alias",
             "{\"alias\":\"Backend roles\"}"),
-        Arguments.of(HttpMethod.DELETE, "/resume/" + RESUME_ID, null));
+        Arguments.of(HttpMethod.DELETE, "/resume/" + RESUME_ID, null),
+        Arguments.of(HttpMethod.POST, "/resume/" + RESUME_ID + "/tailor/" + JOB_ID, null),
+        Arguments.of(HttpMethod.POST, "/resume/tailor/" + CONVERSATION_ID + "/turn",
+            "{\"message\":\"Go ahead\",\"turnKey\":\"k1\"}"),
+        Arguments.of(HttpMethod.GET, "/resume/tailor/" + CONVERSATION_ID, null),
+        Arguments.of(HttpMethod.POST, "/resume/tailor/" + CONVERSATION_ID + "/apply",
+            "{\"resumeId\":\"" + RESUME_ID + "\"}"));
   }
 
   @ParameterizedTest
@@ -133,6 +145,16 @@ class HasRoleAuthorizationTest {
   void aCandidateReachesTheResumeDeletion() throws Exception {
     mockMvc.perform(as(Role.CANDIDATE, HttpMethod.DELETE, "/resume/" + RESUME_ID, null))
         .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void aCandidateReachesTheTailoringConversation() throws Exception {
+    when(resumeTailorService.view(any(), any())).thenReturn(java.util.Map.of("status", "ACTIVE"));
+
+    mockMvc.perform(as(Role.CANDIDATE, HttpMethod.GET, "/resume/tailor/" + CONVERSATION_ID, null))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success", is(true)))
+        .andExpect(jsonPath("$.data.status", is("ACTIVE")));
   }
 
   @Test

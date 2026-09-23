@@ -10,15 +10,19 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.lynq.bff.controller.request.PreviewResumeRequest;
+import com.lynq.bff.controller.request.TailorApplyRestRequest;
+import com.lynq.bff.controller.request.TailorTurnRestRequest;
 import com.lynq.bff.controller.request.TranslateResumeRestRequest;
 import com.lynq.bff.controller.request.UpdateResumeAliasRestRequest;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
+import com.lynq.bff.controller.response.ResumeTailorApplyRestResponse;
 import com.lynq.bff.enums.ResumeTemplate;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.ResumeAliasService;
 import com.lynq.bff.service.ResumeDeletionService;
 import com.lynq.bff.service.ResumeImportService;
+import com.lynq.bff.service.ResumeTailorService;
 import com.lynq.bff.service.ResumeTranslationService;
 import com.lynq.bff.service.ResumePreviewService;
 import java.util.Map;
@@ -40,6 +44,9 @@ class ResumeControllerImplTest {
   private static final String FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
   private static final String UI_LANGUAGE = "es";
   private static final String RESUME_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
+  private static final String JOB_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a61";
+  private static final String CONVERSATION_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42";
+  private static final String TURN_KEY = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d43";
 
   @Mock
   private ResumePreviewService resumePreviewService;
@@ -56,13 +63,16 @@ class ResumeControllerImplTest {
   @Mock
   private ResumeAliasService resumeAliasService;
 
+  @Mock
+  private ResumeTailorService resumeTailorService;
+
   private ResumeControllerImpl resumeController;
 
   @BeforeEach
   void setUp() {
     resumeController = new ResumeControllerImpl(
         resumePreviewService, resumeImportService, resumeDeletionService,
-        resumeTranslationService, resumeAliasService);
+        resumeTranslationService, resumeAliasService, resumeTailorService);
   }
 
   @Test
@@ -231,5 +241,83 @@ class ResumeControllerImplTest {
 
   private PreviewResumeRequest request() {
     return new PreviewResumeRequest(Map.of("summary", "Backend engineer"), ResumeTemplate.MODERN);
+  }
+
+  @Test
+  void startResumeTailoringRespondsWithCreatedAndTheConversation() {
+    Object conversation = Map.of("conversationId", CONVERSATION_ID, "status",
+        "AWAITING_CONFIRMATION");
+    when(resumeTailorService.start(RESUME_ID, JOB_ID, UI_LANGUAGE,
+        new Caller(USER_ID, REQUEST_UUID, AUTHORIZATION))).thenReturn(conversation);
+
+    ResponseEntity<GlobalRestResponse<Object>> response = resumeController.startResumeTailoring(
+        RESUME_ID, JOB_ID, UI_LANGUAGE, REQUEST_UUID, AUTHORIZATION, USER_ID);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
+    assertThat(response.getBody(), is(notNullValue()));
+    assertThat(response.getBody().isSuccess(), is(true));
+    assertThat(response.getBody().getData(), is(conversation));
+  }
+
+  @Test
+  void takeResumeTailoringTurnRespondsWithOkAndTheTurn() {
+    TailorTurnRestRequest request = new TailorTurnRestRequest("Highlight Kubernetes", TURN_KEY);
+    Object turn = Map.of("reply", "Reordered your experience", "version", 2);
+    when(resumeTailorService.turn(eq(CONVERSATION_ID), eq("Highlight Kubernetes"), eq(TURN_KEY),
+        any(Caller.class))).thenReturn(turn);
+
+    ResponseEntity<GlobalRestResponse<Object>> response =
+        resumeController.takeResumeTailoringTurn(CONVERSATION_ID, request, REQUEST_UUID,
+            AUTHORIZATION, USER_ID);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+    assertThat(response.getBody(), is(notNullValue()));
+    assertThat(response.getBody().getData(), is(turn));
+  }
+
+  @Test
+  void getResumeTailoringConversationRespondsWithOkAndTheThread() {
+    Map<String, Object> conversation = Map.of("conversationId", CONVERSATION_ID, "status",
+        "ACTIVE");
+    when(resumeTailorService.view(eq(CONVERSATION_ID), any(Caller.class)))
+        .thenReturn(conversation);
+
+    ResponseEntity<GlobalRestResponse<Map<String, Object>>> response =
+        resumeController.getResumeTailoringConversation(CONVERSATION_ID, REQUEST_UUID,
+            AUTHORIZATION, USER_ID);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+    assertThat(response.getBody(), is(notNullValue()));
+    assertThat(response.getBody().getData(), is(conversation));
+  }
+
+  @Test
+  void applyWithTailoredResumeRespondsWithCreatedAndTheApplication() {
+    TailorApplyRestRequest request = new TailorApplyRestRequest(RESUME_ID);
+    ResumeTailorApplyRestResponse applied = ResumeTailorApplyRestResponse.builder()
+        .application(Map.of("applicationId", "018fa1b2"))
+        .alreadyApplied(false)
+        .conversationStatus("APPLIED")
+        .build();
+    when(resumeTailorService.apply(eq(CONVERSATION_ID), eq(RESUME_ID), any(Caller.class)))
+        .thenReturn(applied);
+
+    ResponseEntity<GlobalRestResponse<ResumeTailorApplyRestResponse>> response =
+        resumeController.applyWithTailoredResume(CONVERSATION_ID, request, REQUEST_UUID,
+            AUTHORIZATION, USER_ID);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
+    assertThat(response.getBody(), is(notNullValue()));
+    assertThat(response.getBody().getData(), is(sameInstance(applied)));
+  }
+
+  @Test
+  void theTailoringRoutesCarryTheCallerTheTokenWasVerifiedFor() {
+    resumeController.applyWithTailoredResume(CONVERSATION_ID,
+        new TailorApplyRestRequest(RESUME_ID), REQUEST_UUID, AUTHORIZATION, USER_ID);
+
+    ArgumentCaptor<Caller> caller = ArgumentCaptor.forClass(Caller.class);
+    verify(resumeTailorService).apply(eq(CONVERSATION_ID), eq(RESUME_ID), caller.capture());
+    assertThat(caller.getValue(), is(new Caller(USER_ID, REQUEST_UUID, AUTHORIZATION)));
   }
 }

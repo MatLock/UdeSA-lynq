@@ -87,6 +87,8 @@ class ConversationView(BaseModel):
     model_config = _CAMEL
 
     conversation_id: str = Field(alias="conversationId")
+    job_id: str = Field(alias="jobId")
+    base_resume_id: str = Field(alias="baseResumeId")
     status: str
     turn_count: int = Field(alias="turnCount")
     turns_left: int = Field(alias="turnsLeft")

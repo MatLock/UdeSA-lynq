@@ -152,6 +152,8 @@ class ConversationService:
 
             return ConversationView(
                 conversation_id=conversation.id,
+                job_id=conversation.job_id,
+                base_resume_id=conversation.base_resume_id,
                 status=conversation.status,
                 turn_count=conversation.turn_count,
                 turns_left=self._turns_left(conversation),

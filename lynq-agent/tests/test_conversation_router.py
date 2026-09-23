@@ -137,6 +137,8 @@ class ConversationRouterTest(unittest.TestCase):
     def test_get_returns_the_thread(self) -> None:
         self.service.view.return_value = ConversationView(
             conversation_id=_CONVERSATION_ID,
+            job_id="job-1",
+            base_resume_id="018f9c3a-0000",
             status="ACTIVE",
             turn_count=1,
             turns_left=9,
@@ -158,6 +160,8 @@ class ConversationRouterTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()["data"]
         self.assertEqual(data["turnsLeft"], 9)
+        self.assertEqual(data["jobId"], "job-1")
+        self.assertEqual(data["baseResumeId"], "018f9c3a-0000")
         self.assertEqual(data["messages"][0]["createdOn"], "2026-09-20T12:00:00")
         self.assertEqual(data["currentResume"], RESUME)
 
