@@ -263,6 +263,7 @@ public class UserService {
         .language(request.getLanguage())
         .createdOn(LocalDate.now(ZoneOffset.UTC))
         .name(request.getName())
+        .tailoredForJobId(request.getTailoredForJobId())
         .lynqFileStorageId(request.getFileId())
         .user(user)
         .build();
@@ -464,6 +465,7 @@ public class UserService {
         .id(resume.getId())
         .name(resume.getName())
         .alias(resume.getAlias())
+        .tailoredForJobId(resume.getTailoredForJobId())
         .language(resume.getLanguage())
         .createdOn(resume.getCreatedOn())
         .resume(parseResume(resume.getResume()))

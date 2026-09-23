@@ -22,6 +22,7 @@ class UserResumeEntityTest {
   private static final Language LANGUAGE = Language.EN;
   private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
   private static final String LYNQ_FILE_STORAGE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
+  private static final String TAILORED_FOR_JOB_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d44";
 
   @Mock
   private UserEntity user;
@@ -36,6 +37,7 @@ class UserResumeEntityTest {
         .language(LANGUAGE)
         .createdOn(CREATED_ON)
         .lynqFileStorageId(LYNQ_FILE_STORAGE_ID)
+        .tailoredForJobId(TAILORED_FOR_JOB_ID)
         .user(user)
         .build();
   }
@@ -47,6 +49,7 @@ class UserResumeEntityTest {
     assertThat(userResumeEntity.getLanguage(), is(LANGUAGE));
     assertThat(userResumeEntity.getCreatedOn(), is(CREATED_ON));
     assertThat(userResumeEntity.getLynqFileStorageId(), is(LYNQ_FILE_STORAGE_ID));
+    assertThat(userResumeEntity.getTailoredForJobId(), is(TAILORED_FOR_JOB_ID));
   }
 
   @Test
@@ -63,6 +66,7 @@ class UserResumeEntityTest {
     target.setLanguage(LANGUAGE);
     target.setCreatedOn(CREATED_ON);
     target.setLynqFileStorageId(LYNQ_FILE_STORAGE_ID);
+    target.setTailoredForJobId(TAILORED_FOR_JOB_ID);
     target.setUser(user);
 
     assertThat(target.getId(), is(USER_RESUME_ID));
@@ -70,6 +74,7 @@ class UserResumeEntityTest {
     assertThat(target.getLanguage(), is(LANGUAGE));
     assertThat(target.getCreatedOn(), is(CREATED_ON));
     assertThat(target.getLynqFileStorageId(), is(LYNQ_FILE_STORAGE_ID));
+    assertThat(target.getTailoredForJobId(), is(TAILORED_FOR_JOB_ID));
     assertThat(target.getUser(), is(sameInstance(user)));
   }
 }
