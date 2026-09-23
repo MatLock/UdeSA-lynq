@@ -49,6 +49,9 @@ public class UserResumeEntity {
   @Column(name = "alias", length = 100)
   private String alias;
 
+  @Column(name = "tailored_for_job_id", length = 64)
+  private String tailoredForJobId;
+
   @Column(name = "lynq_file_storage_id", length = 36)
   private String lynqFileStorageId;
 
