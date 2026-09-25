@@ -11,9 +11,14 @@ const CONFLICT = 409
 const MAX_IN_PROGRESS_RETRIES = 40
 const IN_PROGRESS_RETRY_MS = 5000
 
+const randomHex = (bytes) => {
+  const buffer = new Uint8Array(bytes)
+  globalThis.crypto.getRandomValues(buffer)
+  return Array.from(buffer, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
 const newTurnKey = () =>
-  globalThis.crypto?.randomUUID?.() ??
-  `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${randomHex(8)}`
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
