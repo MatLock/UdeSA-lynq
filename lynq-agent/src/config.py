@@ -71,6 +71,10 @@ class Settings:
         )
         self.bedrock_max_tokens: int = _int("BEDROCK_MAX_TOKENS", 4096)
         self.bedrock_temperature: float = _float("BEDROCK_TEMPERATURE", 0.0)
+        self.bedrock_guardrail_id: str = os.getenv("BEDROCK_GUARDRAIL_ID", "").strip()
+        self.bedrock_guardrail_version: str = os.getenv(
+            "BEDROCK_GUARDRAIL_VERSION", "DRAFT"
+        ).strip()
 
         self.input_price_per_1m, self.output_price_per_1m = self._prices()
 

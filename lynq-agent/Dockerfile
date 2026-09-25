@@ -12,11 +12,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/liquibase \
-    && curl -fsSL -o /tmp/liquibase.tar.gz \
+    && curl -fsSL --proto '=https' --proto-redir '=https' -o /tmp/liquibase.tar.gz \
         "https://github.com/liquibase/liquibase/releases/download/v${LIQUIBASE_VERSION}/liquibase-${LIQUIBASE_VERSION}.tar.gz" \
     && echo "${LIQUIBASE_SHA256}  /tmp/liquibase.tar.gz" | sha256sum -c - \
     && tar -xzf /tmp/liquibase.tar.gz -C /opt/liquibase \
-    && curl -fsSL -o "/opt/liquibase/lib/mysql-connector-j-${MYSQL_CONNECTOR_VERSION}.jar" \
+    && curl -fsSL --proto '=https' --proto-redir '=https' -o "/opt/liquibase/lib/mysql-connector-j-${MYSQL_CONNECTOR_VERSION}.jar" \
         "https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/${MYSQL_CONNECTOR_VERSION}/mysql-connector-j-${MYSQL_CONNECTOR_VERSION}.jar" \
     && echo "${MYSQL_CONNECTOR_SHA256}  /opt/liquibase/lib/mysql-connector-j-${MYSQL_CONNECTOR_VERSION}.jar" | sha256sum -c - \
     && rm -rf /tmp/liquibase.tar.gz /opt/liquibase/examples /opt/liquibase/licenses \

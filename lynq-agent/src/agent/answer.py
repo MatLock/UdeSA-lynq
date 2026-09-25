@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, ValidationError
 log = logging.getLogger(__name__)
 
 _JSON_BLOCK = re.compile(r"\{.*\}", re.DOTALL)
-_FENCE = re.compile(r"^```[a-zA-Z]*\s*|\s*```$")
+_FENCE = re.compile(r"(?:^```[a-zA-Z]*\s*)|(?:\s*```$)")
 
 
 class TurnAnswer(BaseModel):

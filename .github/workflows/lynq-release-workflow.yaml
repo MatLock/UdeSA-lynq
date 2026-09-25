@@ -316,6 +316,48 @@ jobs:
           name: coverage-lynq-feeders
           path: lynq-feeders/coverage.xml
 
+  build-lynq-agent:
+    name: "2 · Build & test: lynq-agent"
+    runs-on: ubuntu-latest
+    needs: set-version
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Setup Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        working-directory: lynq-agent
+        run: |
+          python -m pip install --upgrade --only-binary :all: "pip==26.1.2"
+          # requirements.txt is a full lock (pip-compile --generate-hashes from
+          # requirements.in); --require-hashes makes the install reproducible.
+          # langdetect publishes no wheel, so it is the one source install.
+          pip install --require-hashes --only-binary :all: --no-binary langdetect -r requirements.txt
+          # aiosqlite is test-only: the suite runs the repository against an
+          # SQLite file so it never needs a MySQL container.
+          pip install --only-binary :all: "coverage==7.15.2" "aiosqlite==0.22.1"
+
+      - name: Run tests
+        working-directory: lynq-agent
+        run: |
+          coverage run -m unittest discover -s tests -t .
+          coverage report -m
+          coverage xml -o coverage.xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lynq-agent
+          path: lynq-agent/coverage.xml
+
   # ===========================================================================
   # Stage 3 — Run a SonarCloud analysis of the whole monorepo right after the
   # tests pass and BEFORE any image is built. The Quality Gate is blocking: a
@@ -325,7 +367,7 @@ jobs:
   sonar-scan:
     name: "3 · SonarCloud analysis (Quality Gate)"
     runs-on: ubuntu-latest
-    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-ml, build-lynq-feeders]
+    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-ml, build-lynq-feeders, build-lynq-agent]
     outputs:
       gate: ${{ steps.results.outputs.gate }}
       bugs: ${{ steps.results.outputs.bugs }}
@@ -409,6 +451,16 @@ jobs:
         run: |
           sed -i -E "s|<source>.*</source>|<source>${GITHUB_WORKSPACE}/lynq-feeders</source>|" lynq-feeders/coverage.xml
 
+      - name: Download lynq-agent coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-lynq-agent
+          path: lynq-agent
+
+      - name: Point lynq-agent coverage at this workspace
+        run: |
+          sed -i -E "s|<source>.*</source>|<source>${GITHUB_WORKSPACE}/lynq-agent</source>|" lynq-agent/coverage.xml
+
       - name: Verify coverage reports are present
         run: |
           # A missing report makes the scanner report 0% coverage silently and
@@ -420,7 +472,8 @@ jobs:
                    lynq-file-storage/target/site/jacoco/jacoco.xml \
                    lynq-bff/target/site/jacoco/jacoco.xml \
                    lynq-ml/coverage.xml \
-                   lynq-feeders/coverage.xml; do
+                   lynq-feeders/coverage.xml \
+                   lynq-agent/coverage.xml; do
             if [ -s "$f" ]; then
               echo "✓ $f"
             else

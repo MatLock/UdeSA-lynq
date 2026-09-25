@@ -221,6 +221,8 @@ something to fix in the prompt: the loop is aimed at Nova Pro.
 | `BEDROCK_REGION` | `us-east-1` | Bedrock region |
 | `BEDROCK_MAX_TOKENS` | `4096` | Cap on a single completion |
 | `BEDROCK_TEMPERATURE` | `0` | Sampling temperature |
+| `BEDROCK_GUARDRAIL_ID` | _(empty)_ | Bedrock guardrail applied to every call; empty means none |
+| `BEDROCK_GUARDRAIL_VERSION` | `DRAFT` | Version of that guardrail |
 | `AGENT_LIVE_LLM` | `false` | Tests only: `true` runs the turns that need a real model |
 
 Token prices are not an environment variable: they live in `src/llm/pricing.py` per

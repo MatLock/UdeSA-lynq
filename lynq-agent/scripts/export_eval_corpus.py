@@ -41,9 +41,24 @@ def build_row(conversation: Conversation, current: ResumeVersion, salt: str) -> 
     }
 
 
+def safe_output_path(raw: str) -> str:
+    base = os.path.realpath(os.getcwd())
+    resolved = os.path.realpath(os.path.join(base, raw))
+    if os.path.commonpath([base, resolved]) != base:
+        raise ValueError(f"the corpus must be written inside {base}")
+    return resolved
+
+
+def write_rows(output_path: str, rows: list[dict]) -> int:
+    with open(output_path, "w", encoding="utf-8") as output:
+        for row in rows:
+            output.write(json.dumps(row, ensure_ascii=False) + "\n")
+    return len(rows)
+
+
 async def export(output_path: str, salt: str, only_applied: bool) -> int:
     session_factory = get_session_factory()
-    written = 0
+    rows: list[dict] = []
 
     async with session_factory() as session:
         query = select(Conversation).order_by(Conversation.created_on)
@@ -51,21 +66,19 @@ async def export(output_path: str, salt: str, only_applied: bool) -> int:
             query = query.where(Conversation.status == "APPLIED")
         conversations = (await session.scalars(query)).all()
 
-        with open(output_path, "w", encoding="utf-8") as output:
-            for conversation in conversations:
-                current = await session.scalar(
-                    select(ResumeVersion).where(
-                        ResumeVersion.conversation_id == conversation.id,
-                        ResumeVersion.is_current.is_(True),
-                    )
+        for conversation in conversations:
+            current = await session.scalar(
+                select(ResumeVersion).where(
+                    ResumeVersion.conversation_id == conversation.id,
+                    ResumeVersion.is_current.is_(True),
                 )
-                if current is None or current.version == 0:
-                    continue
+            )
+            if current is None or current.version == 0:
+                continue
 
-                row = build_row(conversation, current, salt)
-                output.write(json.dumps(row, ensure_ascii=False) + "\n")
-                written += 1
+            rows.append(build_row(conversation, current, salt))
 
+    written = write_rows(output_path, rows)
     await dispose_engine()
     return written
 
@@ -95,8 +108,13 @@ def main() -> None:
             "reversible by brute force over the user id space"
         )
 
-    written = asyncio.run(export(arguments.output, salt, arguments.only_applied))
-    print(f"{written} triples written to {arguments.output}")
+    try:
+        output_path = safe_output_path(arguments.output)
+    except ValueError as refusal:
+        parser.error(str(refusal))
+
+    written = asyncio.run(export(output_path, salt, arguments.only_applied))
+    print(f"{written} triples written to {output_path}")
 
 
 if __name__ == "__main__":

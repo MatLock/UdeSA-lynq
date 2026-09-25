@@ -4,7 +4,7 @@ import logging
 import os
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
 
 from prompt import bare_language
 
@@ -17,6 +17,7 @@ SUFFIX = ".jinja"
 
 _environment = Environment(
     loader=FileSystemLoader(TEMPLATE_DIR),
+    autoescape=select_autoescape(default=False, default_for_string=False),
     undefined=StrictUndefined,
     trim_blocks=True,
     lstrip_blocks=True,

@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         working-directory: lynq-agent
         run: |
-          python -m pip install --upgrade "pip==26.1.2"
+          python -m pip install --upgrade --only-binary :all: "pip==26.1.2"
           # requirements.txt is a full lock (pip-compile --generate-hashes from
           # requirements.in); --require-hashes makes the install reproducible.
           pip install --require-hashes --only-binary :all: --no-binary langdetect -r requirements.txt

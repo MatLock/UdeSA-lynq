@@ -49,7 +49,9 @@ class SettingsTest(unittest.TestCase):
 
     def test_the_settings_are_read_once_and_reused(self) -> None:
         with patch.dict("os.environ", {}, clear=True):
-            self.assertIs(get_settings(), get_settings())
+            first = get_settings()
+            second = get_settings()
+            self.assertIs(first, second)
 
 
 if __name__ == "__main__":

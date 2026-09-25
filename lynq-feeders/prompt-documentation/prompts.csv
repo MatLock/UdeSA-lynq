@@ -7,3 +7,4 @@ date,prompt
 "13-09-2026","the sonarcloud quality gate flags the computrabajo scraper regexes that read the relative date and the years of experience as super-linear backtracking. rewrite them so the digit run is bounded instead of relying on possessive quantifiers, keeping the parsed values and the tests unchanged"
 "13-09-2026","rename Rubro to category everywhere in the service. Rename the scraper/rubros.py module, the BumeranRubro/ComputrabajoRubro models, the bumeran_rubro/computrabajo_rubro lookups, the IngestOverrides and RunPlan fields (rubros, jobs_per_rubro) and the FEEDER_RUBROS / FEEDER_JOBS_PER_RUBRO environment variables, keeping the category values themselves untouched"
 "24-09-2026","bump the project version to 2.0.0-SNAPSHOT in the VERSION file"
+"24-09-2026","bump the project version to 2.0.1-SNAPSHOT in the VERSION file"
