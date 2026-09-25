@@ -42,6 +42,7 @@ lynq:
     secret-access-key: ${AWS_SECRET_ACCESS_KEY:test}
     bucket-name: ${AWS_BUCKET_NAME:lynq-bucket}
     endpoint: ${AWS_ENDPOINT:http://localhost:4566}
+    public-endpoint: ${AWS_PUBLIC_ENDPOINT:}
 
 
 server:

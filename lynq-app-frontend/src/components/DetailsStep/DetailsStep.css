@@ -30,7 +30,7 @@
 
 .details-field > label {
   color: var(--text-h);
-  font-size: 12px;
+  font-size: 13px;
   margin-left: var(--icon-col);
 }
 
@@ -45,8 +45,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
 }
 
@@ -71,10 +71,10 @@
   width: 100%;
   box-sizing: border-box;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-square);
   background: var(--bg);
   color: var(--text-h);
   outline: none;
@@ -82,15 +82,15 @@
 
 .details-field input:focus {
   border-color: var(--brand-purple);
-  box-shadow: 0 0 0 3px var(--accent-bg);
+  box-shadow: none;
 }
 
-.details-field input[aria-invalid='true'] {
+.details-field input[aria-invalid="true"] {
   border-color: var(--danger);
 }
 
-.details-field input[aria-invalid='true']:focus {
-  box-shadow: 0 0 0 3px var(--danger-ring);
+.details-field input[aria-invalid="true"]:focus {
+  box-shadow: none;
 }
 
 .details-input-wrap {
@@ -122,14 +122,14 @@
 
 .details-error {
   color: var(--danger-ink);
-  font-size: 11px;
+  font-size: 12px;
   margin: 0 0 0 var(--icon-col);
 }
 
 /* Positive availability line (green), aligned with the input like the error. */
 .details-ok {
   color: var(--success-ink);
-  font-size: 11px;
+  font-size: 12px;
   margin: 0 0 0 var(--icon-col);
 }
 

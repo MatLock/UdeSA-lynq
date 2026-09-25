@@ -44,14 +44,14 @@
 .resume-page-title {
   --lynq-logo-size: 1.15em;
   margin: 0;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 800;
   color: var(--text-h);
 }
 
 .resume-page-subtitle {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text);
 }
 
@@ -68,11 +68,11 @@
   gap: 6px;
   padding: 8px 16px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-square);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
   text-decoration: none;
   cursor: pointer;
@@ -108,13 +108,15 @@
   max-width: 280px;
   padding: 6px 8px 6px 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-chip);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
-  background: #fff;
+  background: var(--surface-raised);
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .resume-page-tab:hover {
@@ -124,7 +126,7 @@
 
 .resume-page-tab.active {
   border-color: transparent;
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
   font-weight: 600;
 }
@@ -139,15 +141,15 @@
 .resume-page-tab-language {
   flex: none;
   padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: var(--radius-chip);
+  font-size: 12px;
   font-weight: 700;
   color: var(--brand-purple-dark);
   background: var(--accent-bg);
 }
 
 .resume-page-tab.active .resume-page-tab-language {
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--overlay-light);
 }
 
@@ -180,7 +182,7 @@
   gap: 10px;
   min-height: 32px;
   padding-right: 4px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .resume-page-doc-date {
@@ -200,17 +202,20 @@
   gap: 6px;
   padding: 6px 14px;
   border: 1px solid var(--accent-border);
-  border-radius: 999px;
-  font-size: 12px;
+  border-radius: var(--radius-chip);
+  font-size: 13px;
   font-weight: 600;
   color: var(--brand-purple-dark);
-  background: #fff;
+  background: var(--surface-raised);
   text-decoration: none;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .resume-page-doc-download:hover {
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
   border-color: transparent;
 }
@@ -223,18 +228,21 @@
   gap: 6px;
   padding: 6px 14px;
   border: 1px solid var(--accent-border);
-  border-radius: 999px;
+  border-radius: var(--radius-chip);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--brand-purple-dark);
   background: var(--accent-bg);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .resume-page-doc-rename:hover {
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
   border-color: transparent;
 }
@@ -247,14 +255,17 @@
   gap: 6px;
   padding: 6px 14px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-chip);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text);
-  background: #fff;
+  background: var(--surface-raised);
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .resume-page-doc-delete:hover {
@@ -278,11 +289,11 @@
   margin: 0;
   padding: 40px;
   border: 1px dashed var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-square);
   text-align: center;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 /* ── States (loading, error) and the post-upload panel ──────────────────── */
@@ -298,7 +309,7 @@
 
 .resume-page-error {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--danger);
 }
 

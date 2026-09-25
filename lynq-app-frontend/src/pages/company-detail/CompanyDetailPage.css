@@ -23,7 +23,7 @@
   margin-bottom: 18px;
   padding: 0;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--brand-purple-dark);
   background: none;
@@ -41,9 +41,9 @@
   flex-direction: column;
   gap: 18px;
   padding: 28px 30px;
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-square);
   box-shadow: var(--shadow-panel);
   position: relative;
   overflow: hidden;
@@ -51,7 +51,7 @@
 
 /* A soft brand wash along the top edge to lift the hero above plain cards. */
 .company-detail-hero::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0 0 auto 0;
   height: 4px;
@@ -75,10 +75,10 @@
   height: 64px;
   flex-shrink: 0;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: var(--radius-square);
   background: var(--accent-bg);
   color: var(--brand-purple);
-  border: 2px solid #fff;
+  border: 2px solid var(--surface-raised);
   box-shadow: var(--shadow-raised);
 }
 
@@ -89,8 +89,8 @@
 }
 
 .company-detail-logo svg {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
 }
 
 .company-detail-hero-main {
@@ -103,7 +103,7 @@
 
 .company-detail-name {
   margin: 0;
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.4px;
@@ -115,7 +115,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
 }
 
@@ -153,9 +153,9 @@
 
 .company-detail-card {
   padding: 22px 24px;
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-square);
   box-shadow: var(--shadow-card);
 }
 
@@ -165,21 +165,21 @@
   justify-content: space-between;
   gap: 12px;
   margin: 0 0 14px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.2px;
   color: var(--text-h);
 }
 
 .company-detail-jobs-count {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--brand-blue-dark);
 }
 
 .company-detail-about {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.65;
   color: var(--text);
   white-space: pre-wrap;
@@ -187,7 +187,7 @@
 
 .company-detail-muted {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
 }
 
@@ -226,11 +226,9 @@
   scroll-snap-align: start;
   background: var(--accent-bg);
   border: 1px solid var(--accent-border);
-  border-radius: 14px;
+  border-radius: var(--radius-square);
   text-decoration: none;
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: transform 0.15s ease;
 }
 
 .company-detail-job-card:hover {
@@ -241,7 +239,7 @@
 /* Closed posts: muted surface + dashed border, with a red "Closed" badge so
    they read as inactive at a glance while staying clickable. */
 .company-detail-job-card.is-closed {
-  background: color-mix(in srgb, var(--accent-bg) 45%, #fff);
+  background: color-mix(in srgb, var(--accent-bg) 45%, var(--surface-raised));
   border-style: dashed;
 }
 
@@ -259,20 +257,20 @@
   top: 12px;
   right: 12px;
   padding: 3px 9px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--score-red);
-  border-radius: 999px;
-  box-shadow: 0 3px 8px rgb(var(--ink-rgb) / 0.12);
+  border-radius: var(--radius-chip);
+  box-shadow: none;
 }
 
 .company-detail-job-card-title {
   display: -webkit-box;
   overflow: hidden;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.3;
   color: var(--brand-purple-dark);
@@ -285,7 +283,7 @@
   display: -webkit-box;
   flex: 1;
   overflow: hidden;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--text);
   overflow-wrap: anywhere;
@@ -295,7 +293,7 @@
 
 .company-detail-job-card-cta {
   margin-top: auto;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--brand-blue-dark);
 }
@@ -313,7 +311,7 @@
   padding: 0;
   background: var(--accent-border);
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-chip);
   cursor: pointer;
   transition:
     width 0.15s ease,
@@ -337,15 +335,15 @@
   gap: 10px;
   padding: 64px 24px;
   text-align: center;
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-square);
   box-shadow: var(--shadow-panel);
 }
 
 .company-detail-empty-title {
   margin: 0;
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 700;
   color: var(--text-h);
 }
@@ -353,7 +351,7 @@
 .company-detail-empty-body {
   margin: 0;
   max-width: 420px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
   color: var(--text);
 }

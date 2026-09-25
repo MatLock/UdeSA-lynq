@@ -45,13 +45,15 @@ public class AppConfig {
       @Value("${lynq.aws.region}") String region,
       @Value("${lynq.aws.access-key-id}") String accessKeyId,
       @Value("${lynq.aws.secret-access-key}") String secretAccessKey,
-      @Value("${lynq.aws.endpoint:}") String endpoint) {
+      @Value("${lynq.aws.endpoint:}") String endpoint,
+      @Value("${lynq.aws.public-endpoint:}") String publicEndpoint) {
+    String endpointToSignAgainst = publicEndpoint.isBlank() ? endpoint : publicEndpoint;
     S3Presigner.Builder builder = S3Presigner.builder()
         .region(Region.of(region))
         .credentialsProvider(StaticCredentialsProvider.create(
             AwsBasicCredentials.create(accessKeyId, secretAccessKey)));
-    if (!endpoint.isBlank()) {
-      builder.endpointOverride(URI.create(endpoint))
+    if (!endpointToSignAgainst.isBlank()) {
+      builder.endpointOverride(URI.create(endpointToSignAgainst))
           .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());
     }
     return builder.build();

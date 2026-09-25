@@ -420,8 +420,18 @@ Two profiles ship with the project:
 | `AWS_SECRET_ACCESS_KEY` | S3 credentials                             | |
 | `AWS_BUCKET_NAME`       | Target bucket                              | |
 | `AWS_ENDPOINT`          | S3 endpoint override                       | empty = real AWS; set to LocalStack (`http://localstack:4566`) for local/dev |
+| `AWS_PUBLIC_ENDPOINT`   | S3 endpoint the pre-signed URLs point at   | empty = same as `AWS_ENDPOINT`; set it when the browser reaches S3 under a different name than this service does (`http://localhost:4566` against the Compose/k8s LocalStack) |
 
-When `AWS_ENDPOINT` is set, the S3 client and presigner switch to **path-style** access so LocalStack works transparently.
+When `AWS_ENDPOINT` is set, the S3 client and presigner switch to **path-style** access so
+LocalStack works transparently.
+
+`AWS_ENDPOINT` and `AWS_PUBLIC_ENDPOINT` exist because the two have different audiences. The
+first is the address **this service** uses to talk to S3; the second is the address baked into
+the **pre-signed URLs handed to the browser**. Against the Compose stack they differ:
+`localstack:4566` resolves on the Docker network and nowhere else, so a URL signed with it dies
+in the browser with `ERR_NAME_NOT_RESOLVED` — every avatar, logo and resume upload with it.
+Left empty, `AWS_PUBLIC_ENDPOINT` falls back to `AWS_ENDPOINT`, which is what real AWS wants:
+both empty, and the SDK signs against the real S3 host.
 
 Pre-signed URLs expire after **15 minutes** (`StorageService.PRE_SIGNED_URL_EXPIRATION`), and a batch is capped at **100** files per call.
 

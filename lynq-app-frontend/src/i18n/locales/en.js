@@ -15,7 +15,7 @@ const en = {
     orDivider: 'or',
     continueWith: 'Continue with',
     google: 'Google',
-    securityNote: 'Your data is protected. We use enterprise-grade encryption.',
+    securityNote: 'Your data will always be protected',
     errors: {
       identifierRequired: 'Enter your username or email',
       passwordRequired: 'Enter your password',
@@ -255,6 +255,7 @@ const en = {
     next: 'Next page',
   },
   sidebar: {
+    analytics: 'Analytics',
     collapse: 'Collapse menu',
     expand: 'Expand menu',
     avatarAlt: 'Profile picture',
@@ -269,6 +270,75 @@ const en = {
     logout: 'Logout',
   },
   pages: {
+    analytics: {
+      title: 'Analytics',
+      subtitle: 'What Lynq data can say about a search, a posting and a profile.',
+      shellNote: {
+        headline: 'There is no data to show yet.',
+        body: 'The cards below are the ones that will appear here, with their shape and computation level already decided. Each one is waiting for its endpoint in lynq-analytics; until then it states how much sample it has, which is none.',
+      },
+      candidate: [
+        {
+          key: 'standing',
+          title: 'Your position among the applicants',
+          where: 'CandidateStandingCard · JobDetailPage',
+          level: 'query',
+          whatIsMissing: 'Apply to a posting so there is a position to measure.',
+          thresholdReason: 'Below 5 applicants it is not shown: with fewer, every bar of the histogram identifies someone.',
+        },
+        {
+          key: 'benchmark',
+          title: 'Your position among profiles like yours',
+          where: 'PeerBenchmarkCard · AnalyticsPage',
+          level: 'snapshot',
+          whatIsMissing: 'Written by the 05:00 job, comparing you against candidates who share your similarity tags.',
+          thresholdReason: 'With fewer than 5 peers the percentile stays empty: that threshold is about privacy, not statistics.',
+        },
+        {
+          key: 'salary',
+          title: 'Your expected salary against the market',
+          where: 'SalaryInsightsCard · JobDetailPage',
+          level: 'query',
+          whatIsMissing: 'Set your expected salary in your profile, and we need similar postings that publish theirs.',
+          fallbackShown: 'Meanwhile the category median is shown, marked as such.',
+        },
+      ],
+      company: [
+        {
+          key: 'timeToFill',
+          title: 'How long a posting like yours takes to fill',
+          where: 'TimeToFillCard · MyJobPostsPage',
+          level: 'ingest',
+          whatIsMissing: 'It needs similar postings that already closed. External postings close when the feeder verifies they are gone.',
+          fallbackShown: 'The ones still open at day 25 are reported separately: they are censored data and do not enter the median.',
+        },
+        {
+          key: 'scoreSpread',
+          title: 'Affinity spread of your applicants',
+          where: 'JobCandidatesPage',
+          level: 'query',
+          whatIsMissing: 'Publish a posting and wait for applications.',
+          thresholdReason: 'Below 5 applicants it is not drawn: the spread says nothing and it identifies people.',
+        },
+        {
+          key: 'marketSalary',
+          title: 'Your salary range against the market',
+          where: 'SalaryInsightsCard · JobDetailPage',
+          level: 'query',
+          whatIsMissing: 'It needs similar postings publishing a salary in the same currency.',
+        },
+      ],
+      readiness: {
+        title: 'What each number is waiting for',
+        chart: 'Analytic', source: 'Reads from', level: 'Level', blockedBy: 'Blocked by',
+        rows: [
+          { chart: 'Position among applicants', source: 'applications', level: '2', levelKey: 'query', blockedBy: 'nothing: it works with today data' },
+          { chart: 'Time to fill', source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'verified closing of external postings' },
+          { chart: 'Salary against the market', source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'posting currency and candidate expected salary' },
+          { chart: 'Peer percentile', source: 'candidate_daily_benchmark', level: '3', levelKey: 'snapshot', blockedBy: 'the 05:00 job' },
+        ],
+      },
+    },
     profile: {
       title: 'Profile',
       subtitle: 'Manage your personal information',
@@ -750,6 +820,19 @@ const en = {
     open: 'Open calendar',
     previousMonth: 'Previous month',
     nextMonth: 'Next month',
+  },
+  ds: {
+    chartCard: { sample: (n) => `N = ${n}` },
+    emptyState: { sample: (n) => `N = ${n}` },
+    levels: { ingest: 'level 1', query: 'level 2', snapshot: 'level 3' },
+    numbers: {
+      jobAffinity: 'Your affinity with this posting',
+      standing: 'Your position among the applicants',
+      peerPercentile: 'Your position among profiles like yours',
+      marketFit: 'Your market fit',
+      jobMedian: 'Median for this posting',
+      asOfToday: 'as of today',
+    },
   },
 }
 

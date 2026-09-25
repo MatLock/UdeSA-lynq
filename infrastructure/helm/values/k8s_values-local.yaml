@@ -198,6 +198,7 @@ lynq_file_storage:
     AWS_REGION: us-east-1
     AWS_BUCKET_NAME: lynq-bucket
     AWS_ENDPOINT: http://localstack:4566
+    AWS_PUBLIC_ENDPOINT: http://localhost:4566
 
 lynq_iam:
   replicas: 1

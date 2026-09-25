@@ -9,9 +9,9 @@
   top: 0;
   padding: 14px;
   box-sizing: border-box;
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-square);
   box-shadow: var(--shadow-panel);
 }
 
@@ -32,14 +32,16 @@
   box-sizing: border-box;
   padding: 8px 10px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-square);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   text-align: left;
   color: var(--text);
   background: transparent;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .resume-nav-item:hover {
@@ -55,7 +57,7 @@
 /* The section currently in view: brand gradient bar, white content. */
 .resume-nav-item.active {
   background: var(--brand-gradient);
-  color: #fff;
+  color: var(--ink-on-action);
   font-weight: 600;
 }
 
@@ -64,16 +66,16 @@
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-square);
   background: var(--accent-blue-bg);
   color: var(--brand-blue-dark);
 }
 
 .resume-nav-item.active .resume-nav-icon {
   background: var(--overlay-light);
-  color: #fff;
+  color: var(--ink-on-action);
 }
 
 .resume-nav-label {
@@ -89,8 +91,8 @@
   flex: none;
   min-width: 20px;
   padding: 1px 6px;
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: var(--radius-chip);
+  font-size: 12px;
   font-weight: 700;
   text-align: center;
   color: var(--brand-purple-dark);
@@ -98,7 +100,7 @@
 }
 
 .resume-nav-item.active .resume-nav-count {
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--overlay-light);
 }
 

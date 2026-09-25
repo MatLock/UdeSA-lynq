@@ -27,7 +27,7 @@
 
 .owner-field > label {
   color: var(--text-h);
-  font-size: 12px;
+  font-size: 13px;
   margin-left: var(--icon-col);
 }
 
@@ -42,8 +42,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
 }
 
@@ -62,10 +62,10 @@
   min-width: 0;
   box-sizing: border-box;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-square);
   background: var(--bg);
   color: var(--text-h);
   outline: none;
@@ -73,16 +73,16 @@
 
 .owner-control > input:focus {
   border-color: var(--brand-purple);
-  box-shadow: 0 0 0 3px var(--accent-bg);
+  box-shadow: none;
 }
 
-.owner-control > input[aria-invalid='true'] {
+.owner-control > input[aria-invalid="true"] {
   border-color: var(--danger);
 }
 
 .owner-error {
   color: var(--danger-ink);
-  font-size: 11px;
+  font-size: 12px;
   margin: 0 0 0 var(--icon-col);
 }
 

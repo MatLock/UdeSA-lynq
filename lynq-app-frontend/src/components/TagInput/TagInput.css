@@ -22,8 +22,8 @@
   align-items: center;
   gap: 4px;
   padding: 3px 6px 3px 11px;
-  border-radius: 999px;
-  font-size: 12px;
+  border-radius: var(--radius-chip);
+  font-size: 13px;
 }
 
 .tag-input-chips.tone-blue .tag-input-chip {
@@ -53,9 +53,9 @@
 .tag-input-add {
   flex: none;
   padding: 6px 14px;
-  border-radius: 7px;
+  border-radius: var(--radius-square);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--brand-purple-dark);
   background: var(--accent-bg);

@@ -67,10 +67,10 @@
   height: 64px;
   padding: 0;
   border: none;
-  border-radius: 16px;
+  border-radius: var(--radius-square);
   overflow: hidden;
   background: var(--brand-gradient);
-  color: #fff;
+  color: var(--ink-on-action);
   cursor: pointer;
 }
 
@@ -86,8 +86,8 @@
 }
 
 .company-edit-logo svg {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
 }
 
 /* Pencil overlay — hidden until the logo is hovered or focused. */
@@ -98,7 +98,7 @@
   align-items: center;
   justify-content: center;
   background: var(--scrim);
-  color: #fff;
+  color: var(--ink-on-action);
   opacity: 0;
   transition: opacity 0.15s ease;
 }
@@ -139,7 +139,7 @@
 
 .company-edit-field > label {
   color: var(--text-h);
-  font-size: 11px;
+  font-size: 12px;
   margin-left: var(--icon-col);
 }
 
@@ -159,8 +159,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
 }
 
@@ -186,10 +186,10 @@
   width: 100%;
   box-sizing: border-box;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-square);
   background: var(--bg);
   color: var(--text-h);
   outline: none;
@@ -204,18 +204,18 @@
 .company-edit-field input:focus,
 .company-edit-textarea:focus {
   border-color: var(--brand-purple);
-  box-shadow: 0 0 0 3px var(--accent-bg);
+  box-shadow: none;
 }
 
 .company-edit-error {
   margin: 0 0 0 var(--icon-col);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--danger-ink);
 }
 
 .company-edit-hint {
   margin: 0 0 0 var(--icon-col);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text);
 }
 
@@ -225,11 +225,11 @@
   margin-top: 8px;
   padding: 9px 20px;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-square);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
   cursor: pointer;
   transition: opacity 0.15s ease;

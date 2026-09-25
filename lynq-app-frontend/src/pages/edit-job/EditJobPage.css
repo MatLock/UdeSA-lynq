@@ -1,7 +1,7 @@
 /* EditJobPage — job-post edit form. Reuses the create-job form design wholesale
    (fields, controls, actions) so the two forms stay visually identical; only a
    few edit-specific states are added below. */
-@import '../create-job/CreateJobPage.css';
+@import "../create-job/CreateJobPage.css";
 
 /* Centered loading state while the job is recovered on a direct hit. */
 .edit-job-state {

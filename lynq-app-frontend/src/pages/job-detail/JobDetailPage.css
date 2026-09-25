@@ -23,7 +23,7 @@
   align-items: center;
   gap: 6px;
   margin-bottom: 18px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--brand-purple-dark);
   text-decoration: none;
@@ -39,9 +39,9 @@
   align-items: flex-start;
   gap: 20px;
   padding: 26px 28px;
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-square);
   box-shadow: var(--shadow-panel);
 }
 
@@ -53,7 +53,7 @@
   height: 72px;
   flex-shrink: 0;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: var(--radius-square);
   background: var(--accent-bg);
   color: var(--brand-purple);
 }
@@ -65,8 +65,8 @@
 }
 
 .job-detail-logo svg {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
 }
 
 .job-detail-hero-main {
@@ -86,7 +86,7 @@
 
 .job-detail-title {
   margin: 0;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
   line-height: 1.25;
   letter-spacing: -0.4px;
@@ -98,7 +98,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
 }
 
@@ -116,13 +116,13 @@
   align-items: baseline;
   gap: 8px;
   margin-top: 2px;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--text-h);
 }
 
 .job-detail-hero-salary-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.4px;
@@ -154,12 +154,12 @@
 .job-detail-apply {
   padding: 11px 26px;
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-square);
   cursor: pointer;
   transition: opacity 0.15s ease;
 }
@@ -185,12 +185,12 @@
 .job-detail-stop {
   padding: 7px 16px;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--danger-dark);
-  background: #fff;
+  background: var(--surface-raised);
   border: 1.5px solid var(--danger);
-  border-radius: 8px;
+  border-radius: var(--radius-square);
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -199,7 +199,7 @@
 }
 
 .job-detail-stop:hover {
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--danger);
 }
 
@@ -210,7 +210,7 @@
 
 .job-detail-stop:disabled:hover {
   color: var(--danger-dark);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 /* Owner "re-open" action, shown when the post is closed — green counterpart to
@@ -218,12 +218,12 @@
 .job-detail-reopen {
   padding: 7px 16px;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--score-green);
-  background: #fff;
+  background: var(--surface-raised);
   border: 1.5px solid var(--score-green);
-  border-radius: 8px;
+  border-radius: var(--radius-square);
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -232,7 +232,7 @@
 }
 
 .job-detail-reopen:hover {
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--score-green);
 }
 
@@ -243,13 +243,13 @@
 
 .job-detail-reopen:disabled:hover {
   color: var(--score-green);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .job-detail-apply-status {
   margin: 0;
   max-width: 200px;
-  font-size: 12px;
+  font-size: 13px;
   text-align: right;
 }
 
@@ -282,15 +282,15 @@
 
 .job-detail-card {
   padding: 22px 24px;
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-square);
   box-shadow: var(--shadow-card);
 }
 
 .job-detail-card-title {
   margin: 0 0 14px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.2px;
   color: var(--text-h);
@@ -298,7 +298,7 @@
 
 .job-detail-description {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.65;
   color: var(--text);
   white-space: pre-wrap;
@@ -306,7 +306,7 @@
 
 .job-detail-muted {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
 }
 
@@ -332,14 +332,14 @@
 }
 
 .job-detail-fact dt {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text);
 }
 
 .job-detail-fact dd {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   text-align: right;
   color: var(--text-h);
@@ -367,7 +367,7 @@
 }
 
 .job-detail-entity-logo {
-  border-radius: 12px;
+  border-radius: var(--radius-square);
 }
 
 .job-detail-entity-avatar {
@@ -383,8 +383,8 @@
 
 .job-detail-entity-logo svg,
 .job-detail-entity-avatar svg {
-  width: 22px;
-  height: 22px;
+  width: 23px;
+  height: 23px;
 }
 
 .job-detail-entity-text {
@@ -395,19 +395,19 @@
 }
 
 .job-detail-entity-name {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-h);
 }
 
 .job-detail-entity-sub {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
 }
 
 .job-detail-about {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
   color: var(--text);
   white-space: pre-wrap;
@@ -417,7 +417,7 @@
   display: inline-flex;
   align-items: center;
   margin-top: 12px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--brand-blue-dark);
   text-decoration: none;
@@ -435,15 +435,15 @@
   gap: 10px;
   padding: 64px 24px;
   text-align: center;
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-square);
   box-shadow: var(--shadow-panel);
 }
 
 .job-detail-empty-title {
   margin: 0;
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 700;
   color: var(--text-h);
 }
@@ -451,7 +451,7 @@
 .job-detail-empty-body {
   margin: 0;
   max-width: 420px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
   color: var(--text);
 }

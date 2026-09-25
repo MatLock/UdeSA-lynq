@@ -81,8 +81,6 @@ const LoginPage = () => {
 
   return (
     <div className="login-bg">
-      <div className="login-dots login-dots-tl" />
-      <div className="login-dots login-dots-br" />
 
       <main className="login-card">
         <LynqTitle as="h1" className="login-title" text={t.title} placement="leading" />

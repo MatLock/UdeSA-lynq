@@ -30,7 +30,7 @@
   border: none;
   background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--brand-purple);
   cursor: pointer;
@@ -42,14 +42,14 @@
 
 .job-candidates-title {
   margin: 0;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 800;
   color: var(--text-h);
 }
 
 .job-candidates-subtitle {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text);
 }
 
@@ -57,12 +57,12 @@
   margin-top: 6px;
   align-self: flex-start;
   padding: 2px 12px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--brand-purple-dark);
   background: var(--accent-bg);
   border: 1px solid var(--accent-border);
-  border-radius: 999px;
+  border-radius: var(--radius-chip);
 }
 
 /* The list is the sole scrollable region — min-height:0 lets it shrink below its
@@ -104,9 +104,9 @@
   align-items: center;
   gap: 16px;
   padding: 16px 20px;
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-square);
   box-shadow: var(--shadow-hairline);
 }
 
@@ -130,8 +130,8 @@
 }
 
 .candidate-avatar svg {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
 }
 
 .candidate-main {
@@ -151,7 +151,7 @@
 }
 
 .candidate-name {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-h);
   text-decoration: none;
@@ -164,13 +164,13 @@ a.candidate-name:hover {
 
 .candidate-position {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
 }
 
 .candidate-applied {
   margin-top: 2px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
 }
 
@@ -185,12 +185,12 @@ a.candidate-name:hover {
   display: inline-flex;
   align-items: center;
   padding: 9px 18px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-square);
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
@@ -221,12 +221,12 @@ a.candidate-name:hover {
   gap: 6px;
   padding: 9px 16px;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-square);
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;

@@ -44,7 +44,7 @@
 
 .create-job-field > label {
   color: var(--text-h);
-  font-size: 11px;
+  font-size: 12px;
   margin-left: var(--icon-col);
 }
 
@@ -70,8 +70,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
 }
 
@@ -98,10 +98,10 @@
   width: 100%;
   box-sizing: border-box;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-square);
   background: var(--bg);
   color: var(--text-h);
   outline: none;
@@ -117,30 +117,30 @@
 .create-job-select:focus,
 .create-job-textarea:focus {
   border-color: var(--brand-purple);
-  box-shadow: 0 0 0 3px var(--accent-bg);
+  box-shadow: none;
 }
 
-.create-job-field input[aria-invalid='true'],
-.create-job-select[aria-invalid='true'],
-.create-job-textarea[aria-invalid='true'] {
+.create-job-field input[aria-invalid="true"],
+.create-job-select[aria-invalid="true"],
+.create-job-textarea[aria-invalid="true"] {
   border-color: var(--danger);
 }
 
-.create-job-field input[aria-invalid='true']:focus,
-.create-job-select[aria-invalid='true']:focus,
-.create-job-textarea[aria-invalid='true']:focus {
-  box-shadow: 0 0 0 3px var(--danger-ring);
+.create-job-field input[aria-invalid="true"]:focus,
+.create-job-select[aria-invalid="true"]:focus,
+.create-job-textarea[aria-invalid="true"]:focus {
+  box-shadow: none;
 }
 
 .create-job-error {
   margin: 0 0 0 var(--icon-col);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--danger-ink);
 }
 
 .create-job-hint {
   margin: 0 0 0 var(--icon-col);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text);
 }
 
@@ -156,9 +156,9 @@
 .create-job-submit {
   min-width: 140px;
   padding: 9px 20px;
-  border-radius: 10px;
+  border-radius: var(--radius-square);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s ease;
@@ -175,7 +175,7 @@
 }
 
 .create-job-submit {
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
   border: none;
 }

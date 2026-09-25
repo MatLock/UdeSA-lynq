@@ -32,7 +32,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-
 /* Collapsed: stack avatar above the toggle since the row won't fit the rail. */
 .sidebar-collapsed .sidebar-header {
   flex-direction: column;
@@ -58,13 +57,15 @@
   height: 28px;
   flex-shrink: 0;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-square);
   background: var(--bg);
   color: var(--brand-purple);
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .sidebar-toggle:hover {
@@ -90,14 +91,16 @@
   width: 100%;
   padding: 10px 10px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-square);
   background: transparent;
   color: var(--text);
-  font-size: 14px;
+  font-size: 15px;
   text-align: left;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .sidebar-item:hover {
@@ -119,19 +122,19 @@
 }
 
 .sidebar-item-icon {
-  font-size: 14.4px;
+  font-size: 15px;
   line-height: 1;
   flex-shrink: 0;
 }
 
 .sidebar-item-icon svg {
   display: block;
-  width: 14.4px;
-  height: 14.4px;
+  width: 15px;
+  height: 15px;
 }
 
 .sidebar-item-label {
-  font-size: 11.2px;
+  font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -141,13 +144,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
   border-radius: 50%;
   overflow: hidden;
   background: var(--brand-gradient);
-  color: #fff;
+  color: var(--ink-on-action);
 }
 
 .sidebar-avatar img {
@@ -157,14 +160,14 @@
 }
 
 .sidebar-avatar svg {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
 }
 
 .sidebar-username {
   flex: 1;
   min-width: 0;
-  font-size: 11.2px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-h);
   overflow: hidden;

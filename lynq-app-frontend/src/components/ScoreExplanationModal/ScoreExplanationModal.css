@@ -11,9 +11,9 @@
   margin: auto;
   padding: 0;
   color: inherit;
-  background: #fff;
+  background: var(--surface-raised);
   border: none;
-  border-radius: 16px;
+  border-radius: var(--radius-square);
   box-shadow: var(--shadow-dialog);
 }
 
@@ -39,7 +39,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 800;
   color: var(--brand-purple-dark);
 }
@@ -52,12 +52,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 23px;
   line-height: 1;
   color: var(--text);
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-square);
   cursor: pointer;
 }
 
@@ -68,7 +68,7 @@
 
 .score-modal-subject {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-h);
 }
@@ -81,7 +81,7 @@
 }
 
 .score-modal-error {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.55;
   color: var(--score-red);
   text-align: center;
@@ -104,7 +104,7 @@
   align-items: center;
   gap: 6px;
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -113,7 +113,7 @@
 
 .score-modal-explanation {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.55;
   color: var(--text-h);
   white-space: pre-line;
@@ -126,7 +126,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
   color: var(--text-h);
 }
@@ -139,11 +139,11 @@
   padding: 12px 14px;
   background: var(--accent-bg);
   border: 1px solid var(--accent-border);
-  border-radius: 12px;
+  border-radius: var(--radius-square);
 }
 
 .score-modal-query {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text-h);
 }
@@ -154,7 +154,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--text-h);
 }
@@ -173,7 +173,7 @@
 
 .score-modal-empty {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--text);
 }

@@ -9,13 +9,13 @@
 }
 
 .account-type-question {
-  font-size: 18px;
+  font-size: 19px;
   color: var(--text);
   margin: 0;
 }
 
 .account-type-helper {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text);
   margin: 2px 0 0;
 }
@@ -37,9 +37,9 @@
   gap: 12px;
   padding: 28px 24px;
   border: 1.5px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-square);
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .account-type-card:hover {
@@ -48,7 +48,7 @@
 
 .account-type-card.selected {
   border-color: var(--brand-purple);
-  box-shadow: 0 0 0 1px var(--brand-purple);
+  box-shadow: none;
 }
 
 /* Native radio is kept for accessibility but hidden; the visual is below. */
@@ -76,7 +76,7 @@
 }
 
 .account-type-card.selected .account-type-radio::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 3px;
   border-radius: 50%;
@@ -87,8 +87,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
+  width: 68px;
+  height: 68px;
   border-radius: 50%;
 }
 
@@ -103,13 +103,13 @@
 }
 
 .account-type-card-title {
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 500;
   color: var(--text-h);
 }
 
 .account-type-card-desc {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.4;
   color: var(--text);
 }
@@ -127,7 +127,7 @@
   justify-content: center;
   gap: 8px;
   margin: 20px 0 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
 }
 

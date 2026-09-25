@@ -2,6 +2,14 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import strings, { activeLocale, locales, setLocale } from '../../i18n'
 import useAuth from '../../hooks/useAuth'
+import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined'
+import PersonOutlineRoundedIcon from '@mui/icons-material/PersonOutlineRounded'
+import ApartmentOutlinedIcon from '@mui/icons-material/ApartmentOutlined'
+import CampaignOutlinedIcon from '@mui/icons-material/CampaignOutlined'
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
+import MarkEmailUnreadOutlinedIcon from '@mui/icons-material/MarkEmailUnreadOutlined'
+import LanguageOutlinedIcon from '@mui/icons-material/LanguageOutlined'
+import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined'
 import UserIcon from '../UserIcon/UserIcon'
 import './Sidebar.css'
 
@@ -27,6 +35,8 @@ const LogoutIcon = () => (
 // Collapsible left navigation bar. The menu adapts to the user type (candidate
 // vs company); each entry navigates to its section and the active route is
 // highlighted. Owns its collapsed/expanded state.
+const ANALYTICS_LINK_VISIBLE = false
+
 const Sidebar = () => {
   const t = strings.sidebar
   const { user, isCompany, logout } = useAuth()
@@ -37,17 +47,20 @@ const Sidebar = () => {
 
   const profileImageUrl = user?.profileImageUrl ?? null
   const items = [
-    { key: 'home', icon: '🏠', label: t.home, to: '/home' },
-    { key: 'profile', icon: '👤', label: t.profile, to: '/profile' },
+    { key: 'home', icon: <HomeOutlinedIcon />, label: t.home, to: '/home' },
+    { key: 'profile', icon: <PersonOutlineRoundedIcon />, label: t.profile, to: '/profile' },
     ...(isCompany
       ? [
-          { key: 'company', icon: '🏢', label: t.company, to: `/company/${user?.companyId}/edit` },
-          { key: 'jobPosts', icon: '📢', label: t.jobPosts, to: '/job/mine' },
+          { key: 'company', icon: <ApartmentOutlinedIcon />, label: t.company, to: `/company/${user?.companyId}/edit` },
+          { key: 'jobPosts', icon: <CampaignOutlinedIcon />, label: t.jobPosts, to: '/job/mine' },
         ]
       : [
-          { key: 'resume', icon: '📄', label: t.resume, to: '/my-resume' },
-          { key: 'applications', icon: '📨', label: t.applications, to: '/user/application' },
+          { key: 'resume', icon: <DescriptionOutlinedIcon />, label: t.resume, to: '/my-resume' },
+          { key: 'applications', icon: <MarkEmailUnreadOutlinedIcon />, label: t.applications, to: '/user/application' },
         ]),
+    ...(ANALYTICS_LINK_VISIBLE
+      ? [{ key: 'analytics', icon: <InsightsOutlinedIcon />, label: t.analytics, to: '/analytics' }]
+      : []),
   ]
 
   const localeCodes = Object.keys(locales)
@@ -108,7 +121,7 @@ const Sidebar = () => {
           title={t.language}
         >
           <span className="sidebar-item-icon" aria-hidden="true">
-            🌐
+            <LanguageOutlinedIcon />
           </span>
           {!collapsed && (
             <span className="sidebar-item-label">{activeLocale.toUpperCase()}</span>

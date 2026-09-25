@@ -28,3 +28,4 @@ date,prompt
 "23-09-2026","map the agent's 409 responses into the gateway envelope without dropping the code, so the browser can tell TURN_IN_PROGRESS, CONVERSATION_EXHAUSTED and ALREADY_APPLIED apart, and relay its 403 and 404 as themselves instead of a generic 502"
 "23-09-2026","add lynq.agent.url pointing at the agent with LYNQ_AGENT_URL as its override, and give the lynqAgent Feign client the same long read timeout as lynqMl, since a tailoring turn is a multi-step LLM loop"
 "23-09-2026","make sure POST /user/resume carries tailoredForJobId through to the app-backend when the browser sends it"
+"24-09-2026","bump the project version to 2.0.0-SNAPSHOT in the pom.xml"

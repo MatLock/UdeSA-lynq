@@ -32,7 +32,9 @@
   background: var(--bg);
   color: var(--text);
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .month-year-clear:hover {

@@ -23,11 +23,11 @@
   gap: 6px;
   padding: 5px 14px;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-chip);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
   cursor: pointer;
   transition: opacity 0.15s ease;
@@ -44,6 +44,6 @@
 
 .resume-employment-generate-hint {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text);
 }

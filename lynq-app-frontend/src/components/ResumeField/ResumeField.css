@@ -15,7 +15,7 @@
 
 .resume-field > label {
   color: var(--text-h);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .resume-field input,
@@ -24,10 +24,10 @@
   width: 100%;
   box-sizing: border-box;
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-square);
   background: var(--bg);
   color: var(--text-h);
   outline: none;
@@ -43,27 +43,27 @@
 .resume-field textarea:focus,
 .resume-field select:focus {
   border-color: var(--brand-purple);
-  box-shadow: 0 0 0 3px var(--accent-bg);
+  box-shadow: none;
 }
 
-.resume-field input[aria-invalid='true'],
-.resume-field textarea[aria-invalid='true'] {
+.resume-field input[aria-invalid="true"],
+.resume-field textarea[aria-invalid="true"] {
   border-color: var(--danger);
 }
 
-.resume-field input[aria-invalid='true']:focus,
-.resume-field textarea[aria-invalid='true']:focus {
-  box-shadow: 0 0 0 3px var(--danger-ring);
+.resume-field input[aria-invalid="true"]:focus,
+.resume-field textarea[aria-invalid="true"]:focus {
+  box-shadow: none;
 }
 
 .resume-field-hint {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text);
 }
 
 .resume-field-error {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--danger);
 }

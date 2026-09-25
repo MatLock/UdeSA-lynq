@@ -19,7 +19,7 @@
 
 .resume-group-title {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -32,19 +32,21 @@
   gap: 4px;
   padding: 4px 12px;
   border: 1px solid var(--accent-border);
-  border-radius: 999px;
+  border-radius: var(--radius-chip);
   font: inherit;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--brand-purple-dark);
   background: var(--accent-bg);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .resume-group-add:hover {
   background: var(--brand-gradient);
-  color: #fff;
+  color: var(--ink-on-action);
   border-color: transparent;
 }
 
@@ -53,8 +55,8 @@
   margin: 0;
   padding: 14px;
   border: 1px dashed var(--border);
-  border-radius: 12px;
-  font-size: 12px;
+  border-radius: var(--radius-square);
+  font-size: 13px;
   text-align: center;
   color: var(--text);
 }
