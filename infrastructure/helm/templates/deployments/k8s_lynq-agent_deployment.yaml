@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lynq-agent-deployment
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-agent
+spec:
+  replicas: {{ .Values.lynq_agent.replicas }}
+  selector:
+    matchLabels:
+      app: lynq-agent
+  template:
+    metadata:
+      labels:
+        app: lynq-agent
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-secret
+      {{- if .Values.localInfra }}
+      # Local only: the container runs Liquibase against lynq_agent_db before
+      # serving, so it must not start before MySQL answers.
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -w 2 mysql 3306 </dev/null; do echo "waiting for mysql:3306"; sleep 2; done']
+        {{- if .Values.ollamaInCluster }}
+        - name: wait-for-ollama
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -w 2 ollama 11434 </dev/null; do echo "waiting for ollama:11434"; sleep 2; done']
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: lynq-agent
+          image: {{ .Values.lynq_agent.image }}
+          {{- with .Values.lynq_agent.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: lynq-agent-config
+            - secretRef:
+                name: lynq-agent-secret
+          ports:
+            - name: http
+              containerPort: 8090
+          livenessProbe:
+            httpGet:
+              path: /lynq-agent/health
+              port: http
+            # Higher than the other Python services: the first start migrates the
+            # schema with Liquibase before the app answers.
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /lynq-agent/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3

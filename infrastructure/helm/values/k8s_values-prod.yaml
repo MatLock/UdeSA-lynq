@@ -31,6 +31,14 @@ k8s_namespace: prod
 #   lynq-ml-secret              (Opaque)
 #     AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   (only if LLM_PROVIDER=bedrock;
 #                                                 omit if using IRSA)
+#
+#   lynq-agent-secret           (Opaque)
+#     DB_URL                    -> full SQLAlchemy URL, credentials included:
+#                                  mysql+aiomysql://<user>:<pass>@<host>:3306/lynq_agent_db
+#                                  (the agent takes one URL, not a user/password pair,
+#                                  which is why it is a secret and not ConfigMap data)
+#     AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   (only if LLM_PROVIDER=bedrock;
+#                                                 omit if using IRSA)
 manageSecrets: false
 
 # Terraform creates the namespace (so the external Secrets can be placed in it
@@ -95,6 +103,51 @@ lynq_ml:
     UDEMY_BASE_URL: https://www.udemy.com
     COURSE_SEARCH_TIMEOUT: "15"
 
+lynq_agent:
+  replicas: 1
+  image: matlock0o/lynq:lynq-agent-2.0.2-SNAPSHOT
+  # Unused in prod: DB_URL comes whole from the external lynq-agent-secret, so
+  # there is no host to interpolate here. Kept so both values files share a shape.
+  dbHost: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      memory: 768Mi
+  config:
+    PORT: "8090"
+    HOST: "0.0.0.0"
+    DB_MIGRATE_ON_STARTUP: "true"
+    LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
+    ML_TIMEOUT: "300"
+    LYNQ_AGENT_SYSTEM_USER_ID: 00000000-0000-0000-0000-0000000a6e17
+    # Both limits are copied onto each conversation row at creation, so changing
+    # them here never rewrites a conversation already under way.
+    AGENT_MAX_STEPS: "12"
+    AGENT_MAX_TURNS: "10"
+    # Operational, never copied onto the row: how long a turn may stay RUNNING
+    # before another turn treats it as a dead process. Must stay above the 310s
+    # Feign read timeout of lynq-bff, so the agent decides the cutoff.
+    AGENT_TURN_TIMEOUT: "600"
+    AGENT_JOB_DESCRIPTION_MAX_CHARS: "6000"
+    AGENT_HOUSEKEEPING_ENABLED: "true"
+    AGENT_HOUSEKEEPING_INTERVAL: "3600"
+    AGENT_ABANDON_AFTER_DAYS: "7"
+    AGENT_TRACE_TTL_DAYS: "30"
+    AGENT_CONVERSATION_TTL_DAYS: "180"
+    LLM_PROVIDER: bedrock
+    OLLAMA_BASE_URL: "REPLACE_OLLAMA_BASE_URL"
+    OLLAMA_MODEL: qwen2.5:7b
+    # The loop is meant for Nova Pro (amazon.nova-pro-v1:0); Nova Lite loses the
+    # thread on multi-step tool use.
+    BEDROCK_MODEL_ID: "REPLACE_AGENT_BEDROCK_MODEL_ID"
+    BEDROCK_REGION: "REPLACE_BEDROCK_REGION"
+    BEDROCK_MAX_TOKENS: "4096"
+    BEDROCK_TEMPERATURE: "0"
+    BEDROCK_GUARDRAIL_ID: ""
+    BEDROCK_GUARDRAIL_VERSION: DRAFT
+
 lynq_feeders:
   replicas: 1
   image: matlock0o/lynq:lynq-feeders-2.0.2-SNAPSHOT
@@ -145,6 +198,7 @@ lynq_bff:
     LYNQ_BACKEND_URL: http://lynq-app-backend-service:8080/lynq-backend-app
     LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
     LYNQ_FILE_STORAGE_URL: http://lynq-file-storage-service:8080/lynq-file-storage
+    LYNQ_AGENT_URL: http://lynq-agent-service:8090/lynq-agent
 
 lynq_app_backend:
   replicas: 1

@@ -67,6 +67,9 @@ jobs:
       - name: Bump lynq-feeders (python) version
         run: echo "${{ steps.resolve.outputs.version }}" > lynq-feeders/VERSION
 
+      - name: Bump lynq-agent (python) version
+        run: echo "${{ steps.resolve.outputs.version }}" > lynq-agent/VERSION
+
       - name: Bump Helm chart appVersion
         run: |
           # Mirror the released tag into the Helm chart's appVersion, matching
@@ -91,7 +94,7 @@ jobs:
       - name: Commit version bump back to main
         uses: ./.github/actions/commit-to-main
         with:
-          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-ml/VERSION lynq-feeders/VERSION infrastructure/helm/Chart.yaml .github/badges/version.svg
+          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-ml/VERSION lynq-feeders/VERSION lynq-agent/VERSION infrastructure/helm/Chart.yaml .github/badges/version.svg
           message: "chore: set release version ${{ steps.resolve.outputs.version }} [skip ci]"
 
   # ===========================================================================
@@ -536,7 +539,7 @@ jobs:
   push-images:
     name: "4 · Push Docker images"
     runs-on: ubuntu-latest
-    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-ml, build-lynq-feeders, sonar-scan]
+    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-ml, build-lynq-feeders, build-lynq-agent, sonar-scan]
     steps:
       - name: Code Checkout
         uses: actions/checkout@v5
@@ -622,6 +625,14 @@ jobs:
           push: true
           tags: ${{ env.DOCKER_NAMESPACE }}:lynq-feeders-${{ needs.set-version.outputs.version }}
 
+      - name: Build and push lynq-agent image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: lynq-agent
+          file: lynq-agent/Dockerfile
+          push: true
+          tags: ${{ env.DOCKER_NAMESPACE }}:lynq-agent-${{ needs.set-version.outputs.version }}
+
       - name: Build and push lynq-app-frontend image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
@@ -680,6 +691,12 @@ jobs:
           name: coverage-lynq-feeders
           path: coverage/lynq-feeders
 
+      - name: Download lynq-agent coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-lynq-agent
+          path: coverage/lynq-agent
+
       - name: Extract coverage percentages
         id: coverage
         run: |
@@ -706,6 +723,8 @@ jobs:
           ML_BRANCH="$(rate coverage/lynq-ml/coverage.xml branch-rate)"
           FEEDERS_LINE="$(rate coverage/lynq-feeders/coverage.xml line-rate)"
           FEEDERS_BRANCH="$(rate coverage/lynq-feeders/coverage.xml branch-rate)"
+          AGENT_LINE="$(rate coverage/lynq-agent/coverage.xml line-rate)"
+          AGENT_BRANCH="$(rate coverage/lynq-agent/coverage.xml branch-rate)"
           {
             echo "iam_instruction=$IAM_INSTR"
             echo "iam_line=$IAM_LINE"
@@ -723,6 +742,8 @@ jobs:
             echo "ml_branch=$ML_BRANCH"
             echo "feeders_line=$FEEDERS_LINE"
             echo "feeders_branch=$FEEDERS_BRANCH"
+            echo "agent_line=$AGENT_LINE"
+            echo "agent_branch=$AGENT_BRANCH"
           } >> "$GITHUB_OUTPUT"
 
       - name: Append coverage & Sonar summary to release notes
@@ -745,6 +766,8 @@ jobs:
           ML_BRANCH: ${{ steps.coverage.outputs.ml_branch }}
           FEEDERS_LINE: ${{ steps.coverage.outputs.feeders_line }}
           FEEDERS_BRANCH: ${{ steps.coverage.outputs.feeders_branch }}
+          AGENT_LINE: ${{ steps.coverage.outputs.agent_line }}
+          AGENT_BRANCH: ${{ steps.coverage.outputs.agent_branch }}
           SONAR_GATE: ${{ needs.sonar-scan.outputs.gate }}
           SONAR_BUGS: ${{ needs.sonar-scan.outputs.bugs }}
           SONAR_VULNS: ${{ needs.sonar-scan.outputs.vulnerabilities }}
@@ -804,7 +827,12 @@ jobs:
             printf '| Metric | Coverage |\n'
             printf '| --- | --- |\n'
             printf '| Lines | %s%% |\n' "$FEEDERS_LINE"
-            printf '| Branches | %s%% |\n' "$FEEDERS_BRANCH"
+            printf '| Branches | %s%% |\n\n' "$FEEDERS_BRANCH"
+            printf '## Test coverage (lynq-agent)\n\n'
+            printf '| Metric | Coverage |\n'
+            printf '| --- | --- |\n'
+            printf '| Lines | %s%% |\n' "$AGENT_LINE"
+            printf '| Branches | %s%% |\n' "$AGENT_BRANCH"
           } > /tmp/notes.md
           gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file /tmp/notes.md
 
@@ -819,12 +847,14 @@ jobs:
           (cd coverage/lynq-bff && zip -qr /tmp/jacoco-report-bff.zip .)
           cp coverage/lynq-ml/coverage.xml /tmp/coverage-lynq-ml.xml
           cp coverage/lynq-feeders/coverage.xml /tmp/coverage-lynq-feeders.xml
+          cp coverage/lynq-agent/coverage.xml /tmp/coverage-lynq-agent.xml
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-iam.zip --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-app-backend.zip --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-file-storage.zip --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/jacoco-report-bff.zip --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/coverage-lynq-ml.xml --clobber
           gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/coverage-lynq-feeders.xml --clobber
+          gh release upload "$TAG" -R "$GITHUB_REPOSITORY" /tmp/coverage-lynq-agent.xml --clobber
 
   # ===========================================================================
   # Stage 6 — Point the Helm values at the images just built and pushed in
@@ -856,7 +886,7 @@ jobs:
           # image in both values files to the version pushed in stage 4.
           for f in infrastructure/helm/values/k8s_values-local.yaml \
                    infrastructure/helm/values/k8s_values-prod.yaml; do
-            sed -i -E "s#(image: ${DOCKER_NAMESPACE}:lynq-(iam|app-backend|app-frontend|file-storage|bff|ml|feeders)-).*#\1${VERSION}#" "$f"
+            sed -i -E "s#(image: ${DOCKER_NAMESPACE}:lynq-(iam|app-backend|app-frontend|file-storage|bff|ml|feeders|agent)-).*#\1${VERSION}#" "$f"
           done
 
       - name: Commit Helm image tag bump to main
@@ -936,6 +966,9 @@ jobs:
       - name: Bump lynq-feeders (python) version
         run: echo "${{ steps.next.outputs.version }}" > lynq-feeders/VERSION
 
+      - name: Bump lynq-agent (python) version
+        run: echo "${{ steps.next.outputs.version }}" > lynq-agent/VERSION
+
       - name: Bump Helm chart appVersion
         run: |
           sed -i -E "s/^appVersion:.*/appVersion: \"${{ steps.next.outputs.version }}\"/" infrastructure/helm/Chart.yaml
@@ -943,5 +976,5 @@ jobs:
       - name: Commit next development version to main
         uses: ./.github/actions/commit-to-main
         with:
-          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-ml/VERSION lynq-feeders/VERSION infrastructure/helm/Chart.yaml
+          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-ml/VERSION lynq-feeders/VERSION lynq-agent/VERSION infrastructure/helm/Chart.yaml
           message: "chore: prepare next development version ${{ steps.next.outputs.version }} [skip ci]"

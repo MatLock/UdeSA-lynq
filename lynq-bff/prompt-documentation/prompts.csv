@@ -30,3 +30,5 @@ date,prompt
 "23-09-2026","make sure POST /user/resume carries tailoredForJobId through to the app-backend when the browser sends it"
 "24-09-2026","bump the project version to 2.0.0-SNAPSHOT in the pom.xml"
 "24-09-2026","bump the project version to 2.0.1-SNAPSHOT in the pom.xml"
+"25-09-2026","the service reads LYNQ_AGENT_URL from application.yaml but the local stack never sets it, so it only works by falling back to the default: declare it in docker compose and add a depends_on so the gateway does not start before the service it calls"
+"25-09-2026","add LYNQ_AGENT_URL to the service config in both Helm values files, pointing at the in-cluster agent service, so the deployed gateway does not depend on the compiled-in default either"
