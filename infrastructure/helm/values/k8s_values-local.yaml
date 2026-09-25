@@ -75,7 +75,7 @@ ingress:
 #     --set lynq_app_frontend.image=lynq-app-frontend:local
 lynq_app_frontend:
   replicas: 1
-  image: matlock0o/lynq:lynq-app-frontend-1.1.0-SNAPSHOT
+  image: matlock0o/lynq:lynq-app-frontend-2.0.2-SNAPSHOT
   resources:
     requests:
       cpu: 10m
@@ -85,7 +85,7 @@ lynq_app_frontend:
 
 lynq_ml:
   replicas: 1
-  image: matlock0o/lynq:lynq-ml-1.1.0-SNAPSHOT
+  image: matlock0o/lynq:lynq-ml-2.0.2-SNAPSHOT
   resources:
     requests:
       cpu: 100m
@@ -115,7 +115,7 @@ lynq_ml:
 
 lynq_feeders:
   replicas: 1
-  image: matlock0o/lynq:lynq-feeders-1.1.0-SNAPSHOT
+  image: matlock0o/lynq:lynq-feeders-2.0.2-SNAPSHOT
   resources:
     requests:
       cpu: 50m
@@ -149,7 +149,7 @@ lynq_feeders:
 
 lynq_bff:
   replicas: 1
-  image: matlock0o/lynq:lynq-bff-1.1.0-SNAPSHOT
+  image: matlock0o/lynq:lynq-bff-2.0.2-SNAPSHOT
   resources:
     requests:
       cpu: 100m
@@ -166,7 +166,7 @@ lynq_bff:
 
 lynq_app_backend:
   replicas: 1
-  image: matlock0o/lynq:lynq-app-backend-1.1.0-SNAPSHOT
+  image: matlock0o/lynq:lynq-app-backend-2.0.2-SNAPSHOT
   resources:
     requests:
       cpu: 100m
@@ -185,7 +185,7 @@ lynq_app_backend:
 # file metadata all live here.
 lynq_file_storage:
   replicas: 1
-  image: matlock0o/lynq:lynq-file-storage-1.1.0-SNAPSHOT
+  image: matlock0o/lynq:lynq-file-storage-2.0.2-SNAPSHOT
   resources:
     requests:
       cpu: 100m
@@ -202,7 +202,7 @@ lynq_file_storage:
 
 lynq_iam:
   replicas: 1
-  image: matlock0o/lynq:lynq-iam-1.1.0-SNAPSHOT
+  image: matlock0o/lynq:lynq-iam-2.0.2-SNAPSHOT
   resources:
     requests:
       cpu: 100m
