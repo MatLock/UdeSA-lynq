@@ -165,3 +165,4 @@ date,prompt
 "24-09-2026","for an external posting show a screen that says the tailored CV was saved and what is going to happen, and on the button open job.jobUrl with window.open first and synchronously, then download the PDF and only then register the application, so the popup is not blocked"
 "24-09-2026","add an ""Aplicar con CV Tailor"" button next to ""Postularme"" in JobHeroSide of JobDetailPage.jsx, with the same applyDisabled, and put every string of the dialog under jobDetail.tailorDialog in es.js and en.js"
 "24-09-2026","bump the project version to 2.0.1-SNAPSHOT in package.json"
+"25-09-2026","in useTailorConversation.js replace the Math.random fallback of the turn key with a crypto.getRandomValues hex suffix, so the sonar rule javascript:S2245 stops flagging a pseudorandom generator"
