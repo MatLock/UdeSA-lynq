@@ -4,7 +4,7 @@ import os
 import sys
 import tempfile
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
@@ -101,7 +101,7 @@ class TemporaryDatabase:
 
 
 def new_conversation(age_days: int = 0, **overrides) -> Conversation:
-    moment = datetime(2026, 9, 19, 12, 0, 0) - timedelta(days=age_days)
+    moment = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=age_days)
     values = dict(
         id=str(uuid.uuid4()),
         user_id="user-1",
