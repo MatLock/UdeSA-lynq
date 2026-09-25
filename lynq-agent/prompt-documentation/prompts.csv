@@ -77,3 +77,4 @@ date,prompt
 "24-09-2026","rewrite the five assertions that compare a call with itself (the settings, engine, session factory and ml client singletons, and the salted hash) so the two sides are named variables: the assertion stays the same but sonar stops reading it as a bug"
 "24-09-2026","install pip itself with --only-binary :all: in the test workflow so no setup script runs on the upgrade"
 "24-09-2026","the release workflow never ran the agent's tests, so sonar saw the whole module as uncovered new code and the gate failed on coverage: add a build & test job for it that uploads coverage.xml, make the sonar job wait for it, download the report, rewrite its <source> path and add it to the check that fails when a report is missing"
+"24-09-2026","bump the project version to 2.0.1-SNAPSHOT in the VERSION file"

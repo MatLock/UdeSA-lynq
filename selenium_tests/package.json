@@ -1,6 +1,6 @@
 {
   "name": "lynq-selenium-tests",
-  "version": "2.0.0-SNAPSHOT",
+  "version": "2.0.1-SNAPSHOT",
   "private": true,
   "type": "module",
   "description": "LYNQ end-to-end tests with Selenium WebDriver",
