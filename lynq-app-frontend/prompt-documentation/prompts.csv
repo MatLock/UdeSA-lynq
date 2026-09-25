@@ -164,3 +164,4 @@ date,prompt
 "24-09-2026","on confirming, chain preview_resume, create_resume with tailoredForJobId, assign_alias with ""<job> — <company>"" and tailor_apply. if the modal is closed after the preview and before the resume is created, drop the file with delete_resume_preview, and ask with ConfirmDialog before throwing away a conversation with changes"
 "24-09-2026","for an external posting show a screen that says the tailored CV was saved and what is going to happen, and on the button open job.jobUrl with window.open first and synchronously, then download the PDF and only then register the application, so the popup is not blocked"
 "24-09-2026","add an ""Aplicar con CV Tailor"" button next to ""Postularme"" in JobHeroSide of JobDetailPage.jsx, with the same applyDisabled, and put every string of the dialog under jobDetail.tailorDialog in es.js and en.js"
+"24-09-2026","bump the project version to 2.0.1-SNAPSHOT in package.json"
