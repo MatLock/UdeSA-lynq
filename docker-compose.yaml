@@ -78,6 +78,7 @@ services:
       - LYNQ_BACKEND_URL=http://lynq-app-backend:8080/lynq-backend-app
       - LYNQ_ML_URL=http://lynq-ml:8084/lynq-ml
       - LYNQ_FILE_STORAGE_URL=http://lynq-file-storage:8080/lynq-file-storage
+      - LYNQ_AGENT_URL=http://lynq-agent:8090/lynq-agent
     depends_on:
       lynq-iam:
         condition: service_started
@@ -86,6 +87,8 @@ services:
       lynq-file-storage:
         condition: service_started
       lynq-ml:
+        condition: service_started
+      lynq-agent:
         condition: service_started
 
   lynq-app-frontend:

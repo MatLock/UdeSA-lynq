@@ -86,3 +86,27 @@ jobs:
         with:
           files: .github/badges/coverage-agent.svg
           message: "chore: update lynq-agent coverage badge [skip ci]"
+
+  # The image is where the two things the unit tests cannot see are checked: the
+  # Dockerfile itself, and that requirements.txt still installs under
+  # --require-hashes. Both only ever failed at release time before this job.
+  # Built, never pushed: publishing is the release workflow's job.
+  docker-build:
+    name: "lynq-agent: Docker build"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Buildx with the docker-container driver
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build the image without pushing it
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: lynq-agent
+          file: lynq-agent/Dockerfile
+          push: false
+          tags: lynq-agent:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
