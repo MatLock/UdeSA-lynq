@@ -3,4 +3,4 @@ name: lynq
 description: Helm chart for the lynq platform (iam, backend, ml), its config/secrets, ingress, and optional local infra (mysql, redis, localstack, ollama).
 type: application
 version: 0.1.0
-appVersion: "2.1.0-SNAPSHOT"
+appVersion: "2.1.1-SNAPSHOT"
