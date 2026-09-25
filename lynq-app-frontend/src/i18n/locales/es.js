@@ -15,7 +15,7 @@ const es = {
     orDivider: 'ó',
     continueWith: 'Continuar con',
     google: 'Google',
-    securityNote: 'Tus datos están protegidos. Usamos cifrado de nivel empresarial.',
+    securityNote: 'Tus datos siempre estarán protegidos',
     errors: {
       identifierRequired: 'Ingresá tu usuario o email',
       passwordRequired: 'Ingresá tu contraseña',
@@ -255,6 +255,7 @@ const es = {
     next: 'Página siguiente',
   },
   sidebar: {
+    analytics: 'Analíticas',
     collapse: 'Contraer menú',
     expand: 'Expandir menú',
     avatarAlt: 'Foto de perfil',
@@ -269,6 +270,75 @@ const es = {
     logout: 'Cerrar sesión',
   },
   pages: {
+    analytics: {
+      title: 'Analíticas',
+      subtitle: 'Lo que los datos de Lynq pueden decir sobre una búsqueda, un aviso y un perfil.',
+      shellNote: {
+        headline: 'Todavía no hay datos que mostrar.',
+        body: 'Las tarjetas de abajo son las que van a aparecer acá, con su forma y su nivel de cálculo ya definidos. Cada una espera su endpoint en lynq-analytics; mientras tanto declara cuánta muestra tiene, que es cero.',
+      },
+      candidate: [
+        {
+          key: 'standing',
+          title: 'Tu posición entre los postulantes',
+          where: 'CandidateStandingCard · JobDetailPage',
+          level: 'query',
+          whatIsMissing: 'Postulate a un aviso para tener una posición que medir.',
+          thresholdReason: 'Debajo de 5 postulantes no se muestra: con menos, cada punto del histograma identifica a alguien.',
+        },
+        {
+          key: 'benchmark',
+          title: 'Tu posición entre perfiles parecidos al tuyo',
+          where: 'PeerBenchmarkCard · AnalyticsPage',
+          level: 'snapshot',
+          whatIsMissing: 'Lo escribe el job de las 05:00 comparándote con candidatos que comparten tus similarity tags.',
+          thresholdReason: 'Con menos de 5 pares el percentil queda vacío: es un umbral de privacidad, no estadístico.',
+        },
+        {
+          key: 'salary',
+          title: 'Tu salario esperado contra el mercado',
+          where: 'SalaryInsightsCard · JobDetailPage',
+          level: 'query',
+          whatIsMissing: 'Cargá tu salario esperado en el perfil y necesitamos avisos parecidos que publiquen el suyo.',
+          fallbackShown: 'Mientras tanto se muestra la mediana de la categoría, marcada como tal.',
+        },
+      ],
+      company: [
+        {
+          key: 'timeToFill',
+          title: 'Cuánto tarda en cubrirse un aviso como el tuyo',
+          where: 'TimeToFillCard · MyJobPostsPage',
+          level: 'ingest',
+          whatIsMissing: 'Hacen falta avisos parecidos ya cerrados. Los avisos externos se cierran cuando el feeder verifica que dejaron de estar publicados.',
+          fallbackShown: 'Los que siguieron abiertos a los 25 días se reportan aparte: son dato censurado y no entran a la mediana.',
+        },
+        {
+          key: 'scoreSpread',
+          title: 'Distribución de afinidad de tus postulantes',
+          where: 'JobCandidatesPage',
+          level: 'query',
+          whatIsMissing: 'Publicá un aviso y esperá a que se postulen.',
+          thresholdReason: 'Debajo de 5 postulantes no se dibuja: la distribución no dice nada y se identifica a la gente.',
+        },
+        {
+          key: 'marketSalary',
+          title: 'Tu rango salarial contra el mercado',
+          where: 'SalaryInsightsCard · JobDetailPage',
+          level: 'query',
+          whatIsMissing: 'Hacen falta avisos parecidos que publiquen salario en la misma moneda.',
+        },
+      ],
+      readiness: {
+        title: 'Qué falta para que cada número exista',
+        chart: 'Analítica', source: 'Lee de', level: 'Nivel', blockedBy: 'Bloqueada por',
+        rows: [
+          { chart: 'Posición entre postulantes', source: 'applications', level: '2', levelKey: 'query', blockedBy: 'nada: sale con los datos de hoy' },
+          { chart: 'Time to fill', source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'cierre verificado de avisos externos' },
+          { chart: 'Salario contra el mercado', source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'moneda del aviso y salario esperado del candidato' },
+          { chart: 'Percentil entre pares', source: 'candidate_daily_benchmark', level: '3', levelKey: 'snapshot', blockedBy: 'el job de las 05:00' },
+        ],
+      },
+    },
     profile: {
       title: 'Perfil',
       subtitle: 'Gestioná tu información personal',
@@ -750,6 +820,19 @@ const es = {
     open: 'Abrir calendario',
     previousMonth: 'Mes anterior',
     nextMonth: 'Mes siguiente',
+  },
+  ds: {
+    chartCard: { sample: (n) => `N = ${n}` },
+    emptyState: { sample: (n) => `N = ${n}` },
+    levels: { ingest: 'nivel 1', query: 'nivel 2', snapshot: 'nivel 3' },
+    numbers: {
+      jobAffinity: 'Tu afinidad con este aviso',
+      standing: 'Tu posición entre los postulantes',
+      peerPercentile: 'Tu posición entre perfiles parecidos al tuyo',
+      marketFit: 'Tu fit de mercado',
+      jobMedian: 'Mediana del aviso',
+      asOfToday: 'al día de hoy',
+    },
   },
 }
 

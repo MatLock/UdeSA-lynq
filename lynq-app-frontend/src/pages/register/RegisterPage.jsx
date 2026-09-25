@@ -11,8 +11,6 @@ const RegisterPage = () => {
 
   return (
     <div className="register-bg">
-      <div className="register-dots register-dots-tr" />
-      <div className="register-dots register-dots-bl" />
 
       <main className="register-card">
         <LynqTitle className="register-logo" text="LYNQ" />

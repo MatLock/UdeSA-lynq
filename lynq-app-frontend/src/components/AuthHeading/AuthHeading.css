@@ -8,7 +8,7 @@
 }
 
 .auth-heading-title {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.5px;
@@ -19,12 +19,12 @@
 .auth-heading-subtitle {
   color: var(--text);
   font-style: italic;
-  font-size: 13px;
+  font-size: 14px;
   margin: 4px 0 0;
 }
 
 @media (max-width: 640px) {
   .auth-heading-title {
-    font-size: 8px;
+    font-size: 9px;
   }
 }

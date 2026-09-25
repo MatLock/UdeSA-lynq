@@ -17,12 +17,12 @@
   height: 36px;
   padding: 0 10px;
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-h);
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-square);
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -37,14 +37,14 @@
 }
 
 .pagination-page.is-active {
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
   border-color: transparent;
   cursor: default;
 }
 
 .pagination-arrow {
-  font-size: 20px;
+  font-size: 21px;
   line-height: 1;
 }
 

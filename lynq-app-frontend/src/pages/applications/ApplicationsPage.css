@@ -25,14 +25,14 @@
 
 .applications-title {
   margin: 0;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 800;
   color: var(--text-h);
 }
 
 .applications-subtitle {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text);
 }
 
@@ -40,12 +40,12 @@
   margin-top: 6px;
   align-self: flex-start;
   padding: 2px 12px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--brand-purple-dark);
   background: var(--accent-bg);
   border: 1px solid var(--accent-border);
-  border-radius: 999px;
+  border-radius: var(--radius-chip);
 }
 
 /* The list is the sole scrollable region — min-height:0 lets it shrink below
@@ -82,12 +82,12 @@
   gap: 8px;
   padding: 9px 20px;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-square);
   cursor: pointer;
   transition: opacity 0.15s ease;
 }

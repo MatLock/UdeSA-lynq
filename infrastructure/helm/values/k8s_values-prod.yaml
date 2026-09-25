@@ -181,6 +181,7 @@ lynq_file_storage:
     AWS_BUCKET_NAME: "REPLACE_BUCKET_NAME"
     # Empty = real AWS endpoints.
     AWS_ENDPOINT: ""
+    AWS_PUBLIC_ENDPOINT: ""
 
 lynq_iam:
   replicas: 1

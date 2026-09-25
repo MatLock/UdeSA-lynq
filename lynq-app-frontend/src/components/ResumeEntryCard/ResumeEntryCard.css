@@ -7,7 +7,7 @@
   gap: 10px;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-square);
   background: var(--bg);
   transition: border-color 0.15s ease;
 }
@@ -45,7 +45,7 @@
   min-width: 0;
   padding: 4px 6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-square);
   font: inherit;
   text-align: left;
   color: inherit;
@@ -71,7 +71,7 @@
 
 .resume-entry-card-title {
   flex: none;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -83,7 +83,7 @@
 .resume-entry-card-summary {
   min-width: 0;
   overflow: hidden;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -102,11 +102,13 @@
   height: 26px;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-square);
   background: var(--bg);
   color: var(--text);
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .resume-entry-card-remove:hover {

@@ -18,11 +18,8 @@
   gap: 14px;
   padding: 22px 24px;
   border: 1px solid var(--border);
-  border-radius: 18px;
-  background:
-    radial-gradient(ellipse at top left, rgb(var(--brand-violet-rgb) / 0.1), transparent 60%),
-    radial-gradient(ellipse at bottom right, rgb(var(--brand-teal-rgb) / 0.14), transparent 60%),
-    #fff;
+  border-radius: var(--radius-square);
+  background: var(--surface-raised);
   box-shadow: var(--shadow-panel);
 }
 
@@ -42,8 +39,8 @@
   height: 56px;
   border-radius: 50%;
   background: var(--brand-gradient);
-  color: #fff;
-  font-size: 20px;
+  color: var(--ink-on-action);
+  font-size: 21px;
   font-weight: 700;
   letter-spacing: 0.5px;
 }
@@ -54,7 +51,7 @@
 
 .resume-name {
   margin: 0;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 800;
   line-height: 1.2;
   color: var(--text-h);
@@ -62,7 +59,7 @@
 
 .resume-headline {
   margin: 4px 0 0;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--brand-purple-dark);
   font-weight: 600;
 }
@@ -81,7 +78,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
 }
 
@@ -106,18 +103,20 @@
   gap: 6px;
   padding: 4px 12px;
   border: 1px solid var(--accent-border);
-  border-radius: 999px;
-  font-size: 12px;
+  border-radius: var(--radius-chip);
+  font-size: 13px;
   font-weight: 600;
   color: var(--brand-purple-dark);
   background: var(--accent-bg);
   text-decoration: none;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .resume-link:hover {
   background: var(--brand-gradient);
-  color: #fff;
+  color: var(--ink-on-action);
   border-color: transparent;
 }
 
@@ -126,8 +125,8 @@
 .resume-section {
   padding: 20px 24px;
   border: 1px solid var(--border);
-  border-radius: 18px;
-  background: #fff;
+  border-radius: var(--radius-square);
+  background: var(--surface-raised);
   box-shadow: var(--shadow-card);
 }
 
@@ -136,7 +135,7 @@
   position: relative;
   margin: 0 0 16px;
   padding-bottom: 8px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -144,13 +143,13 @@
 }
 
 .resume-section-title::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   bottom: 0;
   width: 42px;
   height: 3px;
-  border-radius: 999px;
+  border-radius: var(--radius-chip);
   background: var(--brand-gradient);
 }
 
@@ -159,7 +158,7 @@
    the line breaks of. */
 .resume-summary {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.65;
   color: var(--text);
 }
@@ -178,18 +177,14 @@
 
 /* Vertical rail behind the entries. */
 .resume-timeline::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 6px;
   bottom: 6px;
   left: 4px;
   width: 2px;
-  border-radius: 999px;
-  background: linear-gradient(
-    180deg,
-    var(--brand-blue) 0%,
-    var(--brand-purple) 100%
-  );
+  border-radius: var(--radius-chip);
+  background: var(--action);
   opacity: 0.35;
 }
 
@@ -199,14 +194,14 @@
 
 /* Dot on the rail, aligned with the entry's first line. */
 .resume-timeline-item::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 7px;
   left: -22px;
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface-raised);
   border: 2px solid var(--brand-purple);
 }
 
@@ -225,14 +220,14 @@
 
 .resume-entry-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-h);
 }
 
 .resume-entry-meta {
   margin: 2px 0 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
 }
 
@@ -246,7 +241,7 @@
 }
 
 .resume-entry-dates {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--brand-blue-dark);
   white-space: nowrap;
@@ -254,17 +249,17 @@
 
 .resume-badge {
   padding: 1px 10px;
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: var(--radius-chip);
+  font-size: 12px;
   font-weight: 700;
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
 }
 
 /* Rendered through RichText — see .resume-summary. */
 .resume-entry-body {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
   color: var(--text);
 }
@@ -277,7 +272,7 @@
 
 .resume-entry-block-title {
   margin: 0;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.4px;
   text-transform: uppercase;
@@ -290,7 +285,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.55;
   color: var(--text);
 }
@@ -312,8 +307,8 @@
 
 .resume-chip {
   padding: 3px 11px;
-  border-radius: 999px;
-  font-size: 12px;
+  border-radius: var(--radius-chip);
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -358,17 +353,17 @@
   gap: 8px;
   padding: 5px 6px 5px 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 13px;
+  border-radius: var(--radius-chip);
+  font-size: 14px;
   color: var(--text-h);
 }
 
 .resume-language-level {
   padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: var(--radius-chip);
+  font-size: 12px;
   font-weight: 600;
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
 }
 
@@ -389,9 +384,9 @@
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-square);
   background: var(--bg);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .resume-card:hover {
@@ -404,9 +399,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-square);
   color: var(--brand-purple);
   background: var(--accent-bg);
 }
@@ -421,14 +416,14 @@
 
 .resume-card-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-h);
 }
 
 .resume-card-meta {
   margin: 0;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--text);
 }

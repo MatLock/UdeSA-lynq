@@ -9,9 +9,9 @@
   margin: auto;
   padding: 0;
   color: inherit;
-  background: #fff;
+  background: var(--surface-raised);
   border: none;
-  border-radius: 16px;
+  border-radius: var(--radius-square);
   box-shadow: var(--shadow-dialog);
 }
 
@@ -38,9 +38,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-square);
   color: var(--brand-purple-dark);
   background: var(--accent-bg);
 }
@@ -52,14 +52,14 @@
 
 .confirm-dialog-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--text-h);
 }
 
 .confirm-dialog-message {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   color: var(--text);
 }
@@ -74,14 +74,17 @@
 .confirm-dialog-button {
   padding: 8px 16px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-chip);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
   cursor: pointer;
-  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .confirm-dialog-button:disabled {
@@ -92,7 +95,7 @@
 .confirm-dialog-button--ghost {
   color: var(--text);
   background: none;
-  border-color: var(--border);
+  border-color: var(--border-control);
 }
 
 .confirm-dialog-button--ghost:hover:not(:disabled) {

@@ -44,6 +44,7 @@ lynq:
     # Empty by default (real AWS). Set AWS_ENDPOINT to target LocalStack in the
     # Docker Compose stack (http://localstack:4566).
     endpoint: ${AWS_ENDPOINT:}
+    public-endpoint: ${AWS_PUBLIC_ENDPOINT:}
 
 
 server:

@@ -182,3 +182,4 @@ parameters:
 "23-09-2026","make the resume creation persist tailoredForJobId when the request carries it, and leave the rest of the flow untouched: the candidate skills sync stays exactly as it is and nothing reads or recomputes the LyNQ score"
 "23-09-2026","expose tailoredForJobId in the resume response so the UI can show that a CV was adapted for a given job posting and tailored CVs can be told apart from regular ones"
 "23-09-2026","test that creating a resume with tailoredForJobId persists it and gives it back in the response, and that without the field it stays null"
+"24-09-2026","bump the project version to 2.0.0-SNAPSHOT in the pom.xml"

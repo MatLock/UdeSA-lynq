@@ -18,9 +18,9 @@
   gap: 10px;
   padding: 24px 20px;
   border: 1.5px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-square);
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
 .resume-option-card:hover {
@@ -29,7 +29,7 @@
 
 .resume-option-card.selected {
   border-color: var(--brand-purple);
-  box-shadow: 0 0 0 1px var(--brand-purple);
+  box-shadow: none;
 }
 
 /* Native radio is kept for accessibility but hidden; the visual is below. */
@@ -57,7 +57,7 @@
 }
 
 .resume-option-card.selected .resume-option-radio::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 3px;
   border-radius: 50%;
@@ -68,8 +68,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
 }
 
@@ -84,13 +84,13 @@
 }
 
 .resume-option-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-h);
 }
 
 .resume-option-desc {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.4;
   color: var(--text);
 }

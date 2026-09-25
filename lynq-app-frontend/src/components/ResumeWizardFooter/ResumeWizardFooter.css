@@ -25,17 +25,19 @@
   justify-content: center;
   gap: 8px;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   padding: 9px 18px;
-  border-radius: 9px;
+  border-radius: var(--radius-square);
   cursor: pointer;
-  transition: opacity 0.15s ease, border-color 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .resume-footer-next {
   min-width: 162px;
   border: none;
-  color: #fff;
+  color: var(--ink-on-action);
   background: var(--brand-gradient);
 }
 
@@ -45,7 +47,7 @@
 
 .resume-footer-back {
   border: 1.5px solid var(--border);
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--text-h);
 }
 
@@ -64,9 +66,9 @@
   border: none;
   background: transparent;
   padding: 4px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-square);
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--brand-purple);
   font-weight: 600;
   text-decoration: underline;
