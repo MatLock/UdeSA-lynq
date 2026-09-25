@@ -80,7 +80,7 @@ ingress:
 
 lynq_ml:
   replicas: 1
-  image: matlock0o/lynq:lynq-ml-2.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-ml-2.1.0-SNAPSHOT
   resources:
     requests:
       cpu: 100m
@@ -105,7 +105,7 @@ lynq_ml:
 
 lynq_agent:
   replicas: 1
-  image: matlock0o/lynq:lynq-agent-2.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-agent-2.1.0-SNAPSHOT
   # Unused in prod: DB_URL comes whole from the external lynq-agent-secret, so
   # there is no host to interpolate here. Kept so both values files share a shape.
   dbHost: ""
@@ -150,7 +150,7 @@ lynq_agent:
 
 lynq_feeders:
   replicas: 1
-  image: matlock0o/lynq:lynq-feeders-2.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-feeders-2.1.0-SNAPSHOT
   resources:
     requests:
       cpu: 50m
@@ -184,7 +184,7 @@ lynq_feeders:
 
 lynq_bff:
   replicas: 1
-  image: matlock0o/lynq:lynq-bff-2.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-bff-2.1.0-SNAPSHOT
   resources:
     requests:
       cpu: 100m
@@ -202,7 +202,7 @@ lynq_bff:
 
 lynq_app_backend:
   replicas: 1
-  image: matlock0o/lynq:lynq-app-backend-2.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-app-backend-2.1.0-SNAPSHOT
   resources:
     requests:
       cpu: 100m
@@ -221,7 +221,7 @@ lynq_app_backend:
 # file metadata all live here.
 lynq_file_storage:
   replicas: 1
-  image: matlock0o/lynq:lynq-file-storage-2.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-file-storage-2.1.0-SNAPSHOT
   resources:
     requests:
       cpu: 100m
@@ -239,7 +239,7 @@ lynq_file_storage:
 
 lynq_iam:
   replicas: 1
-  image: matlock0o/lynq:lynq-iam-2.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-iam-2.1.0-SNAPSHOT
   resources:
     requests:
       cpu: 100m
