@@ -12,6 +12,7 @@ from agent.language import verify_resume_language
 from client.lynq_ml_client import SkillExtractionFailed
 from config import Settings
 from db import repository
+from logging_context import log_safe
 from db.models import (
     Conversation,
     ConversationStatus,
@@ -115,7 +116,7 @@ class ConversationService:
             "message= Conversation created, conversationId=%s, jobId=%s, "
             "extractedSkills=%s",
             conversation.id,
-            conversation.job_id,
+            log_safe(conversation.job_id),
             len(job["extractedSkills"]),
         )
         return CreateConversationResponse(
@@ -202,8 +203,8 @@ class ConversationService:
 
             log.info(
                 "message= Conversation applied, conversationId=%s, appliedResumeId=%s",
-                conversation_id,
-                request.applied_resume_id,
+                log_safe(conversation_id),
+                log_safe(request.applied_resume_id),
             )
             return AppliedResponse(status=conversation.status)
 
@@ -224,15 +225,15 @@ class ConversationService:
                 if replay is not None:
                     log.info(
                         "message= Replaying a known turn, conversationId=%s, turnKey=%s",
-                        conversation_id,
-                        request.turn_key,
+                        log_safe(conversation_id),
+                        log_safe(request.turn_key),
                     )
                     return replay
                 log.warning(
                     "message= Reusing the orphan user message of a dead turn, "
                     "conversationId=%s, turnKey=%s",
-                    conversation_id,
-                    request.turn_key,
+                    log_safe(conversation_id),
+                    log_safe(request.turn_key),
                 )
 
             run_token = await repository.claim_turn(session, conversation)
@@ -289,7 +290,7 @@ class ConversationService:
 
             log.info(
                 "message= Turn persisted, conversationId=%s, version=%s, status=%s",
-                conversation_id,
+                log_safe(conversation_id),
                 _number_of(version),
                 conversation.status,
             )
@@ -322,7 +323,7 @@ class ConversationService:
         log.info(
             "message= The turn applied no edit, the current version stands, "
             "conversationId=%s",
-            conversation_id,
+            log_safe(conversation_id),
         )
         return await repository.current_version(session, conversation_id)
 
@@ -345,7 +346,8 @@ class ConversationService:
         )
         await session.commit()
         log.warning(
-            "message= Discarded a superseded turn, conversationId=%s", conversation_id
+            "message= Discarded a superseded turn, conversationId=%s",
+            log_safe(conversation_id),
         )
 
     async def _fail_turn(
@@ -357,14 +359,16 @@ class ConversationService:
         error: Exception,
     ) -> None:
         log.error(
-            "message= Turn failed, conversationId=%s", conversation_id, exc_info=error
+            "message= Turn failed, conversationId=%s",
+            log_safe(conversation_id),
+            exc_info=error,
         )
         async with self._session_factory() as session:
             conversation = await repository.load_for_turn(session, conversation_id)
             if conversation is None or conversation.run_token != run_token:
                 log.warning(
                     "message= The failed turn was already superseded, conversationId=%s",
-                    conversation_id,
+                    log_safe(conversation_id),
                 )
                 return
 
@@ -489,7 +493,7 @@ class ConversationService:
             log.warning(
                 "message= Skill extraction failed, falling back to the skills the "
                 "posting already declares, jobId=%s, %s",
-                job.get("id"),
+                log_safe(job.get("id")),
                 exc,
             )
             return list(job.get("skills") or [])

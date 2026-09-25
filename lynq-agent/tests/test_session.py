@@ -29,15 +29,19 @@ class SessionTest(unittest.IsolatedAsyncioTestCase):
         await session_module.dispose_engine()
 
     async def test_the_engine_is_built_once_and_shared(self) -> None:
-        self.assertIs(session_module.get_engine(), session_module.get_engine())
+        first = session_module.get_engine()
+        second = session_module.get_engine()
+
+        self.assertIs(first, second)
 
     async def test_the_engine_points_at_the_configured_database(self) -> None:
         self.assertEqual(str(session_module.get_engine().url), SQLITE_URL)
 
     async def test_the_session_factory_is_built_once_and_shared(self) -> None:
-        self.assertIs(
-            session_module.get_session_factory(), session_module.get_session_factory()
-        )
+        first = session_module.get_session_factory()
+        second = session_module.get_session_factory()
+
+        self.assertIs(first, second)
 
     async def test_sessions_do_not_expire_their_objects_on_commit(self) -> None:
         self.assertFalse(session_module.get_session_factory().kw["expire_on_commit"])

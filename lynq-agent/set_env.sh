@@ -37,6 +37,8 @@ export BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-}"
 export BEDROCK_REGION="${BEDROCK_REGION:-${AWS_REGION:-us-east-1}}"
 export BEDROCK_MAX_TOKENS="${BEDROCK_MAX_TOKENS:-4096}"
 export BEDROCK_TEMPERATURE="${BEDROCK_TEMPERATURE:-0}"
+export BEDROCK_GUARDRAIL_ID="${BEDROCK_GUARDRAIL_ID:-}"
+export BEDROCK_GUARDRAIL_VERSION="${BEDROCK_GUARDRAIL_VERSION:-DRAFT}"
 
 # The USD per million tokens of each model live in src/llm/pricing.py and are
 # frozen onto every conversation when it is created. Ollama is billed at zero.

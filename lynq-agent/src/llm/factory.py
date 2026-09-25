@@ -6,6 +6,16 @@ from langchain_ollama import ChatOllama
 from config import BEDROCK, Settings, get_settings
 
 
+def bedrock_guardrail_config(settings: Settings) -> dict[str, str] | None:
+    if not settings.bedrock_guardrail_id:
+        return None
+    return {
+        "guardrailIdentifier": settings.bedrock_guardrail_id,
+        "guardrailVersion": settings.bedrock_guardrail_version,
+        "trace": "enabled",
+    }
+
+
 def build_model(settings: Settings | None = None):
     settings = settings or get_settings()
 
@@ -17,6 +27,7 @@ def build_model(settings: Settings | None = None):
             region_name=settings.bedrock_region,
             max_tokens=settings.bedrock_max_tokens,
             temperature=settings.bedrock_temperature,
+            guardrail_config=bedrock_guardrail_config(settings),
         )
 
     return ChatOllama(

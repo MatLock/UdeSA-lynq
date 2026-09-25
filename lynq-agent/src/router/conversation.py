@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Header
 from client.lynq_ml_client import get_lynq_ml_client
 from config import get_settings
 from db.session import get_session_factory
+from logging_context import log_safe
 from model.conversation import (
     AppliedRequest,
     AppliedResponse,
@@ -72,9 +73,9 @@ async def take_turn(
 ) -> GlobalRestResponse[TurnResponse]:
     log.info(
         "message= Started turn, user_id=%s, conversation_id=%s, turn_key=%s",
-        user_id,
-        conversation_id,
-        body.turn_key,
+        log_safe(user_id),
+        log_safe(conversation_id),
+        log_safe(body.turn_key),
     )
     return GlobalRestResponse(data=await service.turn(conversation_id, body, user_id))
 
@@ -99,8 +100,8 @@ async def mark_applied(
 ) -> GlobalRestResponse[AppliedResponse]:
     log.info(
         "message= Marking a conversation as applied, user_id=%s, conversation_id=%s",
-        user_id,
-        conversation_id,
+        log_safe(user_id),
+        log_safe(conversation_id),
     )
     return GlobalRestResponse(
         data=await service.mark_applied(conversation_id, body, user_id)

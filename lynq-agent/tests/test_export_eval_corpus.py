@@ -38,10 +38,10 @@ class AnonymisationTest(unittest.TestCase):
         self.script = load_script()
 
     def test_the_same_candidate_hashes_the_same_way_under_one_salt(self) -> None:
-        self.assertEqual(
-            self.script.anonymize_user("user-1", "salt"),
-            self.script.anonymize_user("user-1", "salt"),
-        )
+        first = self.script.anonymize_user("user-1", "salt")
+        again = self.script.anonymize_user("user-1", "salt")
+
+        self.assertEqual(first, again)
 
     def test_a_different_salt_gives_a_different_hash(self) -> None:
         self.assertNotEqual(
@@ -155,7 +155,37 @@ class CommandLineTest(unittest.TestCase):
                         with contextlib.redirect_stdout(io.StringIO()):
                             self.script.main()
 
-        export.assert_called_once_with("corpus.jsonl", "salt", False)
+        expected = os.path.join(os.path.realpath(os.getcwd()), "corpus.jsonl")
+        export.assert_called_once_with(expected, "salt", False)
+
+    def test_the_corpus_cannot_be_written_outside_the_working_directory(self) -> None:
+        environment = {self.script.SALT_ENV: "salt"}
+        with patch.dict("os.environ", environment, clear=True):
+            with patch("sys.argv", ["export_eval_corpus.py", "../../corpus.jsonl"]):
+                with self.assertRaises(SystemExit):
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        self.script.main()
+
+    def test_the_corpus_is_written_where_the_command_line_says(self) -> None:
+        destination = os.path.join(os.path.realpath(os.getcwd()), "corpus.jsonl")
+        environment = {self.script.SALT_ENV: "salt"}
+        with patch.dict("os.environ", environment, clear=True):
+            with patch("sys.argv", ["export_eval_corpus.py", "corpus.jsonl"]):
+                with patch.object(self.script.asyncio, "run", return_value=7) as run:
+                    with contextlib.redirect_stdout(io.StringIO()) as printed:
+                        self.script.main()
+
+        run.assert_called_once()
+        self.assertIn(destination, printed.getvalue())
+        self.assertIn("7 triples", printed.getvalue())
+
+    def test_a_relative_destination_resolves_inside_the_working_directory(self) -> None:
+        resolved = self.script.safe_output_path("out/corpus.jsonl")
+
+        self.assertEqual(
+            resolved,
+            os.path.join(os.path.realpath(os.getcwd()), "out", "corpus.jsonl"),
+        )
 
 
 if __name__ == "__main__":

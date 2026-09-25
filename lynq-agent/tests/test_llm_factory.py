@@ -8,7 +8,7 @@ from langchain_aws import ChatBedrockConverse
 from langchain_ollama import ChatOllama
 
 from config import Settings, reset_settings
-from llm.factory import build_model
+from llm.factory import bedrock_guardrail_config, build_model
 from llm.pricing import FREE, prices_for
 
 
@@ -29,6 +29,28 @@ class BuildModelTest(unittest.TestCase):
         self.assertIsInstance(model, ChatOllama)
         self.assertEqual(model.model, "qwen2.5:7b")
         self.assertEqual(model.temperature, 0)
+
+    def test_no_guardrail_is_configured_when_none_is_declared(self) -> None:
+        settings = settings_with(LLM_PROVIDER="bedrock", BEDROCK_GUARDRAIL_ID="")
+
+        self.assertIsNone(bedrock_guardrail_config(settings))
+
+    def test_the_declared_guardrail_is_passed_to_bedrock(self) -> None:
+        settings = settings_with(
+            LLM_PROVIDER="bedrock",
+            BEDROCK_MODEL_ID="amazon.nova-pro-v1:0",
+            BEDROCK_GUARDRAIL_ID="gr-1234",
+            BEDROCK_GUARDRAIL_VERSION="3",
+        )
+
+        self.assertEqual(
+            bedrock_guardrail_config(settings),
+            {
+                "guardrailIdentifier": "gr-1234",
+                "guardrailVersion": "3",
+                "trace": "enabled",
+            },
+        )
 
     def test_bedrock_is_built_with_the_model_of_the_environment(self) -> None:
         model = build_model(

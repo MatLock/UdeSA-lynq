@@ -114,7 +114,10 @@ class LynqMlClientTest(unittest.IsolatedAsyncioTestCase):
 
     def test_the_client_is_a_singleton(self) -> None:
         reset_settings()
-        self.assertIs(get_lynq_ml_client(), get_lynq_ml_client())
+        first = get_lynq_ml_client()
+        second = get_lynq_ml_client()
+
+        self.assertIs(first, second)
         reset_lynq_ml_client()
 
 
