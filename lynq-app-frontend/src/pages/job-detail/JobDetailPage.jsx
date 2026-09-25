@@ -6,6 +6,7 @@ import useApi from '../../hooks/useApi'
 import useAuth from '../../hooks/useAuth'
 import jobService from '../../services/jobService'
 import ApplyResumeModal from '../../components/ApplyResumeModal/ApplyResumeModal.jsx'
+import TailorResumeModal from '../../components/TailorResumeModal/TailorResumeModal.jsx'
 import CompanyIcon from '../../components/CompanyIcon/CompanyIcon.jsx'
 import UserIcon from '../../components/UserIcon/UserIcon.jsx'
 import Spinner from '../../components/Spinner/Spinner.jsx'
@@ -140,6 +141,7 @@ const JobHeroSide = ({
   applyState,
   applyDisabled,
   onApply,
+  onTailor,
   t,
 }) => {
   if (isOwner) {
@@ -215,6 +217,14 @@ const JobHeroSide = ({
           >
             {applyState === 'applying' ? applyBusyLabel : applyLabel}
             {isExternal && <span aria-hidden="true"> ↗</span>}
+          </button>
+          <button
+            type="button"
+            className="job-detail-tailor"
+            onClick={onTailor}
+            disabled={applyDisabled}
+          >
+            {t.tailorDialog.open}
           </button>
           {isExternal && !hasExternalUrl && (
             <p className="job-detail-apply-status is-info">{t.externalNoUrl}</p>
@@ -581,11 +591,17 @@ const JobDetailPage = () => {
   // a candidate keeps several resumes and the recruiter only ever sees the one
   // they applied with, so which one is a decision, not a default.
   const [pickingResume, setPickingResume] = useState(false)
+  const [tailoring, setTailoring] = useState(false)
 
   const handleApply = () => {
     // Same condition the button is disabled on, so the two cannot drift apart.
     if (applyDisabled) return
     setPickingResume(true)
+  }
+
+  const handleTailor = () => {
+    if (applyDisabled) return
+    setTailoring(true)
   }
 
   const registerExternalApplication = async (resume) => {
@@ -735,6 +751,7 @@ const JobDetailPage = () => {
               applyState={applyState}
               applyDisabled={applyDisabled}
               onApply={handleApply}
+              onTailor={handleTailor}
               t={t}
             />
           }
@@ -779,6 +796,18 @@ const JobDetailPage = () => {
           sourceLabel={prettySource(job.jobPostSource)}
           onConfirm={handleApplyWithResume}
           onCancel={() => setPickingResume(false)}
+        />
+      )}
+
+      {tailoring && (
+        <TailorResumeModal
+          job={job}
+          jobId={jobId}
+          isExternal={isExternal}
+          externalUrl={externalUrl}
+          sourceLabel={prettySource(job.jobPostSource)}
+          onApplied={setApplyAttempt}
+          onClose={() => setTailoring(false)}
         />
       )}
     </div>

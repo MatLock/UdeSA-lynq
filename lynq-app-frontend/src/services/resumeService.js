@@ -283,6 +283,45 @@ const extract_skills = async (authFetch, resume, language) => {
   return payload?.data;
 };
 
+const start_tailor = async (freshAuthFetch, resumeId, jobId, language) => {
+  const query = language ? `?${new URLSearchParams({ language })}` : '';
+  const payload = await freshAuthFetch(
+    `/resume/${encodeURIComponent(resumeId)}/tailor/${encodeURIComponent(jobId)}${query}`,
+    { method: 'POST' },
+  );
+  return payload?.data;
+};
+
+const tailor_turn = async (freshAuthFetch, conversationId, message, turnKey) => {
+  const payload = await freshAuthFetch(
+    `/resume/tailor/${encodeURIComponent(conversationId)}/turn`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ message, turnKey }),
+    },
+  );
+  return payload?.data;
+};
+
+const get_tailor_conversation = async (authFetch, conversationId) => {
+  const payload = await authFetch(
+    `/resume/tailor/${encodeURIComponent(conversationId)}`,
+    { method: 'GET' },
+  );
+  return payload?.data;
+};
+
+const tailor_apply = async (authFetch, conversationId, resumeId) => {
+  const payload = await authFetch(
+    `/resume/tailor/${encodeURIComponent(conversationId)}/apply`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ resumeId }),
+    },
+  );
+  return payload?.data;
+};
+
 export default {
   LANGUAGES,
   TEMPLATES,
@@ -298,4 +337,8 @@ export default {
   translate_resume,
   delete_resume_preview,
   extract_skills,
+  start_tailor,
+  tailor_turn,
+  get_tailor_conversation,
+  tailor_apply,
 };

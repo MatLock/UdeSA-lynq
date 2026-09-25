@@ -1,0 +1,470 @@
+.tailor-resume-dialog {
+  width: min(1180px, calc(100vw - 48px));
+  max-width: none;
+  max-height: calc(100vh - 48px);
+  margin: auto;
+  padding: 0;
+  color: inherit;
+  background: var(--surface-raised);
+  border: none;
+  border-radius: var(--radius-square);
+  box-shadow: var(--shadow-dialog);
+}
+
+.tailor-resume-dialog::backdrop {
+  background: var(--scrim);
+  backdrop-filter: blur(2px);
+}
+
+.tailor-resume-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  text-align: left;
+}
+
+.tailor-resume-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.tailor-resume-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-square);
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+}
+
+.tailor-resume-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tailor-resume-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.tailor-resume-subtitle,
+.tailor-resume-note,
+.tailor-resume-pick-subtitle {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.tailor-resume-note.is-error {
+  color: var(--danger-ink);
+}
+
+.tailor-resume-note.is-success {
+  color: var(--success-ink);
+}
+
+.tailor-resume-note.is-info {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+}
+
+.tailor-resume-link {
+  color: var(--brand-purple-dark);
+  font-weight: 700;
+}
+
+.tailor-resume-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-square);
+  cursor: pointer;
+}
+
+.tailor-resume-close:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tailor-resume-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+}
+
+.tailor-resume-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tailor-resume-pick-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.tailor-resume-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  margin: 0;
+  padding: 2px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.tailor-resume-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-square);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.tailor-resume-option:hover {
+  border-color: var(--brand-purple-light);
+}
+
+.tailor-resume-option.is-selected {
+  border-color: var(--brand-purple-light);
+  background: var(--accent-bg);
+}
+
+.tailor-resume-option input {
+  accent-color: var(--brand-purple-dark);
+}
+
+.tailor-resume-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tailor-resume-option-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+
+.tailor-resume-option-meta {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.tailor-resume-tabs {
+  display: none;
+  gap: 6px;
+}
+
+.tailor-resume-tab {
+  flex: 1;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-square);
+  cursor: pointer;
+}
+
+.tailor-resume-tab.is-active {
+  color: var(--ink-on-action);
+  background: var(--action);
+  border-color: var(--action);
+}
+
+.tailor-resume-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: 16px;
+  height: 58vh;
+  min-height: 0;
+}
+
+.tailor-resume-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-square);
+}
+
+.tailor-resume-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+}
+
+.tailor-resume-based-on {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+
+.tailor-resume-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
+.tailor-resume-message {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 92%;
+}
+
+.tailor-resume-message.is-user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.tailor-resume-bubble {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-square);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tailor-resume-message.is-user .tailor-resume-bubble {
+  color: var(--ink-on-action);
+  background: var(--action);
+  border-color: var(--action);
+}
+
+.tailor-resume-bubble.is-thinking {
+  color: var(--ink-muted);
+  font-style: italic;
+}
+
+.tailor-resume-warnings {
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-square);
+}
+
+.tailor-resume-warnings ul,
+.tailor-resume-changes ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.tailor-resume-warnings-title,
+.tailor-resume-changes-title {
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.tailor-resume-composer {
+  display: flex;
+  gap: 8px;
+}
+
+.tailor-resume-input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-square);
+}
+
+.tailor-resume-turns {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+
+.tailor-resume-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+}
+
+.tailor-resume-preview-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tailor-resume-preview-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.tailor-resume-version {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+
+.tailor-resume-changes {
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-square);
+}
+
+.tailor-resume-changed-hint {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.tailor-resume-document {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--surface-page);
+  border: 1px solid var(--border);
+}
+
+.tailor-resume-document[data-changed~='personal'] [data-section-id='personal'],
+.tailor-resume-document[data-changed~='summary'] [data-section-id='summary'],
+.tailor-resume-document[data-changed~='experience'] [data-section-id='experience'],
+.tailor-resume-document[data-changed~='education'] [data-section-id='education'],
+.tailor-resume-document[data-changed~='skills'] [data-section-id='skills'],
+.tailor-resume-document[data-changed~='languages'] [data-section-id='languages'],
+.tailor-resume-document[data-changed~='certifications']
+  [data-section-id='certifications'],
+.tailor-resume-document[data-changed~='projects'] [data-section-id='projects'] {
+  padding: 10px;
+  background: var(--level-query-wash);
+  border: 1px solid var(--action);
+}
+
+.tailor-resume-result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tailor-resume-result-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.tailor-resume-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.tailor-resume-button {
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-chip);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink-on-action);
+  background: var(--brand-gradient);
+  cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.tailor-resume-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.tailor-resume-button--ghost {
+  color: var(--text);
+  background: none;
+  border-color: var(--border-control);
+}
+
+.tailor-resume-button--ghost:hover:not(:disabled) {
+  border-color: var(--brand-purple-light);
+  color: var(--brand-purple-dark);
+}
+
+@media (max-width: 900px) {
+  .tailor-resume-dialog {
+    width: calc(100vw - 24px);
+  }
+
+  .tailor-resume-tabs {
+    display: flex;
+  }
+
+  .tailor-resume-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tailor-resume-columns[data-tab='chat'] .tailor-resume-col--document,
+  .tailor-resume-columns[data-tab='document'] .tailor-resume-col--chat {
+    display: none;
+  }
+}

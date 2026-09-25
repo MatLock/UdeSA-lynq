@@ -34,6 +34,7 @@ const sendSecured = async (token, path, options = {}, requestUuid = requestUuidU
     );
     error.status = response.status;
     error.reason = payload?.reason;
+    error.code = payload?.code;
     throw error;
   }
 

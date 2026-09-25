@@ -173,6 +173,34 @@
   cursor: default;
 }
 
+.job-detail-tailor {
+  padding: 10px 20px;
+  max-width: 220px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-square);
+  white-space: normal;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.job-detail-tailor:hover:not(:disabled) {
+  border-color: var(--brand-purple-light);
+  color: var(--brand-purple-dark);
+}
+
+.job-detail-tailor:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .job-detail-apply--external {
   padding: 11px 20px;
   max-width: 220px;
