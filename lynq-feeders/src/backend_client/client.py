@@ -51,6 +51,7 @@ def to_ingest_payload(listing: Listing) -> dict:
         "jobUrl": listing.apply_url,
         "jobPostSource": listing.source.upper(),
         "companyName": listing.company,
+        "companyLogoUrl": listing.company_logo_url,
         "postedAt": listing.posted_at,
         "skills": listing.skills,
         "similarityTags": listing.similarity_tags,

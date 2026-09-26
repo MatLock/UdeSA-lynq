@@ -10,7 +10,7 @@ from config import get_settings
 from ml_client import MlClient
 from model import IngestOverrides
 from response import GlobalRestResponse
-from service import IngestReport, IngestService
+from service import EnrichmentError, IngestReport, IngestService
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +38,10 @@ def build_service() -> IngestService:
     "/ingest",
     responses={
         400: {"description": "The run was scoped to a source the service does not know."},
-        502: {"description": "The downstream job-post ingest failed."},
+        502: {
+            "description": "Skill extraction failed, or the downstream job-post ingest failed. "
+            "Nothing was ingested.",
+        },
     },
 )
 async def ingest(
@@ -52,6 +55,9 @@ async def ingest(
         report = await service.run(lynq_request_uuid, overrides)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except EnrichmentError as exc:
+        log.error("message= Feeder ingest run aborted, skill extraction failed", exc_info=exc)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except BackendError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

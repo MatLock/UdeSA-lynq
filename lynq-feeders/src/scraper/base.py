@@ -28,6 +28,7 @@ class Listing(BaseModel):
     source: str
     category: str
     company: Optional[str] = None
+    company_logo_url: Optional[str] = None
     location: Optional[str] = None
     remote: bool = False
     work_type: Optional[str] = None

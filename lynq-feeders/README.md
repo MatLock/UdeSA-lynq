@@ -73,9 +73,24 @@ The service never touches the database. `lynq-app-backend` owns `lynq_backend_db
 1. For every configured source and category, scrape the latest `FEEDER_JOBS_PER_CATEGORY` postings.
 2. Drop duplicates by `(source, external_id)` — Bumeran merges administración and contabilidad into one area, so the same posting can surface under two categories.
 3. For every posting with a description, call `lynq-ml` `/dmz/skill-enhance` to get `skills` and `similarity_tags`. Calls are bounded by `ML_CONCURRENCY`.
-4. Post the whole batch to `lynq-app-backend`.
+4. Post the whole batch to `lynq-app-backend` — only if every posting came back enriched.
 
-A posting whose skill extraction fails is still ingested, with empty skills and tags. A scraper that fails for one category does not abort the others — the failure is reported per source in the response.
+Each posting also carries its company's logo URL, which both portals hand over at
+no extra cost: Bumeran returns `logoURL` in the same `searchV2` payload, and
+Computrabajo puts it on the detail page that step 1 already fetches. A confidential
+Bumeran posting has no logo, and `lynq-app-backend` keeps whatever an earlier run
+found rather than blanking it. Neither portal publishes a company description, so
+`about` stays empty for scraped companies.
+
+Skill extraction is not best-effort: a posting stored with no skills and no
+similarity tags scores 0 on the LyNQ score for every candidate, and because the
+backend replaces a job post's skills on every ingest, a degraded run also wipes
+what an earlier one had extracted. So if any posting fails to enrich — `lynq-ml`
+unreachable, an empty completion, or a scraper that brought back no description —
+the run aborts with a `502` naming every offender and nothing is ingested. Rerun it
+once `lynq-ml` is healthy.
+
+A scraper that fails for one category does not abort the others — that failure is reported per source in the response.
 
 ---
 
@@ -152,7 +167,9 @@ The response's `plan` echoes what actually ran, so a scoped call is self-documen
 }
 ```
 
-Returns `502` when the downstream ingest fails — for instance when `LYNQ_INTERNAL_TOKEN` does not match what the backend expects.
+Returns `502` when skill extraction fails for any posting — nothing is ingested and
+`reason` names each posting and why — or when the downstream ingest fails, for
+instance when `LYNQ_INTERNAL_TOKEN` does not match what the backend expects.
 
 ### `GET /lynq-feeders/health`
 

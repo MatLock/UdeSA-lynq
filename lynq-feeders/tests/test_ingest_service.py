@@ -7,7 +7,7 @@ from backend_client import BackendError, IngestStats
 from config import Settings
 from ml_client import MlError, SkillEnhanceResult
 from scraper.base import Listing
-from service import IngestService
+from service import EnrichmentError, IngestService
 
 REQUEST_UUID = "11111111-2222-3333-4444-555555555555"
 
@@ -128,7 +128,7 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report.deduplicated, 0)
         self.assertEqual(len(backend.ingest.call_args.args[1]), 2)
 
-    async def test_a_failing_ml_call_still_ingests_the_listing(self):
+    async def test_a_failing_ml_call_aborts_the_run_without_ingesting(self):
         backend = _backend()
         service = IngestService(
             _settings(),
@@ -137,24 +137,60 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
             scrapers=[_scraper(listings=[_listing()])],
         )
 
-        report = await service.run(REQUEST_UUID)
+        with self.assertRaises(EnrichmentError) as raised:
+            await service.run(REQUEST_UUID)
 
-        self.assertEqual(report.enriched, 0)
-        self.assertEqual(report.enrichment_failed, 1)
-        ingested = backend.ingest.call_args.args[1]
-        self.assertEqual(len(ingested), 1)
-        self.assertEqual(ingested[0].skills, [])
+        self.assertIn("ollama down", str(raised.exception))
+        self.assertIn("bumeran/1", str(raised.exception))
+        backend.ingest.assert_not_awaited()
 
-    async def test_listings_without_a_description_skip_the_llm(self):
-        ml = _ml()
+    async def test_an_empty_ml_result_aborts_the_run_without_ingesting(self):
+        backend = _backend()
         service = IngestService(
-            _settings(), ml, _backend(), scrapers=[_scraper(listings=[_listing(description=None)])]
+            _settings(),
+            _ml(SkillEnhanceResult([], [])),
+            backend,
+            scrapers=[_scraper(listings=[_listing()])],
         )
 
-        report = await service.run(REQUEST_UUID)
+        with self.assertRaises(EnrichmentError) as raised:
+            await service.run(REQUEST_UUID)
+
+        self.assertIn("no skills and no similarity tags", str(raised.exception))
+        backend.ingest.assert_not_awaited()
+
+    async def test_listings_without_a_description_skip_the_llm_and_abort_the_run(self):
+        ml = _ml()
+        backend = _backend()
+        service = IngestService(
+            _settings(), ml, backend, scrapers=[_scraper(listings=[_listing(description=None)])]
+        )
+
+        with self.assertRaises(EnrichmentError) as raised:
+            await service.run(REQUEST_UUID)
 
         ml.skill_enhance.assert_not_awaited()
-        self.assertEqual(report.enrichment_failed, 1)
+        self.assertIn("no description", str(raised.exception))
+        backend.ingest.assert_not_awaited()
+
+    async def test_one_failing_listing_aborts_the_whole_run(self):
+        backend = _backend()
+        ml = MagicMock()
+        ml.skill_enhance = AsyncMock(
+            side_effect=[SkillEnhanceResult(["Python"], ["Backend"]), MlError("ollama down")]
+        )
+        service = IngestService(
+            _settings(ml_concurrency=1),
+            ml,
+            backend,
+            scrapers=[_scraper(listings=[_listing("1"), _listing("2")])],
+        )
+
+        with self.assertRaises(EnrichmentError) as raised:
+            await service.run(REQUEST_UUID)
+
+        self.assertIn("1 of 2 listings", str(raised.exception))
+        backend.ingest.assert_not_awaited()
 
     async def test_a_failing_scraper_does_not_abort_the_other_categories(self):
         failing = _scraper("bumeran", error=RuntimeError("cloudflare"))

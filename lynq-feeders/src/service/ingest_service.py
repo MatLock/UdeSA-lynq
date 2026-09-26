@@ -17,6 +17,18 @@ log = logging.getLogger(__name__)
 REMOTE = "REMOTE"
 IN_OFFICE = "IN_OFFICE"
 
+MAX_REPORTED_FAILURES = 10
+
+
+class EnrichmentError(RuntimeError):
+    pass
+
+
+class EnrichmentFailure(BaseModel):
+    source: str
+    external_id: str
+    reason: str
+
 
 class SourceReport(BaseModel):
     source: str
@@ -45,6 +57,20 @@ def _dedupe(listings: list[Listing]) -> list[Listing]:
         seen.add(key)
         unique.append(listing)
     return unique
+
+
+def _describe(failures: list["EnrichmentFailure"], total: int) -> str:
+    shown = failures[:MAX_REPORTED_FAILURES]
+    detail = "; ".join(
+        f"{failure.source}/{failure.external_id}: {failure.reason}" for failure in shown
+    )
+    if len(failures) > len(shown):
+        detail += f"; and {len(failures) - len(shown)} more"
+    return (
+        f"skill extraction failed for {len(failures)} of {total} listings, so nothing was "
+        f"ingested — a job post stored without skills or similarity tags scores 0 on the "
+        f"LyNQ score for every candidate. {detail}"
+    )
 
 
 class IngestService:
@@ -97,8 +123,12 @@ class IngestService:
             log.info("message= Nothing to ingest, the run found no listings")
             return report
 
-        report.enriched = await self._enrich_all(request_uuid, listings)
-        report.enrichment_failed = len(listings) - report.enriched
+        failures = await self._enrich_all(request_uuid, listings)
+        report.enriched = len(listings) - len(failures)
+        report.enrichment_failed = len(failures)
+
+        if failures:
+            raise EnrichmentError(_describe(failures, len(listings)))
 
         try:
             report.ingested = await self.backend_client.ingest(request_uuid, listings)
@@ -139,34 +169,49 @@ class IngestService:
                 report.per_source.append(entry)
         return collected
 
-    async def _enrich(self, request_uuid: str, listing: Listing) -> bool:
+    async def _enrich(self, request_uuid: str, listing: Listing) -> Optional[str]:
         if not listing.description:
-            return False
+            return "the scraper brought back no description to extract skills from"
+
         work_type = REMOTE if listing.remote else IN_OFFICE
         try:
             result = await self.ml_client.skill_enhance(
                 request_uuid, listing.title, listing.description, work_type
             )
         except MlError as exc:
-            log.warning(
-                "message= Skill extraction failed, ingesting the listing without tags, "
-                "source=%s, external_id=%s, error=%s",
-                listing.source,
-                listing.external_id,
-                exc,
-            )
-            return False
+            return f"skill-enhance failed: {exc}"
 
         listing.skills = result.skills
         listing.similarity_tags = result.similarity_tags
-        return not result.is_empty
 
-    async def _enrich_all(self, request_uuid: str, listings: list[Listing]) -> int:
+        if result.is_empty:
+            return "skill-enhance returned no skills and no similarity tags"
+        return None
+
+    async def _enrich_all(
+        self, request_uuid: str, listings: list[Listing]
+    ) -> list[EnrichmentFailure]:
         semaphore = asyncio.Semaphore(max(1, self.settings.ml_concurrency))
 
-        async def guarded(listing: Listing) -> bool:
+        async def guarded(listing: Listing) -> Optional[str]:
             async with semaphore:
                 return await self._enrich(request_uuid, listing)
 
-        outcomes = await asyncio.gather(*(guarded(listing) for listing in listings))
-        return sum(1 for enriched in outcomes if enriched)
+        reasons = await asyncio.gather(*(guarded(listing) for listing in listings))
+
+        failures = []
+        for listing, reason in zip(listings, reasons):
+            if reason is None:
+                continue
+            log.error(
+                "message= Skill extraction failed, source=%s, external_id=%s, reason=%s",
+                listing.source,
+                listing.external_id,
+                reason,
+            )
+            failures.append(
+                EnrichmentFailure(
+                    source=listing.source, external_id=listing.external_id, reason=reason
+                )
+            )
+        return failures

@@ -36,6 +36,12 @@ CARD_HTML = """
 
 DETAIL_HTML = """
 <html><body>
+  <div class="logo_company">
+    <a class="js-o-link" href="https://ar.computrabajo.com/empresas/lectus">
+      <img src="https://ii.ct-stc.com/5/logos/empresas/2025/11/13/lectus191536thumbnail.jpeg"
+           alt="Lectus logo">
+    </a>
+  </div>
   <div description-offer="true">
     <div class="mb40 pb40 bb1">
       Descripci&oacute;n de la oferta
@@ -141,6 +147,24 @@ class FetchTest(unittest.TestCase):
         self.assertIn("desarrollador", found[0].description.lower())
         self.assertNotIn("Aptitudes asociadas", found[0].description)
         self.assertEqual(found[0].experience_level, "5 años de experiencia")
+        self.assertEqual(
+            found[0].company_logo_url,
+            "https://ii.ct-stc.com/5/logos/empresas/2025/11/13/lectus191536thumbnail.jpeg",
+        )
+
+    def test_a_protocol_relative_logo_is_made_absolute(self):
+        detail = DETAIL_HTML.replace("https://ii.ct-stc.com", "//ii.ct-stc.com")
+        self.scraper._get = MagicMock(side_effect=[self._listing_page(), detail])
+
+        found = self.scraper.fetch("TECNOLOGIA", 10)
+
+        self.assertTrue(found[0].company_logo_url.startswith("https://ii.ct-stc.com"))
+
+    def test_a_detail_page_without_a_logo_leaves_it_unset(self):
+        detail = DETAIL_HTML.replace('class="logo_company"', 'class="other"')
+        self.scraper._get = MagicMock(side_effect=[self._listing_page(), detail])
+
+        self.assertIsNone(self.scraper.fetch("TECNOLOGIA", 10)[0].company_logo_url)
 
     def test_caps_the_result_at_the_requested_limit(self):
         self.scraper._get = MagicMock(
@@ -158,6 +182,7 @@ class FetchTest(unittest.TestCase):
 
         self.assertEqual(len(found), 1)
         self.assertIsNone(found[0].description)
+        self.assertIsNone(found[0].company_logo_url)
 
     def test_a_page_without_cards_yields_nothing(self):
         self.scraper._get = MagicMock(return_value="<html><body></body></html>")
