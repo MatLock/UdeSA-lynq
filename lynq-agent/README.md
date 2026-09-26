@@ -28,6 +28,14 @@ back to English when the locale has no template of its own. It is the one place 
 module where Spanish is allowed, because it is the only text the candidate reads that
 the model did not write.
 
+The greeting is stored as the conversation's first message so the front can render it,
+but it is never replayed to the model: a turn's history is trimmed to start on a user
+message. Bedrock's Converse API rejects a conversation that opens on an assistant turn
+(`ValidationException: A conversation must start with a user message`), which hits both
+the first turn — where the greeting is the whole history — and any later turn whose
+history window happens to open on a reply. Nothing is lost by dropping it, because the
+greeting is rendered from the job snapshot the system prompt already carries.
+
 A 409 carries a `code` in the envelope so the front can tell the three cases apart:
 `TURN_IN_PROGRESS` (spin and retry), `CONVERSATION_EXHAUSTED` (hide the input, keep the
 apply button) and `ALREADY_APPLIED` (the `PATCH` arrived with a second resume). A 502
@@ -44,7 +52,7 @@ candidate sees it, and plain prose becomes the reply as it is.
 
 | Tool | What it does |
 | --- | --- |
-| `find_evidence(claim)` | Lexical search **in code** over the base resume, never the model judging itself: normalised (lowercase, no accents, no symbols), by prefix for claims of four characters or more and by exact word for the short ones (`Go`, `C#`, `AWS`). It returns `{path, matched}` with the wording the resume already uses, and it never looks at `personal_info` |
+| `find_evidence(claims)` | Lexical search **in code** over the base resume, never the model judging itself: normalised (lowercase, no accents, no symbols), by prefix for claims of four characters or more and by exact word for the short ones (`Go`, `C#`, `AWS`). It takes up to 20 claims and answers one `{claim, hits}` per claim, each hit a `{path, matched}` with the wording the resume already uses, and it never looks at `personal_info`. The batch is deliberate: a call costs one step whatever it carries, so a turn that looked up eight skills one at a time used to burn eight of its `AGENT_MAX_STEPS` before editing anything |
 | `apply_edit(section, op, payload)` | The only way the resume changes. Answers `OK` or `REJECTED: <reason>`, and the reasons are literal and stable because `docs/queries.sql` groups by them |
 
 The guardrails live in `apply_edit`, in code, not in the prompt: `personal_info is

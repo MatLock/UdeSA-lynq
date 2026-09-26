@@ -50,6 +50,8 @@ class ResumeChange(BaseModel):
     section: str
     kind: str
     detail: str
+    fields: list[str] = Field(default_factory=list)
+    index: int | None = None
 
 
 class TurnResponse(BaseModel):

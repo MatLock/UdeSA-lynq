@@ -41,6 +41,9 @@ EDITABLE_FIELDS = {
 }
 ADDING_OPS = ("add", "append", "insert", "create")
 MAX_EVIDENCE_HITS = 10
+MAX_EVIDENCE_CLAIMS = 20
+TOO_MANY_CLAIMS = f"at most {MAX_EVIDENCE_CLAIMS} claims per call"
+NO_CLAIMS = "claims must hold at least one non-empty string"
 MIN_DETECTABLE_CHARS = 80
 
 
@@ -165,8 +168,23 @@ def _prose_of(payload: dict[str, Any]) -> list[str]:
     return texts
 
 
-def _record_change(state: TurnState, section: str, kind: str, detail: str) -> str:
-    state.changes.append({"section": section, "kind": kind, "detail": detail})
+def _record_change(
+    state: TurnState,
+    section: str,
+    kind: str,
+    detail: str,
+    fields: list[str] | None = None,
+    index: int | None = None,
+) -> str:
+    state.changes.append(
+        {
+            "section": section,
+            "kind": kind,
+            "detail": detail,
+            "fields": fields or [],
+            "index": index,
+        }
+    )
     log.info(
         "message= Edit applied, conversationId=%s, section=%s, op=%s",
         state.conversation_id,
@@ -235,7 +253,12 @@ def _edit_entries(
 
     entries[index].update(fields)
     return _record_change(
-        state, section, op, f"rewrote {', '.join(sorted(fields))} of entry {index}"
+        state,
+        section,
+        op,
+        f"rewrote {', '.join(sorted(fields))} of entry {index}",
+        fields=sorted(fields),
+        index=index,
     )
 
 
@@ -248,10 +271,11 @@ def _reorder_entries(
         for position in order
     ):
         return _rejected(INVALID_PAYLOAD)
-    if len(order) != len(entries):
-        return _rejected(NO_NEW_ENTRIES)
     if sorted(order) != list(range(len(entries))):
-        return _rejected(INVALID_PAYLOAD)
+        return _rejected(
+            f"order must list each of the {len(entries)} positions of {section} "
+            f"exactly once, from 0 to {len(entries) - 1}"
+        )
 
     state.resume[section] = [entries[position] for position in order]
     return _record_change(state, section, "reorder", f"reordered {section} as {order}")
@@ -298,30 +322,52 @@ def _edit_skills(state: TurnState, op: str, payload: dict[str, Any]) -> str:
     current.update(accepted)
     state.resume[SKILLS] = current
     return _record_change(
-        state, SKILLS, "replace", f"rewrote the {', '.join(sorted(accepted))} skills"
+        state,
+        SKILLS,
+        "replace",
+        f"rewrote the {', '.join(sorted(accepted))} skills",
+        fields=sorted(accepted),
     )
 
 
-FIND_EVIDENCE_DESCRIPTION = """Look in the candidate's base resume for wording that backs a claim.
+FIND_EVIDENCE_DESCRIPTION = """Look in the candidate's base resume for wording that backs one or more claims.
 
 Call it before putting any skill into the resume. It never judges: it is a literal
 search over the resume the candidate already wrote.
 
-claim: the skill or statement to look for, for example "PostgreSQL".
+claims: the list of skills or statements to look for, for example
+["PostgreSQL", "Kubernetes", "Docker"]. Ask for every claim you need in one call: the
+whole call costs a single step, so one call with ten claims leaves you nine more steps
+to edit with than ten calls do. At most 20 claims per call.
 
-It answers a list of {"path", "matched"} objects, where "matched" is the text the
-resume itself uses, and an empty list when the resume does not back the claim."""
+It answers a list of {"claim", "hits"} objects, one per claim you asked for, where each
+hit is a {"path", "matched"} and "matched" is the text the resume itself uses. An empty
+"hits" means the resume does not back that claim."""
 
 
-@tool(description=FIND_EVIDENCE_DESCRIPTION)
-async def find_evidence(claim: str) -> Any:
-    state = current_turn_state()
-    if _step_limit_hit(state, "find_evidence"):
-        return STEP_LIMIT_MESSAGE
+def _asked_claims(claims: Any) -> list[str]:
+    values = [claims] if isinstance(claims, str) else claims
+    if not isinstance(values, list):
+        return []
 
-    wanted = claim_words(claim or "")
+    wanted: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        trimmed = value.strip()
+        if not trimmed or trimmed.lower() in seen:
+            continue
+        seen.add(trimmed.lower())
+        wanted.append(trimmed)
+    return wanted
+
+
+def _hits_for(state: TurnState, claim: str) -> list[dict[str, str]]:
+    wanted = claim_words(claim)
     hits: list[dict[str, str]] = []
     seen: set[tuple[str, str]] = set()
+
     for path, text in _searchable(state.base_resume):
         matched = find_match(text, wanted)
         if matched is None or (path, matched) in seen:
@@ -332,13 +378,30 @@ async def find_evidence(claim: str) -> Any:
         if len(hits) >= MAX_EVIDENCE_HITS:
             break
 
-    log.info(
-        "message= Evidence looked up, conversationId=%s, claim=%s, hits=%s",
-        state.conversation_id,
-        claim,
-        len(hits),
-    )
     return hits
+
+
+@tool(description=FIND_EVIDENCE_DESCRIPTION)
+async def find_evidence(claims: list[str]) -> Any:
+    state = current_turn_state()
+    if _step_limit_hit(state, "find_evidence"):
+        return STEP_LIMIT_MESSAGE
+
+    asked = _asked_claims(claims)
+    if not asked:
+        return _rejected(NO_CLAIMS)
+    if len(asked) > MAX_EVIDENCE_CLAIMS:
+        return _rejected(TOO_MANY_CLAIMS)
+
+    found = [{"claim": claim, "hits": _hits_for(state, claim)} for claim in asked]
+
+    log.info(
+        "message= Evidence looked up, conversationId=%s, claims=%s, backed=%s",
+        state.conversation_id,
+        len(asked),
+        sum(1 for entry in found if entry["hits"]),
+    )
+    return found
 
 
 APPLY_EDIT_DESCRIPTION = """Apply one change to the resume that is being tailored.
