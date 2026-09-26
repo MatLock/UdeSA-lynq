@@ -1,0 +1,2 @@
+date,prompt
+"26-09-2026","add GET /dmz/files/{fileId}, the question ""is this file mine?"": it answers the file when the caller owns it and 403 otherwise, reusing the ownership guard that confirm and delete already apply. A service handed a file id by a browser needs it before storing that id as the caller's own"

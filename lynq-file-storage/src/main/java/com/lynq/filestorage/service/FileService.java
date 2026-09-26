@@ -85,6 +85,14 @@ public class FileService {
   }
 
   @AuditLog
+  @Transactional(readOnly = true)
+  public StoredFileEntity findOwnedFile(String fileId, String callerUserId) {
+    StoredFileEntity storedFile = findFile(fileId);
+    requireOwner(storedFile, callerUserId);
+    return storedFile;
+  }
+
+  @AuditLog
   @Transactional
   public void deleteFile(String fileId, String callerUserId) {
     storedFileRepository.findById(fileId).ifPresent(storedFile -> {

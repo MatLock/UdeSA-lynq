@@ -35,6 +35,16 @@ public interface FileController {
   })
   ResponseEntity<GlobalRestResponse<FileRestResponse>> confirmUpload(String fileId, String userId);
 
+  @Operation(summary = "Read a file the caller owns. It is the question \"is this file "
+      + "mine?\": a service that is handed a file id by a browser asks this before it "
+      + "stores that id as the caller's own")
+  @ApiResponses({
+      @ApiResponse(responseCode = "200", description = "The file belongs to the caller"),
+      @ApiResponse(responseCode = "403", description = "The file belongs to another user"),
+      @ApiResponse(responseCode = "404", description = "Unknown file")
+  })
+  ResponseEntity<GlobalRestResponse<FileRestResponse>> findOwnedFile(String fileId, String userId);
+
   @Operation(summary = "Get a pre-signed download URL for a file")
   @ApiResponses({
       @ApiResponse(responseCode = "200", description = "Download URL issued"),
