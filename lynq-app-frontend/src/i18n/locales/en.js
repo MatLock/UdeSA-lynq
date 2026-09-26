@@ -235,40 +235,9 @@ const en = {
       exhausted:
         'This conversation ran out of tweaks. You can apply with the resume as it stands, or start over.',
       warningsTitle: 'What the agent did not do',
-      changesTitle: 'Total changes',
-      changeLabels: {
-        summaryRewrite: 'Rewrote the summary',
-        entryRewrite: '{entry} {position}: rewrote {fields}',
-        reorder: 'Reordered {section}',
-        skillsRewrite: 'Rewrote the skills: {fields}',
-        separator: ' and ',
-        entries: {
-          work_experience: 'Experience',
-          education: 'Education',
-          projects: 'Project',
-        },
-        sections: {
-          summary: 'the summary',
-          skills: 'the skills',
-          work_experience: 'the work experience',
-          education: 'the education',
-          projects: 'the projects',
-        },
-        entryFields: {
-          description: 'the description',
-          achievements: 'the achievements',
-        },
-        skillBuckets: {
-          technical: 'technical',
-          tools: 'tools',
-          soft: 'soft',
-        },
-      },
       documentTab: 'Tailored resume',
       chatTab: 'Conversation',
       documentHeading: 'Your tailored resume',
-      versionLabel: 'Version {version}',
-      baseVersion: 'No changes yet',
       timeline: {
         turn: 'Turn {turn}',
         empty: 'No turns to show yet.',
@@ -276,6 +245,7 @@ const en = {
         rewritten: 'Changed',
         added: 'Added',
         removed: 'Removed',
+        moved: 'Moved',
         arrow: 'becomes',
       },
       diff: {
@@ -285,6 +255,8 @@ const en = {
         empty: 'No differences with your original resume yet.',
         addedLabel: 'Added',
         removedLabel: 'Removed',
+        movedLabel: 'Moved',
+        movedText: 'from position {from} to {to}',
         fields: {
           fullName: 'Name',
           headline: 'Headline',
@@ -304,8 +276,10 @@ const en = {
         'Registering the application…',
       ],
       applied: 'Done: you applied with your tailored resume.',
+      appliedKeep:
+        'The tailored resume lives on the application, not in "My resumes". Download it and upload it again if you want it among your own.',
       appliedAlready:
-        'You had already applied to this job. Your tailored resume was saved to "My resumes" anyway.',
+        'You had already applied to this job, so no second application was registered.',
       applyError:
         'We could not complete the application. If your tailored resume was saved, you will find it in "My resumes".',
       close: 'Close',
@@ -314,9 +288,9 @@ const en = {
         'Closing now loses the changes the agent made in this conversation.',
       discardConfirm: 'Discard',
       discardCancel: 'Keep editing',
-      externalTitle: 'Your tailored resume is saved',
+      externalTitle: 'Your tailored resume is ready',
       externalBody:
-        'This posting comes from {source}. We will download your tailored resume and open the original posting in a new tab so you can finish applying there.',
+        'This posting comes from {source}. We will download your tailored resume and open the original posting in a new tab so you can finish applying there. The resume lives on the application, not in "My resumes": upload it again if you want it among your own.',
       externalConfirm: 'Download resume and open the posting',
       externalDismiss: 'Not now',
       externalRetry: 'Try again',
@@ -788,6 +762,9 @@ const en = {
       emptyCta: 'Browse jobs',
       count: '{count} applications',
       appliedOn: 'Applied',
+      appliedWith: 'Resume used for application',
+      appliedWithUnnamed: 'the CV you chose',
+      appliedWithMissing: 'We did not record which CV you applied with.',
       lynqScore: 'LYNQ-SCORE',
       seeDetails: 'See details',
       lynqScoreExplanation: 'Score explanation',

@@ -140,6 +140,7 @@ const JobHeroSide = ({
   hasExternalUrl,
   applyState,
   applyDisabled,
+  tailorDisabled,
   onApply,
   onTailor,
   t,
@@ -223,7 +224,7 @@ const JobHeroSide = ({
               type="button"
               className="job-detail-tailor"
               onClick={onTailor}
-              disabled={applyDisabled}
+              disabled={tailorDisabled}
             >
               {t.tailorDialog.open}
             </button>
@@ -578,12 +579,17 @@ const JobDetailPage = () => {
   // is not offered — otherwise the button paints enabled over the feed's
   // placeholder and only disables a moment later, long enough to click it and be
   // refused.
+  const hasApplied =
+    applyState === 'applied' || applyState === 'already' || applyState === 'redirected'
   const applyDisabled = isExternal
     ? !detailsSettled || !externalUrl || applyState === 'applying'
-    : !detailsSettled ||
-      applyState === 'applying' ||
-      applyState === 'applied' ||
-      applyState === 'already'
+    : !detailsSettled || applyState === 'applying' || hasApplied
+  // Tailoring is not offered twice even on an external posting, where applying
+  // again is: the apply button there only reopens the source site, but a
+  // tailoring conversation ends in an application, and a second one for the same
+  // posting is refused. Letting it start means the whole conversation is spent
+  // to be turned away at the end.
+  const tailorDisabled = !detailsSettled || applyState === 'applying' || hasApplied
   // Owner-only close/re-open action. The button shown (and which endpoint it
   // hits) is derived from the job's live status; this only tracks the in-flight
   // request so the button can disable and surface an error.
@@ -601,8 +607,10 @@ const JobDetailPage = () => {
     setPickingResume(true)
   }
 
+
   const handleTailor = () => {
-    if (applyDisabled) return
+    // Same condition the button is disabled on, so the two cannot drift apart.
+    if (tailorDisabled) return
     setTailoring(true)
   }
 
@@ -752,6 +760,7 @@ const JobDetailPage = () => {
               hasExternalUrl={Boolean(externalUrl)}
               applyState={applyState}
               applyDisabled={applyDisabled}
+              tailorDisabled={tailorDisabled}
               onApply={handleApply}
               onTailor={handleTailor}
               t={t}
@@ -803,7 +812,6 @@ const JobDetailPage = () => {
 
       {tailoring && (
         <TailorResumeModal
-          job={job}
           jobId={jobId}
           isExternal={isExternal}
           externalUrl={externalUrl}

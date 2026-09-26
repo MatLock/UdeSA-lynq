@@ -13,12 +13,12 @@ import useRotatingPhrase from '../../hooks/useRotatingPhrase'
 import useTailorConversation from '../../hooks/useTailorConversation'
 import resumeService from '../../services/resumeService'
 import downloadFile from '../../utils/downloadFile'
+import requestUuid from '../../utils/requestUuid'
 import formatResumeDate from '../../utils/formatResumeDate'
 import resumeLabel from '../../utils/resumeLabel'
 import resumeChangeRows from '../../utils/resumeChangeRows'
 import resumeDiff from '../../utils/resumeDiff'
 import resumeSections from '../../utils/resumeSections'
-import tailorChangeLabel from '../../utils/tailorChangeLabel'
 import tailorChangedSections from '../../utils/tailorChangedSections'
 import strings, { activeLocale } from '../../i18n'
 import './TailorResumeModal.css'
@@ -34,7 +34,7 @@ const TIMELINE_VIEW = 'TIMELINE'
 
 const EXHAUSTED = 'EXHAUSTED'
 const DEFAULT_TEMPLATE = 'MODERN'
-const MAX_ALIAS_LENGTH = 100
+const ALIAS_LENGTH = 8
 
 const diffLabels = {
   ...strings.pages.resume.labels,
@@ -49,14 +49,10 @@ const timeOf = (iso, locale) => {
   return new Intl.DateTimeFormat(locale, { timeStyle: 'medium' }).format(at)
 }
 
-const aliasFor = (job) =>
-  [job?.title, job?.company?.name]
-    .filter(Boolean)
-    .join(' — ')
-    .slice(0, MAX_ALIAS_LENGTH)
+const newAlias = () =>
+  `cv_tailor_${requestUuid.newRequestUuid().replace(/-/g, '').slice(0, ALIAS_LENGTH)}`
 
 const TailorResumeModal = ({
-  job,
   jobId,
   isExternal = false,
   externalUrl = '',
@@ -87,6 +83,8 @@ const TailorResumeModal = ({
   const previewFileIdRef = useRef('')
   const beginWithRef = useRef(null)
   const transcriptRef = useRef(null)
+
+  const [alias] = useState(newAlias)
 
   const startingPhrase = useRotatingPhrase(t.starting, conversation.starting)
   const thinkingPhrase = useRotatingPhrase(t.thinking, conversation.thinking)
@@ -144,6 +142,7 @@ const TailorResumeModal = ({
           at: entry.at,
           added: turnDiff.added,
           removed: turnDiff.removed,
+          moved: turnDiff.moved,
           rows: resumeChangeRows(turnDiff.groups),
         }
       }),
@@ -201,44 +200,23 @@ const TailorResumeModal = ({
     conversation.send(message)
   }
 
-  const storeTailoredResume = async () => {
-    const preview = await resumeService.preview_resume(freshAuthFetch, {
-      resume: shownResume,
-      template: DEFAULT_TEMPLATE,
-    })
-    previewFileIdRef.current = preview.fileId
-
-    const created = await resumeService.create_resume(authFetch, {
-      name:
-        workingResume?.name ||
-        shownResume?.personal_info?.full_name ||
-        strings.pages.resume.untitled,
-      language: workingResume?.language,
-      resume: shownResume,
-      fileId: preview.fileId,
-      tailoredForJobId: jobId,
-    })
-    previewFileIdRef.current = ''
-
-    const alias = aliasFor(job)
-    if (!alias) return created
-    try {
-      const aliased = await resumeService.assign_alias(authFetch, created.id, alias)
-      return { ...created, ...aliased }
-    } catch {
-      return created
-    }
-  }
-
+  // The tailored resume never becomes one of the candidate's own: it is
+  // rendered into a file and the application carries that file. An external
+  // posting needs the PDF in the candidate's hands before they leave, so there
+  // the file is rendered first and handed back to the apply call afterwards,
+  // which keeps it a single document instead of two.
   const applyWithTailoredResume = async () => {
     if (!canApply) return
     setSaving(true)
     setSaveFailed(false)
     try {
-      const stored = await storeTailoredResume()
-      setSavedResume(stored)
-
       if (isExternal) {
+        const preview = await resumeService.preview_resume(freshAuthFetch, {
+          resume: shownResume,
+          template: DEFAULT_TEMPLATE,
+        })
+        previewFileIdRef.current = preview.fileId
+        setSavedResume({ ...preview, name: alias })
         setStage(SAVED)
         return
       }
@@ -246,7 +224,7 @@ const TailorResumeModal = ({
       const applied = await resumeService.tailor_apply(
         authFetch,
         conversation.conversationId,
-        stored.id,
+        { resumeName: alias, template: DEFAULT_TEMPLATE },
       )
       const result = applied?.alreadyApplied ? 'already' : 'applied'
       setOutcome(result)
@@ -261,10 +239,7 @@ const TailorResumeModal = ({
 
   const registerExternalApplication = async () => {
     try {
-      await downloadFile(
-        savedResume?.pdfUrl,
-        `${resumeLabel(savedResume, t.untitled)}.pdf`,
-      )
+      await downloadFile(savedResume?.pdfUrl, `${savedResume?.name ?? t.untitled}.pdf`)
     } catch {
       setOutcome('downloadError')
       setExternalBusy(false)
@@ -273,11 +248,11 @@ const TailorResumeModal = ({
     }
 
     try {
-      await resumeService.tailor_apply(
-        authFetch,
-        conversation.conversationId,
-        savedResume.id,
-      )
+      await resumeService.tailor_apply(authFetch, conversation.conversationId, {
+        fileId: savedResume.fileId,
+        resumeName: savedResume.name,
+      })
+      previewFileIdRef.current = ''
       setOutcome('redirected')
       onApplied?.('redirected')
     } catch {
@@ -475,6 +450,9 @@ const TailorResumeModal = ({
         {t.diff.diffView}
         <span className="tailor-resume-view-count is-added">+{diff.added}</span>
         <span className="tailor-resume-view-count is-removed">−{diff.removed}</span>
+        {diff.moved > 0 && (
+          <span className="tailor-resume-view-count is-moved">⇅{diff.moved}</span>
+        )}
       </button>
       <button
         type="button"
@@ -504,6 +482,11 @@ const TailorResumeModal = ({
           .join(' · ')}
       </span>
       <span className="tailor-resume-timeline-values">
+        {row.kind === 'moved' && (
+          <span className="tailor-resume-timeline-value is-after">
+            {t.diff.movedText.replace('{from}', row.from).replace('{to}', row.to)}
+          </span>
+        )}
         {row.before && (
           <span className="tailor-resume-timeline-value is-before">{row.before.text}</span>
         )}
@@ -543,6 +526,11 @@ const TailorResumeModal = ({
                   <span className="tailor-resume-view-count is-removed">
                     −{entry.removed}
                   </span>
+                  {entry.moved > 0 && (
+                    <span className="tailor-resume-view-count is-moved">
+                      ⇅{entry.moved}
+                    </span>
+                  )}
                 </span>
               </div>
               {entry.rows.length === 0 ? (
@@ -559,45 +547,18 @@ const TailorResumeModal = ({
     )
   }
 
-  const renderChanges = () => (
-    <div className="tailor-resume-changes">
-      <div className="tailor-resume-changes-header">
-        <span className="tailor-resume-changes-title">{t.changesTitle}</span>
-        <span className="tailor-resume-changes-counts">
-          <span className="tailor-resume-view-count is-added">+{diff.added}</span>
-          <span className="tailor-resume-view-count is-removed">−{diff.removed}</span>
-        </span>
-      </div>
-      <ul>
-        {conversation.changes.map((change, index) => (
-          <li key={`${change.section}-${index}`}>
-            {tailorChangeLabel(change, t.changeLabels)}
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-
   const renderDocument = () => (
     <div className="tailor-resume-preview">
       <header className="tailor-resume-preview-header">
         <h4 className="tailor-resume-preview-title">{t.documentHeading}</h4>
-        <span className="tailor-resume-version">
-          {conversation.version > 0
-            ? t.versionLabel.replace('{version}', conversation.version)
-            : t.baseVersion}
-        </span>
       </header>
 
       {(hasDiff || timeline.length > 0) && renderPreviewToggle()}
 
       {previewView === DIFF_VIEW && (
-        <>
-          {conversation.changes.length > 0 && renderChanges()}
-          <div className="tailor-resume-document">
-            <ResumeDiff groups={diff.groups} />
-          </div>
-        </>
+        <div className="tailor-resume-document">
+          <ResumeDiff groups={diff.groups} />
+        </div>
       )}
 
       {previewView === TIMELINE_VIEW && (
@@ -732,6 +693,7 @@ const TailorResumeModal = ({
       <p className="tailor-resume-note is-success">
         {outcome === 'already' ? t.appliedAlready : t.applied}
       </p>
+      <p className="tailor-resume-note is-info">{t.appliedKeep}</p>
       <div className="tailor-resume-actions">
         <button type="button" className="tailor-resume-button" onClick={closeNow}>
           {t.close}

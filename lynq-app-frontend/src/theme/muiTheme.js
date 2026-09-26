@@ -37,7 +37,7 @@ const muiTheme = createTheme({
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: token("--radius-chip", "2px"),
+          borderRadius: token("--radius-chip", "999px"),
           fontFamily: token("--sans", "IBM Plex Sans, sans-serif"),
           fontWeight: 500,
           height: "auto",

@@ -331,9 +331,10 @@ const create_job = async (
  * `authFetch`. Powers the owner's "see candidates" list reached from the my-job-
  * posts cards. Each item carries the applicant's public profile, their LYNQ
  * match score for this job, and `userResumeUrl` — a short-lived download URL for
- * the resume they chose to apply with, null for applications registered before
- * that choice existed. Note the backend paging param is `pageSize` (not
- * `size`).
+ * the document they applied with, named by `userResumeName`. Both hang off the
+ * application rather than off the candidate's stored resumes, because a CV
+ * Tailor resume is never stored as one of those. Note the backend paging param
+ * is `pageSize` (not `size`).
  *
  * @param {(path: string, options?: object) => Promise<object>} authFetch
  * @param {string} jobId
@@ -342,7 +343,8 @@ const create_job = async (
  * @param {number} [params.pageSize=10] - Page size.
  * @returns {Promise<object>} The unwrapped PagedRestResponse of
  *   JobCandidateResponse ({ id, userId, jobId, userFullName, userProfileImage,
- *   userCurrentPosition, userAppliedOn, userResumeUrl, lynqScore }).
+ *   userCurrentPosition, userAppliedOn, userResumeUrl, userResumeName,
+ *   lynqScore }).
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
 const get_job_candidates = async (authFetch, jobId, { page = 0, pageSize = 10 } = {}) => {

@@ -83,7 +83,10 @@
   --overlay-light: rgb(255 255 255 / 0.24);
 
   --radius-square: 0;
-  --radius-chip: 2px;
+  --radius-control: 2px;
+  --radius-pill: 999px;
+  --radius-bubble: 16px;
+  --radius-chip: var(--radius-pill);
   --radius-code: 3px;
   --border-hairline: 1px;
   --border-accent: 3px;

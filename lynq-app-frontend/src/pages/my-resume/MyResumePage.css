@@ -108,7 +108,7 @@
   max-width: 280px;
   padding: 6px 8px 6px 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-control);
   font: inherit;
   font-size: 14px;
   color: var(--text);
@@ -202,7 +202,7 @@
   gap: 6px;
   padding: 6px 14px;
   border: 1px solid var(--accent-border);
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-control);
   font-size: 13px;
   font-weight: 600;
   color: var(--brand-purple-dark);
@@ -228,7 +228,7 @@
   gap: 6px;
   padding: 6px 14px;
   border: 1px solid var(--accent-border);
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-control);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
@@ -255,7 +255,7 @@
   gap: 6px;
   padding: 6px 14px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-control);
   font: inherit;
   font-size: 13px;
   font-weight: 600;

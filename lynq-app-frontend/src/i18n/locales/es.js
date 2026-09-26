@@ -235,40 +235,9 @@ const es = {
       exhausted:
         'Llegaste al límite de ajustes de esta conversación. Podés postularte con el CV como está o empezar de nuevo.',
       warningsTitle: 'Lo que el agente no hizo',
-      changesTitle: 'Cambios totales',
-      changeLabels: {
-        summaryRewrite: 'Reescribió el resumen',
-        entryRewrite: '{entry} {position}: reescribió {fields}',
-        reorder: 'Reordenó {section}',
-        skillsRewrite: 'Reescribió las habilidades: {fields}',
-        separator: ' y ',
-        entries: {
-          work_experience: 'Experiencia',
-          education: 'Formación',
-          projects: 'Proyecto',
-        },
-        sections: {
-          summary: 'el resumen',
-          skills: 'las habilidades',
-          work_experience: 'la experiencia laboral',
-          education: 'la formación',
-          projects: 'los proyectos',
-        },
-        entryFields: {
-          description: 'la descripción',
-          achievements: 'los logros',
-        },
-        skillBuckets: {
-          technical: 'técnicas',
-          tools: 'herramientas',
-          soft: 'blandas',
-        },
-      },
       documentTab: 'CV adaptado',
       chatTab: 'Conversación',
       documentHeading: 'Tu CV adaptado',
-      versionLabel: 'Versión {version}',
-      baseVersion: 'Todavía sin cambios',
       timeline: {
         turn: 'Turno {turn}',
         empty: 'Todavía no hay turnos para mostrar.',
@@ -276,6 +245,7 @@ const es = {
         rewritten: 'Cambiado',
         added: 'Agregado',
         removed: 'Eliminado',
+        moved: 'Movido',
         arrow: 'pasa a',
       },
       diff: {
@@ -285,6 +255,8 @@ const es = {
         empty: 'Todavía no hay diferencias con tu CV original.',
         addedLabel: 'Agregado',
         removedLabel: 'Eliminado',
+        movedLabel: 'Movido',
+        movedText: 'del lugar {from} al {to}',
         fields: {
           fullName: 'Nombre',
           headline: 'Titular',
@@ -304,8 +276,10 @@ const es = {
         'Registrando la postulación…',
       ],
       applied: 'Listo: te postulaste con tu CV adaptado.',
+      appliedKeep:
+        'El CV adaptado queda en la postulación, no en "Mis CVs". Si lo querés tener entre los tuyos, descargalo y subilo de nuevo.',
       appliedAlready:
-        'Ya te habías postulado a este empleo. Guardamos igual tu CV adaptado en "Mis CVs".',
+        'Ya te habías postulado a este empleo, así que no registramos una segunda postulación.',
       applyError:
         'No pudimos completar la postulación. Si tu CV adaptado se guardó, lo vas a encontrar en "Mis CVs".',
       close: 'Cerrar',
@@ -314,9 +288,9 @@ const es = {
         'Si cerrás ahora se pierden los cambios que el agente hizo en esta conversación.',
       discardConfirm: 'Descartar',
       discardCancel: 'Seguir editando',
-      externalTitle: 'Tu CV adaptado quedó guardado',
+      externalTitle: 'Tu CV adaptado está listo',
       externalBody:
-        'Este aviso es de {source}. Vamos a descargar tu CV adaptado y abrir la publicación original en una pestaña nueva para que completes la postulación ahí.',
+        'Este aviso es de {source}. Vamos a descargar tu CV adaptado y abrir la publicación original en una pestaña nueva para que completes la postulación ahí. El CV queda en la postulación, no en "Mis CVs": si lo querés tener entre los tuyos, subilo de nuevo.',
       externalConfirm: 'Descargar CV y abrir el aviso',
       externalDismiss: 'Ahora no',
       externalRetry: 'Reintentar',
@@ -788,6 +762,9 @@ const es = {
       emptyCta: 'Explorar empleos',
       count: '{count} postulaciones',
       appliedOn: 'Te postulaste',
+      appliedWith: 'CV utilizado',
+      appliedWithUnnamed: 'el CV que elegiste',
+      appliedWithMissing: 'No guardamos con qué CV te postulaste.',
       lynqScore: 'LYNQ-SCORE',
       seeDetails: 'Ver detalle',
       lynqScoreExplanation: 'Explicación del score',
