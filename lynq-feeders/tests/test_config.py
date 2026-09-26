@@ -24,7 +24,17 @@ class SettingsTest(unittest.TestCase):
 
         self.assertEqual(
             settings.categories,
-            ["ADMINISTRACION", "TECNOLOGIA", "CONTABILIDAD", "RECURSOS_HUMANOS"],
+            [
+                "ADMINISTRACION",
+                "TECNOLOGIA",
+                "CONTABILIDAD",
+                "RECURSOS HUMANOS",
+                "JAVA",
+                "NODEJS",
+                "PYTHON",
+                "SCALA",
+                "BASE DE DATOS",
+            ],
         )
         self.assertEqual(settings.sources, ["bumeran", "computrabajo"])
 
