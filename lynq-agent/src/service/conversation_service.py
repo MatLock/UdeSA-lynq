@@ -413,6 +413,7 @@ class ConversationService:
             history=[(message.role, message.content) for message in history],
             message=request.message,
             max_steps=conversation.max_steps,
+            max_edits=self._settings.max_edits,
             turns_left=self._turns_left(conversation),
             resume_version_id=current.id if current else None,
         )

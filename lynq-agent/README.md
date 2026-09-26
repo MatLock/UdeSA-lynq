@@ -53,21 +53,36 @@ candidate sees it, and plain prose becomes the reply as it is.
 | Tool | What it does |
 | --- | --- |
 | `find_evidence(claims)` | Lexical search **in code** over the base resume, never the model judging itself: normalised (lowercase, no accents, no symbols), by prefix for claims of four characters or more and by exact word for the short ones (`Go`, `C#`, `AWS`). It takes up to 20 claims and answers one `{claim, hits}` per claim, each hit a `{path, matched}` with the wording the resume already uses, and it never looks at `personal_info`. The batch is deliberate: a call costs one step whatever it carries, so a turn that looked up eight skills one at a time used to burn eight of its `AGENT_MAX_STEPS` before editing anything |
-| `apply_edit(section, op, payload)` | The only way the resume changes. Answers `OK` or `REJECTED: <reason>`, and the reasons are literal and stable because `docs/queries.sql` groups by them |
+| `rewrite_summary(text)` | Replaces the summary |
+| `rewrite_entry(section, index, description, achievements)` | Rewrites the prose of one entry of the experience, the education or the projects |
+| `reorder_entries(section, order)` | Reorders a section without adding or dropping anything |
+| `replace_skills(technical, tools, soft)` | Replaces the skill buckets it is given, and keeps the ones it is not |
 
-The guardrails live in `apply_edit`, in code, not in the prompt: `personal_info is
-immutable`, `dates are immutable`, `new entries are not allowed`, `no evidence in base
-resume` — a skill only enters if `find_evidence` backs it, and it enters with the
-wording of the resume, so a posting asking for `PostgreSQL` over a resume saying
-`Postgres` adds `Postgres` — and `payload language (es) does not match resume language
-(en)`, a `langdetect` check bounded to prose longer than 80 characters once the skill
-names are taken out.
+The four edit tools are the only way the resume changes. Each answers `OK` or
+`REJECTED: <reason>`, and the reasons are literal and stable because `docs/queries.sql`
+groups by them. They are four rather than one `apply_edit` carrying a free-form payload
+on purpose: Bedrock validates a tool call against the schema it was given, and an
+argument list of strings, integers and lists of strings is something a model can fill
+without inventing structure. The single tool took `payload: dict[str, Any]`, which
+reaches Converse as an object with no properties; a model that guesses that shape wrong
+takes the whole turn down with `ModelErrorException: Model produced invalid sequence as
+part of ToolUse`.
+
+Some guardrails are now the schema's job: there is no argument for a date, for a new
+entry or for an operation, so none of those can even be asked for. The rest live in the
+tools, in code, not in the prompt: `personal_info is immutable`, `index out of range`,
+`field is not editable` — `achievements` belong to `work_experience` alone — `no
+evidence in base resume`, since a skill only enters if `find_evidence` backs it and it
+enters with the wording of the resume, so a posting asking for `PostgreSQL` over a resume
+saying `Postgres` adds `Postgres`, and `payload language (es) does not match resume
+language (en)`, a `langdetect` check bounded to prose longer than 80 characters once the
+skill names are taken out.
 
 **The model never sees `personal_info`.** The code splits it off before rendering the
 prompt and pins it back when each version is serialized (§13.2 of the plan: it is the
 bias channel that gets closed by construction, not by asking the model nicely).
 
-The answer's `resume` comes from what `apply_edit` left behind, never from the text of
+The answer's `resume` comes from what the edit tools left behind, never from the text of
 the model, which only contributes `reply` and `warnings`.
 
 `AGENT_MAX_STEPS` is a **soft** cap: `agent/callbacks.py` counts the steps, and once the
@@ -75,6 +90,23 @@ budget is spent the tools answer `STEP LIMIT REACHED ...` and a `kind='limit'` s
 written, so the candidate gets a partial but valid answer instead of a 502. The hard cap
 is LangGraph's `recursion_limit = 2 * max_steps + 6` — a ReAct cycle costs two graph
 steps, so anything tighter makes the hard cap fire first.
+
+`AGENT_MAX_EDITS` is the other soft cap, and it counts edits rather than steps: once a
+turn has applied that many, the edit tools answer `EDIT LIMIT REACHED ...` and leave their
+own `kind='limit'` span. Two edits a turn keep each exchange reviewable, and the prompt
+has every reply close with the edits the agent would make next — the ones the budget left
+out and whatever else the posting still asks for — so the candidate decides what happens
+in the following turn. The last exchange is the exception: there is nothing left to
+recommend for, so it closes by suggesting the candidate applies with the resume as it is.
+
+Bedrock answers `ModelErrorException: Model produced invalid sequence as part of ToolUse`
+when the model emits a tool call it cannot parse — an ambiguous tool schema, a generation
+cut short, or plain bad luck. It is intermittent, so `ModelRetryMiddleware` retries the
+model call `AGENT_MODEL_RETRIES` times with backoff before the turn is given up on; the
+tools are not re-run, only the call that broke. `llm/errors.py` decides what is worth
+retrying by the AWS error code, so an `AccessDenied` still fails at once. Every attempt
+costs a step and leaves its own span, so a retried turn shows the failure and the recovery
+in its trace.
 
 The tokens of each call come from the `usage_metadata` of the `AIMessage`, never
 estimated, and the tariff of the model lives in `src/llm/pricing.py` and is frozen onto
@@ -216,6 +248,8 @@ something to fix in the prompt: the loop is aimed at Nova Pro.
 | `AGENT_CONVERSATION_TTL_DAYS` | `180` | Days before a conversation is deleted outright |
 | `AGENT_MAX_TURNS` | `10` | Exchanges a conversation accepts; copied onto the row at creation |
 | `AGENT_MAX_STEPS` | `12` | Steps the loop may take in one turn; copied onto the row at creation |
+| `AGENT_MAX_EDITS` | `2` | Edits one turn may apply before the edit tools answer `EDIT LIMIT REACHED`; read live from the settings, never copied onto the row |
+| `AGENT_MODEL_RETRIES` | `2` | Times a model call is retried when Bedrock rejects what the model emitted; each attempt costs a step |
 | `AGENT_TURN_TIMEOUT` | `600` | Seconds before a `RUNNING` turn is treated as a dead process. Operational, never copied onto the row |
 | `AGENT_JOB_DESCRIPTION_MAX_CHARS` | `6000` | The posting is truncated to this before it is frozen into the snapshot |
 | `LYNQ_ML_URL` | `http://localhost:8084/lynq-ml` | Where the skill extraction of the posting is asked for |

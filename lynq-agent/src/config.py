@@ -50,6 +50,8 @@ class Settings:
 
         self.max_turns: int = _int("AGENT_MAX_TURNS", 10)
         self.max_steps: int = _int("AGENT_MAX_STEPS", 12)
+        self.max_edits: int = _int("AGENT_MAX_EDITS", 2)
+        self.model_retries: int = _int("AGENT_MODEL_RETRIES", 2)
         self.turn_timeout_seconds: int = _int("AGENT_TURN_TIMEOUT", 600)
         self.job_description_max_chars: int = _int(
             "AGENT_JOB_DESCRIPTION_MAX_CHARS", 6000

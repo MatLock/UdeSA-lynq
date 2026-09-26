@@ -49,12 +49,8 @@ class CheckpointTest(unittest.IsolatedAsyncioTestCase):
         model = scripted(
             tool_call("find_evidence", {"claims": ["Go"]}, "1"),
             tool_call(
-                "apply_edit",
-                {
-                    "section": "skills",
-                    "op": "replace",
-                    "payload": {"technical": ["Java", "Postgres", "Go"]},
-                },
+                "replace_skills",
+                {"technical": ["Java", "Postgres", "Go"]},
                 "2",
             ),
             tool_call(
@@ -75,21 +71,13 @@ class CheckpointTest(unittest.IsolatedAsyncioTestCase):
             tools["find_evidence"].output, '[{"claim": "Go", "hits": []}]'
         )
         self.assertEqual(
-            tools["apply_edit"].output, "REJECTED: no evidence in base resume"
+            tools["replace_skills"].output, "REJECTED: no evidence in base resume"
         )
 
     async def test_the_agent_talks_in_one_language_and_edits_in_the_other(self) -> None:
         model = scripted(
-            tool_call(
-                "apply_edit",
-                {"section": "summary", "op": "rewrite", "payload": {"text": ENGLISH_REWRITE}},
-                "1",
-            ),
-            tool_call(
-                "apply_edit",
-                {"section": "summary", "op": "rewrite", "payload": {"text": SUMMARY_REWRITE}},
-                "2",
-            ),
+            tool_call("rewrite_summary", {"text": ENGLISH_REWRITE}, "1"),
+            tool_call("rewrite_summary", {"text": SUMMARY_REWRITE}, "2"),
             tool_call("TurnAnswer", {"reply": "I rewrote your summary."}, "3"),
         )
 

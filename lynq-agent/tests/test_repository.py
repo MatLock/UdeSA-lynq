@@ -151,7 +151,7 @@ class RepositoryTest(unittest.IsolatedAsyncioTestCase):
                 completion_tokens=200,
                 cost_usd=Decimal("0.00144000"),
             ),
-            SpanRecord(step=2, kind=SpanKind.TOOL, name="apply_edit"),
+            SpanRecord(step=2, kind=SpanKind.TOOL, name="rewrite_summary"),
         ]
 
         async with self.database.session_factory() as session:

@@ -47,6 +47,7 @@ def render(
     language: str,
     resume_language: str,
     max_steps: int,
+    max_edits: int,
     turns_left: int,
 ) -> str:
     template = _environment.get_template(f"{provider}.jinja")
@@ -62,5 +63,6 @@ def render(
         language=language_name(language),
         resume_language=language_name(resume_language),
         max_steps=max_steps,
+        max_edits=max_edits,
         turns_left=turns_left,
     )

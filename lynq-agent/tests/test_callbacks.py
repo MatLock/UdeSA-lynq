@@ -90,7 +90,7 @@ class TraceCollectorTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_tool_span_keeps_its_name_and_its_answer(self) -> None:
         run = uuid4()
         await self.collector.on_tool_start(
-            {"name": "apply_edit"}, '{"section": "summary"}', run_id=run
+            {"name": "rewrite_summary"}, '{"text": "Kubernetes first."}', run_id=run
         )
         await self.collector.on_tool_end(
             ToolMessage(content="OK", tool_call_id="1"), run_id=run
@@ -98,7 +98,7 @@ class TraceCollectorTest(unittest.IsolatedAsyncioTestCase):
 
         span = self.state.spans[0]
         self.assertEqual(span.kind, SpanKind.TOOL)
-        self.assertEqual(span.name, "apply_edit")
+        self.assertEqual(span.name, "rewrite_summary")
         self.assertEqual(span.output, "OK")
 
     async def test_a_tool_that_answers_an_empty_list_is_not_serialized_as_its_message(self) -> None:
@@ -121,7 +121,9 @@ class TraceCollectorTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_an_error_of_a_tool_becomes_an_error_span(self) -> None:
         run = uuid4()
-        await self.collector.on_tool_start({"name": "apply_edit"}, "{}", run_id=run)
+        await self.collector.on_tool_start(
+            {"name": "rewrite_summary"}, "{}", run_id=run
+        )
         await self.collector.on_tool_error(RuntimeError("boom"), run_id=run)
 
         self.assertEqual(self.state.spans[0].kind, SpanKind.ERROR)

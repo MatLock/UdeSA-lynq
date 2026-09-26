@@ -10,7 +10,16 @@ log = logging.getLogger(__name__)
 
 INSTRUCTIONS_END = "<job_posting>"
 SHINGLE_WORDS = 8
-MARKERS = ("find_evidence", "apply_edit", "turnanswer", "job_posting", "system_prompt")
+MARKERS = (
+    "find_evidence",
+    "rewrite_summary",
+    "rewrite_entry",
+    "reorder_entries",
+    "replace_skills",
+    "turnanswer",
+    "job_posting",
+    "system_prompt",
+)
 SPAN_NAME = "out_of_scope"
 SPAN_REASON = "the answer echoed the instructions"
 
