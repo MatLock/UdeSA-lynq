@@ -21,6 +21,7 @@ def _listing(**overrides) -> Listing:
         source="computrabajo",
         category="TECNOLOGIA",
         company="Lectus",
+        company_logo_url="https://ii.ct-stc.com/lectus.jpeg",
         description="Python y FastAPI.",
         remote=True,
         salary_min=1500000.0,
@@ -63,6 +64,7 @@ class ToIngestPayloadTest(unittest.TestCase):
         self.assertEqual(payload["title"], "Backend Developer")
         self.assertEqual(payload["jobPostSource"], "COMPUTRABAJO")
         self.assertEqual(payload["companyName"], "Lectus")
+        self.assertEqual(payload["companyLogoUrl"], "https://ii.ct-stc.com/lectus.jpeg")
         self.assertEqual(payload["jobUrl"], "https://ar.computrabajo.com/oferta")
         self.assertEqual(payload["skills"], ["Python"])
         self.assertEqual(payload["similarityTags"], ["Backend Development"])

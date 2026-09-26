@@ -435,11 +435,17 @@ public class UserService {
         .jobDescription(projection.jobDescription())
         .companyId(projection.companyId())
         .companyName(projection.companyName())
-        .companyProfileImage(signedUrl(logoUrls, projection.companyFileStorageId()))
+        .companyProfileImage(companyImageUrl(logoUrls, projection))
         .appliedOn(projection.appliedOn())
         .lynqScore(LyNQScoreCalculator.score(splitSkills(projection.jobSkills()),
             splitSkills(projection.jobSimilarityTags()), candidateSkills, candidateSimilarityTags))
         .build();
+  }
+
+  private static String companyImageUrl(Map<String, String> downloadUrls,
+      UserApplicationProjection projection) {
+    String uploaded = signedUrl(downloadUrls, projection.companyFileStorageId());
+    return uploaded != null ? uploaded : projection.companyLogoUrl();
   }
 
   private static String signedUrl(Map<String, String> downloadUrls, String fileId) {

@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import AutoFixHighOutlinedIcon from '@mui/icons-material/AutoFixHighOutlined'
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded'
 import ConfirmDialog from '../ConfirmDialog/ConfirmDialog.jsx'
+import ResumeDiff from '../ResumeDiff/ResumeDiff.jsx'
 import ResumeDocument from '../ResumeDocument/ResumeDocument.jsx'
 import Spinner from '../Spinner/Spinner.jsx'
 import useApi from '../../hooks/useApi'
@@ -14,9 +15,12 @@ import resumeService from '../../services/resumeService'
 import downloadFile from '../../utils/downloadFile'
 import formatResumeDate from '../../utils/formatResumeDate'
 import resumeLabel from '../../utils/resumeLabel'
+import resumeChangeRows from '../../utils/resumeChangeRows'
+import resumeDiff from '../../utils/resumeDiff'
 import resumeSections from '../../utils/resumeSections'
+import tailorChangeLabel from '../../utils/tailorChangeLabel'
 import tailorChangedSections from '../../utils/tailorChangedSections'
-import strings from '../../i18n'
+import strings, { activeLocale } from '../../i18n'
 import './TailorResumeModal.css'
 
 const PICK_RESUME = 'PICK_RESUME'
@@ -24,9 +28,26 @@ const CHAT = 'CHAT'
 const SAVED = 'SAVED'
 const DONE = 'DONE'
 
+const DOCUMENT_VIEW = 'DOCUMENT'
+const DIFF_VIEW = 'DIFF'
+const TIMELINE_VIEW = 'TIMELINE'
+
 const EXHAUSTED = 'EXHAUSTED'
 const DEFAULT_TEMPLATE = 'MODERN'
 const MAX_ALIAS_LENGTH = 100
+
+const diffLabels = {
+  ...strings.pages.resume.labels,
+  ...strings.jobDetail.tailorDialog.diff.fields,
+}
+
+const sectionNames = strings.pages.resume.sections
+
+const timeOf = (iso, locale) => {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return ''
+  return new Intl.DateTimeFormat(locale, { timeStyle: 'medium' }).format(at)
+}
 
 const aliasFor = (job) =>
   [job?.title, job?.company?.name]
@@ -55,6 +76,7 @@ const TailorResumeModal = ({
   const [stage, setStage] = useState(PICK_RESUME)
   const [draft, setDraft] = useState('')
   const [mobileTab, setMobileTab] = useState('chat')
+  const [chosenPreviewView, setChosenPreviewView] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saveFailed, setSaveFailed] = useState(false)
   const [savedResume, setSavedResume] = useState(null)
@@ -110,6 +132,23 @@ const TailorResumeModal = ({
   const isExhausted = conversation.status === EXHAUSTED
   const shownResume = conversation.resume ?? workingResume?.resume ?? null
   const changedSections = tailorChangedSections(conversation.changes)
+  const diff = resumeDiff.compare(workingResume?.resume ?? null, shownResume, diffLabels)
+  const hasDiff = diff.groups.length > 0
+  const previewView = chosenPreviewView ?? (hasDiff ? DIFF_VIEW : DOCUMENT_VIEW)
+  const timeline = useMemo(
+    () =>
+      conversation.turns.map((entry) => {
+        const turnDiff = resumeDiff.compare(entry.before, entry.after, diffLabels)
+        return {
+          turn: entry.turn,
+          at: entry.at,
+          added: turnDiff.added,
+          removed: turnDiff.removed,
+          rows: resumeChangeRows(turnDiff.groups),
+        }
+      }),
+    [conversation.turns],
+  )
   const canApply =
     Boolean(shownResume) && (conversation.version > 0 || isExhausted) && !busy
 
@@ -145,6 +184,7 @@ const TailorResumeModal = ({
     if (busy) return
     conversation.reset()
     setDraft('')
+    setChosenPreviewView(null)
     if (resumes?.length === 1) {
       beginWith(resumes[0])
       return
@@ -408,6 +448,136 @@ const TailorResumeModal = ({
     </div>
   )
 
+  const renderPreviewToggle = () => (
+    <div className="tailor-resume-views" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={previewView === DOCUMENT_VIEW}
+        className={
+          previewView === DOCUMENT_VIEW
+            ? 'tailor-resume-view is-active'
+            : 'tailor-resume-view'
+        }
+        onClick={() => setChosenPreviewView(DOCUMENT_VIEW)}
+      >
+        {t.diff.documentView}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={previewView === DIFF_VIEW}
+        className={
+          previewView === DIFF_VIEW ? 'tailor-resume-view is-active' : 'tailor-resume-view'
+        }
+        onClick={() => setChosenPreviewView(DIFF_VIEW)}
+      >
+        {t.diff.diffView}
+        <span className="tailor-resume-view-count is-added">+{diff.added}</span>
+        <span className="tailor-resume-view-count is-removed">−{diff.removed}</span>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={previewView === TIMELINE_VIEW}
+        className={
+          previewView === TIMELINE_VIEW
+            ? 'tailor-resume-view is-active'
+            : 'tailor-resume-view'
+        }
+        onClick={() => setChosenPreviewView(TIMELINE_VIEW)}
+      >
+        {t.diff.timelineView}
+      </button>
+    </div>
+  )
+
+  const renderTimelineRow = (row, index) => (
+    <li className={`tailor-resume-timeline-row is-${row.kind}`} key={`${row.field}-${index}`}>
+      <span className="tailor-resume-timeline-place">
+        <span className={`tailor-resume-timeline-kind is-${row.kind}`}>
+          {t.timeline[row.kind]}
+        </span>
+        {[sectionNames[row.section], row.entry, row.field]
+          .filter(Boolean)
+          .filter((part, index, parts) => parts.indexOf(part) === index)
+          .join(' · ')}
+      </span>
+      <span className="tailor-resume-timeline-values">
+        {row.before && (
+          <span className="tailor-resume-timeline-value is-before">{row.before.text}</span>
+        )}
+        {row.before && row.after && (
+          <span className="tailor-resume-timeline-arrow">
+            <span aria-hidden="true">→</span>
+            <span className="tailor-resume-reader-only">{t.timeline.arrow}</span>
+          </span>
+        )}
+        {row.after && (
+          <span className="tailor-resume-timeline-value is-after">{row.after.text}</span>
+        )}
+      </span>
+    </li>
+  )
+
+  const renderTimeline = () => {
+    if (timeline.length === 0) {
+      return <p className="tailor-resume-timeline-empty">{t.timeline.empty}</p>
+    }
+
+    return (
+      <ol className="tailor-resume-timeline">
+        {timeline.map((entry) => (
+          <li className="tailor-resume-timeline-turn" key={entry.turn}>
+            <span className="tailor-resume-timeline-marker" aria-hidden="true" />
+            <div className="tailor-resume-timeline-body">
+              <div className="tailor-resume-timeline-header">
+                <span className="tailor-resume-timeline-turn-label">
+                  {t.timeline.turn.replace('{turn}', entry.turn)}
+                </span>
+                <span className="tailor-resume-timeline-time">
+                  {timeOf(entry.at, activeLocale)}
+                </span>
+                <span className="tailor-resume-changes-counts">
+                  <span className="tailor-resume-view-count is-added">+{entry.added}</span>
+                  <span className="tailor-resume-view-count is-removed">
+                    −{entry.removed}
+                  </span>
+                </span>
+              </div>
+              {entry.rows.length === 0 ? (
+                <p className="tailor-resume-timeline-empty">{t.timeline.noChanges}</p>
+              ) : (
+                <ul className="tailor-resume-timeline-rows">
+                  {entry.rows.map(renderTimelineRow)}
+                </ul>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
+    )
+  }
+
+  const renderChanges = () => (
+    <div className="tailor-resume-changes">
+      <div className="tailor-resume-changes-header">
+        <span className="tailor-resume-changes-title">{t.changesTitle}</span>
+        <span className="tailor-resume-changes-counts">
+          <span className="tailor-resume-view-count is-added">+{diff.added}</span>
+          <span className="tailor-resume-view-count is-removed">−{diff.removed}</span>
+        </span>
+      </div>
+      <ul>
+        {conversation.changes.map((change, index) => (
+          <li key={`${change.section}-${index}`}>
+            {tailorChangeLabel(change, t.changeLabels)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+
   const renderDocument = () => (
     <div className="tailor-resume-preview">
       <header className="tailor-resume-preview-header">
@@ -419,29 +589,34 @@ const TailorResumeModal = ({
         </span>
       </header>
 
-      {conversation.changes.length > 0 && (
-        <div className="tailor-resume-changes">
-          <span className="tailor-resume-changes-title">{t.changesTitle}</span>
-          <ul>
-            {conversation.changes.map((change, index) => (
-              <li key={`${change.section}-${index}`}>{change.detail}</li>
-            ))}
-          </ul>
-          <p className="tailor-resume-changed-hint">{t.changedHint}</p>
-        </div>
+      {(hasDiff || timeline.length > 0) && renderPreviewToggle()}
+
+      {previewView === DIFF_VIEW && (
+        <>
+          {conversation.changes.length > 0 && renderChanges()}
+          <div className="tailor-resume-document">
+            <ResumeDiff groups={diff.groups} />
+          </div>
+        </>
       )}
 
-      <div
-        className="tailor-resume-document"
-        data-changed={changedSections.join(' ')}
-      >
-        {shownResume && (
-          <ResumeDocument
-            resume={shownResume}
-            sections={resumeSections.sectionsOf(shownResume)}
-          />
-        )}
-      </div>
+      {previewView === TIMELINE_VIEW && (
+        <div className="tailor-resume-document">{renderTimeline()}</div>
+      )}
+
+      {previewView === DOCUMENT_VIEW && (
+        <div
+          className="tailor-resume-document"
+          data-changed={changedSections.join(' ')}
+        >
+          {shownResume && (
+            <ResumeDocument
+              resume={shownResume}
+              sections={resumeSections.sectionsOf(shownResume)}
+            />
+          )}
+        </div>
+      )}
     </div>
   )
 

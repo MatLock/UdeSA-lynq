@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from itertools import dropwhile
 
 from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage
@@ -19,6 +20,7 @@ from agent.tools import apply_edit, find_evidence
 from config import BEDROCK, OLLAMA, get_settings
 from db.models import MessageRole, SpanKind
 from llm.factory import build_model
+from prompt.notice import render as no_change_notice
 from prompt.resume_tailor import reference, render
 
 log = logging.getLogger(__name__)
@@ -47,6 +49,8 @@ def turn_messages(context: TurnContext) -> list:
     history = list(context.history)
     if history and history[-1] == (MessageRole.USER, context.message):
         history = history[:-1]
+
+    history = list(dropwhile(lambda entry: entry[0] != MessageRole.USER, history))
 
     messages = [
         HumanMessage(content) if role == MessageRole.USER else AIMessage(content)
@@ -95,6 +99,10 @@ async def run_turn(context: TurnContext, model=None) -> TurnOutcome:
                 output=answer.reply,
                 error=SPAN_REASON,
             )
+        )
+    elif not state.changes:
+        answer = answer.model_copy(
+            update={"warnings": [*answer.warnings, no_change_notice(context.language)]}
         )
     log.info(
         "message= Turn finished, conversationId=%s, steps=%s, edits=%s, warnings=%s",

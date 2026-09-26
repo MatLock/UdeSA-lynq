@@ -14,6 +14,7 @@ _AVISO = {
     "modalidadTrabajo": "Remoto",
     "tipoTrabajo": "Full-time",
     "fechaHoraPublicacion": "10-09-2026 15:50:15",
+    "logoURL": "https://imgbum.jobscdn.com/portal/img/empresas/1/static/logoMainPic_1.jpg",
 }
 
 
@@ -56,11 +57,19 @@ class ToListingTest(unittest.TestCase):
         self.assertEqual(listing.external_id, "1118437287")
         self.assertEqual(listing.title, "DevSecOps Senior")
         self.assertEqual(listing.company, "KPMG")
+        self.assertEqual(
+            listing.company_logo_url,
+            "https://imgbum.jobscdn.com/portal/img/empresas/1/static/logoMainPic_1.jpg",
+        )
         self.assertEqual(listing.source, "bumeran")
         self.assertEqual(listing.category, "TECNOLOGIA")
         self.assertTrue(listing.remote)
         self.assertEqual(listing.work_type, "Full-time")
         self.assertIn("devsecops-senior-1118437287", listing.apply_url)
+
+    def test_a_confidential_listing_carries_no_logo(self):
+        listing = _to_listing({**_AVISO, "empresa": "Confidencial", "logoURL": None}, "TECNOLOGIA")
+        self.assertIsNone(listing.company_logo_url)
 
     def test_non_remote_modality_is_not_flagged_remote(self):
         listing = _to_listing({**_AVISO, "modalidadTrabajo": "Presencial"}, "TECNOLOGIA")

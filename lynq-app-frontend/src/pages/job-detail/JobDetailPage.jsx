@@ -207,25 +207,27 @@ const JobHeroSide = ({
         )}
         {/* Apply action, vertically centered on the hero's right edge. */}
         <div className="job-detail-hero-actions">
-          <button
-            type="button"
-            className={
-              isExternal ? 'job-detail-apply job-detail-apply--external' : 'job-detail-apply'
-            }
-            onClick={onApply}
-            disabled={applyDisabled}
-          >
-            {applyState === 'applying' ? applyBusyLabel : applyLabel}
-            {isExternal && <span aria-hidden="true"> ↗</span>}
-          </button>
-          <button
-            type="button"
-            className="job-detail-tailor"
-            onClick={onTailor}
-            disabled={applyDisabled}
-          >
-            {t.tailorDialog.open}
-          </button>
+          <div className="job-detail-apply-row">
+            <button
+              type="button"
+              className={
+                isExternal ? 'job-detail-apply job-detail-apply--external' : 'job-detail-apply'
+              }
+              onClick={onApply}
+              disabled={applyDisabled}
+            >
+              {applyState === 'applying' ? applyBusyLabel : applyLabel}
+              {isExternal && <span aria-hidden="true"> ↗</span>}
+            </button>
+            <button
+              type="button"
+              className="job-detail-tailor"
+              onClick={onTailor}
+              disabled={applyDisabled}
+            >
+              {t.tailorDialog.open}
+            </button>
+          </div>
           {isExternal && !hasExternalUrl && (
             <p className="job-detail-apply-status is-info">{t.externalNoUrl}</p>
           )}
@@ -710,7 +712,7 @@ const JobDetailPage = () => {
   const hasScore = !isCompany && job.lynqScore != null
   const skills = job.skills ?? []
   const company = job.company ?? null
-  const companyLogo = isExternal ? null : company?.profileImageUrl
+  const companyLogo = company?.profileImageUrl
   const recruiter = job.postedBy ?? null
   // The post belongs to the logged-in user when they are the one who created it.
   // Only LYNQ posts carry a poster, so external jobs never match.

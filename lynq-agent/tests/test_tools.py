@@ -63,41 +63,100 @@ def state_for(language: str = "es", resume_language: str = "es", max_steps: int 
     return build_turn_state(context)
 
 
+def hits_of(found, claim=None):
+    if claim is None:
+        return found[0]["hits"]
+    return next(entry["hits"] for entry in found if entry["claim"] == claim)
+
+
 class FindEvidenceTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_it_returns_the_wording_of_the_resume_not_of_the_posting(self) -> None:
         state = state_for()
         with use_turn_state(state):
-            hits = await find_evidence.ainvoke({"claim": "PostgreSQL"})
+            found = await find_evidence.ainvoke({"claims": ["PostgreSQL"]})
 
+        hits = hits_of(found)
         self.assertEqual([hit["matched"] for hit in hits], ["Postgres", "Postgres"])
         self.assertIn("summary", [hit["path"] for hit in hits])
 
     async def test_it_finds_a_skill_buried_in_prose(self) -> None:
         state = state_for()
         with use_turn_state(state):
-            hits = await find_evidence.ainvoke({"claim": "Kubernetes"})
+            found = await find_evidence.ainvoke({"claims": ["Kubernetes"]})
 
+        hits = hits_of(found)
         self.assertIn("work_experience[1].description", [hit["path"] for hit in hits])
 
     async def test_it_returns_nothing_when_the_resume_does_not_back_the_claim(self) -> None:
         state = state_for()
         with use_turn_state(state):
-            hits = await find_evidence.ainvoke({"claim": "Go"})
+            found = await find_evidence.ainvoke({"claims": ["Go"]})
 
-        self.assertEqual(hits, [])
+        self.assertEqual(hits_of(found), [])
 
     async def test_it_never_looks_at_personal_info(self) -> None:
         state = state_for()
         with use_turn_state(state):
-            hits = await find_evidence.ainvoke({"claim": "Lovelace"})
+            found = await find_evidence.ainvoke({"claims": ["Lovelace"]})
 
-        self.assertEqual(hits, [])
+        self.assertEqual(hits_of(found), [])
+
+    async def test_one_call_answers_every_claim_it_was_given(self) -> None:
+        state = state_for()
+        with use_turn_state(state):
+            found = await find_evidence.ainvoke(
+                {"claims": ["PostgreSQL", "Kubernetes", "Go", "Lovelace"]}
+            )
+
+        self.assertEqual(
+            [entry["claim"] for entry in found],
+            ["PostgreSQL", "Kubernetes", "Go", "Lovelace"],
+        )
+        self.assertNotEqual(hits_of(found, "PostgreSQL"), [])
+        self.assertNotEqual(hits_of(found, "Kubernetes"), [])
+        self.assertEqual(hits_of(found, "Go"), [])
+        self.assertEqual(hits_of(found, "Lovelace"), [])
+
+    async def test_a_batch_remembers_the_evidence_of_every_claim(self) -> None:
+        state = state_for()
+        with use_turn_state(state):
+            await find_evidence.ainvoke({"claims": ["Kubernetes", "PostgreSQL"]})
+
+        self.assertEqual(state.evidence["kubernetes"], "Kubernetes")
+        self.assertEqual(state.evidence["postgres"], "Postgres")
+
+    async def test_a_claim_asked_twice_is_looked_up_once(self) -> None:
+        state = state_for()
+        with use_turn_state(state):
+            found = await find_evidence.ainvoke(
+                {"claims": ["Kubernetes", "kubernetes ", "Kubernetes"]}
+            )
+
+        self.assertEqual([entry["claim"] for entry in found], ["Kubernetes"])
+
+    async def test_an_empty_claim_list_is_rejected(self) -> None:
+        state = state_for()
+        with use_turn_state(state):
+            answer = await find_evidence.ainvoke({"claims": ["", "   "]})
+
+        self.assertEqual(
+            answer, "REJECTED: claims must hold at least one non-empty string"
+        )
+
+    async def test_too_many_claims_in_one_call_are_rejected(self) -> None:
+        state = state_for()
+        with use_turn_state(state):
+            answer = await find_evidence.ainvoke(
+                {"claims": [f"skill {number}" for number in range(21)]}
+            )
+
+        self.assertEqual(answer, "REJECTED: at most 20 claims per call")
 
     async def test_what_it_finds_is_remembered_for_this_turn(self) -> None:
         state = state_for()
         with use_turn_state(state):
-            await find_evidence.ainvoke({"claim": "Kubernetes"})
+            await find_evidence.ainvoke({"claims": ["Kubernetes"]})
 
         self.assertEqual(state.evidence["kubernetes"], "Kubernetes")
 
@@ -138,7 +197,19 @@ class ApplyEditTest(unittest.IsolatedAsyncioTestCase):
             state, "work_experience", "reorder", {"order": [0, 1, 2]}
         )
 
-        self.assertEqual(answer, "REJECTED: new entries are not allowed")
+        self.assertEqual(
+            answer,
+            "REJECTED: order must list each of the 2 positions of work_experience "
+            "exactly once, from 0 to 1",
+        )
+
+    async def test_a_reorder_that_misses_a_position_says_how_many_there_are(self) -> None:
+        state = state_for()
+        answer = await self.edit(state, "work_experience", "reorder", {"order": [1]})
+
+        self.assertIn("2 positions of work_experience", answer)
+        self.assertEqual(state.changes, [])
+
 
     async def test_a_skill_without_evidence_is_rejected(self) -> None:
         state = state_for()
@@ -150,7 +221,7 @@ class ApplyEditTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_skill_enters_with_the_wording_of_the_resume(self) -> None:
         state = state_for()
         with use_turn_state(state):
-            await find_evidence.ainvoke({"claim": "Kubernetes"})
+            await find_evidence.ainvoke({"claims": ["Kubernetes"]})
         answer = await self.edit(
             state, "skills", "replace", {"technical": ["PostgreSQL", "Kubernetes"]}
         )
@@ -167,6 +238,34 @@ class ApplyEditTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(answer, "OK")
         self.assertEqual(state.resume["summary"], "Backend engineer on Kubernetes.")
         self.assertEqual(state.changes[0]["section"], "summary")
+
+    async def test_a_rewritten_entry_records_which_fields_and_which_entry(self) -> None:
+        state = state_for()
+        answer = await self.edit(
+            state,
+            "work_experience",
+            "rewrite",
+            {"index": 1, "description": "Ran the Kubernetes platform."},
+        )
+
+        self.assertEqual(answer, "OK")
+        change = state.changes[0]
+        self.assertEqual(change["section"], "work_experience")
+        self.assertEqual(change["kind"], "rewrite")
+        self.assertEqual(change["fields"], ["description"])
+        self.assertEqual(change["index"], 1)
+
+    async def test_a_skills_rewrite_records_the_buckets_it_touched(self) -> None:
+        state = state_for()
+        answer = await self.edit(
+            state, "skills", "replace", {"technical": ["Kubernetes"]}
+        )
+
+        self.assertEqual(answer, "OK")
+        change = state.changes[0]
+        self.assertEqual(change["section"], "skills")
+        self.assertEqual(change["fields"], ["technical"])
+        self.assertIsNone(change["index"])
 
     async def test_rewriting_the_summary_with_what_it_already_says_changes_nothing(self) -> None:
         state = state_for()
@@ -247,7 +346,7 @@ class StepLimitTest(unittest.IsolatedAsyncioTestCase):
         state.steps = 2
 
         with use_turn_state(state):
-            evidence = await find_evidence.ainvoke({"claim": "Kubernetes"})
+            evidence = await find_evidence.ainvoke({"claims": ["Kubernetes"]})
             edit = await apply_edit.ainvoke(
                 {"section": "summary", "op": "rewrite", "payload": {"text": "x"}}
             )
@@ -261,8 +360,8 @@ class StepLimitTest(unittest.IsolatedAsyncioTestCase):
         state.steps = 1
 
         with use_turn_state(state):
-            await find_evidence.ainvoke({"claim": "Kubernetes"})
-            await find_evidence.ainvoke({"claim": "Postgres"})
+            await find_evidence.ainvoke({"claims": ["Kubernetes"]})
+            await find_evidence.ainvoke({"claims": ["Postgres"]})
 
         limits = [span for span in state.spans if span.kind == SpanKind.LIMIT]
         self.assertEqual(len(limits), 1)
@@ -273,7 +372,7 @@ class OutsideATurnTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_tools_refuse_to_run_without_a_turn(self) -> None:
         with self.assertRaises(RuntimeError):
-            await find_evidence.ainvoke({"claim": "Kubernetes"})
+            await find_evidence.ainvoke({"claims": ["Kubernetes"]})
 
 
 class MoreApplyEditTest(unittest.IsolatedAsyncioTestCase):
@@ -339,7 +438,7 @@ class MoreApplyEditTest(unittest.IsolatedAsyncioTestCase):
         state = state_for()
         answer = await self.edit(state, "work_experience", "reorder", {"order": [0, 0]})
 
-        self.assertEqual(answer, "REJECTED: invalid payload")
+        self.assertIn("exactly once", answer)
 
     async def test_editing_a_section_the_resume_does_not_have_yet_is_out_of_range(self) -> None:
         state = state_for()
@@ -439,6 +538,6 @@ class EvidenceCapTest(unittest.IsolatedAsyncioTestCase):
         state = build_turn_state(context)
 
         with use_turn_state(state):
-            hits = await find_evidence.ainvoke({"claim": "Java"})
+            found = await find_evidence.ainvoke({"claims": ["Java"]})
 
-        self.assertEqual(len(hits), 10)
+        self.assertEqual(len(hits_of(found)), 10)

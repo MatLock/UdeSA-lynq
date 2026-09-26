@@ -145,11 +145,8 @@ const JobCard = ({
   const poster = job.postedBy
   const publishedAt = formatRelativeDate(job.createdOn)
 
-  // The logo shows the company's profile image for LYNQ-native posts. Scraped
-  // (external) posts carry no trusted company logo, so they fall back to the
-  // default icon.
   const isExternal = job.jobPostSource && job.jobPostSource !== 'LYNQ'
-  const logoUrl = isExternal ? null : job.company?.profileImageUrl
+  const logoUrl = job.company?.profileImageUrl
 
   return (
     <article className={`job-card${showStatus && isClosed ? ' is-closed' : ''}`}>

@@ -45,6 +45,8 @@ class JobIngestServiceTest {
   private static final String DESCRIPTION = "Referente tecnico en iniciativas de DevSecOps.";
   private static final String COMPANY_NAME = "KPMG";
   private static final String JOB_URL = "https://www.bumeran.com.ar/empleos/devsecops-senior-1118437287.html";
+  private static final String LOGO_URL = "https://imgbum.jobscdn.com/portal/img/empresas/1/logoMainPic_1.jpg";
+  private static final String NEW_LOGO_URL = "https://imgbum.jobscdn.com/portal/img/empresas/1/logoMainPic_2.jpg";
 
   private static final String EXPECTED_JOB_ID = "4b422947-8ced-54da-8c1c-ccbfb064f434";
   private static final String EXPECTED_COMPANY_ID = "2fd4e277-d7fb-5269-b87f-9291f24ad704";
@@ -194,6 +196,57 @@ class JobIngestServiceTest {
     IngestJobPostsRestResponse response = service.ingest(List.of(request().build()));
 
     assertThat(response.getCompanies(), is(0));
+    verify(companyRepository, never()).save(any(CompanyEntity.class));
+  }
+
+  @Test
+  void theScrapedLogoUrlIsStoredOnANewCompany() {
+    savesWhatItIsGiven();
+    ArgumentCaptor<CompanyEntity> captor = ArgumentCaptor.forClass(CompanyEntity.class);
+
+    service.ingest(List.of(request().companyLogoUrl(LOGO_URL).build()));
+
+    verify(companyRepository).save(captor.capture());
+    assertThat(captor.getValue().getLogoUrl(), is(LOGO_URL));
+  }
+
+  @Test
+  void anExistingCompanyPicksUpAVersionedLogoUrl() {
+    CompanyEntity existing = CompanyEntity.builder()
+        .id(EXPECTED_COMPANY_ID).name(COMPANY_NAME).logoUrl(LOGO_URL).build();
+    when(companyRepository.findById(EXPECTED_COMPANY_ID)).thenReturn(Optional.of(existing));
+    savesWhatItIsGiven();
+
+    service.ingest(List.of(request().companyLogoUrl(NEW_LOGO_URL).build()));
+
+    assertThat(existing.getLogoUrl(), is(NEW_LOGO_URL));
+    verify(companyRepository).save(existing);
+  }
+
+  @Test
+  void anUnchangedLogoUrlIsNotWrittenBack() {
+    CompanyEntity existing = CompanyEntity.builder()
+        .id(EXPECTED_COMPANY_ID).name(COMPANY_NAME).logoUrl(LOGO_URL).build();
+    when(companyRepository.findById(EXPECTED_COMPANY_ID)).thenReturn(Optional.of(existing));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    service.ingest(List.of(request().companyLogoUrl(LOGO_URL).build()));
+
+    verify(companyRepository, never()).save(any(CompanyEntity.class));
+  }
+
+  @Test
+  void aPostingWithoutALogoDoesNotWipeTheStoredOne() {
+    CompanyEntity existing = CompanyEntity.builder()
+        .id(EXPECTED_COMPANY_ID).name(COMPANY_NAME).logoUrl(LOGO_URL).build();
+    when(companyRepository.findById(EXPECTED_COMPANY_ID)).thenReturn(Optional.of(existing));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    service.ingest(List.of(request().companyLogoUrl(null).build()));
+
+    assertThat(existing.getLogoUrl(), is(LOGO_URL));
     verify(companyRepository, never()).save(any(CompanyEntity.class));
   }
 

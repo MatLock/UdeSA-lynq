@@ -27,6 +27,7 @@ BASE = "https://ar.computrabajo.com"
 MAX_RETRIES = 4
 SKILLS_SECTION_MARKER = "Aptitudes asociadas"
 DESCRIPTION_HEADING = "Descripción de la oferta"
+COMPANY_LOGO_SELECTOR = "div.logo_company img"
 
 _DIGIT_RE = re.compile(r"(\d+)")
 _HOURS_RE = re.compile(r"(\d{1,3})\s{0,3}hora")
@@ -41,6 +42,14 @@ def _text(node) -> Optional[str]:
         return None
     collapsed = _WHITESPACE_RE.sub(" ", node.get_text(strip=True)).strip()
     return collapsed or None
+
+
+def _company_logo(soup) -> Optional[str]:
+    image = soup.select_one(COMPANY_LOGO_SELECTOR)
+    source = image.get("src") if image else None
+    if not source:
+        return None
+    return f"https:{source}" if source.startswith("//") else source
 
 
 def _first_int(text: str, default: int = 1) -> int:
@@ -218,6 +227,8 @@ class ComputrabajoScraper:
                 exc,
             )
             return
+
+        listing.company_logo_url = _company_logo(soup)
 
         box = soup.find(attrs={"description-offer": True})
         block = box.select_one("div.mb40.pb40.bb1") if box else None

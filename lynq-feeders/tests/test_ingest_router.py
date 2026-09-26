@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from backend_client import BackendError, IngestStats
 from main import app
-from service import IngestReport, SourceReport
+from service import EnrichmentError, IngestReport, SourceReport
 
 INGEST = "/lynq-feeders/ingest"
 HEADERS = {"lynq-request-uuid": "11111111-2222-3333-4444-555555555555"}
@@ -61,6 +61,16 @@ class IngestRouterTest(unittest.TestCase):
         payload = response.json()
         self.assertFalse(payload["success"])
         self.assertIn("401", payload["reason"])
+
+    def test_a_failing_enrichment_becomes_a_502_in_the_error_envelope(self):
+        error = EnrichmentError("skill extraction failed for 3 of 8 listings")
+        with patch("router.ingest.build_service", return_value=_service(run_error=error)):
+            response = self.client.post(INGEST, headers=HEADERS)
+
+        self.assertEqual(response.status_code, 502)
+        payload = response.json()
+        self.assertFalse(payload["success"])
+        self.assertIn("skill extraction failed for 3 of 8 listings", payload["reason"])
 
     def test_missing_request_uuid_is_rejected(self):
         response = self.client.post(INGEST)

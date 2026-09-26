@@ -11,6 +11,7 @@ from tests.test_react_loop import JOB, RESUME, context_for
 from agent.context import TurnContext
 from agent.graph import run_turn
 from config import reset_settings
+from prompt.notice import render as no_change_notice
 from db.models import SpanKind
 
 ENGLISH_REWRITE = (
@@ -46,7 +47,7 @@ class CheckpointTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_skill_the_resume_does_not_back_never_enters_it(self) -> None:
         model = scripted(
-            tool_call("find_evidence", {"claim": "Go"}, "1"),
+            tool_call("find_evidence", {"claims": ["Go"]}, "1"),
             tool_call(
                 "apply_edit",
                 {
@@ -67,10 +68,12 @@ class CheckpointTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(outcome.resume["skills"], RESUME["skills"])
         self.assertEqual(outcome.changes, [])
-        self.assertEqual(outcome.warnings, [WARNING])
+        self.assertEqual(outcome.warnings, [WARNING, no_change_notice("es")])
 
         tools = {span.name: span for span in outcome.spans if span.kind == SpanKind.TOOL}
-        self.assertEqual(tools["find_evidence"].output, "[]")
+        self.assertEqual(
+            tools["find_evidence"].output, '[{"claim": "Go", "hits": []}]'
+        )
         self.assertEqual(
             tools["apply_edit"].output, "REJECTED: no evidence in base resume"
         )

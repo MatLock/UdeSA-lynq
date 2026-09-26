@@ -56,6 +56,8 @@ class CompanyServiceTest {
   private static final String COMPANY_ID = "company-1";
   private static final String COMPANY_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d43";
   private static final String COMPANY_IMAGE_URL = "https://presigned/company-logo.png";
+  private static final String COMPANY_LOGO_URL =
+      "https://ii.ct-stc.com/5/logos/empresas/2025/11/13/lectus191536thumbnail.jpeg";
   private static final LocalDate COMPANY_CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
   private static final String JOB_ID = "job-1";
   private static final String JOB_TITLE = "Senior Backend Engineer";
@@ -290,6 +292,22 @@ class CompanyServiceTest {
 
     assertThat(detail.getProfileImageUrl(), is(org.hamcrest.Matchers.nullValue()));
     assertThat(detail.getJobs(), is(org.hamcrest.Matchers.empty()));
+  }
+
+  @Test
+  void getCompanyDetailFallsBackToTheScrapedLogoUrl() {
+    CompanyEntity company = CompanyEntity.builder()
+        .id(COMPANY_ID)
+        .name(COMPANY_NAME)
+        .lynqFileStorageId(null)
+        .logoUrl(COMPANY_LOGO_URL)
+        .build();
+    when(companyRepository.findById(COMPANY_ID)).thenReturn(Optional.of(company));
+    when(jobPostRepository.findByCompanyId(COMPANY_ID)).thenReturn(java.util.List.of());
+
+    GetCompanyDetailRestResponse detail = companyService.getCompanyDetail(COMPANY_ID);
+
+    assertThat(detail.getProfileImageUrl(), is(COMPANY_LOGO_URL));
   }
 
   @Test

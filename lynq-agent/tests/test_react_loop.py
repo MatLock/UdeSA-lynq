@@ -20,6 +20,7 @@ from tests.support import scripted, tool_call
 from agent.context import TurnContext
 from agent.graph import recursion_limit, run_turn, turn_messages
 from config import reset_settings
+from prompt.notice import render as no_change_notice
 from db.models import MessageRole, SpanKind
 
 JOB = {
@@ -59,7 +60,9 @@ RESUME = {
 ANSWER = {"reply": REPLY, "warnings": [WARNING]}
 
 
-def context_for(max_steps: int = 12, message: str = ASK_FOR_GO) -> TurnContext:
+def context_for(
+    max_steps: int = 12, message: str = ASK_FOR_GO, history=None
+) -> TurnContext:
     return TurnContext(
         conversation_id="conversation-1",
         run_token="token-1",
@@ -68,7 +71,9 @@ def context_for(max_steps: int = 12, message: str = ASK_FOR_GO) -> TurnContext:
         job_snapshot=JOB,
         base_resume=RESUME,
         current_resume=RESUME,
-        history=[
+        history=history
+        if history is not None
+        else [
             (MessageRole.ASSISTANT, GREETING),
             (MessageRole.USER, message),
         ],
@@ -90,7 +95,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_loop_edits_the_resume_and_traces_every_step(self) -> None:
         model = scripted(
-            tool_call("find_evidence", {"claim": "Kubernetes"}, "1"),
+            tool_call("find_evidence", {"claims": ["Kubernetes"]}, "1"),
             tool_call(
                 "apply_edit",
                 {"section": "work_experience", "op": "reorder", "payload": {"order": [1, 0]}},
@@ -102,7 +107,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
         outcome = await run_turn(context_for(), model=model)
 
         self.assertEqual(outcome.reply, ANSWER["reply"])
-        self.assertEqual(outcome.warnings, ANSWER["warnings"])
+        self.assertEqual(outcome.warnings[: len(ANSWER["warnings"])], ANSWER["warnings"])
         self.assertEqual(
             [entry["company"] for entry in outcome.resume["work_experience"]],
             ["Acme", "Globex"],
@@ -115,6 +120,28 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             [span.name for span in outcome.spans if span.kind == SpanKind.TOOL],
             ["find_evidence", "apply_edit"],
+        )
+
+    async def test_a_batched_lookup_spends_one_step_on_every_claim(self) -> None:
+        model = scripted(
+            tool_call(
+                "find_evidence",
+                {"claims": ["Kubernetes", "PostgreSQL", "Go", "Rust"]},
+                "1",
+            ),
+            tool_call("TurnAnswer", ANSWER, "2"),
+        )
+
+        outcome = await run_turn(context_for(), model=model)
+
+        lookups = [
+            span for span in outcome.spans
+            if span.kind == SpanKind.TOOL and span.name == "find_evidence"
+        ]
+        self.assertEqual(len(lookups), 1)
+        self.assertEqual(
+            [span.kind for span in outcome.spans],
+            [SpanKind.LLM, SpanKind.TOOL, SpanKind.LLM],
         )
 
     async def test_an_answer_that_gives_the_instructions_away_never_reaches_the_candidate(
@@ -188,13 +215,73 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
         outcome = await run_turn(context_for(), model=model)
 
         self.assertEqual(outcome.reply, ANSWER["reply"])
-        self.assertEqual(outcome.warnings, ANSWER["warnings"])
+        self.assertEqual(outcome.warnings[: len(ANSWER["warnings"])], ANSWER["warnings"])
+
+    async def test_a_turn_that_applied_nothing_says_so(self) -> None:
+        model = scripted(AIMessage(content=json.dumps(ANSWER, ensure_ascii=False)))
+
+        outcome = await run_turn(context_for(), model=model)
+
+        self.assertEqual(outcome.changes, [])
+        self.assertIn(no_change_notice("es"), outcome.warnings)
+
+    async def test_a_turn_that_applied_something_does_not_say_it_applied_nothing(
+        self,
+    ) -> None:
+        model = scripted(
+            tool_call("apply_edit", {
+                "section": "summary",
+                "op": "rewrite",
+                "payload": {"text": "Ingeniero backend sobre Kubernetes."},
+            }),
+            AIMessage(content=json.dumps(ANSWER, ensure_ascii=False)),
+        )
+
+        outcome = await run_turn(context_for(), model=model)
+
+        self.assertNotEqual(outcome.changes, [])
+        self.assertNotIn(no_change_notice("es"), outcome.warnings)
 
     async def test_the_last_user_message_is_not_repeated(self) -> None:
+        messages = turn_messages(
+            context_for(
+                message=GO_AHEAD,
+                history=[
+                    (MessageRole.USER, ASK_FOR_GO),
+                    (MessageRole.ASSISTANT, GREETING),
+                    (MessageRole.USER, GO_AHEAD),
+                ],
+            )
+        )
+
+        self.assertEqual([message.type for message in messages], ["human", "ai", "human"])
+        self.assertEqual(messages[-1].content, GO_AHEAD)
+
+    async def test_the_opening_greeting_is_not_sent_as_the_first_message(self) -> None:
         messages = turn_messages(context_for(message=GO_AHEAD))
 
-        self.assertEqual([message.type for message in messages], ["ai", "human"])
-        self.assertEqual(messages[-1].content, GO_AHEAD)
+        self.assertEqual([message.type for message in messages], ["human"])
+        self.assertEqual(messages[0].content, GO_AHEAD)
+
+    async def test_a_window_that_opens_on_an_assistant_reply_still_starts_on_a_user_turn(
+        self,
+    ) -> None:
+        messages = turn_messages(
+            context_for(
+                message=GO_AHEAD,
+                history=[
+                    (MessageRole.ASSISTANT, GREETING),
+                    (MessageRole.ASSISTANT, REPLY),
+                    (MessageRole.USER, ASK_FOR_GO),
+                    (MessageRole.ASSISTANT, REPLY),
+                ],
+            )
+        )
+
+        self.assertEqual(
+            [message.type for message in messages], ["human", "ai", "human"]
+        )
+        self.assertEqual(messages[0].content, ASK_FOR_GO)
 
 
 class RecursionLimitTest(unittest.TestCase):

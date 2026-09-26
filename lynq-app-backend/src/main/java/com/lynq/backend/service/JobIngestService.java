@@ -37,6 +37,7 @@ public class JobIngestService {
   private static final int MAX_COMPANY_NAME_LENGTH = 255;
   private static final int MAX_TITLE_LENGTH = 255;
   private static final int MAX_JOB_URL_LENGTH = 2048;
+  private static final int MAX_LOGO_URL_LENGTH = 2048;
   private static final int MAX_TAG_LENGTH = 255;
 
   private final JobPostRepository jobPostRepository;
@@ -68,7 +69,7 @@ public class JobIngestService {
         continue;
       }
 
-      CompanyResult company = upsertCompany(request.getCompanyName());
+      CompanyResult company = upsertCompany(request);
       if (company.created()) {
         companies++;
       }
@@ -88,24 +89,34 @@ public class JobIngestService {
         .build();
   }
 
-  private CompanyResult upsertCompany(String rawName) {
-    String name = truncate(rawName, MAX_COMPANY_NAME_LENGTH);
+  private CompanyResult upsertCompany(IngestJobPostRequest request) {
+    String name = truncate(request.getCompanyName(), MAX_COMPANY_NAME_LENGTH);
     if (name == null || name.isBlank()) {
       return new CompanyResult(null, false);
     }
 
+    String logoUrl = truncate(request.getCompanyLogoUrl(), MAX_LOGO_URL_LENGTH);
     String id = deterministicId(COMPANY_KEY_PREFIX + name.toLowerCase(Locale.ROOT));
     Optional<CompanyEntity> existing = companyRepository.findById(id);
     if (existing.isPresent()) {
-      return new CompanyResult(existing.get(), false);
+      return new CompanyResult(refreshLogo(existing.get(), logoUrl), false);
     }
 
     CompanyEntity company = CompanyEntity.builder()
         .id(id)
         .name(name)
+        .logoUrl(logoUrl)
         .createdOn(LocalDate.now(ZoneOffset.UTC))
         .build();
     return new CompanyResult(companyRepository.save(company), true);
+  }
+
+  private CompanyEntity refreshLogo(CompanyEntity company, String logoUrl) {
+    if (logoUrl == null || logoUrl.equals(company.getLogoUrl())) {
+      return company;
+    }
+    company.setLogoUrl(logoUrl);
+    return companyRepository.save(company);
   }
 
   private JobPostEntity upsertJob(IngestJobPostRequest request, String title, CompanyEntity company) {

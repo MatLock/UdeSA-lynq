@@ -118,6 +118,8 @@ class JobServiceTest {
   private static final String COMPANY_ABOUT = "We hire";
   private static final Integer COMPANY_SIZE = 42;
   private static final String COMPANY_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d43";
+  private static final String COMPANY_LOGO_URL =
+      "https://ii.ct-stc.com/5/logos/empresas/2025/11/13/lectus191536thumbnail.jpeg";
   private static final String COMPANY_IMAGE_URL = "https://presigned/company.png";
 
   private static final String POSTER_ID = "user-1";
@@ -370,7 +372,7 @@ class JobServiceTest {
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
-        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID, null,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
         JOB_SKILLS_CONCATENATED,
         null);
@@ -518,7 +520,7 @@ class JobServiceTest {
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.CLOSE,
-        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID, null,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
         JOB_SKILLS_CONCATENATED,
         null);
@@ -574,12 +576,53 @@ class JobServiceTest {
   }
 
   @Test
+  void aScrapedCompanyFallsBackToThePortalLogoUrl() {
+    stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA)));
+    JobWithDetailsProjection projection = new JobWithDetailsProjection(
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, null, COMPANY_LOGO_URL,
+        POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
+        JOB_SKILLS_CONCATENATED,
+        null);
+    when(jobPostRepository.findJobDetailsById(JOB_ID)).thenReturn(Optional.of(projection));
+    when(userApplicationJobRepository.countByJobId(JOB_ID)).thenReturn(TOTAL_CANDIDATES_APPLIED);
+    when(fileStorageService.obtainDownloadUrls(anyList()))
+        .thenReturn(Map.of(POSTER_FILE_ID, POSTER_IMAGE_URL));
+
+    GetJobDetailForCandidateRestResponse job = jobService.getJobDetails(JOB_ID);
+
+    assertThat(job.getCompany().getProfileImageUrl(), is(COMPANY_LOGO_URL));
+  }
+
+  @Test
+  void anUploadedCompanyLogoWinsOverThePortalOne() {
+    stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA)));
+    JobWithDetailsProjection projection = new JobWithDetailsProjection(
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID, COMPANY_LOGO_URL,
+        POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
+        JOB_SKILLS_CONCATENATED,
+        null);
+    when(jobPostRepository.findJobDetailsById(JOB_ID)).thenReturn(Optional.of(projection));
+    when(userApplicationJobRepository.countByJobId(JOB_ID)).thenReturn(TOTAL_CANDIDATES_APPLIED);
+    when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of(
+        COMPANY_FILE_ID, COMPANY_IMAGE_URL,
+        POSTER_FILE_ID, POSTER_IMAGE_URL));
+
+    GetJobDetailForCandidateRestResponse job = jobService.getJobDetails(JOB_ID);
+
+    assertThat(job.getCompany().getProfileImageUrl(), is(COMPANY_IMAGE_URL));
+  }
+
+  @Test
   void getJobDetailsMapsProjectionFieldsIncludingCompanyPosterAndLynqScore() {
     stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA, SKILL_SPRING)));
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
-        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID, null,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
         JOB_SKILLS_CONCATENATED,
         null);
@@ -1236,7 +1279,7 @@ class JobServiceTest {
     return new JobWithDetailsProjection(
         jobId, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         null, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
-        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID, null,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION, null,
         null);
   }
@@ -1473,7 +1516,7 @@ class JobServiceTest {
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
-        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID, null,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
         JOB_SKILLS_CONCATENATED,
         null);
@@ -1530,7 +1573,7 @@ class JobServiceTest {
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
-        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, null,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, null, null,
         POSTER_ID, POSTER_FULL_NAME, null, POSTER_CURRENT_POSITION, concatenatedSkills,
         null);
     when(jobPostRepository.searchAvailableJobs(null, DEFAULT_PAGEABLE))
@@ -1541,7 +1584,7 @@ class JobServiceTest {
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
         JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
-        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, null,
+        COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, null, null,
         POSTER_ID, POSTER_FULL_NAME, null, POSTER_CURRENT_POSITION, concatenatedSkills,
         concatenatedTags);
     when(jobPostRepository.searchAvailableJobs(null, DEFAULT_PAGEABLE))

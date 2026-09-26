@@ -62,6 +62,7 @@ def _to_listing(aviso: dict, category: str) -> Optional[Listing]:
         source=SOURCE,
         category=category,
         company=aviso.get("empresa"),
+        company_logo_url=aviso.get("logoURL"),
         location=aviso.get("localizacion"),
         remote="remoto" in modalidad,
         work_type=aviso.get("tipoTrabajo"),
