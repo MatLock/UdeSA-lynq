@@ -75,6 +75,9 @@ The service never touches the database. `lynq-app-backend` owns `lynq_backend_db
 3. For every posting with a description, call `lynq-ml` `/dmz/skill-enhance` to get `skills` and `similarity_tags`. Calls are bounded by `ML_CONCURRENCY`.
 4. Post the whole batch to `lynq-app-backend` — only if every posting came back enriched.
 
+Steps 1-4 run in the background, after the caller has been answered: nothing downstream
+of the `202` can be reported back to whoever asked for the run, so it is all logged.
+
 Each posting also carries its company's logo URL, which both portals hand over at
 no extra cost: Bumeran returns `logoURL` in the same `searchV2` payload, and
 Computrabajo puts it on the detail page that step 1 already fetches. A confidential
@@ -87,10 +90,10 @@ similarity tags scores 0 on the LyNQ score for every candidate, and because the
 backend replaces a job post's skills on every ingest, a degraded run also wipes
 what an earlier one had extracted. So if any posting fails to enrich — `lynq-ml`
 unreachable, an empty completion, or a scraper that brought back no description —
-the run aborts with a `502` naming every offender and nothing is ingested. Rerun it
+the run aborts naming every offender in the logs and nothing is ingested. Rerun it
 once `lynq-ml` is healthy.
 
-A scraper that fails for one category does not abort the others — that failure is reported per source in the response.
+A scraper that fails for one category does not abort the others — that failure is logged per source and the run carries on.
 
 ---
 
@@ -116,13 +119,19 @@ A category that is not in the table falls back to a keyword derived from its nam
 | Method | Path                    | Purpose                                      |
 | ------ | ----------------------- | -------------------------------------------- |
 | `GET`  | `/lynq-feeders/health`  | Liveness/readiness probe.                    |
-| `POST` | `/lynq-feeders/ingest`  | Run one feed and ingest the results. Scoped by an optional body. |
+| `POST` | `/lynq-feeders/ingest`  | Accept one feed run and start it in the background. Scoped by an optional body. |
 
 Every route except the probe requires the `lynq-request-uuid` header; a request without it is rejected with `403`.
 
 ### `POST /lynq-feeders/ingest`
 
-Runs one feed. Called with no body it runs the configured defaults — this is what the CronJob does:
+Accepts one feed run and answers **`202` with an empty body**, then runs it in the
+background. A run is ~80 postings, each one an LLM generation, so holding the caller's
+connection open for the whole thing made the CronJob fail on the connection rather than
+on the ingest. The outcome now lives in the pod's logs, under the caller's
+`lynq-request-uuid`.
+
+Called with no body it runs the configured defaults — this is what the CronJob does:
 
 ```bash
 curl -X POST http://localhost:8089/lynq-feeders/ingest \
@@ -144,32 +153,42 @@ curl -X POST http://localhost:8089/lynq-feeders/ingest \
 | `categories` | `FEEDER_CATEGORIES` | A category with no mapping falls back to a keyword search. |
 | `jobs_per_category` | `FEEDER_JOBS_PER_CATEGORY` | Between 1 and 50. |
 
-The response's `plan` echoes what actually ran, so a scoped call is self-documenting.
+The plan is validated before the `202`: an unknown source is still a `400`, and so is a
+`jobs_per_category` outside 1-50. What actually ran is logged the moment the run is
+accepted.
 
-```json
-{
-  "success": true,
-  "data": {
-    "plan": {
-      "sources": ["bumeran", "computrabajo"],
-      "categories": ["ADMINISTRACION", "TECNOLOGIA", "CONTABILIDAD", "RECURSOS_HUMANOS"],
-      "jobs_per_category": 10
-    },
-    "fetched": 80,
-    "deduplicated": 6,
-    "enriched": 71,
-    "enrichment_failed": 3,
-    "ingested": { "jobs": 74, "companies": 41, "skills": 612, "similarity_tags": 388, "skipped": 0 },
-    "per_source": [
-      { "source": "bumeran", "category": "TECNOLOGIA", "fetched": 10, "error": null }
-    ]
-  }
-}
+Only one run at a time. A call that arrives while one is in flight is refused with `409`
+and nothing is started — the CronJob's `concurrencyPolicy: Forbid` stopped protecting
+against overlap the moment the trigger began returning immediately.
+
+| Status | Meaning |
+| ------ | ------- |
+| `202` | Accepted and running. No body. |
+| `400` | Unknown source, or a field outside its range. Nothing was started. |
+| `403` | No `lynq-request-uuid` header. |
+| `409` | A run is already in progress. Nothing was started. |
+
+Follow the run in the pod's logs, filtered by the uuid the caller sent:
+
+```bash
+kubectl -n lynq-local-namespace logs -l app=lynq-feeders -f | grep "$REQUEST_UUID"
 ```
 
-Returns `502` when skill extraction fails for any posting — nothing is ingested and
-`reason` names each posting and why — or when the downstream ingest fails, for
-instance when `LYNQ_INTERNAL_TOKEN` does not match what the backend expects.
+It ends on one of two lines. A successful run logs its totals:
+
+```
+message= Finished feeder run, fetched=80, deduplicated=6, enriched=74, ingested_jobs=74, ingested_skills=612, ingested_similarity_tags=388
+message= Finished feeder ingest run, ingested_jobs=74
+```
+
+A failed one logs the reason and ingests nothing — skill extraction failed for some
+posting, each offender on its own line, or the downstream ingest was rejected, for
+instance when `LYNQ_INTERNAL_TOKEN` does not match what the backend expects:
+
+```
+message= Feeder ingest run aborted, skill extraction failed
+message= Feeder ingest run aborted, the job post ingest failed
+```
 
 ### `GET /lynq-feeders/health`
 
@@ -241,7 +260,7 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 The service has no scheduler of its own — it is a plain HTTP service that does nothing until something calls it. Two separate workloads make up the daily run:
 
 - a **Deployment** serving the endpoint around the clock, and
-- a **CronJob** (`infrastructure/helm/templates/cronjobs/`) whose only job is to `POST` to that endpoint at `0 6 * * *` UTC from a throwaway `curl` pod, with `concurrencyPolicy: Forbid` so a slow run is never overlapped by the next one.
+- a **CronJob** (`infrastructure/helm/templates/cronjobs/`) whose only job is to `POST` to that endpoint at `0 6 * * *` UTC from a throwaway `curl` pod. It waits for the `202` and exits; the run outlives it inside the Deployment's pod, and a second run landing on top of a live one is refused there with a `409`.
 
 Because the schedule lives entirely in Kubernetes, the same endpoint is available on demand at any time.
 
@@ -274,6 +293,8 @@ To replay exactly what the schedule would do, run the CronJob itself:
 kubectl -n lynq-local-namespace create job --from=cronjob/lynq-feeders-cronjob feeders-manual
 kubectl -n lynq-local-namespace logs -f job/feeders-manual
 ```
+
+That log only carries the `202`. The run itself is in the Deployment's pod: `kubectl -n lynq-local-namespace logs -l app=lynq-feeders -f`.
 
 ---
 

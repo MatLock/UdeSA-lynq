@@ -100,6 +100,11 @@ class IngestService:
             return self._scrapers
         return get_scrapers(plan.sources, self.settings.scrape_timeout)
 
+    def validate(self, overrides: Optional[IngestOverrides] = None) -> RunPlan:
+        plan = self.plan_for(overrides)
+        self.scrapers_for(plan)
+        return plan
+
     async def run(
         self, request_uuid: str, overrides: Optional[IngestOverrides] = None
     ) -> IngestReport:
