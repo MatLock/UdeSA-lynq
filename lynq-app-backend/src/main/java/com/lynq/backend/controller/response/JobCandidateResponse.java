@@ -27,6 +27,7 @@ public class JobCandidateResponse {
    * so the recruiter's UI must treat the action as unavailable, not broken.
    */
   private String userResumeUrl;
+  private String userResumeName;
   private Integer lynqScore;
 
 }

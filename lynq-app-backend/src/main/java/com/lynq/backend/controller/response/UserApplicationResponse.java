@@ -23,5 +23,7 @@ public class UserApplicationResponse {
   private String companyProfileImage;
   private LocalDate appliedOn;
   private Integer lynqScore;
+  private String resumeName;
+  private String resumePdfUrl;
 
 }

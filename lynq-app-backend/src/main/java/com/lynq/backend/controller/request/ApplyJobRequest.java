@@ -1,6 +1,5 @@
 package com.lynq.backend.controller.request;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -11,12 +10,24 @@ import lombok.Setter;
 public class ApplyJobRequest {
 
   /**
-   * The resume the candidate applies with. Required: an application whose
-   * resume the recruiter cannot open is not worth registering, and the caller
-   * always has one to pick — the UI only offers the action once it has listed
-   * them.
+   * The candidate's own resume to apply with. The document and the label are
+   * read off it, so the caller never says which file to attach.
    */
-  @NotBlank
   private String resumeId;
+
+  /**
+   * A document the candidate applies with that is not one of their stored
+   * resumes — a CV Tailor resume, which is deliberately never saved as one.
+   * It has to belong to the caller in lynq-file-storage, and it is checked
+   * there before the application is registered.
+   */
+  private String fileId;
+
+  /**
+   * How to call the document of a fileId application in the candidate's list of
+   * applications. Ignored when resumeId is given, because the resume names
+   * itself.
+   */
+  private String resumeName;
 
 }

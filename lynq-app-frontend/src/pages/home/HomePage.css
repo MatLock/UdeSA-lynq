@@ -63,7 +63,7 @@
   padding: 10px 18px;
   background: var(--surface-raised);
   border: 1px solid var(--border-control);
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-control);
   box-shadow: var(--shadow-sm);
   transition: border-color 0.15s ease;
 }
@@ -100,7 +100,7 @@
   color: var(--ink-on-action);
   background: var(--brand-gradient);
   border: none;
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-control);
   cursor: pointer;
   transition: opacity 0.15s ease;
 }
@@ -123,7 +123,7 @@
   color: var(--brand-purple-dark);
   background: var(--surface-raised);
   border: 1px solid var(--accent-border);
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-control);
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition:

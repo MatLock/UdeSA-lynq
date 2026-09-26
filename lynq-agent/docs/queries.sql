@@ -54,7 +54,9 @@ WHERE s.conversation_id = '3f8a1c2e-...' GROUP BY m.seq ORDER BY m.seq;
 -- metric for the prompt: if it drops while iterating, the prompt is improving.
 SELECT COUNT(*) AS rejections,
        SUBSTRING_INDEX(output, ': ', -1) AS reason
-FROM trace_span WHERE name = 'apply_edit' AND output LIKE 'REJECTED%'
+FROM trace_span WHERE name IN ('rewrite_summary', 'rewrite_entry',
+                               'reorder_entries', 'replace_skills')
+  AND output LIKE 'REJECTED%'
 GROUP BY reason ORDER BY rejections DESC;
 
 -- Cost analytics ----------------------------------------------------------

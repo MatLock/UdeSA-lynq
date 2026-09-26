@@ -184,6 +184,8 @@ const confirm_profile_image_upload = async (authFetch, fileId) => {
  *     companyProfileImage: string | null,
  *     appliedOn: string,
  *     lynqScore: number | null,
+ *     resumeName: string | null,
+ *     resumePdfUrl: string | null,
  *   }>,
  *   page: number,
  *   size: number,

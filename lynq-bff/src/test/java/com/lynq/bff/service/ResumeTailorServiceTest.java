@@ -22,7 +22,11 @@ import com.lynq.bff.client.request.TailorTurnRequest;
 import com.lynq.bff.client.response.JobDetailsResponse;
 import com.lynq.bff.client.response.UserResumeResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
+import com.lynq.bff.controller.request.PreviewResumeRequest;
+import com.lynq.bff.controller.request.TailorApplyRestRequest;
+import com.lynq.bff.controller.response.ResumePreviewRestResponse;
 import com.lynq.bff.controller.response.ResumeTailorApplyRestResponse;
+import com.lynq.bff.enums.ResumeTemplate;
 import com.lynq.bff.exceptions.BadGatewayException;
 import com.lynq.bff.exceptions.BadRequestException;
 import com.lynq.bff.exceptions.ConflictException;
@@ -65,10 +69,14 @@ class ResumeTailorServiceTest {
   private static final String COMPANY_NAME = "Acme";
   private static final List<String> JOB_SKILLS = List.of("Java", "Kubernetes");
 
+  private static final String TAILORED_FILE_ID = "018fa1b2-2b1d-7c4e-9a6f-1e2d3c4b5a63";
+  private static final String TAILORED_PDF_URL = "https://files.lynq.dev/tailored.pdf";
+
   private static final Map<String, Object> CONVERSATION = Map.of(
       "conversationId", CONVERSATION_ID,
       "jobId", JOB_ID,
       "baseResumeId", RESUME_ID,
+      "currentResume", BASE_RESUME,
       "status", "ACTIVE");
 
   private static final Map<String, Object> APPLICATION = Map.of(
@@ -81,12 +89,23 @@ class ResumeTailorServiceTest {
   @Mock
   private LynqAgentClient lynqAgentClient;
 
+  @Mock
+  private ResumePreviewService resumePreviewService;
+
   private ResumeTailorService resumeTailorService;
 
   @BeforeEach
   void setUp() {
-    resumeTailorService =
-        new ResumeTailorService(lynqBackendClient, lynqAgentClient, new ObjectMapper());
+    resumeTailorService = new ResumeTailorService(lynqBackendClient, lynqAgentClient,
+        resumePreviewService, new ObjectMapper());
+  }
+
+  private void givenTheResumeRenders() {
+    lenient().when(resumePreviewService.preview(any(PreviewResumeRequest.class), any(Caller.class)))
+        .thenReturn(ResumePreviewRestResponse.builder()
+            .fileId(TAILORED_FILE_ID)
+            .pdfUrl(TAILORED_PDF_URL)
+            .build());
   }
 
   @Test
@@ -224,6 +243,7 @@ class ResumeTailorServiceTest {
   @Test
   void viewReturnsTheConversationAsTheAgentKeepsIt() {
     givenTheConversation();
+    givenTheResumeRenders();
 
     assertThat(resumeTailorService.view(CONVERSATION_ID, CALLER), is(CONVERSATION));
   }
@@ -250,25 +270,26 @@ class ResumeTailorServiceTest {
 
   @Test
   void applyAppliesWithTheTailoredResumeAndClosesTheConversation() {
-    givenTheCallersResumes();
     givenTheConversation();
+    givenTheResumeRenders();
     when(lynqBackendClient.applyToJob(eq(JOB_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, APPLICATION));
     givenTheConversationCloses();
 
     ResumeTailorApplyRestResponse applied =
-        resumeTailorService.apply(CONVERSATION_ID, RESUME_ID, CALLER);
+        resumeTailorService.apply(CONVERSATION_ID, new TailorApplyRestRequest(), CALLER);
 
     ArgumentCaptor<ApplyJobRequest> application = ArgumentCaptor.forClass(ApplyJobRequest.class);
     verify(lynqBackendClient).applyToJob(eq(JOB_ID), application.capture(), eq(REQUEST_UUID),
         eq(AUTHORIZATION));
-    assertThat(application.getValue().getResumeId(), is(RESUME_ID));
+    assertThat(application.getValue().getFileId(), is(TAILORED_FILE_ID));
+    assertThat(application.getValue().getResumeId(), is(nullValue()));
 
     ArgumentCaptor<MarkConversationAppliedRequest> closed =
         ArgumentCaptor.forClass(MarkConversationAppliedRequest.class);
     verify(lynqAgentClient).markApplied(eq(CONVERSATION_ID), closed.capture(), eq(REQUEST_UUID),
         eq(USER_ID));
-    assertThat(closed.getValue().getAppliedResumeId(), is(RESUME_ID));
+    assertThat(closed.getValue().getAppliedResumeId(), is(TAILORED_FILE_ID));
 
     assertThat(applied.getApplication(), is(APPLICATION));
     assertThat(applied.isAlreadyApplied(), is(false));
@@ -277,13 +298,13 @@ class ResumeTailorServiceTest {
 
   @Test
   void applyTakesTheJobFromTheConversationAndNotFromTheCaller() {
-    givenTheCallersResumes();
     givenTheConversation();
+    givenTheResumeRenders();
     when(lynqBackendClient.applyToJob(eq(JOB_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, APPLICATION));
     givenTheConversationCloses();
 
-    resumeTailorService.apply(CONVERSATION_ID, RESUME_ID, CALLER);
+    resumeTailorService.apply(CONVERSATION_ID, new TailorApplyRestRequest(), CALLER);
 
     verify(lynqAgentClient).getConversation(CONVERSATION_ID, REQUEST_UUID, USER_ID);
     verify(lynqBackendClient).applyToJob(eq(JOB_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
@@ -291,14 +312,14 @@ class ResumeTailorServiceTest {
 
   @Test
   void applyClosesTheConversationWhenTheCandidateHadAlreadyAppliedToTheJob() {
-    givenTheCallersResumes();
     givenTheConversation();
+    givenTheResumeRenders();
     when(lynqBackendClient.applyToJob(eq(JOB_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenThrow(feignFailure(400, "{\"reason\":\"User has already applied to this job\"}"));
     givenTheConversationCloses();
 
     ResumeTailorApplyRestResponse applied =
-        resumeTailorService.apply(CONVERSATION_ID, RESUME_ID, CALLER);
+        resumeTailorService.apply(CONVERSATION_ID, new TailorApplyRestRequest(), CALLER);
 
     assertThat(applied.isAlreadyApplied(), is(true));
     assertThat(applied.getApplication(), is(nullValue()));
@@ -307,36 +328,72 @@ class ResumeTailorServiceTest {
   }
 
   @Test
-  void applyRejectsAResumeThatDoesNotBelongToTheCaller() {
-    givenTheCallersResumes();
+  void applyRendersTheResumeTheConversationHoldsAndNeverStoresItAsOneOfTheCallersOwn() {
+    givenTheConversation();
+    givenTheResumeRenders();
+    when(lynqBackendClient.applyToJob(eq(JOB_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
+        .thenReturn(new GlobalRestResponse<>(true, APPLICATION));
+    givenTheConversationCloses();
 
-    assertThrows(BadRequestException.class,
-        () -> resumeTailorService.apply(CONVERSATION_ID, OTHER_RESUME_ID, CALLER));
+    ResumeTailorApplyRestResponse applied =
+        resumeTailorService.apply(CONVERSATION_ID, new TailorApplyRestRequest(), CALLER);
+
+    ArgumentCaptor<PreviewResumeRequest> rendered =
+        ArgumentCaptor.forClass(PreviewResumeRequest.class);
+    verify(resumePreviewService).preview(rendered.capture(), any(Caller.class));
+    assertThat(rendered.getValue().getResume(), is(BASE_RESUME));
+    assertThat(rendered.getValue().getTemplate(), is(ResumeTemplate.MODERN));
+
+    verify(lynqBackendClient, never()).createResume(any(), any(), any());
+    assertThat(applied.getResumeFileId(), is(TAILORED_FILE_ID));
+    assertThat(applied.getResumePdfUrl(), is(TAILORED_PDF_URL));
+  }
+
+  @Test
+  void applyReusesAPdfTheBrowserAlreadyRenderedInsteadOfRenderingASecondOne() {
+    givenTheConversation();
+    givenTheResumeRenders();
+    when(lynqBackendClient.applyToJob(eq(JOB_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
+        .thenReturn(new GlobalRestResponse<>(true, APPLICATION));
+    givenTheConversationCloses();
+
+    TailorApplyRestRequest request = TailorApplyRestRequest.builder()
+        .fileId(TAILORED_FILE_ID)
+        .resumeName(JOB_TITLE)
+        .build();
+    resumeTailorService.apply(CONVERSATION_ID, request, CALLER);
+
+    verify(resumePreviewService, never()).preview(any(), any());
+    ArgumentCaptor<ApplyJobRequest> application = ArgumentCaptor.forClass(ApplyJobRequest.class);
+    verify(lynqBackendClient).applyToJob(eq(JOB_ID), application.capture(), eq(REQUEST_UUID),
+        eq(AUTHORIZATION));
+    assertThat(application.getValue().getFileId(), is(TAILORED_FILE_ID));
+    assertThat(application.getValue().getResumeName(), is(JOB_TITLE));
+  }
+
+  @Test
+  void applyFailsWhenTheConversationCarriesNoResumeToApplyWith() {
+    when(lynqAgentClient.getConversation(CONVERSATION_ID, REQUEST_UUID, USER_ID))
+        .thenReturn(new GlobalRestResponse<>(true, Map.of("jobId", JOB_ID)));
+
+    assertThrows(BadGatewayException.class,
+        () -> resumeTailorService.apply(CONVERSATION_ID, new TailorApplyRestRequest(), CALLER));
 
     verify(lynqBackendClient, never()).applyToJob(any(), any(), any(), any());
     verify(lynqAgentClient, never()).markApplied(any(), any(), any(), any());
   }
 
   @Test
-  void applyRejectsAMissingResumeId() {
-    BadRequestException failure = assertThrows(BadRequestException.class,
-        () -> resumeTailorService.apply(CONVERSATION_ID, " ", CALLER));
-
-    assertThat(failure.getMessage(), is("A resume id is required"));
-    verify(lynqBackendClient, never()).applyToJob(any(), any(), any(), any());
-  }
-
-  @Test
   void applyKeepsTheApplicationWhenTheConversationCannotBeClosed() {
-    givenTheCallersResumes();
     givenTheConversation();
+    givenTheResumeRenders();
     when(lynqBackendClient.applyToJob(eq(JOB_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, APPLICATION));
     when(lynqAgentClient.markApplied(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(USER_ID)))
         .thenThrow(feignFailure(502, "{\"reason\":\"The agent is down\"}"));
 
     ResumeTailorApplyRestResponse applied =
-        resumeTailorService.apply(CONVERSATION_ID, RESUME_ID, CALLER);
+        resumeTailorService.apply(CONVERSATION_ID, new TailorApplyRestRequest(), CALLER);
 
     assertThat(applied.getApplication(), is(APPLICATION));
     assertThat(applied.getConversationStatus(), is(nullValue()));
@@ -344,8 +401,8 @@ class ResumeTailorServiceTest {
 
   @Test
   void applySurfacesTheAgentsAlreadyAppliedConflict() {
-    givenTheCallersResumes();
     givenTheConversation();
+    givenTheResumeRenders();
     when(lynqBackendClient.applyToJob(eq(JOB_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, APPLICATION));
     when(lynqAgentClient.markApplied(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(USER_ID)))
@@ -353,31 +410,30 @@ class ResumeTailorServiceTest {
             + "\"code\":\"ALREADY_APPLIED\"}"));
 
     ConflictException failure = assertThrows(ConflictException.class,
-        () -> resumeTailorService.apply(CONVERSATION_ID, RESUME_ID, CALLER));
+        () -> resumeTailorService.apply(CONVERSATION_ID, new TailorApplyRestRequest(), CALLER));
 
     assertThat(failure.getCode(), is("ALREADY_APPLIED"));
   }
 
   @Test
   void applyReportsABadGatewayWhenTheApplicationCannotBeCreated() {
-    givenTheCallersResumes();
     givenTheConversation();
+    givenTheResumeRenders();
     when(lynqBackendClient.applyToJob(eq(JOB_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenThrow(feignFailure(500, "{\"reason\":\"boom\"}"));
 
     assertThrows(BadGatewayException.class,
-        () -> resumeTailorService.apply(CONVERSATION_ID, RESUME_ID, CALLER));
+        () -> resumeTailorService.apply(CONVERSATION_ID, new TailorApplyRestRequest(), CALLER));
     verify(lynqAgentClient, never()).markApplied(any(), any(), any(), any());
   }
 
   @Test
   void applyReportsABadGatewayWhenTheConversationCarriesNoJob() {
-    givenTheCallersResumes();
     when(lynqAgentClient.getConversation(CONVERSATION_ID, REQUEST_UUID, USER_ID))
         .thenReturn(new GlobalRestResponse<>(true, Map.of("status", "ACTIVE")));
 
     assertThrows(BadGatewayException.class,
-        () -> resumeTailorService.apply(CONVERSATION_ID, RESUME_ID, CALLER));
+        () -> resumeTailorService.apply(CONVERSATION_ID, new TailorApplyRestRequest(), CALLER));
     verify(lynqBackendClient, never()).applyToJob(any(), any(), any(), any());
   }
 

@@ -45,6 +45,21 @@ public class UserApplicationJobEntity {
   @JoinColumn(name = "user_resume_id")
   private UserResumeEntity userResume;
 
+  /**
+   * The document the application was made with, in lynq-file-storage. A CV
+   * Tailor resume never becomes one of the candidate's own, so this is the only
+   * way back to it.
+   */
+  @Column(name = "resume_file_storage_id", length = 36)
+  private String resumeFileStorageId;
+
+  /**
+   * The label the candidate saw when applying, kept here on purpose: deleting
+   * the resume it came from must not erase what the application was made with.
+   */
+  @Column(name = "resume_name", length = 255)
+  private String resumeName;
+
   @Column(name = "applied_on", nullable = false)
   private LocalDate appliedOn;
 

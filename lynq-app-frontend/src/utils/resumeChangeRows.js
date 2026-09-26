@@ -1,5 +1,6 @@
 const ADDED = 'added'
 const REMOVED = 'removed'
+const MOVED = 'moved'
 const REWRITTEN = 'rewritten'
 
 const samePlace = (left, right) =>
@@ -12,6 +13,8 @@ const rowOf = (line, kind, before, after) => ({
   section: line.section,
   entry: line.entry,
   field: line.field,
+  from: line.from,
+  to: line.to,
   before,
   after,
 })
@@ -26,6 +29,12 @@ const resumeChangeRows = (groups) => {
     while (index < lines.length) {
       const line = lines[index]
       const next = lines[index + 1]
+
+      if (line.type === MOVED) {
+        rows.push(rowOf(line, MOVED, null, null))
+        index += 1
+        continue
+      }
 
       if (line.type === REMOVED && next?.type === ADDED && samePlace(line, next)) {
         rows.push(rowOf(line, REWRITTEN, line, next))
@@ -46,4 +55,4 @@ const resumeChangeRows = (groups) => {
 }
 
 export default resumeChangeRows
-export { ADDED, REMOVED, REWRITTEN }
+export { ADDED, REMOVED, MOVED, REWRITTEN }

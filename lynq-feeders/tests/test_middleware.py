@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -9,16 +9,28 @@ from backend_client import IngestStats
 from logging_context import NO_REQUEST_UUID, request_uuid_ctx
 from main import app
 from middleware.request_uuid import EXEMPT_PATHS, REQUEST_UUID_HEADER
+from model import RunPlan
+from router.ingest import run_guard
 from service import IngestReport
 
 INGEST = "/lynq-feeders/ingest"
 REQUEST_UUID = "11111111-2222-3333-4444-555555555555"
 
 
+def _service() -> AsyncMock:
+    service = AsyncMock()
+    service.validate = MagicMock(
+        return_value=RunPlan(sources=["bumeran"], categories=["TECNOLOGIA"], jobs_per_category=10)
+    )
+    service.run = AsyncMock(return_value=IngestReport(ingested=IngestStats()))
+    return service
+
+
 class RequireRequestUuidTest(unittest.TestCase):
 
     def setUp(self):
         self.client = TestClient(app)
+        self.addCleanup(run_guard.finish)
 
     def test_a_request_without_the_header_is_rejected_with_403(self):
         response = self.client.post(INGEST)
@@ -47,7 +59,7 @@ class RequireRequestUuidTest(unittest.TestCase):
             seen["uuid"] = request_uuid_ctx.get()
             return IngestReport(ingested=IngestStats())
 
-        service = AsyncMock()
+        service = _service()
         service.run = capture
         with patch("router.ingest.build_service", return_value=service):
             self.client.post(INGEST, headers={REQUEST_UUID_HEADER: REQUEST_UUID})
@@ -55,8 +67,7 @@ class RequireRequestUuidTest(unittest.TestCase):
         self.assertEqual(seen["uuid"], REQUEST_UUID)
 
     def test_the_context_is_reset_after_the_request(self):
-        service = AsyncMock()
-        service.run = AsyncMock(return_value=IngestReport(ingested=IngestStats()))
+        service = _service()
         with patch("router.ingest.build_service", return_value=service):
             self.client.post(INGEST, headers={REQUEST_UUID_HEADER: REQUEST_UUID})
 

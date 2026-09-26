@@ -11,6 +11,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from botocore.exceptions import ClientError
+
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
@@ -64,8 +66,8 @@ async def stub_loop(context) -> TurnOutcome:
         SpanRecord(
             step=2,
             kind=SpanKind.TOOL,
-            name="apply_edit",
-            input='{"section": "summary"}',
+            name="rewrite_summary",
+            input='{"text": "Backend engineer on Kubernetes."}',
             output="OK",
             latency_ms=1,
         )
@@ -203,6 +205,42 @@ class ScriptedChatModel(BaseChatModel):
 
 def scripted(*answers: AIMessage) -> ScriptedChatModel:
     return ScriptedChatModel(answers=list(answers), binds=[], prompts=[])
+
+
+class BreakingChatModel(ScriptedChatModel):
+
+    failures: int = 0
+    error: object = None
+    attempts: list = []
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs) -> ChatResult:
+        self.attempts.append(messages)
+        if len(self.attempts) <= self.failures:
+            raise self.error
+        return super()._generate(messages, stop, run_manager, **kwargs)
+
+
+def breaking(error: Exception, failures: int, *answers: AIMessage) -> BreakingChatModel:
+    return BreakingChatModel(
+        answers=list(answers),
+        binds=[],
+        prompts=[],
+        attempts=[],
+        failures=failures,
+        error=error,
+    )
+
+
+def bedrock_error(code: str = "ModelErrorException") -> ClientError:
+    return ClientError(
+        {
+            "Error": {
+                "Code": code,
+                "Message": "Model produced invalid sequence as part of ToolUse.",
+            }
+        },
+        "Converse",
+    )
 
 
 def tool_call(name: str, arguments: dict, call_id: str = "call-1") -> AIMessage:

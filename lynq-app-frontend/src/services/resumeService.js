@@ -311,12 +311,17 @@ const get_tailor_conversation = async (authFetch, conversationId) => {
   return payload?.data;
 };
 
-const tailor_apply = async (authFetch, conversationId, resumeId) => {
+// Closes the tailoring conversation and applies with the tailored resume. The
+// resume is never stored as one of the candidate's own: the BFF renders it into
+// a file and the application carries that file, so `body` says how to name it
+// and, when the browser already rendered it to download for an external
+// posting, which file to reuse instead of rendering a second one.
+const tailor_apply = async (authFetch, conversationId, body = {}) => {
   const payload = await authFetch(
     `/resume/tailor/${encodeURIComponent(conversationId)}/apply`,
     {
       method: 'POST',
-      body: JSON.stringify({ resumeId }),
+      body: JSON.stringify(body),
     },
   );
   return payload?.data;

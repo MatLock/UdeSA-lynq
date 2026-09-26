@@ -149,7 +149,7 @@
   bottom: 0;
   width: 42px;
   height: 3px;
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-control);
   background: var(--brand-gradient);
 }
 
@@ -183,7 +183,7 @@
   bottom: 6px;
   left: 4px;
   width: 2px;
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-control);
   background: var(--action);
   opacity: 0.35;
 }

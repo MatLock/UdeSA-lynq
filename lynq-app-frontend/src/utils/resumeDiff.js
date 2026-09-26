@@ -8,6 +8,7 @@ const SKILL_KEYS = ['technical', 'tools', 'soft']
 const SAME = 'same'
 const ADDED = 'added'
 const REMOVED = 'removed'
+const MOVED = 'moved'
 
 const FIELD_SEPARATOR = '::|::'
 const META_SEPARATOR = ' · '
@@ -93,6 +94,63 @@ const flattenResume = (resume, labels) => {
 
 const identityOf = (row) =>
   [row.section, row.entry, row.field, row.text].join(FIELD_SEPARATOR)
+
+const placeOf = (row) => [row.section, row.entry].join(FIELD_SEPARATOR)
+
+const contentOf = (lines) =>
+  lines.map((line) => [line.field, line.text].join(FIELD_SEPARATOR)).join('\n')
+
+const orderOf = (rows) => {
+  const sections = {}
+  rows.forEach((row) => {
+    if (!row.entry) return
+    const entries = sections[row.section] ?? (sections[row.section] = [])
+    if (!entries.includes(row.entry)) entries.push(row.entry)
+  })
+  return sections
+}
+
+const positionIn = (sections, row) =>
+  (sections[row.section] ?? []).indexOf(row.entry) + 1
+
+const byPlace = (lines, type) =>
+  lines
+    .filter((line) => line.type === type && line.entry)
+    .reduce((places, line) => {
+      const place = placeOf(line)
+      return { ...places, [place]: [...(places[place] ?? []), line] }
+    }, {})
+
+const collapseMoves = (lines, beforeRows, afterRows) => {
+  const removed = byPlace(lines, REMOVED)
+  const added = byPlace(lines, ADDED)
+  const moves = Object.keys(removed).filter(
+    (place) => added[place] && contentOf(removed[place]) === contentOf(added[place]),
+  )
+  if (moves.length === 0) return lines
+
+  const beforeOrder = orderOf(beforeRows)
+  const afterOrder = orderOf(afterRows)
+  const seen = new Set()
+
+  return lines.flatMap((line) => {
+    const place = placeOf(line)
+    if (!moves.includes(place)) return [line]
+    if (seen.has(place)) return []
+    seen.add(place)
+    return [
+      {
+        section: line.section,
+        entry: line.entry,
+        field: '',
+        text: '',
+        type: MOVED,
+        from: positionIn(beforeOrder, line),
+        to: positionIn(afterOrder, line),
+      },
+    ]
+  })
+}
 
 const commonSuffixLengths = (before, after) => {
   const lengths = Array.from({ length: before.length + 1 }, () =>
@@ -199,6 +257,23 @@ const isRewriteOf = (removed, added) =>
   removed.entry === added.entry &&
   removed.field === added.field
 
+const pairRewrites = (lines) => {
+  const ordered = []
+  const pending = [...lines]
+
+  while (pending.length > 0) {
+    const line = pending.shift()
+    ordered.push(line)
+    if (line.type !== REMOVED) continue
+    const match = pending.findIndex(
+      (other) => other.type === ADDED && isRewriteOf(line, other),
+    )
+    if (match >= 0) ordered.push(...pending.splice(match, 1))
+  }
+
+  return ordered
+}
+
 const withWordHighlights = (lines) => {
   const highlighted = lines.map((line) => ({ ...line, parts: plainParts(line.text) }))
 
@@ -238,12 +313,14 @@ const compare = (before, after, labels) => {
         : { ...afterRows[step.rightIndex], type: ADDED },
     )
 
-  const lines = withWordHighlights(changedLines)
+  const moves = collapseMoves(changedLines, beforeRows, afterRows)
+  const lines = withWordHighlights(pairRewrites(moves))
 
   return {
     groups: groupBySection(lines),
     added: lines.filter((line) => line.type === ADDED).length,
     removed: lines.filter((line) => line.type === REMOVED).length,
+    moved: lines.filter((line) => line.type === MOVED).length,
   }
 }
 
@@ -252,4 +329,5 @@ export default {
   flattenResume,
   ADDED,
   REMOVED,
+  MOVED,
 }

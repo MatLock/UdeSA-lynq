@@ -36,6 +36,7 @@ def live_system_prompt(context) -> str:
         language=context.language,
         resume_language=context.resume_language,
         max_steps=context.max_steps,
+        max_edits=context.max_edits,
         turns_left=context.turns_left,
     )
 
@@ -55,7 +56,15 @@ class ToolChoiceTest(unittest.IsolatedAsyncioTestCase):
         binding = model.binds[0]
         self.assertEqual(binding["tool_choice"], "any")
         self.assertEqual(
-            sorted(binding["tools"]), ["TurnAnswer", "apply_edit", "find_evidence"]
+            sorted(binding["tools"]),
+            [
+                "TurnAnswer",
+                "find_evidence",
+                "reorder_entries",
+                "replace_skills",
+                "rewrite_entry",
+                "rewrite_summary",
+            ],
         )
 
     async def test_the_tool_call_becomes_the_structured_response(self) -> None:

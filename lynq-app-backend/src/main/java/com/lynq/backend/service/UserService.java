@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -263,7 +264,6 @@ public class UserService {
         .language(request.getLanguage())
         .createdOn(LocalDate.now(ZoneOffset.UTC))
         .name(request.getName())
-        .tailoredForJobId(request.getTailoredForJobId())
         .lynqFileStorageId(request.getFileId())
         .user(user)
         .build();
@@ -329,14 +329,16 @@ public class UserService {
     Page<UserApplicationProjection> applications =
         userApplicationJobRepository.findApplicationsByUserId(userId, pageable);
 
-    Map<String, String> logoUrls = fileStorageService.obtainDownloadUrls(
-        applications.getContent().stream()
-            .map(UserApplicationProjection::companyFileStorageId)
-            .toList());
+    Map<String, String> downloadUrls = fileStorageService.obtainDownloadUrls(Stream.concat(
+            applications.getContent().stream()
+                .map(UserApplicationProjection::companyFileStorageId),
+            applications.getContent().stream()
+                .map(UserApplicationProjection::resumeFileStorageId))
+        .toList());
 
     return PagedRestResponse.from(applications
-        .map(projection ->
-            toApplicationResponse(projection, candidateSkills, candidateSimilarityTags, logoUrls)));
+        .map(projection -> toApplicationResponse(
+            projection, candidateSkills, candidateSimilarityTags, downloadUrls)));
   }
 
   private UserProfileCompanyRestResponse toCompanyResponse(CompanyEntity company) {
@@ -427,7 +429,8 @@ public class UserService {
   }
 
   private UserApplicationResponse toApplicationResponse(UserApplicationProjection projection,
-      List<String> candidateSkills, List<String> candidateSimilarityTags, Map<String, String> logoUrls) {
+      List<String> candidateSkills, List<String> candidateSimilarityTags,
+      Map<String, String> downloadUrls) {
     return UserApplicationResponse.builder()
         .id(projection.id())
         .jobId(projection.jobId())
@@ -435,10 +438,12 @@ public class UserService {
         .jobDescription(projection.jobDescription())
         .companyId(projection.companyId())
         .companyName(projection.companyName())
-        .companyProfileImage(companyImageUrl(logoUrls, projection))
+        .companyProfileImage(companyImageUrl(downloadUrls, projection))
         .appliedOn(projection.appliedOn())
         .lynqScore(LyNQScoreCalculator.score(splitSkills(projection.jobSkills()),
             splitSkills(projection.jobSimilarityTags()), candidateSkills, candidateSimilarityTags))
+        .resumeName(projection.resumeName())
+        .resumePdfUrl(signedUrl(downloadUrls, projection.resumeFileStorageId()))
         .build();
   }
 
@@ -471,7 +476,6 @@ public class UserService {
         .id(resume.getId())
         .name(resume.getName())
         .alias(resume.getAlias())
-        .tailoredForJobId(resume.getTailoredForJobId())
         .language(resume.getLanguage())
         .createdOn(resume.getCreatedOn())
         .resume(parseResume(resume.getResume()))

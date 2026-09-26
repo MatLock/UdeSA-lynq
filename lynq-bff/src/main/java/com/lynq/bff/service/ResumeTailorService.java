@@ -12,7 +12,11 @@ import com.lynq.bff.client.request.TailorJobRequest;
 import com.lynq.bff.client.request.TailorTurnRequest;
 import com.lynq.bff.client.response.JobDetailsResponse;
 import com.lynq.bff.client.response.UserResumeResponse;
+import com.lynq.bff.controller.request.PreviewResumeRequest;
+import com.lynq.bff.controller.request.TailorApplyRestRequest;
+import com.lynq.bff.controller.response.ResumePreviewRestResponse;
 import com.lynq.bff.controller.response.ResumeTailorApplyRestResponse;
+import com.lynq.bff.enums.ResumeTemplate;
 import com.lynq.bff.exceptions.BadGatewayException;
 import com.lynq.bff.exceptions.BadRequestException;
 import com.lynq.bff.exceptions.ConflictException;
@@ -32,9 +36,10 @@ public class ResumeTailorService {
 
   private static final String DEFAULT_LANGUAGE = "EN";
   private static final String JOB_ID_FIELD = "jobId";
+  private static final String CURRENT_RESUME_FIELD = "currentResume";
   private static final String STATUS_FIELD = "status";
+  private static final ResumeTemplate DEFAULT_TEMPLATE = ResumeTemplate.MODERN;
 
-  private static final String RESUME_ID_REQUIRED = "A resume id is required";
   private static final String MESSAGE_REQUIRED = "A message is required";
   private static final String TURN_KEY_REQUIRED = "A turn key is required";
   private static final String RESUMES_UNREADABLE = "The caller's resumes could not be read";
@@ -48,19 +53,24 @@ public class ResumeTailorService {
       "The tailoring conversation could not be read";
   private static final String CONVERSATION_WITHOUT_JOB =
       "The tailoring conversation does not carry the job posting it was started for";
+  private static final String CONVERSATION_WITHOUT_RESUME =
+      "The tailoring conversation does not carry a resume to apply with";
   private static final String APPLY_FAILED = "The application could not be created";
   private static final String CONVERSATION_NOT_CLOSED =
       "The tailoring conversation could not be closed";
 
   private final LynqBackendClient lynqBackendClient;
   private final LynqAgentClient lynqAgentClient;
+  private final ResumePreviewService resumePreviewService;
   private final ObjectMapper objectMapper;
 
   public ResumeTailorService(LynqBackendClient lynqBackendClient,
                              LynqAgentClient lynqAgentClient,
+                             ResumePreviewService resumePreviewService,
                              ObjectMapper objectMapper) {
     this.lynqBackendClient = lynqBackendClient;
     this.lynqAgentClient = lynqAgentClient;
+    this.resumePreviewService = resumePreviewService;
     this.objectMapper = objectMapper;
   }
 
@@ -112,26 +122,67 @@ public class ResumeTailorService {
     return readConversation(conversationId, caller);
   }
 
-  public ResumeTailorApplyRestResponse apply(String conversationId, String resumeId,
+  /**
+   * Closes the flow. The tailored resume is rendered here and stored as a file
+   * of the caller's, never as one of their resumes: a candidate who tailors for
+   * ten postings would otherwise end up with ten more CVs in "My CV" that they
+   * never asked to keep. The application carries the file, and the candidate
+   * who wants the document among their own uploads it again.
+   */
+  public ResumeTailorApplyRestResponse apply(String conversationId,
+                                             TailorApplyRestRequest request,
                                              Caller caller) {
-    if (resumeId == null || resumeId.isBlank()) {
-      throw new BadRequestException(RESUME_ID_REQUIRED);
-    }
-
-    ownedResume(resumeId, caller);
     Map<String, Object> conversation = readConversation(conversationId, caller);
     String jobId = jobIdOf(conversation);
 
     log.info("message= Closing a tailoring conversation, user_id={}, conversation_id={}, "
-        + "job_id={}, resume_id={}", caller.userId(), conversationId, jobId, resumeId);
+        + "job_id={}", caller.userId(), conversationId, jobId);
 
-    Applied applied = applyToJob(jobId, resumeId, caller);
+    ResumePreviewRestResponse rendered = render(conversation, request, caller);
+    Applied applied = applyToJob(jobId, rendered.getFileId(), nameOf(request, jobId, caller),
+        caller);
 
     return ResumeTailorApplyRestResponse.builder()
         .application(applied.application())
         .alreadyApplied(applied.alreadyApplied())
-        .conversationStatus(markApplied(conversationId, resumeId, caller))
+        .conversationStatus(markApplied(conversationId, rendered.getFileId(), caller))
+        .resumeFileId(rendered.getFileId())
+        .resumePdfUrl(rendered.getPdfUrl())
         .build();
+  }
+
+  private ResumePreviewRestResponse render(Map<String, Object> conversation,
+                                           TailorApplyRestRequest request, Caller caller) {
+    String rendered = request == null ? null : request.getFileId();
+    if (rendered != null && !rendered.isBlank()) {
+      return ResumePreviewRestResponse.builder().fileId(rendered.trim()).build();
+    }
+
+    Object resume = conversation == null ? null : conversation.get(CURRENT_RESUME_FIELD);
+    if (resume == null) {
+      throw new BadGatewayException(CONVERSATION_WITHOUT_RESUME);
+    }
+
+    ResumeTemplate template = request == null || request.getTemplate() == null
+        ? DEFAULT_TEMPLATE
+        : request.getTemplate();
+
+    return resumePreviewService.preview(new PreviewResumeRequest(resume, template), caller);
+  }
+
+  private String nameOf(TailorApplyRestRequest request, String jobId, Caller caller) {
+    String asked = request == null ? null : request.getResumeName();
+    if (asked != null && !asked.isBlank()) {
+      return asked.trim();
+    }
+
+    try {
+      return readJob(jobId, caller).getTitle();
+    } catch (RuntimeException e) {
+      log.warn("message= The tailored resume goes into the application unnamed, job_id={}",
+          jobId, e);
+      return null;
+    }
   }
 
   private UserResumeResponse ownedResume(String resumeId, Caller caller) {
@@ -198,8 +249,11 @@ public class ResumeTailorService {
     return jobId.toString();
   }
 
-  private Applied applyToJob(String jobId, String resumeId, Caller caller) {
-    ApplyJobRequest request = ApplyJobRequest.builder().resumeId(resumeId).build();
+  private Applied applyToJob(String jobId, String fileId, String resumeName, Caller caller) {
+    ApplyJobRequest request = ApplyJobRequest.builder()
+        .fileId(fileId)
+        .resumeName(resumeName)
+        .build();
 
     try {
       Object application = lynqBackendClient

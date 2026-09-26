@@ -8,6 +8,7 @@ import com.lynq.backend.client.request.CandidateSpec;
 import com.lynq.backend.client.request.JobSpec;
 import com.lynq.backend.client.response.CandidateExplanationResponse;
 import com.lynq.backend.client.response.UpskillingSuggestionResponse;
+import com.lynq.backend.controller.request.ApplyJobRequest;
 import com.lynq.backend.controller.response.GetJobDetailForCandidateRestResponse;
 import com.lynq.backend.controller.response.GetJobRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
@@ -65,6 +66,11 @@ public class JobService {
   private static final String JOB_POST_NOT_FOUND = "Job post not found";
   private static final String ALREADY_APPLIED_TO_JOB = "User has already applied to this job";
   private static final String RESUME_NOT_FOUND = "Resume '%s' not found";
+  private static final String RESUME_OR_FILE_REQUIRED =
+      "An application needs the resume it was made with: send resumeId, or fileId for a "
+          + "document that is not one of the candidate's stored resumes";
+  private static final String FILE_NOT_THE_CALLERS =
+      "File '%s' does not belong to the caller";
   private static final String ONLY_JOB_OWNER_CAN_REFRESH = "Only the owner of the job post can refresh it";
   private static final String ONLY_CLOSED_JOBS_CAN_BE_REFRESHED = "Only closed job posts can be refreshed";
   private static final String ONLY_JOB_OWNER_CAN_CLOSE = "Only the owner of the job post can close it";
@@ -206,28 +212,71 @@ public class JobService {
    * candidate is a 404 rather than a 403: the caller learns nothing about
    * resumes that are not theirs.
    */
-  public UserApplicationJobEntity applyToJob(String jobId, String resumeId) {
+  public UserApplicationJobEntity applyToJob(String jobId, ApplyJobRequest request) {
     UserEntity user = getAuthenticatedUser();
 
     JobPostEntity job = jobPostRepository.findById(jobId)
         .orElseThrow(() -> new NotFoundException(JOB_POST_NOT_FOUND));
 
-    UserResumeEntity resume = userResumeRepository.findByIdAndUserId(resumeId, user.getId())
-        .orElseThrow(() -> new NotFoundException(String.format(RESUME_NOT_FOUND, resumeId)));
+    UserApplicationJobEntity application = appliedWith(request, user);
 
     if (userApplicationJobRepository.existsByJobIdAndUserId(jobId, user.getId())) {
       throw new AlreadyAppliedToJobException(ALREADY_APPLIED_TO_JOB);
     }
 
-    UserApplicationJobEntity application = UserApplicationJobEntity.builder()
-        .id(Generators.timeBasedEpochGenerator().generate().toString())
-        .jobPost(job)
-        .user(user)
-        .userResume(resume)
-        .appliedOn(LocalDate.now(ZoneOffset.UTC))
-        .build();
+    application.setId(Generators.timeBasedEpochGenerator().generate().toString());
+    application.setJobPost(job);
+    application.setUser(user);
+    application.setAppliedOn(LocalDate.now(ZoneOffset.UTC));
 
     return userApplicationJobRepository.save(application);
+  }
+
+  /**
+   * Resolves the document the application is made with. A stored resume names
+   * itself and carries its own file, so nothing about it is taken from the
+   * caller. A loose file is a CV Tailor resume, which is never stored as one of
+   * the candidate's own: it is accepted only once lynq-file-storage says it
+   * belongs to the caller, or anyone could attach somebody else's document.
+   */
+  private UserApplicationJobEntity appliedWith(ApplyJobRequest request, UserEntity user) {
+    String resumeId = trimmed(request.getResumeId());
+    String fileId = trimmed(request.getFileId());
+
+    if (resumeId != null) {
+      UserResumeEntity resume = userResumeRepository.findByIdAndUserId(resumeId, user.getId())
+          .orElseThrow(() -> new NotFoundException(String.format(RESUME_NOT_FOUND, resumeId)));
+
+      return UserApplicationJobEntity.builder()
+          .userResume(resume)
+          .resumeFileStorageId(resume.getLynqFileStorageId())
+          .resumeName(labelOf(resume))
+          .build();
+    }
+
+    if (fileId == null) {
+      throw new BadRequestException(RESUME_OR_FILE_REQUIRED);
+    }
+    if (!fileStorageService.belongsToCaller(fileId)) {
+      throw new BadRequestException(String.format(FILE_NOT_THE_CALLERS, fileId));
+    }
+
+    return UserApplicationJobEntity.builder()
+        .resumeFileStorageId(fileId)
+        .resumeName(trimmed(request.getResumeName()))
+        .build();
+  }
+
+  private static String labelOf(UserResumeEntity resume) {
+    String alias = trimmed(resume.getAlias());
+    return alias != null ? alias : trimmed(resume.getName());
+  }
+
+  private static String trimmed(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return value.trim();
   }
 
   @AuditLog
@@ -443,6 +492,7 @@ public class JobService {
         .userCurrentPosition(projection.userCurrentPosition())
         .userAppliedOn(projection.appliedOn())
         .userResumeUrl(signedUrl(downloadUrls, projection.userResumeFileStorageId()))
+        .userResumeName(projection.userResumeName())
         .lynqScore(LyNQScoreCalculator.score(jobSkills, splitSkills(projection.jobSimilarityTags()),
             candidateSkills, splitSkills(projection.userSimilarityTags())))
         .build();

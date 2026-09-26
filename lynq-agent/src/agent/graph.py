@@ -4,6 +4,7 @@ import logging
 from itertools import dropwhile
 
 from langchain.agents import create_agent
+from langchain.agents.middleware import ModelRetryMiddleware
 from langchain_core.messages import AIMessage, HumanMessage
 
 from agent.answer import TurnAnswer, from_result
@@ -16,9 +17,10 @@ from agent.context import (
     use_turn_state,
 )
 from agent.scope import SPAN_NAME, SPAN_REASON, enforce
-from agent.tools import apply_edit, find_evidence
+from agent.tools import EDIT_TOOLS, find_evidence
 from config import BEDROCK, OLLAMA, get_settings
 from db.models import MessageRole, SpanKind
+from llm.errors import retryable
 from llm.factory import build_model
 from prompt.notice import render as no_change_notice
 from prompt.resume_tailor import reference, render
@@ -36,12 +38,21 @@ def recursion_limit(max_steps: int) -> int:
     return 2 * max_steps + RECURSION_HEADROOM
 
 
+def retry_middleware() -> ModelRetryMiddleware:
+    return ModelRetryMiddleware(
+        max_retries=get_settings().model_retries,
+        retry_on=retryable,
+        on_failure="error",
+    )
+
+
 def build_agent(system_prompt: str, model=None):
     return create_agent(
         model=model if model is not None else build_model(),
-        tools=[find_evidence, apply_edit],
+        tools=[find_evidence, *EDIT_TOOLS],
         system_prompt=system_prompt,
         response_format=TurnAnswer,
+        middleware=[retry_middleware()],
     )
 
 
@@ -72,6 +83,7 @@ async def run_turn(context: TurnContext, model=None) -> TurnOutcome:
         language=context.language,
         resume_language=context.resume_language,
         max_steps=context.max_steps,
+        max_edits=context.max_edits,
         turns_left=context.turns_left,
     )
     collector = TraceCollector(

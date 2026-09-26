@@ -28,6 +28,7 @@ def system_prompt() -> str:
         language="es",
         resume_language="en",
         max_steps=12,
+        max_edits=2,
         turns_left=9,
     )
 

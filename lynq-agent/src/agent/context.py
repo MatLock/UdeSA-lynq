@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Any, Iterator
 
 PERSONAL_INFO = "personal_info"
+DEFAULT_MAX_EDITS = 2
 PER_MILLION = Decimal("1000000")
 
 
@@ -45,6 +46,7 @@ class TurnContext:
     message: str
     max_steps: int
     turns_left: int
+    max_edits: int = DEFAULT_MAX_EDITS
     resume_version_id: str | None = None
     spans: list[SpanRecord] = field(default_factory=list)
 
@@ -73,7 +75,9 @@ class TurnState:
     changes: list[dict[str, Any]] = field(default_factory=list)
     spans: list[SpanRecord] = field(default_factory=list)
     steps: int = 0
+    max_edits: int = DEFAULT_MAX_EDITS
     limit_reported: bool = False
+    edit_limit_reported: bool = False
 
     def next_step(self) -> int:
         self.steps += 1
@@ -81,6 +85,9 @@ class TurnState:
 
     def at_step_limit(self) -> bool:
         return self.steps >= self.max_steps
+
+    def at_edit_limit(self) -> bool:
+        return len(self.changes) >= self.max_edits
 
     def remember_evidence(self, normalized: str, matched: str) -> None:
         self.evidence.setdefault(normalized, matched)
@@ -115,6 +122,7 @@ def build_turn_state(context: TurnContext) -> TurnState:
         language=context.language,
         resume_language=context.resume_language,
         max_steps=context.max_steps,
+        max_edits=context.max_edits,
         base_resume=context.base_resume,
         personal_info=personal_info,
         resume=resume,

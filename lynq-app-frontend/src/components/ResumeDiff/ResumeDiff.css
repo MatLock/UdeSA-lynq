@@ -71,6 +71,11 @@
   background: rgb(var(--danger-rgb) / 0.08);
 }
 
+.resume-diff-line.is-moved {
+  color: var(--brand-purple-dark);
+  background: var(--accent-bg);
+}
+
 .resume-diff-sign {
   flex: none;
   width: 10px;
@@ -101,7 +106,7 @@
 
 .resume-diff-word.is-changed {
   font-weight: 700;
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-control);
 }
 
 .is-added .resume-diff-word.is-changed {

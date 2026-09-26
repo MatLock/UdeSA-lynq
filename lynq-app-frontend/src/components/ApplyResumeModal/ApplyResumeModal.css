@@ -142,7 +142,7 @@
 .apply-resume-button {
   padding: 8px 16px;
   border: 1px solid transparent;
-  border-radius: var(--radius-chip);
+  border-radius: var(--radius-control);
   font: inherit;
   font-size: 14px;
   font-weight: 700;

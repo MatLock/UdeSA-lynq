@@ -64,17 +64,17 @@ public class FileControllerImpl implements com.lynq.filestorage.controller.FileC
       @PathVariable String fileId, @RequestHeader(USER_ID_HEADER) String userId) {
     StoredFileEntity storedFile = fileService.confirmUpload(fileId, userId);
 
-    FileRestResponse response = FileRestResponse.builder()
-        .fileId(storedFile.getId())
-        .fileName(storedFile.getFileName())
-        .contentType(storedFile.getContentType())
-        .s3Key(storedFile.getS3Key())
-        .status(storedFile.getStatus())
-        .createdOn(storedFile.getCreatedOn())
-        .updatedOn(storedFile.getUpdatedOn())
-        .build();
+    return ResponseEntity.ok(new GlobalRestResponse<>(true, toResponse(storedFile)));
+  }
 
-    return ResponseEntity.ok(new GlobalRestResponse<>(true, response));
+  @Override
+  @GetMapping("/{fileId}")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<FileRestResponse>> findOwnedFile(
+      @PathVariable String fileId, @RequestHeader(USER_ID_HEADER) String userId) {
+    StoredFileEntity storedFile = fileService.findOwnedFile(fileId, userId);
+
+    return ResponseEntity.ok(new GlobalRestResponse<>(true, toResponse(storedFile)));
   }
 
   @Override
@@ -101,6 +101,18 @@ public class FileControllerImpl implements com.lynq.filestorage.controller.FileC
     Map<String, String> downloadUrls = fileService.createDownloadUrls(request.getFileIds());
 
     return ResponseEntity.ok(new GlobalRestResponse<>(true, downloadUrls));
+  }
+
+  private FileRestResponse toResponse(StoredFileEntity storedFile) {
+    return FileRestResponse.builder()
+        .fileId(storedFile.getId())
+        .fileName(storedFile.getFileName())
+        .contentType(storedFile.getContentType())
+        .s3Key(storedFile.getS3Key())
+        .status(storedFile.getStatus())
+        .createdOn(storedFile.getCreatedOn())
+        .updatedOn(storedFile.getUpdatedOn())
+        .build();
   }
 
   @Override

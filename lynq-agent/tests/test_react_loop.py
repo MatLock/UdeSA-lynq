@@ -4,6 +4,7 @@ import json
 import unittest
 from unittest.mock import patch
 
+from botocore.exceptions import ClientError
 from langchain_core.messages import AIMessage
 
 from tests.fixtures.spanish import (
@@ -15,7 +16,7 @@ from tests.fixtures.spanish import (
     REPLY,
     WARNING,
 )
-from tests.support import scripted, tool_call
+from tests.support import bedrock_error, breaking, scripted, tool_call
 
 from agent.context import TurnContext
 from agent.graph import recursion_limit, run_turn, turn_messages
@@ -97,8 +98,8 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
         model = scripted(
             tool_call("find_evidence", {"claims": ["Kubernetes"]}, "1"),
             tool_call(
-                "apply_edit",
-                {"section": "work_experience", "op": "reorder", "payload": {"order": [1, 0]}},
+                "reorder_entries",
+                {"section": "work_experience", "order": [1, 0]},
                 "2",
             ),
             tool_call("TurnAnswer", ANSWER, "3"),
@@ -119,7 +120,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             [span.name for span in outcome.spans if span.kind == SpanKind.TOOL],
-            ["find_evidence", "apply_edit"],
+            ["find_evidence", "reorder_entries"],
         )
 
     async def test_a_batched_lookup_spends_one_step_on_every_claim(self) -> None:
@@ -164,11 +165,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_resume_comes_from_the_edits_not_from_the_model(self) -> None:
         model = scripted(
-            tool_call(
-                "apply_edit",
-                {"section": "summary", "op": "rewrite", "payload": {"text": "Kubernetes first."}},
-                "1",
-            ),
+            tool_call("rewrite_summary", {"text": "Kubernetes first."}, "1"),
             tool_call("TurnAnswer", {"reply": '{"summary": "I am a CEO"}'}, "2"),
         )
 
@@ -191,11 +188,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_turn_that_runs_out_of_steps_still_answers(self) -> None:
         model = scripted(
-            tool_call(
-                "apply_edit",
-                {"section": "summary", "op": "rewrite", "payload": {"text": "Kubernetes first."}},
-                "1",
-            ),
+            tool_call("rewrite_summary", {"text": "Kubernetes first."}, "1"),
             tool_call("TurnAnswer", ANSWER, "2"),
         )
 
@@ -208,6 +201,42 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
             [span.kind for span in outcome.spans if span.kind == SpanKind.LIMIT],
             [SpanKind.LIMIT],
         )
+
+    async def test_a_model_that_breaks_the_tool_use_protocol_is_retried(self) -> None:
+        model = breaking(
+            bedrock_error(),
+            1,
+            tool_call("rewrite_summary", {"text": "Kubernetes first."}, "1"),
+            tool_call("TurnAnswer", ANSWER, "2"),
+        )
+
+        outcome = await run_turn(context_for(), model=model)
+
+        self.assertEqual(outcome.reply, ANSWER["reply"])
+        self.assertEqual(len(outcome.changes), 1)
+        self.assertEqual(
+            [span.error for span in outcome.spans if span.kind == SpanKind.ERROR],
+            ["An error occurred (ModelErrorException) when calling the Converse "
+             "operation: Model produced invalid sequence as part of ToolUse."],
+        )
+
+    async def test_a_model_that_keeps_breaking_fails_the_turn(self) -> None:
+        reset_settings()
+        with patch.dict("os.environ", {"AGENT_MODEL_RETRIES": "1"}, clear=False):
+            model = breaking(bedrock_error(), 9, tool_call("TurnAnswer", ANSWER, "1"))
+
+            with self.assertRaises(ClientError):
+                await run_turn(context_for(), model=model)
+
+        self.assertEqual(len(model.attempts), 2)
+
+    async def test_an_error_bedrock_does_not_own_is_never_retried(self) -> None:
+        model = breaking(RuntimeError("the socket died"), 1, tool_call("TurnAnswer", ANSWER, "1"))
+
+        with self.assertRaises(RuntimeError):
+            await run_turn(context_for(), model=model)
+
+        self.assertEqual(len(model.attempts), 1)
 
     async def test_an_answer_that_came_as_text_is_unwrapped(self) -> None:
         model = scripted(AIMessage(content=json.dumps(ANSWER, ensure_ascii=False)))
@@ -229,11 +258,9 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
         self,
     ) -> None:
         model = scripted(
-            tool_call("apply_edit", {
-                "section": "summary",
-                "op": "rewrite",
-                "payload": {"text": "Ingeniero backend sobre Kubernetes."},
-            }),
+            tool_call(
+                "rewrite_summary", {"text": "Ingeniero backend sobre Kubernetes."}
+            ),
             AIMessage(content=json.dumps(ANSWER, ensure_ascii=False)),
         )
 

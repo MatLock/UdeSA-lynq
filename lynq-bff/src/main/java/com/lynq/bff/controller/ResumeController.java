@@ -401,15 +401,16 @@ public interface ResumeController {
 
   @Operation(
       summary = "Apply with the tailored resume and close the conversation",
-      description = "The orchestrated close of the flow. The candidate has already stored the "
-          + "tailored resume through POST /user/resume; this checks it belongs to the caller, "
-          + "reads from the conversation which posting it was started for, applies to that "
-          + "posting with it against lynq-app-backend and tells lynq-agent the conversation is "
-          + "applied. Having already applied to the posting is not an error: the conversation is "
-          + "closed all the same and the response says so, which is the meaning the browser "
-          + "already gives that case on external postings. The application is what comes back, so "
-          + "the browser never calls the apply endpoint by itself and leaves the conversation "
-          + "open behind it.")
+      description = "The orchestrated close of the flow. It reads the conversation for the "
+          + "posting it was started for and the resume as it stands, renders that resume into a "
+          + "PDF stored as a file of the caller's, applies to the posting with that file against "
+          + "lynq-app-backend and tells lynq-agent the conversation is applied. The tailored "
+          + "resume is deliberately never stored as one of the candidate's own resumes: someone "
+          + "who tailors for ten postings would end up with ten CVs in \"My CV\" they never "
+          + "asked to keep, so a candidate who wants to keep it uploads it again. The response "
+          + "carries the file, which is how the browser downloads it for an external posting. "
+          + "Having already applied to the posting is not an error: the conversation is closed "
+          + "all the same and the response says so.")
   @ApiResponses({
       @ApiResponse(
           responseCode = "201",
@@ -429,11 +430,13 @@ public interface ResumeController {
                             "appliedOn": "2026-09-23"
                           },
                           "alreadyApplied": false,
-                          "conversationStatus": "APPLIED"
+                          "conversationStatus": "APPLIED",
+                          "resumeFileId": "018fa1b2-2b1d-7c4e-9a6f-1e2d3c4b5a63",
+                          "resumePdfUrl": "https://files.lynq.dev/..."
                         }
                       }"""))),
-      @ApiResponse(responseCode = "400", description = "The resume id is missing, or no such "
-          + "resume belongs to the caller."),
+      @ApiResponse(responseCode = "400", description = "The conversation carries no resume to "
+          + "apply with."),
       @ApiResponse(responseCode = "401", description = "The Authorization header is missing, or the "
           + "access token's signature is invalid or expired."),
       @ApiResponse(responseCode = "403", description = "The lynq-request-uuid header is missing, "

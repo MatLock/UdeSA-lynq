@@ -5,7 +5,17 @@ import unittest
 from tests.fixtures.spanish import PROSE
 
 from agent.context import TurnContext, build_turn_state, use_turn_state
-from agent.tools import STEP_LIMIT_MESSAGE, apply_edit, find_evidence
+from pydantic import ValidationError
+
+from agent.tools import (
+    EDIT_LIMIT_MESSAGE,
+    STEP_LIMIT_MESSAGE,
+    find_evidence,
+    reorder_entries,
+    replace_skills,
+    rewrite_entry,
+    rewrite_summary,
+)
 from db.models import SpanKind
 
 JOB = {
@@ -46,7 +56,12 @@ RESUME = {
 SPANISH = PROSE
 
 
-def state_for(language: str = "es", resume_language: str = "es", max_steps: int = 12):
+def state_for(
+    language: str = "es",
+    resume_language: str = "es",
+    max_steps: int = 12,
+    max_edits: int = 2,
+):
     context = TurnContext(
         conversation_id="conversation-1",
         run_token="token-1",
@@ -58,6 +73,7 @@ def state_for(language: str = "es", resume_language: str = "es", max_steps: int 
         history=[],
         message="go ahead",
         max_steps=max_steps,
+        max_edits=max_edits,
         turns_left=9,
     )
     return build_turn_state(context)
@@ -161,40 +177,40 @@ class FindEvidenceTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state.evidence["kubernetes"], "Kubernetes")
 
 
-class ApplyEditTest(unittest.IsolatedAsyncioTestCase):
+class EditToolsTest(unittest.IsolatedAsyncioTestCase):
 
-    async def edit(self, state, section, op, payload) -> str:
+    async def call(self, state, tool, **arguments) -> str:
         with use_turn_state(state):
-            return await apply_edit.ainvoke(
-                {"section": section, "op": op, "payload": payload}
+            return await tool.ainvoke(arguments)
+
+    def test_an_edit_takes_the_arguments_it_needs_and_nothing_else(self) -> None:
+        properties = rewrite_entry.args_schema.model_json_schema()["properties"]
+
+        self.assertEqual(
+            sorted(properties), ["achievements", "description", "index", "section"]
+        )
+        for tool in (rewrite_summary, rewrite_entry, reorder_entries, replace_skills):
+            schema = tool.args_schema.model_json_schema()["properties"]
+
+            self.assertNotIn("op", schema)
+            self.assertNotIn("payload", schema)
+            self.assertEqual(
+                [name for name, field in schema.items() if field.get("type") == "object"],
+                [],
             )
 
     async def test_personal_info_is_immutable(self) -> None:
         state = state_for()
-        answer = await self.edit(state, "personal_info", "rewrite", {"full_name": "X"})
+        answer = await self.call(
+            state, rewrite_entry, section="personal_info", index=0, description="X"
+        )
 
         self.assertEqual(answer, "REJECTED: personal_info is immutable")
 
-    async def test_dates_are_immutable(self) -> None:
-        state = state_for()
-        answer = await self.edit(
-            state, "work_experience", "rewrite", {"index": 0, "start_date": "2010-01"}
-        )
-
-        self.assertEqual(answer, "REJECTED: dates are immutable")
-
-    async def test_new_entries_are_not_allowed(self) -> None:
-        state = state_for()
-        answer = await self.edit(
-            state, "work_experience", "add", {"company": "Initech"}
-        )
-
-        self.assertEqual(answer, "REJECTED: new entries are not allowed")
-
     async def test_a_reorder_that_grows_the_section_is_not_allowed(self) -> None:
         state = state_for()
-        answer = await self.edit(
-            state, "work_experience", "reorder", {"order": [0, 1, 2]}
+        answer = await self.call(
+            state, reorder_entries, section="work_experience", order=[0, 1, 2]
         )
 
         self.assertEqual(
@@ -205,15 +221,16 @@ class ApplyEditTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_reorder_that_misses_a_position_says_how_many_there_are(self) -> None:
         state = state_for()
-        answer = await self.edit(state, "work_experience", "reorder", {"order": [1]})
+        answer = await self.call(
+            state, reorder_entries, section="work_experience", order=[1]
+        )
 
         self.assertIn("2 positions of work_experience", answer)
         self.assertEqual(state.changes, [])
 
-
     async def test_a_skill_without_evidence_is_rejected(self) -> None:
         state = state_for()
-        answer = await self.edit(state, "skills", "replace", {"technical": ["Go"]})
+        answer = await self.call(state, replace_skills, technical=["Go"])
 
         self.assertEqual(answer, "REJECTED: no evidence in base resume")
         self.assertEqual(state.changes, [])
@@ -222,8 +239,8 @@ class ApplyEditTest(unittest.IsolatedAsyncioTestCase):
         state = state_for()
         with use_turn_state(state):
             await find_evidence.ainvoke({"claims": ["Kubernetes"]})
-        answer = await self.edit(
-            state, "skills", "replace", {"technical": ["PostgreSQL", "Kubernetes"]}
+        answer = await self.call(
+            state, replace_skills, technical=["PostgreSQL", "Kubernetes"]
         )
 
         self.assertEqual(answer, "OK")
@@ -231,8 +248,8 @@ class ApplyEditTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_it_rewrites_the_summary(self) -> None:
         state = state_for()
-        answer = await self.edit(
-            state, "summary", "rewrite", {"text": "Backend engineer on Kubernetes."}
+        answer = await self.call(
+            state, rewrite_summary, text="Backend engineer on Kubernetes."
         )
 
         self.assertEqual(answer, "OK")
@@ -241,11 +258,12 @@ class ApplyEditTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_rewritten_entry_records_which_fields_and_which_entry(self) -> None:
         state = state_for()
-        answer = await self.edit(
+        answer = await self.call(
             state,
-            "work_experience",
-            "rewrite",
-            {"index": 1, "description": "Ran the Kubernetes platform."},
+            rewrite_entry,
+            section="work_experience",
+            index=1,
+            description="Ran the Kubernetes platform.",
         )
 
         self.assertEqual(answer, "OK")
@@ -257,9 +275,7 @@ class ApplyEditTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_skills_rewrite_records_the_buckets_it_touched(self) -> None:
         state = state_for()
-        answer = await self.edit(
-            state, "skills", "replace", {"technical": ["Kubernetes"]}
-        )
+        answer = await self.call(state, replace_skills, technical=["Kubernetes"])
 
         self.assertEqual(answer, "OK")
         change = state.changes[0]
@@ -269,14 +285,16 @@ class ApplyEditTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_rewriting_the_summary_with_what_it_already_says_changes_nothing(self) -> None:
         state = state_for()
-        answer = await self.edit(state, "summary", "rewrite", {"text": RESUME["summary"]})
+        answer = await self.call(state, rewrite_summary, text=RESUME["summary"])
 
         self.assertEqual(answer, "OK")
         self.assertEqual(state.changes, [])
 
     async def test_it_reorders_the_experience(self) -> None:
         state = state_for()
-        answer = await self.edit(state, "work_experience", "reorder", {"order": [1, 0]})
+        answer = await self.call(
+            state, reorder_entries, section="work_experience", order=[1, 0]
+        )
 
         self.assertEqual(answer, "OK")
         self.assertEqual(
@@ -286,41 +304,41 @@ class ApplyEditTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_only_prose_fields_are_editable(self) -> None:
         state = state_for()
-        answer = await self.edit(
-            state, "work_experience", "rewrite", {"index": 0, "position": "Architect"}
+        answer = await self.call(
+            state,
+            rewrite_entry,
+            section="education",
+            index=0,
+            achievements=["Graduated with honours"],
         )
 
         self.assertEqual(answer, "REJECTED: field is not editable")
 
     async def test_an_index_outside_the_section_is_rejected(self) -> None:
         state = state_for()
-        answer = await self.edit(
-            state, "work_experience", "rewrite", {"index": 7, "description": "x"}
+        answer = await self.call(
+            state, rewrite_entry, section="work_experience", index=7, description="x"
         )
 
         self.assertEqual(answer, "REJECTED: index out of range")
 
     async def test_an_unknown_section_is_rejected(self) -> None:
         state = state_for()
-        answer = await self.edit(state, "hobbies", "rewrite", {"text": "chess"})
+        answer = await self.call(
+            state, rewrite_entry, section="hobbies", index=0, description="chess"
+        )
 
         self.assertEqual(answer, "REJECTED: unknown section")
 
-    async def test_an_unknown_op_is_rejected(self) -> None:
+    async def test_a_summary_without_text_is_rejected(self) -> None:
         state = state_for()
-        answer = await self.edit(state, "summary", "translate", {"text": "hola"})
-
-        self.assertEqual(answer, "REJECTED: unknown op for this section")
-
-    async def test_a_payload_without_text_is_rejected(self) -> None:
-        state = state_for()
-        answer = await self.edit(state, "summary", "rewrite", {"text": "   "})
+        answer = await self.call(state, rewrite_summary, text="   ")
 
         self.assertEqual(answer, "REJECTED: invalid payload")
 
     async def test_prose_written_in_the_language_of_the_chat_is_rejected(self) -> None:
         state = state_for(language="es", resume_language="en")
-        answer = await self.edit(state, "summary", "rewrite", {"text": SPANISH})
+        answer = await self.call(state, rewrite_summary, text=SPANISH)
 
         self.assertEqual(
             answer, "REJECTED: payload language (es) does not match resume language (en)"
@@ -328,13 +346,13 @@ class ApplyEditTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_prose_in_the_language_of_the_resume_is_applied(self) -> None:
         state = state_for(language="es", resume_language="es")
-        answer = await self.edit(state, "summary", "rewrite", {"text": SPANISH})
+        answer = await self.call(state, rewrite_summary, text=SPANISH)
 
         self.assertEqual(answer, "OK")
 
     async def test_short_payloads_are_never_language_checked(self) -> None:
         state = state_for(language="es", resume_language="en")
-        answer = await self.edit(state, "summary", "rewrite", {"text": "Kubernetes y Java"})
+        answer = await self.call(state, rewrite_summary, text="Kubernetes y Java")
 
         self.assertEqual(answer, "OK")
 
@@ -347,9 +365,7 @@ class StepLimitTest(unittest.IsolatedAsyncioTestCase):
 
         with use_turn_state(state):
             evidence = await find_evidence.ainvoke({"claims": ["Kubernetes"]})
-            edit = await apply_edit.ainvoke(
-                {"section": "summary", "op": "rewrite", "payload": {"text": "x"}}
-            )
+            edit = await rewrite_summary.ainvoke({"text": "x"})
 
         self.assertEqual(evidence, STEP_LIMIT_MESSAGE)
         self.assertEqual(edit, STEP_LIMIT_MESSAGE)
@@ -368,32 +384,72 @@ class StepLimitTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(limits[0].name, "max_steps")
 
 
+class EditLimitTest(unittest.IsolatedAsyncioTestCase):
+
+    async def call(self, state, tool, **arguments) -> str:
+        with use_turn_state(state):
+            return await tool.ainvoke(arguments)
+
+    async def test_a_turn_applies_no_more_than_its_budget_of_edits(self) -> None:
+        state = state_for(max_edits=2)
+
+        first = await self.call(state, rewrite_summary, text=PROSE)
+        second = await self.call(
+            state, reorder_entries, section="work_experience", order=[1, 0]
+        )
+        third = await self.call(state, rewrite_summary, text=PROSE + " Kubernetes.")
+
+        self.assertEqual(first, "OK")
+        self.assertEqual(second, "OK")
+        self.assertEqual(third, EDIT_LIMIT_MESSAGE)
+        self.assertEqual(len(state.changes), 2)
+
+    async def test_the_budget_leaves_one_span_behind(self) -> None:
+        state = state_for(max_edits=1)
+
+        await self.call(state, rewrite_summary, text=PROSE)
+        await self.call(state, rewrite_summary, text=PROSE)
+        await self.call(state, rewrite_summary, text=PROSE)
+
+        limits = [span for span in state.spans if span.kind == SpanKind.LIMIT]
+        self.assertEqual(len(limits), 1)
+        self.assertEqual(limits[0].name, "max_edits")
+
+    async def test_looking_for_evidence_never_spends_the_edit_budget(self) -> None:
+        state = state_for(max_edits=1)
+
+        await self.call(state, rewrite_summary, text=PROSE)
+        with use_turn_state(state):
+            found = await find_evidence.ainvoke({"claims": ["Postgres"]})
+
+        self.assertNotEqual(found, EDIT_LIMIT_MESSAGE)
+
+
 class OutsideATurnTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_tools_refuse_to_run_without_a_turn(self) -> None:
         with self.assertRaises(RuntimeError):
             await find_evidence.ainvoke({"claims": ["Kubernetes"]})
 
+        with self.assertRaises(RuntimeError):
+            await rewrite_summary.ainvoke({"text": "Kubernetes first."})
 
-class MoreApplyEditTest(unittest.IsolatedAsyncioTestCase):
 
-    async def edit(self, state, section, op, payload) -> str:
+class MoreEditToolsTest(unittest.IsolatedAsyncioTestCase):
+
+    async def call(self, state, tool, **arguments) -> str:
         with use_turn_state(state):
-            return await apply_edit.ainvoke(
-                {"section": section, "op": op, "payload": payload}
-            )
+            return await tool.ainvoke(arguments)
 
     async def test_it_rewrites_the_description_of_one_experience(self) -> None:
         state = state_for()
-        answer = await self.edit(
+        answer = await self.call(
             state,
-            "work_experience",
-            "rewrite",
-            {
-                "index": 1,
-                "description": "Built services on Kubernetes.",
-                "achievements": ["Took deploys from weekly to daily"],
-            },
+            rewrite_entry,
+            section="work_experience",
+            index=1,
+            description="Built services on Kubernetes.",
+            achievements=["Took deploys from weekly to daily"],
         )
 
         self.assertEqual(answer, "OK")
@@ -404,79 +460,75 @@ class MoreApplyEditTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_description_written_in_the_language_of_the_chat_is_rejected(self) -> None:
         state = state_for(language="es", resume_language="en")
-        answer = await self.edit(
-            state, "work_experience", "rewrite", {"index": 0, "description": SPANISH}
+        answer = await self.call(
+            state, rewrite_entry, section="work_experience", index=0, description=SPANISH
         )
 
         self.assertEqual(
             answer, "REJECTED: payload language (es) does not match resume language (en)"
         )
 
-    async def test_an_index_that_is_not_a_number_is_rejected(self) -> None:
+    async def test_an_index_that_is_not_a_number_never_reaches_the_tool(self) -> None:
         state = state_for()
-        answer = await self.edit(
-            state, "work_experience", "rewrite", {"index": "first", "description": "x"}
-        )
 
-        self.assertEqual(answer, "REJECTED: invalid payload")
+        with self.assertRaises(ValidationError):
+            await self.call(
+                state,
+                rewrite_entry,
+                section="work_experience",
+                index="first",
+                description="x",
+            )
+
+        self.assertEqual(state.changes, [])
+
+    async def test_an_order_that_is_not_a_list_of_numbers_never_reaches_the_tool(self) -> None:
+        state = state_for()
+
+        with self.assertRaises(ValidationError):
+            await self.call(
+                state, reorder_entries, section="work_experience", order=["first"]
+            )
+
+    async def test_a_bucket_that_is_not_a_list_of_names_never_reaches_the_tool(self) -> None:
+        state = state_for()
+
+        with self.assertRaises(ValidationError):
+            await self.call(state, replace_skills, technical="Java")
 
     async def test_a_rewrite_without_fields_is_rejected(self) -> None:
         state = state_for()
-        answer = await self.edit(state, "work_experience", "rewrite", {"index": 0})
-
-        self.assertEqual(answer, "REJECTED: invalid payload")
-
-    async def test_an_order_that_is_not_a_list_of_numbers_is_rejected(self) -> None:
-        state = state_for()
-        answer = await self.edit(
-            state, "work_experience", "reorder", {"order": ["first", "second"]}
+        answer = await self.call(
+            state, rewrite_entry, section="work_experience", index=0
         )
 
         self.assertEqual(answer, "REJECTED: invalid payload")
 
     async def test_an_order_that_repeats_an_entry_is_rejected(self) -> None:
         state = state_for()
-        answer = await self.edit(state, "work_experience", "reorder", {"order": [0, 0]})
+        answer = await self.call(
+            state, reorder_entries, section="work_experience", order=[0, 0]
+        )
 
         self.assertIn("exactly once", answer)
 
     async def test_editing_a_section_the_resume_does_not_have_yet_is_out_of_range(self) -> None:
         state = state_for()
-        answer = await self.edit(
-            state, "projects", "rewrite", {"index": 0, "description": "x"}
+        answer = await self.call(
+            state, rewrite_entry, section="projects", index=0, description="x"
         )
 
         self.assertEqual(answer, "REJECTED: index out of range")
 
-    async def test_an_unknown_op_on_an_experience_is_rejected(self) -> None:
+    async def test_replacing_no_bucket_at_all_is_rejected(self) -> None:
         state = state_for()
-        answer = await self.edit(state, "work_experience", "translate", {"index": 0})
-
-        self.assertEqual(answer, "REJECTED: unknown op for this section")
-
-    async def test_an_unknown_op_on_the_skills_is_rejected(self) -> None:
-        state = state_for()
-        answer = await self.edit(state, "skills", "sort", {"technical": []})
-
-        self.assertEqual(answer, "REJECTED: unknown op for this section")
-
-    async def test_a_skills_payload_that_is_not_a_list_of_names_is_rejected(self) -> None:
-        state = state_for()
-        answer = await self.edit(state, "skills", "replace", {"technical": "Java"})
-
-        self.assertEqual(answer, "REJECTED: invalid payload")
-
-    async def test_a_skills_payload_without_a_known_bucket_is_rejected(self) -> None:
-        state = state_for()
-        answer = await self.edit(state, "skills", "replace", {"hard": ["Java"]})
+        answer = await self.call(state, replace_skills)
 
         self.assertEqual(answer, "REJECTED: invalid payload")
 
     async def test_replacing_the_skills_with_the_same_ones_changes_nothing(self) -> None:
         state = state_for()
-        answer = await self.edit(
-            state, "skills", "replace", {"technical": ["Java", "Postgres"]}
-        )
+        answer = await self.call(state, replace_skills, technical=["Java", "Postgres"])
 
         self.assertEqual(answer, "OK")
         self.assertEqual(state.changes, [])
@@ -498,15 +550,13 @@ class MoreApplyEditTest(unittest.IsolatedAsyncioTestCase):
         )
         state = build_turn_state(context)
 
-        answer = await self.edit(state, "skills", "replace", {"technical": ["Java"]})
+        answer = await self.call(state, replace_skills, technical=["Java"])
 
         self.assertEqual(answer, "OK")
 
     async def test_text_that_langdetect_cannot_read_is_applied(self) -> None:
         state = state_for(language="es", resume_language="en")
-        answer = await self.edit(
-            state, "summary", "rewrite", {"text": "1234567890 " * 12}
-        )
+        answer = await self.call(state, rewrite_summary, text="1234567890 " * 12)
 
         self.assertEqual(answer, "OK")
 

@@ -448,7 +448,9 @@ class JobControllerImplTest {
         .build();
   }
 
-  private ApplyJobRequest applyRequest() {
+  private final ApplyJobRequest applyRequest = applyRequest();
+
+  private static ApplyJobRequest applyRequest() {
     ApplyJobRequest request = new ApplyJobRequest();
     request.setResumeId(RESUME_ID);
     return request;
@@ -456,29 +458,29 @@ class JobControllerImplTest {
 
   @Test
   void applyToJobDelegatesToServiceWithJobIdAndTheChosenResume() {
-    when(jobService.applyToJob(JOB_ID, RESUME_ID)).thenReturn(application());
+    when(jobService.applyToJob(JOB_ID, applyRequest)).thenReturn(application());
 
-    jobController.applyToJob(JOB_ID, applyRequest());
+    jobController.applyToJob(JOB_ID, applyRequest);
 
-    verify(jobService).applyToJob(JOB_ID, RESUME_ID);
+    verify(jobService).applyToJob(JOB_ID, applyRequest);
   }
 
   @Test
   void applyToJobRespondsWithCreatedStatus() {
-    when(jobService.applyToJob(JOB_ID, RESUME_ID)).thenReturn(application());
+    when(jobService.applyToJob(JOB_ID, applyRequest)).thenReturn(application());
 
     ResponseEntity<GlobalRestResponse<ApplyJobRestResponse>> response =
-        jobController.applyToJob(JOB_ID, applyRequest());
+        jobController.applyToJob(JOB_ID, applyRequest);
 
     assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
   }
 
   @Test
   void applyToJobMapsApplicationIntoSuccessfulResponseData() {
-    when(jobService.applyToJob(JOB_ID, RESUME_ID)).thenReturn(application());
+    when(jobService.applyToJob(JOB_ID, applyRequest)).thenReturn(application());
 
     ResponseEntity<GlobalRestResponse<ApplyJobRestResponse>> response =
-        jobController.applyToJob(JOB_ID, applyRequest());
+        jobController.applyToJob(JOB_ID, applyRequest);
 
     GlobalRestResponse<ApplyJobRestResponse> body = response.getBody();
     assertThat(body, is(notNullValue()));

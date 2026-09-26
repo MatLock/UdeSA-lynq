@@ -2,7 +2,10 @@ import resumeDiff from '../../utils/resumeDiff'
 import strings from '../../i18n'
 import './ResumeDiff.css'
 
-const SIGN = { added: '+', removed: '−' }
+const SIGN = { added: '+', removed: '−', moved: '⇅' }
+
+const moveText = (line, t) =>
+  t.movedText.replace('{from}', line.from).replace('{to}', line.to)
 
 const ResumeDiff = ({ groups }) => {
   const t = strings.jobDetail.tailorDialog.diff
@@ -17,7 +20,7 @@ const ResumeDiff = ({ groups }) => {
       {groups.map((group) => (
         <section
           className="resume-diff-group"
-          key={`${group.section}-${group.entry}-${group.lines[0].text}`}
+          key={`${group.section}-${group.entry}-${group.lines[0].type}-${group.lines[0].text}`}
         >
           <h5 className="resume-diff-group-title">
             {sectionNames[group.section]}
@@ -37,20 +40,32 @@ const ResumeDiff = ({ groups }) => {
                 </span>
                 <span className="resume-diff-body">
                   <span className="resume-diff-field">
-                    <span className="resume-diff-reader-only">
-                      {line.type === resumeDiff.ADDED ? t.addedLabel : t.removedLabel}
-                    </span>
-                    {line.field}
+                    {line.type === resumeDiff.MOVED ? (
+                      t.movedLabel
+                    ) : (
+                      <>
+                        <span className="resume-diff-reader-only">
+                          {line.type === resumeDiff.ADDED
+                            ? t.addedLabel
+                            : t.removedLabel}
+                        </span>
+                        {line.field}
+                      </>
+                    )}
                   </span>
                   <span className="resume-diff-text">
-                    {line.parts.map((part, partIndex) => (
-                      <span
-                        className={part.changed ? 'resume-diff-word is-changed' : undefined}
-                        key={`${partIndex}-${part.text}`}
-                      >
-                        {part.text}
-                      </span>
-                    ))}
+                    {line.type === resumeDiff.MOVED
+                      ? moveText(line, t)
+                      : line.parts.map((part, partIndex) => (
+                          <span
+                            className={
+                              part.changed ? 'resume-diff-word is-changed' : undefined
+                            }
+                            key={`${partIndex}-${part.text}`}
+                          >
+                            {part.text}
+                          </span>
+                        ))}
                   </span>
                 </span>
               </li>

@@ -1,5 +1,6 @@
 import { Chip } from '@mui/material'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 import { Link } from 'react-router-dom'
 import strings from '../../i18n'
 import CompanyIcon from '../CompanyIcon/CompanyIcon.jsx'
@@ -44,6 +45,8 @@ const ApplicationCard = ({ application, onExplain, explainDisabled }) => {
   const appliedAt = formatRelativeDate(application.appliedOn)
   const companyName = application.companyName ?? t.externalCompany
   const logoUrl = application.companyProfileImage
+  const resumeUrl = application.resumePdfUrl
+  const resumeTitle = application.resumeName || t.appliedWithUnnamed
 
   return (
     <article className="application-card">
@@ -84,6 +87,24 @@ const ApplicationCard = ({ application, onExplain, explainDisabled }) => {
         <p className="application-card-description">
           {truncate(application.jobDescription, MAX_DESCRIPTION_LENGTH)}
         </p>
+
+        {resumeUrl ? (
+          <a
+            className="application-card-resume"
+            href={resumeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <DescriptionOutlinedIcon className="application-card-resume-icon" />
+            <span>
+              {t.appliedWith}: {resumeTitle}
+            </span>
+          </a>
+        ) : (
+          <span className="application-card-resume is-missing">
+            {t.appliedWithMissing}
+          </span>
+        )}
       </div>
 
       <div className="application-card-side">

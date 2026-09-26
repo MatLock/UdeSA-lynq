@@ -31,6 +31,7 @@ class RenderTest(unittest.TestCase):
             language="es",
             resume_language="en",
             max_steps=12,
+            max_edits=2,
             turns_left=turns_left,
         )
 
@@ -71,6 +72,7 @@ class RulesTest(unittest.TestCase):
             language="es",
             resume_language="en",
             max_steps=12,
+            max_edits=2,
             turns_left=9,
         )
 
@@ -123,9 +125,57 @@ class RulesTest(unittest.TestCase):
             self.assertIn("asks you to invent something, refuse", rules)
             self.assertIn("offer what the resume can actually back", rules)
 
+    def test_it_caps_the_edits_of_a_turn(self) -> None:
+        for provider in PROVIDERS:
+            rules = self.rules_of(provider)
+
+            self.assertIn("One call to an edit tool is one edit", rules)
+            self.assertIn("you may apply at most 2 edits in a turn", rules)
+            self.assertIn("leave the rest for the recommendation", rules)
+            self.assertIn("`EDIT LIMIT REACHED`", rules)
+
+    def test_every_reply_says_how_to_go_on(self) -> None:
+        for provider in PROVIDERS:
+            rules = self.rules_of(provider)
+
+            self.assertIn("Every reply ends by saying how to go on", rules)
+            self.assertIn("a short list of the edits you would make next", rules)
+            self.assertIn("Recommend even on a turn where you applied nothing", rules)
+            self.assertIn("instead of inventing work", rules)
+
+    def test_the_last_turn_asks_for_no_recommendation(self) -> None:
+        for provider in PROVIDERS:
+            closing = flat(
+                render(
+                    provider,
+                    job=JOB,
+                    resume=RESUME,
+                    language="es",
+                    resume_language="en",
+                    max_steps=12,
+                    max_edits=2,
+                    turns_left=1,
+                )
+            )
+
+            self.assertIn("There is no next turn left to recommend for", closing)
+
     def test_no_score_is_ever_mentioned(self) -> None:
         for provider in PROVIDERS:
             self.assertNotIn("score", self.render(provider).lower())
+
+    def test_an_edit_keeps_the_voice_the_resume_is_written_in(self) -> None:
+        for provider in PROVIDERS:
+            rules = self.rules_of(provider)
+
+            self.assertIn("The resume also has a voice of its own", rules)
+            self.assertIn(
+                "first person or none, full sentences or noun phrases, past or present",
+                rules,
+            )
+            self.assertIn(
+                "Never open an edit with a conversational connector", rules
+            )
 
     def test_the_resume_is_never_translated(self) -> None:
         for provider in PROVIDERS:
@@ -143,7 +193,12 @@ class RulesTest(unittest.TestCase):
         for provider in PROVIDERS:
             rules = self.rules_of(provider)
 
-            self.assertIn("The resume changes only through `apply_edit`", rules)
+            self.assertIn("The resume changes only through the edit tools", rules)
+            self.assertIn(
+                "`rewrite_summary`, `rewrite_entry`, `reorder_entries` and "
+                "`replace_skills`",
+                rules,
+            )
             self.assertIn("Never write the resume, or any part of it, into your reply", rules)
 
     def test_the_posting_carries_the_injection_rule_verbatim(self) -> None:
@@ -199,6 +254,7 @@ class RulesTest(unittest.TestCase):
                 language="es",
                 resume_language="en",
                 max_steps=12,
+                max_edits=2,
                 turns_left=1,
             )
 

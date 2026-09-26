@@ -11,6 +11,8 @@ public record UserApplicationProjection(
     String companyName,
     String companyFileStorageId,
     String companyLogoUrl,
+    String resumeFileStorageId,
+    String resumeName,
     LocalDate appliedOn,
     String jobSkills,
     String jobSimilarityTags) {

@@ -33,6 +33,12 @@ public interface LynqFileStorageClient {
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
       @RequestHeader(USER_ID_HEADER) String userId);
 
+  @GetMapping("/dmz/files/{fileId}")
+  GlobalRestResponse<StoredFileResponse> findOwnedFile(
+      @PathVariable("fileId") String fileId,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(USER_ID_HEADER) String userId);
+
   @GetMapping("/dmz/files/{fileId}/download-url")
   GlobalRestResponse<CreateFileDownloadResponse> createDownloadUrl(
       @PathVariable("fileId") String fileId,

@@ -9,7 +9,8 @@ from backend_client import IngestStats
 from config import Settings
 from main import app
 from ml_client import SkillEnhanceResult
-from model import IngestOverrides
+from model import IngestOverrides, RunPlan
+from router.ingest import run_guard
 from scraper.base import Listing
 from service import IngestService
 
@@ -87,6 +88,22 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(plan.jobs_per_category, 2)
 
 
+class ValidateTest(unittest.TestCase):
+
+    def setUp(self):
+        self.service = IngestService(_settings(), _ml(), _backend())
+
+    def test_returns_the_plan_that_would_run(self):
+        plan = self.service.validate(IngestOverrides(categories=["TECNOLOGIA"]))
+
+        self.assertEqual(plan.categories, ["TECNOLOGIA"])
+        self.assertEqual(plan.sources, ["bumeran", "computrabajo"])
+
+    def test_an_unknown_source_is_rejected(self):
+        with self.assertRaises(ValueError):
+            self.service.validate(IngestOverrides(sources=["linkedin"]))
+
+
 class ScopedRunTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_override_reaches_the_scraper(self):
@@ -124,6 +141,7 @@ class OnDemandEndpointTest(unittest.TestCase):
 
     def setUp(self):
         self.client = TestClient(app)
+        self.addCleanup(run_guard.finish)
 
     def test_the_cron_calls_it_with_no_body_at_all(self):
         service = self._service()
@@ -143,15 +161,18 @@ class OnDemandEndpointTest(unittest.TestCase):
         self.assertEqual(overrides.categories, ["TECNOLOGIA"])
         self.assertEqual(overrides.jobs_per_category, 2)
 
-    def test_an_unknown_source_is_a_400_not_a_500(self):
-        service = AsyncMock()
-        service.run = AsyncMock(side_effect=ValueError("Unsupported feeder source: 'linkedin'"))
+    def test_an_unknown_source_is_a_400_before_the_run_is_accepted(self):
+        service = self._service()
+        service.validate = MagicMock(
+            side_effect=ValueError("Unsupported feeder source: 'linkedin'")
+        )
         with patch("router.ingest.build_service", return_value=service):
             response = self.client.post(INGEST, headers=HEADERS, json={"sources": ["linkedin"]})
 
         self.assertEqual(response.status_code, 400)
         self.assertFalse(response.json()["success"])
         self.assertIn("linkedin", response.json()["reason"])
+        service.run.assert_not_awaited()
 
     def test_an_out_of_range_limit_is_rejected_before_anything_runs(self):
         service = self._service()
@@ -168,6 +189,11 @@ class OnDemandEndpointTest(unittest.TestCase):
 
     def _service(self):
         service = AsyncMock()
+        service.validate = MagicMock(
+            return_value=RunPlan(
+                sources=["bumeran"], categories=["TECNOLOGIA"], jobs_per_category=10
+            )
+        )
         service.run = AsyncMock(return_value=MagicMock())
         return service
 
