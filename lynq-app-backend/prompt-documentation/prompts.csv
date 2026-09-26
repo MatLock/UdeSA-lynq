@@ -184,3 +184,4 @@ parameters:
 "23-09-2026","test that creating a resume with tailoredForJobId persists it and gives it back in the response, and that without the field it stays null"
 "24-09-2026","bump the project version to 2.0.0-SNAPSHOT in the pom.xml"
 "24-09-2026","bump the project version to 2.0.1-SNAPSHOT in the pom.xml"
+"26-09-2026","store and serve the logo of a scraped company: add a logo_url column to the companies table in a new changelog file, expose it on CompanyEntity, accept companyLogoUrl on IngestJobPostRequest and persist it in JobIngestService (refreshing a changed URL but never wiping a stored one when a posting carries none), select it in the job and application projections, and fall back to it in JobService, CompanyService and UserService when the company has no lynq_file_storage_id"

@@ -778,7 +778,7 @@ class UserServiceTest {
     when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(new UserApplicationProjection(
             APPLICATION_ID, JOB_ID, JOB_TITLE, JOB_DESCRIPTION, COMPANY_ID, COMPANY_NAME, null,
-            APPLIED_ON, "Java,Kafka,Terraform",
+            null, APPLIED_ON, "Java,Kafka,Terraform",
             "Backend Development,Asynchronous Messaging")), DEFAULT_PAGEABLE, 1));
     when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
 
@@ -879,7 +879,7 @@ class UserServiceTest {
 
   private UserApplicationProjection applicationProjection(String id, String companyImagePath) {
     return new UserApplicationProjection(id, JOB_ID, JOB_TITLE, JOB_DESCRIPTION, COMPANY_ID,
-        COMPANY_NAME, companyImagePath, APPLIED_ON, JOB_SKILLS_CSV, null);
+        COMPANY_NAME, companyImagePath, null, APPLIED_ON, JOB_SKILLS_CSV, null);
   }
 
   private UserEntity candidateWithSkills() {

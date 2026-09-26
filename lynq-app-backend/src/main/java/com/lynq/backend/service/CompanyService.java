@@ -108,7 +108,7 @@ public class CompanyService {
         .name(company.getName())
         .about(company.getAbout())
         .size(company.getSize())
-        .profileImageUrl(fileStorageService.obtainDownloadUrl(company.getLynqFileStorageId()))
+        .profileImageUrl(companyImageUrl(company))
         .createdOn(company.getCreatedOn())
         .jobs(jobPostRepository.findByCompanyId(companyId).stream()
             .map(this::toJobResponse)
@@ -142,6 +142,11 @@ public class CompanyService {
         .profileImageUrl(fileStorageService.obtainDownloadUrl(saved.getLynqFileStorageId()))
         .createdOn(saved.getCreatedOn())
         .build();
+  }
+
+  private String companyImageUrl(CompanyEntity company) {
+    String uploaded = fileStorageService.obtainDownloadUrl(company.getLynqFileStorageId());
+    return uploaded != null ? uploaded : company.getLogoUrl();
   }
 
   private CompanyJobRestResponse toJobResponse(JobPostEntity job) {

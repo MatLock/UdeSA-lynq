@@ -34,6 +34,7 @@ public class IngestJobPostRequest {
   @NotNull
   private JobPostSource jobPostSource;
   private String companyName;
+  private String companyLogoUrl;
   private Long postedAt;
   private List<String> skills;
   private List<String> similarityTags;

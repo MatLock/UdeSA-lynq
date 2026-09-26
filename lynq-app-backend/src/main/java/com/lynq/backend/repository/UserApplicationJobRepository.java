@@ -48,7 +48,8 @@ public interface UserApplicationJobRepository extends JpaRepository<UserApplicat
   Page<JobCandidateProjection> findCandidatesByJobId(@Param("jobId") String jobId, Pageable pageable);
 
   @Query(value = "SELECT new com.lynq.backend.repository.projection.UserApplicationProjection("
-      + "a.id, j.id, j.title, j.description, c.id, c.name, c.lynqFileStorageId, a.appliedOn, "
+      + "a.id, j.id, j.title, j.description, c.id, c.name, c.lynqFileStorageId, c.logoUrl, "
+      + "a.appliedOn, "
       + "CAST((SELECT function('group_concat', jsk.skill) FROM JobPostSkillEntity jsk "
       + "WHERE jsk.jobPost = j) AS string), "
       + "CAST((SELECT function('group_concat', jtg.similarityTag) FROM JobPostSimilarityTagEntity jtg "

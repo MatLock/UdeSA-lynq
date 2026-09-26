@@ -22,6 +22,7 @@ public record JobWithDetailsProjection(
     String companyAbout,
     Integer companySize,
     String companyFileStorageId,
+    String companyLogoUrl,
     String userId,
     String userFullName,
     String userFileStorageId,

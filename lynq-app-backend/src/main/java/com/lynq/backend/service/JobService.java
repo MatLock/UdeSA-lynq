@@ -460,6 +460,12 @@ public class JobService {
     return fileId == null ? null : downloadUrls.get(fileId);
   }
 
+  private static String companyImageUrl(Map<String, String> downloadUrls,
+      JobWithDetailsProjection projection) {
+    String uploaded = signedUrl(downloadUrls, projection.companyFileStorageId());
+    return uploaded != null ? uploaded : projection.companyLogoUrl();
+  }
+
   private GetJobRestResponse toResponse(JobWithDetailsProjection projection, UserEntity user,
       Map<String, String> imageUrls) {
     List<String> skills = splitSkills(projection.skills());
@@ -481,7 +487,7 @@ public class JobService {
             .name(projection.companyName())
             .about(projection.companyAbout())
             .size(projection.companySize())
-            .profileImageUrl(signedUrl(imageUrls, projection.companyFileStorageId()))
+            .profileImageUrl(companyImageUrl(imageUrls, projection))
             .build())
         .postedBy(JobPostedByRestResponse.builder()
             .id(projection.userId())

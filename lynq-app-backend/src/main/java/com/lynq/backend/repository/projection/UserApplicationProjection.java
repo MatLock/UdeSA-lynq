@@ -10,6 +10,7 @@ public record UserApplicationProjection(
     String companyId,
     String companyName,
     String companyFileStorageId,
+    String companyLogoUrl,
     LocalDate appliedOn,
     String jobSkills,
     String jobSimilarityTags) {

@@ -43,6 +43,9 @@ public class CompanyEntity {
   @Column(name = "lynq_file_storage_id", length = 36)
   private String lynqFileStorageId;
 
+  @Column(name = "logo_url", length = 2048)
+  private String logoUrl;
+
   @Column(name = "created_on", nullable = false)
   private LocalDate createdOn;
 
