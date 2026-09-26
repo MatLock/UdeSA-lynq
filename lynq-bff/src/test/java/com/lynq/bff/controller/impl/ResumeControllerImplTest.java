@@ -293,13 +293,14 @@ class ResumeControllerImplTest {
 
   @Test
   void applyWithTailoredResumeRespondsWithCreatedAndTheApplication() {
-    TailorApplyRestRequest request = new TailorApplyRestRequest(RESUME_ID);
+    TailorApplyRestRequest request = new TailorApplyRestRequest();
     ResumeTailorApplyRestResponse applied = ResumeTailorApplyRestResponse.builder()
         .application(Map.of("applicationId", "018fa1b2"))
         .alreadyApplied(false)
         .conversationStatus("APPLIED")
         .build();
-    when(resumeTailorService.apply(eq(CONVERSATION_ID), eq(RESUME_ID), any(Caller.class)))
+    when(resumeTailorService.apply(eq(CONVERSATION_ID), any(TailorApplyRestRequest.class),
+        any(Caller.class)))
         .thenReturn(applied);
 
     ResponseEntity<GlobalRestResponse<ResumeTailorApplyRestResponse>> response =
@@ -314,10 +315,11 @@ class ResumeControllerImplTest {
   @Test
   void theTailoringRoutesCarryTheCallerTheTokenWasVerifiedFor() {
     resumeController.applyWithTailoredResume(CONVERSATION_ID,
-        new TailorApplyRestRequest(RESUME_ID), REQUEST_UUID, AUTHORIZATION, USER_ID);
+        new TailorApplyRestRequest(), REQUEST_UUID, AUTHORIZATION, USER_ID);
 
     ArgumentCaptor<Caller> caller = ArgumentCaptor.forClass(Caller.class);
-    verify(resumeTailorService).apply(eq(CONVERSATION_ID), eq(RESUME_ID), caller.capture());
+    verify(resumeTailorService).apply(eq(CONVERSATION_ID),
+        any(TailorApplyRestRequest.class), caller.capture());
     assertThat(caller.getValue(), is(new Caller(USER_ID, REQUEST_UUID, AUTHORIZATION)));
   }
 }

@@ -206,7 +206,7 @@ public class ResumeControllerImpl implements ResumeController {
       @RequestHeader(AUTHORIZATION_HEADER) String authorization,
       @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
     ResumeTailorApplyRestResponse applied = resumeTailorService.apply(conversationId,
-        request.getResumeId(), new Caller(userId, requestUuid, authorization));
+        request, new Caller(userId, requestUuid, authorization));
 
     return ResponseEntity
         .status(HttpStatus.CREATED)

@@ -16,4 +16,12 @@ public class ResumeTailorApplyRestResponse {
   private Object application;
   private boolean alreadyApplied;
   private String conversationStatus;
+
+  /**
+   * The tailored PDF the application carries. It lives in lynq-file-storage and
+   * is never one of the candidate's stored resumes, so this is the only handle
+   * on it: the browser downloads it from here when the posting is external.
+   */
+  private String resumeFileId;
+  private String resumePdfUrl;
 }

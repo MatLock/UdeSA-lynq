@@ -14,4 +14,6 @@ import lombok.Setter;
 public class ApplyJobRequest {
 
   private String resumeId;
+  private String fileId;
+  private String resumeName;
 }
