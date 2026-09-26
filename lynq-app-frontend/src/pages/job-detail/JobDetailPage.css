@@ -61,7 +61,7 @@
 .job-detail-logo img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .job-detail-logo svg {
@@ -86,7 +86,7 @@
 
 .job-detail-title {
   margin: 0;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
   line-height: 1.25;
   letter-spacing: -0.4px;
@@ -151,10 +151,16 @@
   gap: 8px;
 }
 
+.job-detail-apply-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
 .job-detail-apply {
-  padding: 11px 26px;
+  padding: 8px 18px;
   font: inherit;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--ink-on-action);
   background: var(--brand-gradient);
@@ -174,11 +180,12 @@
 }
 
 .job-detail-tailor {
-  padding: 10px 20px;
-  max-width: 220px;
+  padding: 8px 16px;
+  max-width: 150px;
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1.3;
   color: var(--text);
   background: none;
   border: 1px solid var(--border-control);
@@ -202,10 +209,10 @@
 }
 
 .job-detail-apply--external {
-  padding: 11px 20px;
-  max-width: 220px;
+  padding: 8px 14px;
+  max-width: 170px;
   white-space: normal;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 /* Owner "stop seeking candidates" action — an outlined counterpart to the
@@ -276,7 +283,7 @@
 
 .job-detail-apply-status {
   margin: 0;
-  max-width: 200px;
+  max-width: 330px;
   font-size: 13px;
   text-align: right;
 }
@@ -402,7 +409,12 @@
   border-radius: 50%;
 }
 
-.job-detail-entity-logo img,
+.job-detail-entity-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .job-detail-entity-avatar img {
   width: 100%;
   height: 100%;
@@ -504,8 +516,16 @@
     width: 100%;
   }
 
-  .job-detail-apply {
+  .job-detail-apply-row {
+    flex-direction: column;
     width: 100%;
+  }
+
+  .job-detail-apply,
+  .job-detail-tailor,
+  .job-detail-apply--external {
+    width: 100%;
+    max-width: none;
   }
 
   .job-detail-apply-status {

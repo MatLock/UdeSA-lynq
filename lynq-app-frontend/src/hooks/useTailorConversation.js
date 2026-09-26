@@ -49,6 +49,7 @@ const useTailorConversation = (jobId) => {
   const [messages, setMessages] = useState([])
   const [resume, setResume] = useState(null)
   const [changes, setChanges] = useState([])
+  const [turns, setTurns] = useState([])
   const [warnings, setWarnings] = useState([])
   const [version, setVersion] = useState(0)
   const [turnsLeft, setTurnsLeft] = useState(null)
@@ -57,6 +58,7 @@ const useTailorConversation = (jobId) => {
   const [failure, setFailure] = useState('')
 
   const conversationIdRef = useRef('')
+  const resumeRef = useRef(null)
 
   const start = useCallback(
     async (storedResume) => {
@@ -73,8 +75,10 @@ const useTailorConversation = (jobId) => {
         setConversationId(started.conversationId)
         setStatus(started.status)
         setMessages([{ role: 'assistant', content: started.greeting }])
+        resumeRef.current = storedResume.resume ?? null
         setResume(storedResume.resume ?? null)
         setChanges([])
+        setTurns([])
         setWarnings([])
         setVersion(0)
         setTurnsLeft(null)
@@ -97,7 +101,10 @@ const useTailorConversation = (jobId) => {
       if (!view) return
       setStatus(view.status)
       setTurnsLeft(view.turnsLeft ?? 0)
-      if (view.currentResume) setResume(view.currentResume)
+      if (view.currentResume) {
+        resumeRef.current = view.currentResume
+        setResume(view.currentResume)
+      }
     } catch {
       setStatus(EXHAUSTED)
     }
@@ -123,8 +130,20 @@ const useTailorConversation = (jobId) => {
           ...previous,
           { role: 'assistant', content: answer.reply, warnings: answer.warnings ?? [] },
         ])
+        const before = resumeRef.current
+        resumeRef.current = answer.resume
         setResume(answer.resume)
-        setChanges(answer.changes ?? [])
+        setChanges((previous) => [...previous, ...(answer.changes ?? [])])
+        setTurns((previous) => [
+          ...previous,
+          {
+            turn: previous.length + 1,
+            at: new Date().toISOString(),
+            message: text,
+            before,
+            after: answer.resume,
+          },
+        ])
         setWarnings(answer.warnings ?? [])
         setVersion(answer.version ?? 0)
         setStatus(answer.status)
@@ -149,8 +168,10 @@ const useTailorConversation = (jobId) => {
     setConversationId('')
     setStatus('')
     setMessages([])
+    resumeRef.current = null
     setResume(null)
     setChanges([])
+    setTurns([])
     setWarnings([])
     setVersion(0)
     setTurnsLeft(null)
@@ -163,6 +184,7 @@ const useTailorConversation = (jobId) => {
     messages,
     resume,
     changes,
+    turns,
     warnings,
     version,
     turnsLeft,
