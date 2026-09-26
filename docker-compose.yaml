@@ -142,7 +142,6 @@ services:
       - BEDROCK_MAX_ATTEMPTS=${BEDROCK_MAX_ATTEMPTS:-3}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
-      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
       - PORT=8084
     depends_on:
       ollama:
@@ -223,7 +222,6 @@ services:
       - BEDROCK_GUARDRAIL_VERSION=${BEDROCK_GUARDRAIL_VERSION:-DRAFT}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
-      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
     depends_on:
       mysql:
         condition: service_healthy

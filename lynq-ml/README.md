@@ -637,7 +637,7 @@ To use Amazon Bedrock instead of a local model. `BEDROCK_MODEL_ID` is any model
 the Converse API accepts, so the provider is a config choice, not a code change:
 
 ```bash
-export AWS_PROFILE=lynq            # or AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+export AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
 LLM_PROVIDER=bedrock \
   BEDROCK_MODEL_ID=anthropic.claude-sonnet-4-5-20250929-v1:0 \
   BEDROCK_REGION=us-east-1 \
