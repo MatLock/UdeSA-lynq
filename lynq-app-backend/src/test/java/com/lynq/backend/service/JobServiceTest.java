@@ -14,6 +14,7 @@ import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.exceptions.AlreadyAppliedToJobException;
+import com.lynq.backend.controller.request.ApplyJobRequest;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.ForbiddenException;
 import com.lynq.backend.exceptions.NotFoundException;
@@ -137,6 +138,7 @@ class JobServiceTest {
   private static final String CANDIDATE_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d45";
   private static final String CANDIDATE_RESUME_FILE_ID =
       "77777777-7777-7777-7777-777777777777";
+  private static final String CANDIDATE_RESUME_NAME = "Ada Lovelace - Backend";
   private static final String CANDIDATE_RESUME_URL =
       "https://lynq-bucket.s3/applied-cv.pdf?X-Amz-Signature=get";
   private static final String CANDIDATE_IMAGE_URL = "https://presigned/candidate.png";
@@ -748,7 +750,7 @@ class JobServiceTest {
     ArgumentCaptor<UserApplicationJobEntity> applicationCaptor =
         ArgumentCaptor.forClass(UserApplicationJobEntity.class);
 
-    UserApplicationJobEntity result = jobService.applyToJob(JOB_ID, RESUME_ID);
+    UserApplicationJobEntity result = jobService.applyToJob(JOB_ID, applyWith(RESUME_ID));
 
     verify(userApplicationJobRepository).save(applicationCaptor.capture());
     UserApplicationJobEntity saved = applicationCaptor.getValue();
@@ -760,6 +762,87 @@ class JobServiceTest {
     assertThat(result, is(sameInstance(saved)));
   }
 
+  private static ApplyJobRequest applyWith(String resumeId) {
+    ApplyJobRequest request = new ApplyJobRequest();
+    request.setResumeId(resumeId);
+    return request;
+  }
+
+  private static ApplyJobRequest applyWithFile(String fileId, String resumeName) {
+    ApplyJobRequest request = new ApplyJobRequest();
+    request.setFileId(fileId);
+    request.setResumeName(resumeName);
+    return request;
+  }
+
+  @Test
+  void applyToJobStoresTheFileAndTheLabelOfTheChosenResume() {
+    UserEntity user = candidateUser(null);
+    stubAuthenticatedUser(user);
+    JobPostEntity job = JobPostEntity.builder().id(JOB_ID).build();
+    UserResumeEntity resume = UserResumeEntity.builder()
+        .id(RESUME_ID)
+        .name("ada-lovelace.pdf")
+        .alias("Backend roles")
+        .lynqFileStorageId(CANDIDATE_RESUME_FILE_ID)
+        .build();
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(userResumeRepository.findByIdAndUserId(RESUME_ID, USER_ID)).thenReturn(Optional.of(resume));
+    when(userApplicationJobRepository.existsByJobIdAndUserId(JOB_ID, USER_ID)).thenReturn(false);
+    when(userApplicationJobRepository.save(any(UserApplicationJobEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    UserApplicationJobEntity saved = jobService.applyToJob(JOB_ID, applyWith(RESUME_ID));
+
+    assertThat(saved.getResumeFileStorageId(), is(CANDIDATE_RESUME_FILE_ID));
+    assertThat(saved.getResumeName(), is("Backend roles"));
+    verify(fileStorageService, never()).belongsToCaller(any());
+  }
+
+  @Test
+  void applyToJobTakesAFileThatBelongsToTheCallerAndNeverStoresItAsAResume() {
+    stubAuthenticatedUser(candidateUser(null));
+    when(jobPostRepository.findById(JOB_ID))
+        .thenReturn(Optional.of(JobPostEntity.builder().id(JOB_ID).build()));
+    when(userApplicationJobRepository.existsByJobIdAndUserId(JOB_ID, USER_ID)).thenReturn(false);
+    when(fileStorageService.belongsToCaller(CANDIDATE_RESUME_FILE_ID)).thenReturn(true);
+    when(userApplicationJobRepository.save(any(UserApplicationJobEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    UserApplicationJobEntity saved =
+        jobService.applyToJob(JOB_ID, applyWithFile(CANDIDATE_RESUME_FILE_ID, "Backend Engineer"));
+
+    assertThat(saved.getResumeFileStorageId(), is(CANDIDATE_RESUME_FILE_ID));
+    assertThat(saved.getResumeName(), is("Backend Engineer"));
+    assertThat(saved.getUserResume(), is(nullValue()));
+    verify(userResumeRepository, never()).findByIdAndUserId(any(), any());
+  }
+
+  @Test
+  void applyToJobRejectsAFileThatBelongsToSomebodyElse() {
+    stubAuthenticatedUser(candidateUser(null));
+    when(jobPostRepository.findById(JOB_ID))
+        .thenReturn(Optional.of(JobPostEntity.builder().id(JOB_ID).build()));
+    when(fileStorageService.belongsToCaller(CANDIDATE_RESUME_FILE_ID)).thenReturn(false);
+
+    assertThrows(BadRequestException.class,
+        () -> jobService.applyToJob(JOB_ID, applyWithFile(CANDIDATE_RESUME_FILE_ID, "Backend Engineer")));
+
+    verify(userApplicationJobRepository, never()).save(any());
+  }
+
+  @Test
+  void applyToJobRejectsAnApplicationThatNamesNoResumeAtAll() {
+    stubAuthenticatedUser(candidateUser(null));
+    when(jobPostRepository.findById(JOB_ID))
+        .thenReturn(Optional.of(JobPostEntity.builder().id(JOB_ID).build()));
+
+    assertThrows(BadRequestException.class,
+        () -> jobService.applyToJob(JOB_ID, new ApplyJobRequest()));
+
+    verify(userApplicationJobRepository, never()).save(any());
+  }
+
   @Test
   void applyToJobThrowsNotFoundWhenTheResumeIsNotOneOfTheCandidatesOwn() {
     stubAuthenticatedUser(candidateUser(null));
@@ -769,7 +852,7 @@ class JobServiceTest {
         .thenReturn(Optional.empty());
 
     NotFoundException exception = assertThrows(NotFoundException.class,
-        () -> jobService.applyToJob(JOB_ID, RESUME_ID));
+        () -> jobService.applyToJob(JOB_ID, applyWith(RESUME_ID)));
 
     assertThat(exception.getMessage(), is(RESUME_NOT_FOUND));
     verify(userApplicationJobRepository, never()).save(any());
@@ -781,7 +864,7 @@ class JobServiceTest {
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.empty());
 
     NotFoundException exception = assertThrows(NotFoundException.class,
-        () -> jobService.applyToJob(JOB_ID, RESUME_ID));
+        () -> jobService.applyToJob(JOB_ID, applyWith(RESUME_ID)));
     assertThat(exception.getMessage(), is(JOB_POST_NOT_FOUND));
     verify(userApplicationJobRepository, never()).save(any());
   }
@@ -797,7 +880,7 @@ class JobServiceTest {
         .thenReturn(true);
 
     AlreadyAppliedToJobException exception = assertThrows(AlreadyAppliedToJobException.class,
-        () -> jobService.applyToJob(JOB_ID, RESUME_ID));
+        () -> jobService.applyToJob(JOB_ID, applyWith(RESUME_ID)));
     assertThat(exception.getMessage(), is(ALREADY_APPLIED_TO_JOB));
     verify(userApplicationJobRepository, never()).save(any());
   }
@@ -1141,7 +1224,7 @@ class JobServiceTest {
     stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
         JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, null,
-        APPLIED_ON, CANDIDATE_JOB_SKILLS, CANDIDATE_MATCHING_SKILLS, null, null);
+        null, APPLIED_ON, CANDIDATE_JOB_SKILLS, CANDIDATE_MATCHING_SKILLS, null, null);
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
@@ -1155,7 +1238,7 @@ class JobServiceTest {
   void getJobCandidatesScoresLynqAsPercentageOfMatchingJobSkills() {
     stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
-        JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, CANDIDATE_RESUME_FILE_ID, APPLIED_ON,
+        JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, CANDIDATE_RESUME_FILE_ID, CANDIDATE_RESUME_NAME, APPLIED_ON,
         CANDIDATE_JOB_SKILLS, CANDIDATE_JOB_SKILLS, null, null);
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
@@ -1170,7 +1253,7 @@ class JobServiceTest {
   void getJobCandidatesScoresLynqZeroWhenCandidateHasNoSkills() {
     stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
-        JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, CANDIDATE_RESUME_FILE_ID, APPLIED_ON,
+        JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, CANDIDATE_RESUME_FILE_ID, CANDIDATE_RESUME_NAME, APPLIED_ON,
         CANDIDATE_JOB_SKILLS, null, null, null);
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
@@ -1185,7 +1268,7 @@ class JobServiceTest {
   void getJobCandidatesScoresLynqZeroWhenJobHasNoSkills() {
     stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
-        JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, CANDIDATE_RESUME_FILE_ID, APPLIED_ON,
+        JOB_ID, CANDIDATE_FULL_NAME, CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, CANDIDATE_RESUME_FILE_ID, CANDIDATE_RESUME_NAME, APPLIED_ON,
         null, CANDIDATE_MATCHING_SKILLS, null, null);
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
@@ -1200,7 +1283,7 @@ class JobServiceTest {
   void getJobCandidatesLeavesProfileImageNullWhenTheCandidateHasNoImage() {
     stubJobOwnedByAuthenticatedUser();
     JobCandidateProjection projection = new JobCandidateProjection(APPLICATION_ID, CANDIDATE_ID,
-        JOB_ID, CANDIDATE_FULL_NAME, null, CANDIDATE_CURRENT_POSITION, CANDIDATE_RESUME_FILE_ID, APPLIED_ON,
+        JOB_ID, CANDIDATE_FULL_NAME, null, CANDIDATE_CURRENT_POSITION, CANDIDATE_RESUME_FILE_ID, CANDIDATE_RESUME_NAME, APPLIED_ON,
         CANDIDATE_JOB_SKILLS, CANDIDATE_MATCHING_SKILLS, null, null);
     when(userApplicationJobRepository.findCandidatesByJobId(JOB_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
@@ -1271,7 +1354,7 @@ class JobServiceTest {
 
   private JobCandidateProjection candidateProjection(String applicationId) {
     return new JobCandidateProjection(applicationId, CANDIDATE_ID, JOB_ID, CANDIDATE_FULL_NAME,
-        CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, CANDIDATE_RESUME_FILE_ID, APPLIED_ON, CANDIDATE_JOB_SKILLS,
+        CANDIDATE_FILE_ID, CANDIDATE_CURRENT_POSITION, CANDIDATE_RESUME_FILE_ID, CANDIDATE_RESUME_NAME, APPLIED_ON, CANDIDATE_JOB_SKILLS,
         CANDIDATE_MATCHING_SKILLS, null, null);
   }
 

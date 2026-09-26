@@ -9,9 +9,11 @@ public record JobCandidateProjection(
     String userFullName,
     String userFileStorageId,
     String userCurrentPosition,
-    // Null for applications registered before candidates chose a resume, and
-    // for a resume whose document was never stored.
+    // The document the candidate applied with. It hangs off the application, not
+    // off the candidate's resumes, because a CV Tailor resume is never stored as
+    // one of those.
     String userResumeFileStorageId,
+    String userResumeName,
     LocalDate appliedOn,
     String jobSkills,
     String userSkills,

@@ -88,7 +88,6 @@ class UserServiceTest {
   private static final String RESUME_JSON = "{\"summary\":\"Backend engineer\",\"years\":8}";
   private static final String RESUME_FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42";
   private static final String RESUME_PDF_URL = "https://presigned/cv.pdf";
-  private static final String TAILORED_FOR_JOB_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d44";
   private static final Map<String, Object> RESUME_CONTENT = Map.of("summary", "Backend engineer");
   private static final Map<String, Object> RESUME_WITH_SKILLS = Map.of(
       "summary", "Backend engineer",
@@ -424,7 +423,6 @@ class UserServiceTest {
     assertThat(saved.getLanguage(), is(RESUME_LANGUAGE));
     assertThat(saved.getCreatedOn(), is(LocalDate.now(ZoneOffset.UTC)));
     assertThat(saved.getLynqFileStorageId(), is(RESUME_FILE_ID));
-    assertThat(saved.getTailoredForJobId(), is(nullValue()));
     assertThat(saved.getUser(), is(sameInstance(candidate)));
     assertThat(saved.getResume(), is("{\"summary\":\"Backend engineer\"}"));
 
@@ -433,25 +431,6 @@ class UserServiceTest {
     @SuppressWarnings("unchecked")
     Map<String, Object> resumeJson = (Map<String, Object>) result.getResume();
     assertThat(resumeJson.get("summary"), is("Backend engineer"));
-    assertThat(result.getTailoredForJobId(), is(nullValue()));
-  }
-
-  @Test
-  void createResumeMarksTheResumeAsTailoredWhenTheRequestCarriesTheJobItWasAdaptedFor() {
-    UserEntity candidate = candidate();
-    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
-    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
-    when(fileStorageService.obtainDownloadUrl(RESUME_FILE_ID)).thenReturn(RESUME_PDF_URL);
-    CreateResumeRequest request = createRequest();
-    request.setTailoredForJobId(TAILORED_FOR_JOB_ID);
-
-    GetUserResumeRestResponse result = userService.createResume(USER_ID, request);
-
-    ArgumentCaptor<UserResumeEntity> captor = ArgumentCaptor.forClass(UserResumeEntity.class);
-    verify(userResumeRepository).save(captor.capture());
-    assertThat(captor.getValue().getTailoredForJobId(), is(TAILORED_FOR_JOB_ID));
-    assertThat(result.getTailoredForJobId(), is(TAILORED_FOR_JOB_ID));
-    assertThat(candidate.getSkills(), is(empty()));
   }
 
   @Test
@@ -732,8 +711,8 @@ class UserServiceTest {
   @Test
   void getUserApplicationsMapsProjectionFieldsAndSignsTheCompanyLogo() {
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidateWithSkills()));
-    when(fileStorageService.obtainDownloadUrls(List.of(COMPANY_FILE_ID)))
-        .thenReturn(Map.of(COMPANY_FILE_ID, COMPANY_IMAGE_URL));
+    when(fileStorageService.obtainDownloadUrls(List.of(COMPANY_FILE_ID, RESUME_FILE_ID)))
+        .thenReturn(Map.of(COMPANY_FILE_ID, COMPANY_IMAGE_URL, RESUME_FILE_ID, RESUME_PDF_URL));
     when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(applicationProjection(APPLICATION_ID, COMPANY_FILE_ID)),
             DEFAULT_PAGEABLE, 1));
@@ -751,6 +730,8 @@ class UserServiceTest {
     assertThat(application.getCompanyName(), is(COMPANY_NAME));
     assertThat(application.getCompanyProfileImage(), is(COMPANY_IMAGE_URL));
     assertThat(application.getAppliedOn(), is(APPLIED_ON));
+    assertThat(application.getResumeName(), is(RESUME_NAME));
+    assertThat(application.getResumePdfUrl(), is(RESUME_PDF_URL));
   }
 
   @Test
@@ -778,7 +759,7 @@ class UserServiceTest {
     when(userApplicationJobRepository.findApplicationsByUserId(USER_ID, DEFAULT_PAGEABLE))
         .thenReturn(new PageImpl<>(List.of(new UserApplicationProjection(
             APPLICATION_ID, JOB_ID, JOB_TITLE, JOB_DESCRIPTION, COMPANY_ID, COMPANY_NAME, null,
-            null, APPLIED_ON, "Java,Kafka,Terraform",
+            null, RESUME_FILE_ID, RESUME_NAME, APPLIED_ON, "Java,Kafka,Terraform",
             "Backend Development,Asynchronous Messaging")), DEFAULT_PAGEABLE, 1));
     when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
 
@@ -879,7 +860,8 @@ class UserServiceTest {
 
   private UserApplicationProjection applicationProjection(String id, String companyImagePath) {
     return new UserApplicationProjection(id, JOB_ID, JOB_TITLE, JOB_DESCRIPTION, COMPANY_ID,
-        COMPANY_NAME, companyImagePath, null, APPLIED_ON, JOB_SKILLS_CSV, null);
+        COMPANY_NAME, companyImagePath, null, RESUME_FILE_ID, RESUME_NAME, APPLIED_ON,
+        JOB_SKILLS_CSV, null);
   }
 
   private UserEntity candidateWithSkills() {

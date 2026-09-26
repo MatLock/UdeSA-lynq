@@ -27,7 +27,8 @@ public interface UserApplicationJobRepository extends JpaRepository<UserApplicat
   long countByJobId(@Param("jobId") String jobId);
 
   @Query(value = "SELECT new com.lynq.backend.repository.projection.JobCandidateProjection("
-      + "a.id, u.id, j.id, u.fullName, u.lynqFileStorageId, u.currentPosition, r.lynqFileStorageId, a.appliedOn, "
+      + "a.id, u.id, j.id, u.fullName, u.lynqFileStorageId, u.currentPosition, "
+      + "a.resumeFileStorageId, a.resumeName, a.appliedOn, "
       + "CAST((SELECT function('group_concat', jsk.skill) FROM JobPostSkillEntity jsk "
       + "WHERE jsk.jobPost = j) AS string), "
       + "CAST((SELECT function('group_concat', usk.skill) FROM UserSkillsEntity usk "
@@ -39,9 +40,6 @@ public interface UserApplicationJobRepository extends JpaRepository<UserApplicat
       + "FROM UserApplicationJobEntity a "
       + "JOIN a.user u "
       + "JOIN a.jobPost j "
-      // LEFT: an application made before candidates chose a resume has none,
-      // and an inner join would silently drop it from the recruiter's list.
-      + "LEFT JOIN a.userResume r "
       + "WHERE j.id = :jobId "
       + "ORDER BY a.appliedOn DESC",
       countQuery = "SELECT COUNT(a) FROM UserApplicationJobEntity a WHERE a.jobPost.id = :jobId")
@@ -49,7 +47,7 @@ public interface UserApplicationJobRepository extends JpaRepository<UserApplicat
 
   @Query(value = "SELECT new com.lynq.backend.repository.projection.UserApplicationProjection("
       + "a.id, j.id, j.title, j.description, c.id, c.name, c.lynqFileStorageId, c.logoUrl, "
-      + "a.appliedOn, "
+      + "a.resumeFileStorageId, a.resumeName, a.appliedOn, "
       + "CAST((SELECT function('group_concat', jsk.skill) FROM JobPostSkillEntity jsk "
       + "WHERE jsk.jobPost = j) AS string), "
       + "CAST((SELECT function('group_concat', jtg.similarityTag) FROM JobPostSimilarityTagEntity jtg "

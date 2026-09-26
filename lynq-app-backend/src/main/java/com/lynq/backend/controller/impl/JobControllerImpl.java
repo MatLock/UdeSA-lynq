@@ -214,7 +214,7 @@ public class JobControllerImpl implements JobController {
   @AuditLog
   public ResponseEntity<GlobalRestResponse<ApplyJobRestResponse>> applyToJob(
       @PathVariable String jobId, @Valid @RequestBody ApplyJobRequest request) {
-    UserApplicationJobEntity application = jobService.applyToJob(jobId, request.getResumeId());
+    UserApplicationJobEntity application = jobService.applyToJob(jobId, request);
 
     ApplyJobRestResponse response = ApplyJobRestResponse.builder()
         .applicationId(application.getId())

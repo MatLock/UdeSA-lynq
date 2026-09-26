@@ -6,12 +6,14 @@ import com.lynq.backend.client.request.CreateFileDownloadBatchRequest;
 import com.lynq.backend.client.request.CreateFileUploadRequest;
 import com.lynq.backend.client.response.CreateFileUploadResponse;
 import com.lynq.backend.security.LynqUserPrincipal;
+import feign.FeignException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.slf4j.MDC;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -44,6 +46,23 @@ public class FileStorageService {
   @AuditLog
   public void confirmUpload(String fileId) {
     lynqFileStorageClient.confirmUpload(fileId, requestUuid(), authenticatedUserId());
+  }
+
+  @AuditLog
+  public boolean belongsToCaller(String fileId) {
+    if (isBlank(fileId)) {
+      return false;
+    }
+    try {
+      return lynqFileStorageClient
+          .findOwnedFile(fileId, requestUuid(), authenticatedUserId())
+          .getData() != null;
+    } catch (FeignException e) {
+      if (e.status() == HttpStatus.FORBIDDEN.value() || e.status() == HttpStatus.NOT_FOUND.value()) {
+        return false;
+      }
+      throw e;
+    }
   }
 
   @AuditLog
