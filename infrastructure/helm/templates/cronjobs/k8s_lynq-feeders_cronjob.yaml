@@ -8,15 +8,16 @@ metadata:
 spec:
   schedule: {{ .Values.lynq_feeders.cron.schedule | quote }}
   timeZone: {{ .Values.lynq_feeders.cron.timeZone | quote }}
-  # A run is ~80 postings, each one an LLM generation, so it can outlast the
-  # interval on a slow model. Never let a second run pile onto a running one.
+  # The trigger only fires the run and exits, so two of these never overlap in
+  # practice. Overlapping *ingest runs* are refused by lynq-feeders itself with
+  # a 409 — this stays as a cheap second line of defence.
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: {{ .Values.lynq_feeders.cron.successfulJobsHistoryLimit }}
   failedJobsHistoryLimit: {{ .Values.lynq_feeders.cron.failedJobsHistoryLimit }}
   startingDeadlineSeconds: {{ .Values.lynq_feeders.cron.startingDeadlineSeconds }}
   jobTemplate:
     spec:
-      # The feed is scraped fresh every day: a failed run is better retried
+      # The feed is scraped fresh every day: a failed trigger is better retried
       # tomorrow than hammered at now.
       backoffLimit: {{ .Values.lynq_feeders.cron.backoffLimit }}
       activeDeadlineSeconds: {{ .Values.lynq_feeders.cron.activeDeadlineSeconds }}
@@ -45,8 +46,13 @@ spec:
                   set -eu
                   REQUEST_UUID="$(cat /proc/sys/kernel/random/uuid)"
                   echo "Triggering lynq-feeders ingest, lynq-request-uuid=${REQUEST_UUID}"
+                  # The endpoint answers 202 with no body and runs the ingest in
+                  # the background, so this waits for the acknowledgement only —
+                  # the run itself is followed in the lynq-feeders pod logs,
+                  # filtering by the request uuid printed above.
                   curl -sS --fail-with-body \
                     --max-time {{ .Values.lynq_feeders.cron.requestTimeoutSeconds }} \
+                    -o /dev/null -w 'lynq-feeders answered HTTP %{http_code}\n' \
                     -X POST \
                     -H "lynq-request-uuid: ${REQUEST_UUID}" \
                     "http://lynq-feeders-service:8089/lynq-feeders/ingest"

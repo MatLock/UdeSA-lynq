@@ -138,6 +138,14 @@ lynq_agent:
     # to exercise the partial answer and the EXHAUSTED status without code changes.
     AGENT_MAX_STEPS: "12"
     AGENT_MAX_TURNS: "10"
+    # Read live from the settings, never copied onto the row: how many edits one
+    # turn may apply before the tools answer EDIT LIMIT REACHED and the agent
+    # recommends the rest instead of applying it.
+    AGENT_MAX_EDITS: "2"
+    # Bedrock answers ModelErrorException when the model emits a tool use it cannot
+    # parse. It is intermittent, so the model call is retried before the turn is
+    # given up on; every attempt costs a step.
+    AGENT_MODEL_RETRIES: "2"
     # Operational, never copied onto the row: how long a turn may stay RUNNING
     # before another turn treats it as a dead process. Must stay above the 310s
     # Feign read timeout of lynq-bff, so the agent decides the cutoff.
@@ -192,8 +200,10 @@ lynq_feeders:
     failedJobsHistoryLimit: 3
     startingDeadlineSeconds: 600
     backoffLimit: 1
-    activeDeadlineSeconds: 5400
-    requestTimeoutSeconds: 5400
+    # The trigger pod only waits for the 202, not for the run: the ingest goes on
+    # in the lynq-feeders pod after this one is gone.
+    activeDeadlineSeconds: 120
+    requestTimeoutSeconds: 30
 
 lynq_bff:
   replicas: 1

@@ -54,13 +54,16 @@ All credentials live in a single `credentials` block in `k8s_values-local.yaml` 
 
 `lynq-feeders` is the only workload that is not driven by users. It scrapes Bumeran and Computrabajo, asks `lynq-ml` for skills and similarity tags, and hands the batch to `lynq-app-backend`. The Deployment serves the endpoint; a CronJob calls it.
 
+The ingest endpoint answers `202` with no body and does the work in the background, so the CronJob pod is a trigger and nothing more: it is done in milliseconds, whatever the run costs. A run is ~80 postings, each an LLM generation, and used to hold the trigger's connection open for up to 90 minutes — any hiccup on that connection failed the Job even though the ingest itself was fine.
+
 | Setting | Value | Why |
 |---------|-------|-----|
 | `lynq_feeders.cron.schedule` | `0 6 * * *` | One run a day, off-peak. |
 | `lynq_feeders.cron.timeZone` | `Etc/UTC` | Pinned so the run does not drift with DST. |
-| `concurrencyPolicy` | `Forbid` | A run is ~80 postings, each an LLM generation, and can outlast the interval on a slow model. Never stack two runs. |
-| `backoffLimit` | `1` | The feed is scraped fresh daily; a failed run is better retried tomorrow than hammered at now. |
-| `activeDeadlineSeconds` | `5400` | Kills a run that hangs instead of leaving it to block the next one. |
+| `concurrencyPolicy` | `Forbid` | Two triggers no longer overlap in practice — `lynq-feeders` refuses a second run with a `409` — but this costs nothing to keep. |
+| `backoffLimit` | `1` | The feed is scraped fresh daily; a failed trigger is better retried tomorrow than hammered at now. |
+| `activeDeadlineSeconds` | `120` | The trigger waits for an acknowledgement, not for the run. |
+| `requestTimeoutSeconds` | `30` | `curl --max-time` for that acknowledgement. |
 
 Trigger a run by hand without waiting for the schedule:
 
@@ -69,13 +72,19 @@ kubectl -n lynq-local-namespace create job --from=cronjob/lynq-feeders-cronjob f
 kubectl -n lynq-local-namespace logs -f job/feeders-manual
 ```
 
+The Job's log only shows the `202`. The run itself is in the `lynq-feeders` pod, under the request uuid the trigger printed:
+
+```bash
+kubectl -n lynq-local-namespace logs -l app=lynq-feeders -f | grep "<request-uuid>"
+```
+
 ### The internal token
 
 `lynq-app-backend` exposes `/internal/job-posts/ingest` for the feeder. That route is exempt from the bearer-token filters — a cron has no user behind it — and is guarded instead by a shared secret in the `lynq-internal-token` header.
 
 **The same value must be in two Secrets**: `lynq-feeders-secret` (the caller presents it) and `lynq-app-backend-secret` (the callee checks it). Locally both come from `credentials.internal.token` in `k8s_values-local.yaml`, so they cannot drift. In prod both Secrets are created outside the chart and it is on whoever provisions them to keep them equal.
 
-If the values differ, the ingest fails closed: the backend answers `401` and the feeder's run ends with `502`. The same happens when the token is missing entirely — a deploy that forgets it fails loudly rather than accepting unauthenticated writes.
+If the values differ, the ingest fails closed: the backend answers `401` and the feeder's run ends with an error logged in its pod — the trigger already got its `202`, so the CronJob is green and the failure is only visible there. The same happens when the token is missing entirely — a deploy that forgets it fails loudly rather than accepting unauthenticated writes.
 
 
 ## Running locally

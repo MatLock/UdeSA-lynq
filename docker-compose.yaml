@@ -203,6 +203,14 @@ services:
       # EXHAUSTED). They are copied onto each conversation row at creation.
       - AGENT_MAX_STEPS=${AGENT_MAX_STEPS:-12}
       - AGENT_MAX_TURNS=${AGENT_MAX_TURNS:-10}
+      # Read live from the settings, not copied onto the row: how many edits one
+      # turn may apply before the tools answer EDIT LIMIT REACHED and the agent
+      # recommends the rest instead of applying it.
+      - AGENT_MAX_EDITS=${AGENT_MAX_EDITS:-2}
+      # Bedrock answers ModelErrorException when the model emits a tool use it
+      # cannot parse. It is intermittent, so the model call is retried before the
+      # turn is given up on; every attempt costs a step.
+      - AGENT_MODEL_RETRIES=${AGENT_MODEL_RETRIES:-2}
       # Operational, not part of the conversation contract: how long a turn may
       # stay RUNNING before it is treated as a dead process. Above the 310s
       # Feign read timeout in lynq-bff.
