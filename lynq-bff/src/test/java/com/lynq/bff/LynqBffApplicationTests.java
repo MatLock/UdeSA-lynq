@@ -7,6 +7,8 @@ import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
 import static org.mockserver.model.JsonBody.json;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -34,6 +36,20 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
   private static final String USER_BODY = """
       {"success": true, "data": {"id": "11111111-1111-1111-1111-111111111111"}}""";
+
+  private static final String JOB_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a70";
+  private static final String UPLOAD_URL_BODY = """
+      {"success": true, "data": {"preSignedUrl": "https://s3.local/put", "fileId": "file-1"}}""";
+  private static final String EMPTY_PAGE_BODY = """
+      {"success": true, "data": {"content": [], "page": 2, "size": 5, "totalElements": 0}}""";
+  private static final String CREATED_JOB_BODY = """
+      {"success": true, "data": {"jobId": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a70", \
+"title": "Senior Backend Engineer"}}""";
+  private static final String JOB_DETAILS_BODY = """
+      {"success": true, "data": {"jobId": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a70", \
+"title": "Senior Backend Engineer", "alreadyApplied": false}}""";
+  private static final String STORED_FILE_BODY = """
+      {"success": true, "data": {"fileId": "file-1", "uploadUrl": "https://s3.local/put"}}""";
 
   private static final String RESUME_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
   private static final String RESUME_ALIAS_PATH = "/dmz/user/resume/" + RESUME_ID + "/alias";
@@ -66,6 +82,8 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   @LocalServerPort
   private int port;
 
+  private static final ObjectMapper JSON = new ObjectMapper();
+
   private final HttpClient httpClient = HttpClient.newHttpClient();
   private String accessToken;
 
@@ -79,7 +97,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void proxiesToLynqBackendUnderTheDmzPrefixAndReturnsItsBodyVerbatim() throws Exception {
+  void relaysTheAuthenticatedUserFromLynqBackend() throws Exception {
     lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/user"))
         .respond(response().withStatusCode(200)
             .withContentType(MediaType.APPLICATION_JSON)
@@ -88,7 +106,8 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     HttpResponse<String> response = send("GET", CONTEXT_PATH + "/user", null);
 
     assertThat(response.statusCode(), is(200));
-    assertThat(response.body(), is(USER_BODY));
+    assertThat(payloadOf(response).path("success").asBoolean(), is(true));
+    assertThat(dataField(response, "id"), is(TOKEN_SUBJECT));
     assertThat(response.headers().firstValue(CONTENT_TYPE_HEADER).orElseThrow(),
         containsString(APPLICATION_JSON));
   }
@@ -108,9 +127,11 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void keepsNestedPathSegmentsAndTheQueryStringIntact() throws Exception {
+  void sendsTheDeclaredQueryParameterToLynqBackend() throws Exception {
     lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/user/generate-upload-image"))
-        .respond(response().withStatusCode(200).withBody("{}"));
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(UPLOAD_URL_BODY));
 
     HttpResponse<String> response = send(
         "GET", CONTEXT_PATH + "/user/generate-upload-image?file-name=avatar.png", null);
@@ -124,34 +145,44 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void keepsRepeatedQueryParametersIntact() throws Exception {
+  void sendsTheDeclaredPagingParametersAndDropsWhateverTheRouteDoesNotName() throws Exception {
     lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/job"))
-        .respond(response().withStatusCode(200).withBody("{}"));
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(EMPTY_PAGE_BODY));
 
-    send("GET", CONTEXT_PATH + "/job?skills=Java&skills=Spring", null);
+    send("GET", CONTEXT_PATH + "/job?page=2&size=5&skills=Java&skills=Spring", null);
 
     lynqBackendMock.verify(request()
         .withMethod("GET")
         .withPath("/dmz/job")
-        .withQueryStringParameter(Parameter.param("skills", "Java", "Spring")),
+        .withQueryStringParameter(Parameter.param("page", "2"))
+        .withQueryStringParameter(Parameter.param("size", "5")),
         VerificationTimes.once());
+    lynqBackendMock.verify(request()
+        .withPath("/dmz/job")
+        .withQueryStringParameter(Parameter.param("skills", "Java")),
+        VerificationTimes.exactly(0));
   }
 
   @Test
-  void passesThePostBodyThroughUnchanged() throws Exception {
+  void sendsTheTypedJobBodyToLynqBackend() throws Exception {
     useRoles("R_COMPANY");
     String requestBody = """
         {"title": "Senior Backend Engineer", "workType": "REMOTE"}""";
     lynqBackendMock.when(request().withMethod("POST").withPath("/dmz/job"))
-        .respond(response().withStatusCode(201).withBody(USER_BODY));
+        .respond(response().withStatusCode(201)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(CREATED_JOB_BODY));
 
     HttpResponse<String> response = send("POST", CONTEXT_PATH + "/job", requestBody);
 
     assertThat(response.statusCode(), is(201));
+    assertThat(dataField(response, "jobId"), is(JOB_ID));
     lynqBackendMock.verify(request()
         .withMethod("POST")
         .withPath("/dmz/job")
-        .withBody(requestBody), VerificationTimes.once());
+        .withBody(json(requestBody)), VerificationTimes.once());
   }
 
   @Test
@@ -159,16 +190,18 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     String requestBody = """
         {"fullName": "Jane Q. Doe"}""";
     lynqBackendMock.when(request().withMethod("PATCH").withPath("/dmz/user"))
-        .respond(response().withStatusCode(200).withBody(USER_BODY));
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(USER_BODY));
 
     HttpResponse<String> response = send("PATCH", CONTEXT_PATH + "/user", requestBody);
 
     assertThat(response.statusCode(), is(200));
-    assertThat(response.body(), is(USER_BODY));
+    assertThat(dataField(response, "id"), is(TOKEN_SUBJECT));
     lynqBackendMock.verify(request()
         .withMethod("PATCH")
         .withPath("/dmz/user")
-        .withBody(requestBody), VerificationTimes.once());
+        .withBody(json(requestBody)), VerificationTimes.once());
   }
 
   @Test
@@ -195,7 +228,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     HttpResponse<String> response = send("POST", CONTEXT_PATH + "/detect-language", "{}");
 
     assertThat(response.statusCode(), is(200));
-    assertThat(response.body(), is(mlBody));
+    assertThat(dataField(response, "language"), is("en"));
     lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
   }
 
@@ -211,7 +244,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     HttpResponse<String> response = send("POST", CONTEXT_PATH + "/skill-enhance", "{}");
 
     assertThat(response.statusCode(), is(200));
-    assertThat(response.body(), is(mlBody));
+    assertThat(payloadOf(response).path("data").path("skills").get(0).asText(), is("Java"));
     lynqMlMock.verify(request()
         .withPath("/dmz/skill-enhance")
         .withHeader(USER_ID_HEADER, TOKEN_SUBJECT), VerificationTimes.once());
@@ -231,7 +264,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
         send("POST", CONTEXT_PATH + "/resume/skill-extraction?language=es", "{}");
 
     assertThat(response.statusCode(), is(200));
-    assertThat(response.body(), is(mlBody));
+    assertThat(payloadOf(response).path("data").path("skills").get(0).asText(), is("Java"));
     lynqMlMock.verify(request()
         .withPath("/dmz/resume/skill-extraction")
         .withQueryStringParameter(Parameter.param("language", "es"))
@@ -319,21 +352,25 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void forwardsTheTokenSubjectAsTheUserIdHeader() throws Exception {
-    lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/user"))
-        .respond(response().withStatusCode(200).withBody(USER_BODY));
+  void forwardsTheTokenSubjectAsTheUserIdHeaderToLynqFileStorage() throws Exception {
+    lynqFileStorageMock.when(request().withMethod("POST").withPath("/dmz/files/upload-url"))
+        .respond(response().withStatusCode(201)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(STORED_FILE_BODY));
 
-    send("GET", CONTEXT_PATH + "/user", null);
+    send("POST", CONTEXT_PATH + "/files/upload-url", "{}");
 
-    lynqBackendMock.verify(request()
-        .withPath("/dmz/user")
+    lynqFileStorageMock.verify(request()
+        .withPath("/dmz/files/upload-url")
         .withHeader(USER_ID_HEADER, TOKEN_SUBJECT), VerificationTimes.once());
   }
 
   @Test
-  void overwritesAClientSuppliedUserIdWithTheTokenSubject() throws Exception {
+  void neverRelaysAClientSuppliedUserIdOrCompanyId() throws Exception {
     lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/user"))
-        .respond(response().withStatusCode(200).withBody(USER_BODY));
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(USER_BODY));
 
     HttpRequest httpRequest = HttpRequest.newBuilder()
         .uri(URI.create(baseUrl() + CONTEXT_PATH + "/user"))
@@ -347,10 +384,10 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
     lynqBackendMock.verify(request()
         .withPath("/dmz/user")
-        .withHeader(USER_ID_HEADER, TOKEN_SUBJECT), VerificationTimes.once());
+        .withHeader(AUTHORIZATION_HEADER, "Bearer " + accessToken), VerificationTimes.once());
     lynqBackendMock.verify(request()
         .withPath("/dmz/user")
-        .withHeader(USER_ID_HEADER, SPOOFED_USER_ID), VerificationTimes.exactly(0));
+        .withHeader(USER_ID_HEADER), VerificationTimes.exactly(0));
     lynqBackendMock.verify(request()
         .withPath("/dmz/user")
         .withHeader(COMPANY_ID_HEADER), VerificationTimes.exactly(0));
@@ -359,19 +396,22 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   @Test
   void routesToLynqFileStorageOnTheFileStoragePrefix() throws Exception {
     lynqFileStorageMock.when(request().withMethod("POST").withPath("/dmz/files/upload-url"))
-        .respond(response().withStatusCode(201).withBody("{}"));
+        .respond(response().withStatusCode(201)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(STORED_FILE_BODY));
 
     HttpResponse<String> response =
         send("POST", CONTEXT_PATH + "/files/upload-url", "{}");
 
     assertThat(response.statusCode(), is(201));
+    assertThat(dataField(response, "fileId"), is("file-1"));
     lynqFileStorageMock.verify(request()
         .withMethod("POST")
         .withPath("/dmz/files/upload-url"), VerificationTimes.once());
   }
 
   @Test
-  void passesADownstreamErrorStatusAndBodyStraightBack() throws Exception {
+  void passesADownstreamErrorStatusAndItsReasonBack() throws Exception {
     String errorBody = """
         {"success": false, "reason": "User not found"}""";
     lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/user"))
@@ -382,7 +422,8 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     HttpResponse<String> response = send("GET", CONTEXT_PATH + "/user", null);
 
     assertThat(response.statusCode(), is(404));
-    assertThat(response.body(), is(errorBody));
+    assertThat(payloadOf(response).path("success").asBoolean(), is(false));
+    assertThat(payloadOf(response).path("reason").asText(), is("User not found"));
   }
 
   @Test
@@ -453,8 +494,8 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void returnsMethodNotAllowedForAVerbTheGatewayDoesNotRelay() throws Exception {
-    HttpResponse<String> response = send("HEAD", CONTEXT_PATH + "/user", null);
+  void returnsMethodNotAllowedForAVerbTheRouteDoesNotDeclare() throws Exception {
+    HttpResponse<String> response = send("PUT", CONTEXT_PATH + "/user", "{}");
 
     assertThat(response.statusCode(), is(405));
     lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
@@ -490,7 +531,8 @@ class LynqBffApplicationTests extends AbstractE2ETest {
         sendAnonymous("POST", CONTEXT_PATH + "/auth/login/email", LOGIN_BODY);
 
     assertThat(response.statusCode(), is(200));
-    assertThat(response.body(), is(SESSION_BODY));
+    assertThat(dataField(response, "accessToken"), is("eyJhbGciOiJIUzI1NiJ9.access.token"));
+    assertThat(dataField(response, "refreshToken"), is("opaque-refresh-token"));
     lynqIamMock.verify(request()
         .withMethod("POST")
         .withPath("/auth/login/email")
@@ -509,7 +551,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
         sendAnonymous("POST", CONTEXT_PATH + "/auth/register", REGISTER_BODY);
 
     assertThat(response.statusCode(), is(201));
-    assertThat(response.body(), is(SESSION_BODY));
+    assertThat(dataField(response, "id"), is(TOKEN_SUBJECT));
     lynqIamMock.verify(request().withMethod("POST").withPath("/auth/register")
         .withBody(json(REGISTER_BODY)), VerificationTimes.once());
   }
@@ -560,7 +602,8 @@ class LynqBffApplicationTests extends AbstractE2ETest {
         "GET", CONTEXT_PATH + "/auth/check-username?username=janedoe", null);
 
     assertThat(response.statusCode(), is(200));
-    assertThat(response.body(), is(AVAILABILITY_BODY));
+    assertThat(payloadOf(response).path("data").path("valid").asBoolean(), is(false));
+    assertThat(dataField(response, "reason"), is("Username is already taken"));
     lynqIamMock.verify(request()
         .withMethod("GET")
         .withPath("/auth/check-username")
@@ -578,7 +621,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
         send("PATCH", CONTEXT_PATH + "/auth/update-password", PASSWORD_UPDATE_BODY);
 
     assertThat(response.statusCode(), is(200));
-    assertThat(response.body(), is(SESSION_BODY));
+    assertThat(dataField(response, "id"), is(TOKEN_SUBJECT));
     lynqIamMock.verify(request()
         .withMethod("PATCH")
         .withPath("/auth/update-password")
@@ -620,7 +663,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void passesALynqIamErrorStatusAndBodyStraightBack() throws Exception {
+  void passesALynqIamErrorStatusAndItsReasonBack() throws Exception {
     lynqIamMock.when(request().withMethod("POST").withPath("/auth/login/email"))
         .respond(response().withStatusCode(403)
             .withContentType(MediaType.APPLICATION_JSON)
@@ -630,7 +673,8 @@ class LynqBffApplicationTests extends AbstractE2ETest {
         sendAnonymous("POST", CONTEXT_PATH + "/auth/login/email", LOGIN_BODY);
 
     assertThat(response.statusCode(), is(403));
-    assertThat(response.body(), is(INVALID_CREDENTIALS_BODY));
+    assertThat(payloadOf(response).path("success").asBoolean(), is(false));
+    assertThat(payloadOf(response).path("reason").asText(), is("Invalid password"));
   }
 
   @Test
@@ -691,12 +735,20 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/job/018f9c3a/details"))
         .respond(response().withStatusCode(200)
             .withContentType(MediaType.APPLICATION_JSON)
-            .withBody(USER_BODY));
+            .withBody(JOB_DETAILS_BODY));
 
     HttpResponse<String> response = send("GET", CONTEXT_PATH + "/job/018f9c3a/details", null);
 
     assertThat(response.statusCode(), is(200));
-    assertThat(response.body(), is(USER_BODY));
+    assertThat(dataField(response, "jobId"), is(JOB_ID));
+  }
+
+  private static JsonNode payloadOf(HttpResponse<String> response) throws Exception {
+    return JSON.readTree(response.body());
+  }
+
+  private static String dataField(HttpResponse<String> response, String field) throws Exception {
+    return payloadOf(response).path("data").path(field).asText();
   }
 
   private String baseUrl() {

@@ -3,8 +3,10 @@ package com.lynq.bff.client;
 import com.lynq.bff.client.request.LanguageDetectionRequest;
 import com.lynq.bff.client.request.ParseResumeRequest;
 import com.lynq.bff.client.request.ResumeTemplateCreationRequest;
+import com.lynq.bff.client.request.SkillEnhanceRequest;
 import com.lynq.bff.client.request.TranslateResumeRequest;
 import com.lynq.bff.client.response.LanguageDetectionResponse;
+import com.lynq.bff.client.response.SkillEnhanceResponse;
 import com.lynq.bff.client.response.SkillExtractionResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -22,6 +24,12 @@ public interface LynqMlClient {
   @PostMapping("/dmz/resume-template-creation")
   void createResumeTemplate(
       @RequestBody ResumeTemplateCreationRequest request,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(USER_ID_HEADER) String userId);
+
+  @PostMapping("/dmz/skill-enhance")
+  GlobalRestResponse<SkillEnhanceResponse> enhanceSkills(
+      @RequestBody SkillEnhanceRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
       @RequestHeader(USER_ID_HEADER) String userId);
 

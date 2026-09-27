@@ -21,6 +21,8 @@ import com.lynq.bff.client.request.ParseResumeRequest;
 import com.lynq.bff.client.response.CreateFileDownloadResponse;
 import com.lynq.bff.client.response.LanguageDetectionResponse;
 import com.lynq.bff.client.response.SkillExtractionResponse;
+import com.lynq.bff.client.response.UserResumeResponse;
+import com.lynq.bff.enums.Language;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.exceptions.BadGatewayException;
 import java.util.List;
@@ -52,7 +54,10 @@ class ResumeImportServiceTest {
       "summary", SUMMARY,
       "work_experience", List.of(Map.of("company", "LYNQ", "description", ROLE_DESCRIPTION)),
       "skills", Map.of("technical", List.of("Java")));
-  private static final Object STORED_RESUME = Map.of("id", "resume-1", "language", "EN");
+  private static final UserResumeResponse STORED_RESUME = UserResumeResponse.builder()
+      .id("resume-1")
+      .language(Language.EN)
+      .build();
   private static final List<String> SIMILARITY_TAGS =
       List.of("Asynchronous Messaging", "Payment Processing");
 
@@ -155,7 +160,7 @@ class ResumeImportServiceTest {
     verify(lynqBackendClient).createResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     CreateResumeRequest request = captor.getValue();
     assertThat(request.getName(), is(FULL_NAME));
-    assertThat(request.getLanguage(), is("ES"));
+    assertThat(request.getLanguage(), is(Language.ES));
     assertThat(request.getFileId(), is(FILE_ID));
     assertThat(request.getResume(), is(sameInstance(PARSED_RESUME)));
   }
@@ -174,7 +179,7 @@ class ResumeImportServiceTest {
     verify(lynqMlClient, never()).detectLanguage(any(), any(), any());
     ArgumentCaptor<CreateResumeRequest> captor = ArgumentCaptor.forClass(CreateResumeRequest.class);
     verify(lynqBackendClient).createResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
-    assertThat(captor.getValue().getLanguage(), is("ES"));
+    assertThat(captor.getValue().getLanguage(), is(Language.ES));
   }
 
   @Test
@@ -188,7 +193,7 @@ class ResumeImportServiceTest {
 
     ArgumentCaptor<CreateResumeRequest> captor = ArgumentCaptor.forClass(CreateResumeRequest.class);
     verify(lynqBackendClient).createResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
-    assertThat(captor.getValue().getLanguage(), is("EN"));
+    assertThat(captor.getValue().getLanguage(), is(Language.EN));
   }
 
   @Test

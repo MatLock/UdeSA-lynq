@@ -86,7 +86,8 @@ public class ResumeTailorService {
         .baseResumeId(resumeId)
         .baseResume(baseResume.getResume())
         .language(normalized(language))
-        .resumeLanguage(normalized(baseResume.getLanguage()))
+        .resumeLanguage(baseResume.getLanguage() == null
+            ? null : normalized(baseResume.getLanguage().name()))
         .build();
 
     return relay(
@@ -228,7 +229,7 @@ public class ResumeTailorService {
         .title(job.getTitle())
         .description(job.getDescription())
         .company(job.getCompany() == null ? null : job.getCompany().getName())
-        .workType(job.getWorkType())
+        .workType(job.getWorkType() == null ? null : job.getWorkType().name())
         .skills(job.getSkills() == null ? List.of() : job.getSkills())
         .build();
   }

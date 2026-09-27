@@ -7,6 +7,7 @@ import com.lynq.bff.client.request.CreateResumeRequest;
 import com.lynq.bff.client.request.LanguageDetectionRequest;
 import com.lynq.bff.client.request.ParseResumeRequest;
 import com.lynq.bff.client.response.LanguageDetectionResponse;
+import com.lynq.bff.enums.Language;
 import com.lynq.bff.client.response.SkillExtractionResponse;
 import com.lynq.bff.exceptions.BadGatewayException;
 import java.util.List;
@@ -135,7 +136,7 @@ public class ResumeImportService {
                        Caller caller) {
     CreateResumeRequest request = CreateResumeRequest.builder()
         .name(ParsedResume.fullName(resume))
-        .language(language)
+        .language(Language.valueOf(language))
         .resume(resume)
         .similarityTags(similarityTags)
         .fileId(fileId)

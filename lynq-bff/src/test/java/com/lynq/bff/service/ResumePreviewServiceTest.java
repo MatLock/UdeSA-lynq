@@ -18,7 +18,7 @@ import com.lynq.bff.client.request.CreateFileUploadRequest;
 import com.lynq.bff.client.request.ResumeTemplateCreationRequest;
 import com.lynq.bff.client.response.CreateFileDownloadResponse;
 import com.lynq.bff.client.response.CreateFileUploadResponse;
-import com.lynq.bff.client.response.UserResponse;
+import com.lynq.bff.client.response.GetUserResponse;
 import com.lynq.bff.controller.request.PreviewResumeRequest;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
@@ -265,9 +265,8 @@ class ResumePreviewServiceTest {
 
   private void givenCandidate(String profileImageUrl) {
     when(lynqBackendClient.getUser(REQUEST_UUID, AUTHORIZATION))
-        .thenReturn(new GlobalRestResponse<>(true, UserResponse.builder()
+        .thenReturn(new GlobalRestResponse<>(true, GetUserResponse.builder()
             .id(USER_ID)
-            .userType("CANDIDATE")
             .userProfileImageUrl(profileImageUrl)
             .build()));
   }

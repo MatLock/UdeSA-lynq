@@ -104,7 +104,8 @@ public class ResumeTranslationService {
     }
 
     boolean taken = resumes.stream()
-        .anyMatch(resume -> language.equalsIgnoreCase(resume.getLanguage()));
+        .anyMatch(resume -> resume.getLanguage() != null
+            && language.equalsIgnoreCase(resume.getLanguage().name()));
     if (taken) {
       throw new BadRequestException(String.format(LANGUAGE_TAKEN, language));
     }
