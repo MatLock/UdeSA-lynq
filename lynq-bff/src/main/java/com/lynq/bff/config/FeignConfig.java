@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 public class FeignConfig {
 
   @Bean
-  public Client dmzFeignClient() {
+  public Client apacheFeignClient() {
     return new ApacheHttp5Client();
   }
 }

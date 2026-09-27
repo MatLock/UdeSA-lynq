@@ -15,6 +15,7 @@ import com.lynq.bff.client.LynqMlClient;
 import com.lynq.bff.client.request.TranslateResumeRequest;
 import com.lynq.bff.client.response.SupportedLanguageResponse;
 import com.lynq.bff.client.response.UserResumeResponse;
+import com.lynq.bff.enums.Language;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.exceptions.BadGatewayException;
 import com.lynq.bff.exceptions.BadRequestException;
@@ -188,7 +189,7 @@ class ResumeTranslationServiceTest {
     return UserResumeResponse.builder()
         .id(id)
         .name(name)
-        .language(language)
+        .language(Language.valueOf(language))
         .resume(SOURCE_RESUME)
         .build();
   }

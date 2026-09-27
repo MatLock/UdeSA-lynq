@@ -1,15 +1,13 @@
 package com.lynq.bff.security;
 
-import com.lynq.bff.client.LynqBackendDmzClient;
-import com.lynq.bff.client.LynqFileStorageDmzClient;
-import com.lynq.bff.client.LynqMlDmzClient;
+import com.lynq.bff.client.response.GetUserResponse;
 import com.lynq.bff.config.SecurityConfig;
 import com.lynq.bff.controller.handler.ControllerExceptionHandler;
-import com.lynq.bff.controller.impl.DmzProxyControllerImpl;
+import com.lynq.bff.controller.impl.UserControllerImpl;
 import com.lynq.bff.controller.impl.ResumeControllerImpl;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
 import com.lynq.bff.filter.JwtSignatureFilter;
-import com.lynq.bff.service.DmzProxyService;
+import com.lynq.bff.service.UserService;
 import com.lynq.bff.service.ResumeAliasService;
 import com.lynq.bff.service.ResumeDeletionService;
 import com.lynq.bff.service.ResumeImportService;
@@ -26,7 +24,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -42,7 +39,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = {ResumeControllerImpl.class, DmzProxyControllerImpl.class})
+@WebMvcTest(controllers = {ResumeControllerImpl.class, UserControllerImpl.class})
 @Import({SecurityConfig.class, ControllerExceptionHandler.class})
 class HasRoleAuthorizationTest {
 
@@ -81,16 +78,7 @@ class HasRoleAuthorizationTest {
   private ResumeTailorService resumeTailorService;
 
   @MockitoBean
-  private DmzProxyService dmzProxyService;
-
-  @MockitoBean
-  private LynqBackendDmzClient lynqBackendDmzClient;
-
-  @MockitoBean
-  private LynqMlDmzClient lynqMlDmzClient;
-
-  @MockitoBean
-  private LynqFileStorageDmzClient lynqFileStorageDmzClient;
+  private UserService userService;
 
   static List<Arguments> resumeEndpoints() {
     return List.of(
@@ -159,11 +147,12 @@ class HasRoleAuthorizationTest {
 
   @Test
   void theRelayedRoutesStayReachableWhateverRoleTheCallerHolds() throws Exception {
-    when(dmzProxyService.forward(any(), any(), any()))
-        .thenReturn(ResponseEntity.ok(new byte[0]));
+    when(userService.getUser(any()))
+        .thenReturn(GetUserResponse.builder().id(USER_ID).build());
 
     mockMvc.perform(as(null, HttpMethod.GET, "/user", null))
-        .andExpect(status().isOk());
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.id", is(USER_ID)));
   }
 
   private MockHttpServletRequestBuilder as(String role, HttpMethod method, String path,

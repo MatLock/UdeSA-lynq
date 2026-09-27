@@ -6,7 +6,7 @@ import com.lynq.bff.client.LynqMlClient;
 import com.lynq.bff.client.request.CreateFileUploadRequest;
 import com.lynq.bff.client.request.ResumeTemplateCreationRequest;
 import com.lynq.bff.client.response.CreateFileUploadResponse;
-import com.lynq.bff.client.response.UserResponse;
+import com.lynq.bff.client.response.GetUserResponse;
 import com.lynq.bff.controller.request.PreviewResumeRequest;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
 import com.lynq.bff.exceptions.BadGatewayException;
@@ -49,7 +49,7 @@ public class ResumePreviewService {
       throw new BadRequestException(TEMPLATE_REQUIRED);
     }
 
-    UserResponse user = readCaller(caller);
+    GetUserResponse user = readCaller(caller);
     CreateFileUploadResponse upload = registerPdf(caller);
 
     log.info("message= Started resume preview, user_id={}, template={}, file_id={}",
@@ -84,8 +84,8 @@ public class ResumePreviewService {
     log.info("message= Discarded resume preview, user_id={}, file_id={}", caller.userId(), fileId);
   }
 
-  private UserResponse readCaller(Caller caller) {
-    UserResponse user;
+  private GetUserResponse readCaller(Caller caller) {
+    GetUserResponse user;
     try {
       user = lynqBackendClient.getUser(caller.requestUuid(), caller.authorization()).getData();
     } catch (RuntimeException e) {
@@ -114,7 +114,7 @@ public class ResumePreviewService {
     }
   }
 
-  private void render(PreviewResumeRequest request, UserResponse user,
+  private void render(PreviewResumeRequest request, GetUserResponse user,
                       CreateFileUploadResponse upload, Caller caller) {
     ResumeTemplateCreationRequest renderRequest = ResumeTemplateCreationRequest.builder()
         .resumeContent(request.getResume())

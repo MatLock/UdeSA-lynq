@@ -19,7 +19,11 @@ import com.lynq.bff.client.request.ApplyJobRequest;
 import com.lynq.bff.client.request.MarkConversationAppliedRequest;
 import com.lynq.bff.client.request.StartTailorConversationRequest;
 import com.lynq.bff.client.request.TailorTurnRequest;
+import com.lynq.bff.client.response.ApplyJobResponse;
+import com.lynq.bff.client.response.JobCompanyResponse;
 import com.lynq.bff.client.response.JobDetailsResponse;
+import com.lynq.bff.enums.Language;
+import com.lynq.bff.enums.WorkType;
 import com.lynq.bff.client.response.UserResumeResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.controller.request.PreviewResumeRequest;
@@ -79,9 +83,10 @@ class ResumeTailorServiceTest {
       "currentResume", BASE_RESUME,
       "status", "ACTIVE");
 
-  private static final Map<String, Object> APPLICATION = Map.of(
-      "applicationId", "018fa1b2-2b1d-7c4e-9a6f-1e2d3c4b5a62",
-      "jobId", JOB_ID);
+  private static final ApplyJobResponse APPLICATION = ApplyJobResponse.builder()
+      .applicationId("018fa1b2-2b1d-7c4e-9a6f-1e2d3c4b5a62")
+      .jobId(JOB_ID)
+      .build();
 
   @Mock
   private LynqBackendClient lynqBackendClient;
@@ -452,7 +457,7 @@ class ResumeTailorServiceTest {
     when(lynqBackendClient.getUserResumes(REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, List.of(UserResumeResponse.builder()
             .id(RESUME_ID)
-            .language(RESUME_LANGUAGE)
+            .language(Language.valueOf(RESUME_LANGUAGE))
             .resume(BASE_RESUME)
             .build())));
   }
@@ -463,9 +468,9 @@ class ResumeTailorServiceTest {
             .jobId(JOB_ID)
             .title(JOB_TITLE)
             .description(JOB_DESCRIPTION)
-            .workType("REMOTE")
+            .workType(WorkType.REMOTE)
             .skills(JOB_SKILLS)
-            .company(JobDetailsResponse.JobCompanyResponse.builder()
+            .company(JobCompanyResponse.builder()
                 .id("company-1")
                 .name(COMPANY_NAME)
                 .build())

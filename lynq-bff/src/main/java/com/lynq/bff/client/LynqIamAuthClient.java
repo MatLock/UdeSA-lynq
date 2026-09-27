@@ -1,50 +1,61 @@
 package com.lynq.bff.client;
 
-import com.lynq.bff.config.DmzPassThroughFeignConfig;
-import feign.Response;
-import java.util.Collection;
-import java.util.Map;
+import com.lynq.bff.client.request.EmailLoginRequest;
+import com.lynq.bff.client.request.RegisterUserRequest;
+import com.lynq.bff.client.request.UpdatePasswordRequest;
+import com.lynq.bff.client.request.UsernameLoginRequest;
+import com.lynq.bff.client.response.AccessTokenRefreshedResponse;
+import com.lynq.bff.client.response.AuthUserResponse;
+import com.lynq.bff.client.response.CheckEmailResponse;
+import com.lynq.bff.client.response.CheckUsernameResponse;
+import com.lynq.bff.controller.response.GlobalRestResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
-/**
- * The auth API of lynq-iam, as the gateway relays it. Unlike the services behind the DMZ prefix,
- * lynq-iam is not behind one: it mints and checks the tokens itself, so it keeps validating every
- * credential it is handed and this client adds nothing to what crosses.
- *
- * <p>Only the verbs the relayed auth surface uses are declared — GET for the availability checks,
- * POST for registration, the logins and the refresh, PATCH for the password update. It is a
- * separate interface rather than a {@link DmzClient} sibling because the path it hangs off is
- * {@code /auth}, not {@code /dmz}, and because Feign allows a client interface only one level of
- * inheritance.
- */
-@FeignClient(name = "lynqIamAuth", url = "${lynq.iam.url}",
-    configuration = DmzPassThroughFeignConfig.class)
+@FeignClient(name = "lynqIamAuth", url = "${lynq.iam.url}")
 public interface LynqIamAuthClient {
 
-  String AUTH_PATH = "/auth/{path}";
-  String PATH_VARIABLE = "path";
+  String REQUEST_UUID_HEADER = "lynq-request-uuid";
+  String AUTHORIZATION_HEADER = "Authorization";
 
-  @GetMapping(AUTH_PATH)
-  Response get(@PathVariable(PATH_VARIABLE) String path,
-               @RequestParam Map<String, Collection<String>> query,
-               @RequestHeader Map<String, Collection<String>> headers);
+  @PostMapping("/auth/register")
+  GlobalRestResponse<AuthUserResponse> register(
+      @RequestBody RegisterUserRequest request,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
 
-  @PostMapping(AUTH_PATH)
-  Response post(@PathVariable(PATH_VARIABLE) String path,
-                @RequestParam Map<String, Collection<String>> query,
-                @RequestHeader Map<String, Collection<String>> headers,
-                @RequestBody byte[] body);
+  @PostMapping("/auth/login/username")
+  GlobalRestResponse<AuthUserResponse> loginByUsername(
+      @RequestBody UsernameLoginRequest request,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
 
-  @PatchMapping(AUTH_PATH)
-  Response patch(@PathVariable(PATH_VARIABLE) String path,
-                 @RequestParam Map<String, Collection<String>> query,
-                 @RequestHeader Map<String, Collection<String>> headers,
-                 @RequestBody byte[] body);
+  @PostMapping("/auth/login/email")
+  GlobalRestResponse<AuthUserResponse> loginByEmail(
+      @RequestBody EmailLoginRequest request,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
+
+  @PostMapping("/auth/refresh")
+  GlobalRestResponse<AccessTokenRefreshedResponse> refresh(
+      @RequestHeader(AUTHORIZATION_HEADER) String refreshToken,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
+
+  @PatchMapping("/auth/update-password")
+  GlobalRestResponse<AuthUserResponse> updatePassword(
+      @RequestBody UpdatePasswordRequest request,
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
+
+  @GetMapping("/auth/check-username")
+  GlobalRestResponse<CheckUsernameResponse> checkUsername(
+      @RequestParam("username") String username,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
+
+  @GetMapping("/auth/check-email")
+  GlobalRestResponse<CheckEmailResponse> checkEmail(
+      @RequestParam("email") String email,
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
 }
