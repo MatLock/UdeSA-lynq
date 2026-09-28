@@ -17,7 +17,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from agent.context import SpanRecord, TurnOutcome
+from agent.context import INTENT_SPAN, Intent, SpanRecord, TurnOutcome
 from db.models import (
     Base,
     Conversation,
@@ -52,6 +52,18 @@ STUB_REPLY = "I moved Kubernetes to the front of your experience."
 async def stub_loop(context) -> TurnOutcome:
     context.spans.append(
         SpanRecord(
+            step=0,
+            kind=SpanKind.LLM,
+            name=INTENT_SPAN,
+            input='{"message": "Go"}',
+            output=Intent.EDIT,
+            prompt_tokens=120,
+            completion_tokens=2,
+            latency_ms=3,
+        )
+    )
+    context.spans.append(
+        SpanRecord(
             step=1,
             kind=SpanKind.LLM,
             name="model",
@@ -80,6 +92,7 @@ async def stub_loop(context) -> TurnOutcome:
         ],
         warnings=[],
         spans=context.spans,
+        intent=Intent.EDIT,
     )
 
 
@@ -205,6 +218,10 @@ class ScriptedChatModel(BaseChatModel):
 
 def scripted(*answers: AIMessage) -> ScriptedChatModel:
     return ScriptedChatModel(answers=list(answers), binds=[], prompts=[])
+
+
+def intending(intent: str = Intent.EDIT) -> ScriptedChatModel:
+    return scripted(AIMessage(content=intent))
 
 
 class BreakingChatModel(ScriptedChatModel):

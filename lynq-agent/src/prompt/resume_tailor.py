@@ -49,6 +49,7 @@ def render(
     max_steps: int,
     max_edits: int,
     turns_left: int,
+    intent: str,
 ) -> str:
     template = _environment.get_template(f"{provider}.jinja")
     return template.render(
@@ -65,4 +66,5 @@ def render(
         max_steps=max_steps,
         max_edits=max_edits,
         turns_left=turns_left,
+        intent=intent,
     )

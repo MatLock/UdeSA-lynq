@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from tests.fixtures.spanish import RESUME as SPANISH_RESUME
 from tests.fixtures.spanish import SUMMARY_REWRITE, WARNING
-from tests.support import scripted, tool_call
+from tests.support import intending, scripted, tool_call
 from tests.test_react_loop import JOB, RESUME, context_for
 
 from agent.context import TurnContext
@@ -60,7 +60,7 @@ class CheckpointTest(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
-        outcome = await run_turn(context_for(), model=model)
+        outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
         self.assertEqual(outcome.resume["skills"], RESUME["skills"])
         self.assertEqual(outcome.changes, [])
@@ -81,7 +81,7 @@ class CheckpointTest(unittest.IsolatedAsyncioTestCase):
             tool_call("TurnAnswer", {"reply": "I rewrote your summary."}, "3"),
         )
 
-        outcome = await run_turn(spanish_context(), model=model)
+        outcome = await run_turn(spanish_context(), model=model, intent_model=intending())
 
         self.assertEqual(outcome.reply, "I rewrote your summary.")
         self.assertEqual(outcome.resume["summary"], SUMMARY_REWRITE)
@@ -102,7 +102,7 @@ class CheckpointTest(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         model = scripted(tool_call("TurnAnswer", {"reply": "Nothing to change."}, "1"))
 
-        await run_turn(spanish_context(), model=model)
+        await run_turn(spanish_context(), model=model, intent_model=intending())
 
         system_prompt = model.prompts[0][0].content
         self.assertIn("Write `reply` and `warnings` in English (en)", system_prompt)

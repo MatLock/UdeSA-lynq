@@ -59,6 +59,23 @@ FROM trace_span WHERE name IN ('rewrite_summary', 'rewrite_entry',
   AND output LIKE 'REJECTED%'
 GROUP BY reason ORDER BY rejections DESC;
 
+-- What the intent step reads, and how often a turn only answers. A turn read as
+-- `advise` holds no edit tool, so a version written on one is a bug.
+SELECT s.output AS intent, COUNT(*) AS turns,
+       SUM(v.id IS NOT NULL) AS turns_with_a_new_version
+FROM trace_span s
+  JOIN message m ON m.id = s.message_id
+  LEFT JOIN message a ON a.conversation_id = m.conversation_id AND a.seq = m.seq + 1
+  LEFT JOIN resume_version v ON v.produced_by = a.id
+WHERE s.name = 'intent' AND s.kind = 'llm'
+GROUP BY s.output ORDER BY turns DESC;
+
+-- The turns where the intent step could not be read and the turn fell back to
+-- editing. If this is not near zero, the intent prompt needs looking at.
+SELECT conversation_id, created_on, error
+FROM trace_span WHERE name = 'intent' AND kind = 'error'
+ORDER BY created_on DESC LIMIT 20;
+
 -- Cost analytics ----------------------------------------------------------
 
 -- The cost of one conversation comes off the column; no join needed.

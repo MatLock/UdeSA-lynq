@@ -4,6 +4,7 @@ import os
 import re
 import unittest
 
+from agent.context import Intent
 from prompt.resume_tailor import TEMPLATE_DIR, language_name, reference, render
 
 JOB = {
@@ -33,6 +34,7 @@ class RenderTest(unittest.TestCase):
             max_steps=12,
             max_edits=2,
             turns_left=turns_left,
+            intent=Intent.EDIT,
         )
 
     def test_both_providers_have_their_own_template(self) -> None:
@@ -64,7 +66,7 @@ class RenderTest(unittest.TestCase):
 
 class RulesTest(unittest.TestCase):
 
-    def render(self, provider: str) -> str:
+    def render(self, provider: str, intent: str = Intent.EDIT) -> str:
         return render(
             provider,
             job=JOB,
@@ -74,6 +76,7 @@ class RulesTest(unittest.TestCase):
             max_steps=12,
             max_edits=2,
             turns_left=9,
+            intent=intent,
         )
 
     def source(self, provider: str) -> str:
@@ -155,6 +158,7 @@ class RulesTest(unittest.TestCase):
                     max_steps=12,
                     max_edits=2,
                     turns_left=1,
+                    intent=Intent.EDIT,
                 )
             )
 
@@ -256,10 +260,96 @@ class RulesTest(unittest.TestCase):
                 max_steps=12,
                 max_edits=2,
                 turns_left=1,
+                intent=Intent.EDIT,
             )
 
             self.assertIn("last exchange of this conversation", flat(closing))
             self.assertIn("suggest applying with it", flat(closing))
+
+
+class AdviseTest(unittest.TestCase):
+
+    def render(self, provider: str, intent: str) -> str:
+        return render(
+            provider,
+            job=JOB,
+            resume=RESUME,
+            language="es",
+            resume_language="en",
+            max_steps=12,
+            max_edits=2,
+            turns_left=9,
+            intent=intent,
+        )
+
+    def rules_of(self, provider: str, intent: str) -> str:
+        return flat(self.render(provider, intent).partition("<job_posting>")[0])
+
+    def test_both_providers_state_the_same_rules_when_advising(self) -> None:
+        self.assertEqual(
+            self.rules_of("bedrock", Intent.ADVISE),
+            self.rules_of("ollama", Intent.ADVISE),
+        )
+
+    def test_advising_says_the_turn_is_an_answer_not_a_change(self) -> None:
+        for provider in PROVIDERS:
+            rules = self.rules_of(provider, Intent.ADVISE)
+
+            self.assertIn(
+                "This turn the candidate asked you something instead of asking for a "
+                "change",
+                rules,
+            )
+            self.assertIn("The resume stays exactly as they see it", rules)
+
+    def test_advising_hands_over_no_edit_tool_and_no_edit_budget(self) -> None:
+        for provider in PROVIDERS:
+            rules = self.rules_of(provider, Intent.ADVISE)
+
+            self.assertIn("You hold no edit tool this turn", rules)
+            self.assertNotIn("rewrite_summary", rules)
+            self.assertNotIn("EDIT LIMIT REACHED", rules)
+            self.assertNotIn("you may apply at most", rules)
+
+    def test_advising_forbids_claiming_a_change_that_never_happened(self) -> None:
+        for provider in PROVIDERS:
+            rules = self.rules_of(provider, Intent.ADVISE)
+
+            self.assertIn(
+                "Never say, suggest or imply that you changed something", rules
+            )
+            self.assertIn(
+                "What you would change is a recommendation, not something you did",
+                rules,
+            )
+
+    def test_advising_still_closes_with_what_to_do_next(self) -> None:
+        for provider in PROVIDERS:
+            rules = self.rules_of(provider, Intent.ADVISE)
+
+            self.assertIn(
+                "the edits you would apply if they ask for them", rules
+            )
+            self.assertIn("instead of inventing work", rules)
+
+    def test_editing_keeps_the_edit_tools_the_advising_turn_gives_up(self) -> None:
+        for provider in PROVIDERS:
+            rules = self.rules_of(provider, Intent.EDIT)
+
+            self.assertIn("rewrite_summary", rules)
+            self.assertIn("EDIT LIMIT REACHED", rules)
+            self.assertNotIn("You hold no edit tool this turn", rules)
+
+    def test_the_closing_call_names_what_reply_carries_in_each_intent(self) -> None:
+        for provider in PROVIDERS:
+            self.assertIn(
+                "`reply` is what you did and what you could not do",
+                flat(self.render(provider, Intent.EDIT)),
+            )
+            self.assertIn(
+                "`reply` is the answer to what the candidate asked",
+                flat(self.render(provider, Intent.ADVISE)),
+            )
 
 
 class ReferenceTest(unittest.TestCase):

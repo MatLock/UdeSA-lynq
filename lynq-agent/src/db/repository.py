@@ -7,7 +7,7 @@ from decimal import Decimal
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agent.context import SpanRecord, utc_now
+from agent.context import INTENT_SPAN, SpanRecord, utc_now
 from db.models import (
     Conversation,
     ConversationStatus,
@@ -68,6 +68,15 @@ async def find_reply_after(
             Message.seq > seq,
         )
         .order_by(Message.seq)
+        .limit(1)
+    )
+
+
+async def intent_of(session: AsyncSession, message_id: str) -> str | None:
+    return await session.scalar(
+        select(TraceSpan.output)
+        .where(TraceSpan.message_id == message_id, TraceSpan.name == INTENT_SPAN)
+        .order_by(TraceSpan.created_on)
         .limit(1)
     )
 

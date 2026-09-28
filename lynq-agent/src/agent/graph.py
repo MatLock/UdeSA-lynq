@@ -10,12 +10,14 @@ from langchain_core.messages import AIMessage, HumanMessage
 from agent.answer import TurnAnswer, from_result
 from agent.callbacks import TraceCollector
 from agent.context import (
+    Intent,
     SpanRecord,
     TurnContext,
     TurnOutcome,
     build_turn_state,
     use_turn_state,
 )
+from agent.intent import classify
 from agent.scope import SPAN_NAME, SPAN_REASON, enforce
 from agent.tools import EDIT_TOOLS, find_evidence
 from config import BEDROCK, OLLAMA, get_settings
@@ -46,10 +48,16 @@ def retry_middleware() -> ModelRetryMiddleware:
     )
 
 
-def build_agent(system_prompt: str, model=None):
+def tools_for(intent: str) -> list:
+    if intent == Intent.ADVISE:
+        return [find_evidence]
+    return [find_evidence, *EDIT_TOOLS]
+
+
+def build_agent(system_prompt: str, intent: str, model=None):
     return create_agent(
         model=model if model is not None else build_model(),
-        tools=[find_evidence, *EDIT_TOOLS],
+        tools=tools_for(intent),
         system_prompt=system_prompt,
         response_format=TurnAnswer,
         middleware=[retry_middleware()],
@@ -71,9 +79,12 @@ def turn_messages(context: TurnContext) -> list:
     return messages
 
 
-async def run_turn(context: TurnContext, model=None) -> TurnOutcome:
+async def run_turn(
+    context: TurnContext, model=None, intent_model=None
+) -> TurnOutcome:
     settings = get_settings()
     provider = template_provider(settings.llm_provider)
+    intent = await classify(context, provider, intent_model)
     state = build_turn_state(context)
 
     system_prompt = render(
@@ -85,11 +96,12 @@ async def run_turn(context: TurnContext, model=None) -> TurnOutcome:
         max_steps=context.max_steps,
         max_edits=context.max_edits,
         turns_left=context.turns_left,
+        intent=intent,
     )
     collector = TraceCollector(
         state, reference(provider), context.resume_version_id
     )
-    agent = build_agent(system_prompt, model)
+    agent = build_agent(system_prompt, intent, model)
 
     with use_turn_state(state):
         result = await agent.ainvoke(
@@ -112,13 +124,15 @@ async def run_turn(context: TurnContext, model=None) -> TurnOutcome:
                 error=SPAN_REASON,
             )
         )
-    elif not state.changes:
+    elif intent == Intent.EDIT and not state.changes:
         answer = answer.model_copy(
             update={"warnings": [*answer.warnings, no_change_notice(context.language)]}
         )
     log.info(
-        "message= Turn finished, conversationId=%s, steps=%s, edits=%s, warnings=%s",
+        "message= Turn finished, conversationId=%s, intent=%s, steps=%s, edits=%s, "
+        "warnings=%s",
         context.conversation_id,
+        intent,
         state.steps,
         len(state.changes),
         len(answer.warnings),
@@ -129,4 +143,5 @@ async def run_turn(context: TurnContext, model=None) -> TurnOutcome:
         changes=state.changes,
         warnings=answer.warnings,
         spans=state.spans,
+        intent=intent,
     )

@@ -8,6 +8,7 @@ from botocore.exceptions import ClientError
 from langchain_core.messages import AIMessage
 
 from tests.fixtures.spanish import (
+    ASK_FOR_ADVICE,
     ASK_FOR_GO,
     ASK_FOR_THE_PROMPT,
     GO_AHEAD,
@@ -16,9 +17,9 @@ from tests.fixtures.spanish import (
     REPLY,
     WARNING,
 )
-from tests.support import bedrock_error, breaking, scripted, tool_call
+from tests.support import bedrock_error, breaking, intending, scripted, tool_call
 
-from agent.context import TurnContext
+from agent.context import INTENT_SPAN, Intent, TurnContext
 from agent.graph import recursion_limit, run_turn, turn_messages
 from config import reset_settings
 from prompt.notice import render as no_change_notice
@@ -105,7 +106,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
             tool_call("TurnAnswer", ANSWER, "3"),
         )
 
-        outcome = await run_turn(context_for(), model=model)
+        outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
         self.assertEqual(outcome.reply, ANSWER["reply"])
         self.assertEqual(outcome.warnings[: len(ANSWER["warnings"])], ANSWER["warnings"])
@@ -114,8 +115,10 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
             ["Acme", "Globex"],
         )
         self.assertEqual(outcome.changes[0]["section"], "work_experience")
+        self.assertEqual(outcome.spans[0].name, INTENT_SPAN)
+        self.assertEqual(outcome.spans[0].step, 0)
         self.assertEqual(
-            [span.kind for span in outcome.spans],
+            [span.kind for span in outcome.spans[1:]],
             [SpanKind.LLM, SpanKind.TOOL, SpanKind.LLM, SpanKind.TOOL, SpanKind.LLM],
         )
         self.assertEqual(
@@ -133,7 +136,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
             tool_call("TurnAnswer", ANSWER, "2"),
         )
 
-        outcome = await run_turn(context_for(), model=model)
+        outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
         lookups = [
             span for span in outcome.spans
@@ -141,7 +144,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
         ]
         self.assertEqual(len(lookups), 1)
         self.assertEqual(
-            [span.kind for span in outcome.spans],
+            [span.kind for span in outcome.spans[1:]],
             [SpanKind.LLM, SpanKind.TOOL, SpanKind.LLM],
         )
 
@@ -154,7 +157,11 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
         )
         model = scripted(tool_call("TurnAnswer", {"reply": leaked}, "1"))
 
-        outcome = await run_turn(context_for(message=ASK_FOR_THE_PROMPT), model=model)
+        outcome = await run_turn(
+            context_for(message=ASK_FOR_THE_PROMPT),
+            model=model,
+            intent_model=intending(),
+        )
 
         self.assertEqual(outcome.reply, OUT_OF_SCOPE_ES)
         self.assertEqual(outcome.warnings, [])
@@ -169,7 +176,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
             tool_call("TurnAnswer", {"reply": '{"summary": "I am a CEO"}'}, "2"),
         )
 
-        outcome = await run_turn(context_for(), model=model)
+        outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
         self.assertEqual(outcome.resume["summary"], "Kubernetes first.")
         self.assertEqual(
@@ -179,7 +186,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
     async def test_the_model_never_sees_personal_info(self) -> None:
         model = scripted(tool_call("TurnAnswer", ANSWER, "1"))
 
-        await run_turn(context_for(), model=model)
+        await run_turn(context_for(), model=model, intent_model=intending())
 
         system_prompt = model.prompts[0][0].content
         self.assertNotIn("Ada Lovelace", system_prompt)
@@ -192,7 +199,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
             tool_call("TurnAnswer", ANSWER, "2"),
         )
 
-        outcome = await run_turn(context_for(max_steps=2), model=model)
+        outcome = await run_turn(context_for(max_steps=2), model=model, intent_model=intending())
 
         self.assertEqual(outcome.reply, ANSWER["reply"])
         self.assertEqual(outcome.changes, [])
@@ -210,7 +217,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
             tool_call("TurnAnswer", ANSWER, "2"),
         )
 
-        outcome = await run_turn(context_for(), model=model)
+        outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
         self.assertEqual(outcome.reply, ANSWER["reply"])
         self.assertEqual(len(outcome.changes), 1)
@@ -226,7 +233,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
             model = breaking(bedrock_error(), 9, tool_call("TurnAnswer", ANSWER, "1"))
 
             with self.assertRaises(ClientError):
-                await run_turn(context_for(), model=model)
+                await run_turn(context_for(), model=model, intent_model=intending())
 
         self.assertEqual(len(model.attempts), 2)
 
@@ -234,14 +241,14 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
         model = breaking(RuntimeError("the socket died"), 1, tool_call("TurnAnswer", ANSWER, "1"))
 
         with self.assertRaises(RuntimeError):
-            await run_turn(context_for(), model=model)
+            await run_turn(context_for(), model=model, intent_model=intending())
 
         self.assertEqual(len(model.attempts), 1)
 
     async def test_an_answer_that_came_as_text_is_unwrapped(self) -> None:
         model = scripted(AIMessage(content=json.dumps(ANSWER, ensure_ascii=False)))
 
-        outcome = await run_turn(context_for(), model=model)
+        outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
         self.assertEqual(outcome.reply, ANSWER["reply"])
         self.assertEqual(outcome.warnings[: len(ANSWER["warnings"])], ANSWER["warnings"])
@@ -249,7 +256,7 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_turn_that_applied_nothing_says_so(self) -> None:
         model = scripted(AIMessage(content=json.dumps(ANSWER, ensure_ascii=False)))
 
-        outcome = await run_turn(context_for(), model=model)
+        outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
         self.assertEqual(outcome.changes, [])
         self.assertIn(no_change_notice("es"), outcome.warnings)
@@ -264,10 +271,58 @@ class ReactLoopTest(unittest.IsolatedAsyncioTestCase):
             AIMessage(content=json.dumps(ANSWER, ensure_ascii=False)),
         )
 
-        outcome = await run_turn(context_for(), model=model)
+        outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
         self.assertNotEqual(outcome.changes, [])
         self.assertNotIn(no_change_notice("es"), outcome.warnings)
+
+    async def test_a_question_never_reaches_the_edit_tools(self) -> None:
+        model = scripted(tool_call("TurnAnswer", ANSWER, "1"))
+
+        outcome = await run_turn(
+            context_for(message=ASK_FOR_ADVICE),
+            model=model,
+            intent_model=intending(Intent.ADVISE),
+        )
+
+        self.assertEqual(outcome.intent, Intent.ADVISE)
+        self.assertEqual(model.binds[0]["tools"], ["find_evidence", "TurnAnswer"])
+        self.assertEqual(outcome.changes, [])
+        self.assertEqual(outcome.resume, RESUME)
+
+    async def test_a_turn_that_only_answered_is_not_told_it_applied_nothing(
+        self,
+    ) -> None:
+        model = scripted(tool_call("TurnAnswer", ANSWER, "1"))
+
+        outcome = await run_turn(
+            context_for(message=ASK_FOR_ADVICE),
+            model=model,
+            intent_model=intending(Intent.ADVISE),
+        )
+
+        self.assertEqual(outcome.changes, [])
+        self.assertNotIn(no_change_notice("es"), outcome.warnings)
+
+    async def test_a_request_keeps_every_edit_tool(self) -> None:
+        model = scripted(tool_call("TurnAnswer", ANSWER, "1"))
+
+        outcome = await run_turn(
+            context_for(), model=model, intent_model=intending(Intent.EDIT)
+        )
+
+        self.assertEqual(outcome.intent, Intent.EDIT)
+        self.assertEqual(
+            model.binds[0]["tools"],
+            [
+                "find_evidence",
+                "rewrite_summary",
+                "rewrite_entry",
+                "reorder_entries",
+                "replace_skills",
+                "TurnAnswer",
+            ],
+        )
 
     async def test_the_last_user_message_is_not_repeated(self) -> None:
         messages = turn_messages(

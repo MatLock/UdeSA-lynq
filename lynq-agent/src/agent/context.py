@@ -12,6 +12,15 @@ DEFAULT_MAX_EDITS = 2
 PER_MILLION = Decimal("1000000")
 
 
+class Intent:
+    ADVISE = "advise"
+    EDIT = "edit"
+
+
+DEFAULT_INTENT = Intent.EDIT
+INTENT_SPAN = "intent"
+
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -58,6 +67,7 @@ class TurnOutcome:
     changes: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     spans: list[SpanRecord] = field(default_factory=list)
+    intent: str = DEFAULT_INTENT
 
 
 @dataclass

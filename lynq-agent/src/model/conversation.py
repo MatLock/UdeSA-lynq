@@ -64,6 +64,7 @@ class TurnResponse(BaseModel):
     version: int
     status: str
     turns_left: int = Field(alias="turnsLeft")
+    intent: str | None = None
 
 
 class MessageView(BaseModel):

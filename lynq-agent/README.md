@@ -43,8 +43,23 @@ means the turn itself failed — it does not cost the candidate a turn.
 
 ## The turn, inside
 
-`src/agent/graph.py` builds a ReAct loop with `langchain.agents.create_agent` over two
-tools, a system prompt rendered from `resources/prompts/resume_tailor/{bedrock,ollama}.jinja`
+A turn opens with the **intent step**, in `src/agent/intent.py`: one cheap model call
+that reads the message of the candidate together with the last four messages of the
+exchange and answers a single word, `edit` or `advise`. It exists because the agent used
+to treat every message as a request to change the resume — asked *what else do you
+suggest?*, it reordered the experience, rewrote the summary again and reported the work
+as done. An `advise` turn is built with `find_evidence` as its only tool, so the edit
+tools are not merely discouraged, they are not there; the resume cannot change, and the
+prompt tells the model to answer and then recommend rather than to apply. The call is
+the first thing the turn does, it does not spend a step of `AGENT_MAX_STEPS`, and it
+leaves a `step=0` span named `intent` whose output is the word that was read. Anything
+that goes wrong with it — a model that breaks, an answer that says neither word — falls
+back to `edit` and writes a `kind='error'` span: the classifier never takes a turn down,
+and the product keeps doing what it is for. `docs/queries.sql` reads that span back, and
+a `resume_version` written on an `advise` turn would be a bug.
+
+`src/agent/graph.py` then builds a ReAct loop with `langchain.agents.create_agent` over
+its tools, a system prompt rendered from `resources/prompts/resume_tailor/{bedrock,ollama}.jinja`
 and `response_format=TurnAnswer`, which LangChain binds as one more tool with
 `tool_choice="any"`, so the turn ends with the model calling it. When a model breaks
 that format — Ollama does, now and then — the JSON is unwrapped from the text before the
@@ -55,10 +70,11 @@ candidate sees it, and plain prose becomes the reply as it is.
 | `find_evidence(claims)` | Lexical search **in code** over the base resume, never the model judging itself: normalised (lowercase, no accents, no symbols), by prefix for claims of four characters or more and by exact word for the short ones (`Go`, `C#`, `AWS`). It takes up to 20 claims and answers one `{claim, hits}` per claim, each hit a `{path, matched}` with the wording the resume already uses, and it never looks at `personal_info`. The batch is deliberate: a call costs one step whatever it carries, so a turn that looked up eight skills one at a time used to burn eight of its `AGENT_MAX_STEPS` before editing anything |
 | `rewrite_summary(text)` | Replaces the summary |
 | `rewrite_entry(section, index, description, achievements)` | Rewrites the prose of one entry of the experience, the education or the projects |
-| `reorder_entries(section, order)` | Reorders a section without adding or dropping anything |
+| `reorder_entries(section, order)` | Reorders a section without adding or dropping anything. An order that is already the one the section has answers `OK` and records nothing: a turn that "reordered" `[0, 1, 2, 3, 4, 5]` used to show up as a change that moved no line |
 | `replace_skills(technical, tools, soft)` | Replaces the skill buckets it is given, and keeps the ones it is not |
 
-The four edit tools are the only way the resume changes. Each answers `OK` or
+The four edit tools are the only way the resume changes, and an `advise` turn is not
+given them at all. Each answers `OK` or
 `REJECTED: <reason>`, and the reasons are literal and stable because `docs/queries.sql`
 groups by them. They are four rather than one `apply_edit` carrying a free-form payload
 on purpose: Bedrock validates a tool call against the schema it was given, and an
@@ -165,8 +181,8 @@ gets a 409 instead of blocking on the row lock for as long as the loop runs:
    turn in flight (409), an older one is a dead process and gets taken over. The
    conversation flips to `RUNNING` with a fresh `run_token`, the user message is
    inserted, commit.
-2. **The loop**, with no transaction open, under `AGENT_TURN_TIMEOUT - 30s`, so it dies
-   before anyone else can declare it dead.
+2. **The intent step and the loop**, with no transaction open, under
+   `AGENT_TURN_TIMEOUT - 30s`, so they die before anyone else can declare them dead.
 3. **Persist.** `SELECT ... FOR UPDATE` again and compare the `run_token`: if it
    changed, this process is a zombie that another turn already superseded — its orphan
    user message is deleted, a `stale_run` span is written and it answers 502 without
@@ -177,7 +193,8 @@ gets a 409 instead of blocking on the row lock for as long as the loop runs:
    while the base resume is still the current one.
 
 `turn_key` makes a retry safe: with its assistant message already stored the previous
-answer is replayed, and with only the user message stored — the orphan of a process
+answer is replayed — down to the intent, which is read back off the `intent` span of the
+user message rather than guessed — and with only the user message stored — the orphan of a process
 that died between the two transactions — that row is reused and the turn runs again.
 
 The rescue is worth exercising by hand once: take a turn, kill the process between the
