@@ -50,6 +50,8 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 "title": "Senior Backend Engineer", "alreadyApplied": false}}""";
   private static final String STORED_FILE_BODY = """
       {"success": true, "data": {"fileId": "file-1", "uploadUrl": "https://s3.local/put"}}""";
+  private static final String COMPANY_ONLY_REFUSAL_BODY = """
+      {"success": false, "reason": "Only users of type COMPANY can perform this action"}""";
 
   private static final String RESUME_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
   private static final String RESUME_ALIAS_PATH = "/dmz/user/resume/" + RESUME_ID + "/alias";
@@ -710,27 +712,24 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void bouncesACompanyOnlyRelayedRouteWithoutTouchingLynqBackend() throws Exception {
+  void relaysARoleScopedRouteAndPassesLynqBackendsRefusalBack() throws Exception {
+    lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/job/mine"))
+        .respond(response().withStatusCode(403)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(COMPANY_ONLY_REFUSAL_BODY));
+
     HttpResponse<String> response = send("GET", CONTEXT_PATH + "/job/mine", null);
 
     assertThat(response.statusCode(), is(403));
     assertThat(response.body(), containsString("COMPANY"));
-    lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
+    lynqBackendMock.verify(request()
+        .withMethod("GET")
+        .withPath("/dmz/job/mine")
+        .withHeader(AUTHORIZATION_HEADER, "Bearer " + accessToken), VerificationTimes.once());
   }
 
   @Test
-  void bouncesACandidateOnlyRelayedRouteWithoutTouchingLynqBackend() throws Exception {
-    useRoles("R_COMPANY");
-
-    HttpResponse<String> response = send("GET", CONTEXT_PATH + "/user/resume", null);
-
-    assertThat(response.statusCode(), is(403));
-    assertThat(response.body(), containsString("CANDIDATE"));
-    lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
-  }
-
-  @Test
-  void relaysARouteNoRuleCoversWhateverTheRoleIs() throws Exception {
+  void relaysARelayedRouteWhateverTheRoleIs() throws Exception {
     useRoles("R_COMPANY");
     lynqBackendMock.when(request().withMethod("GET").withPath("/dmz/job/018f9c3a/details"))
         .respond(response().withStatusCode(200)
