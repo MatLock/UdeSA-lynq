@@ -310,18 +310,27 @@
   border-radius: var(--radius-chip);
   font-size: 13px;
   font-weight: 500;
+  color: var(--text-h);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
 }
 
-.resume-chips.tone-blue .resume-chip {
-  color: var(--brand-blue-dark);
-  background: var(--accent-blue-bg);
-  border: 1px solid var(--accent-blue-border);
-}
-
-.resume-chips.tone-purple .resume-chip {
+.resume-chips.tone-technical .resume-chip {
   color: var(--brand-purple-dark);
   background: var(--accent-bg);
-  border: 1px solid var(--accent-border);
+  border-color: var(--accent-border);
+}
+
+.resume-chips.tone-tools .resume-chip {
+  color: var(--brand-blue-dark);
+  background: var(--accent-blue-bg);
+  border-color: var(--accent-blue-border);
+}
+
+.resume-chips.tone-soft .resume-chip {
+  color: var(--brand-ochre-dark);
+  background: var(--accent-ochre-bg);
+  border-color: var(--accent-ochre-border);
 }
 
 .resume-skill-groups {

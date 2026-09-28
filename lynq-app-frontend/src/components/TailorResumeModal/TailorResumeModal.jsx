@@ -16,7 +16,7 @@ import downloadFile from '../../utils/downloadFile'
 import requestUuid from '../../utils/requestUuid'
 import formatResumeDate from '../../utils/formatResumeDate'
 import resumeLabel from '../../utils/resumeLabel'
-import resumeChangeRows from '../../utils/resumeChangeRows'
+import resumeChangeSummary from '../../utils/resumeChangeSummary'
 import resumeDiff from '../../utils/resumeDiff'
 import resumeSections from '../../utils/resumeSections'
 import tailorChangedSections from '../../utils/tailorChangedSections'
@@ -32,6 +32,8 @@ const DOCUMENT_VIEW = 'DOCUMENT'
 const DIFF_VIEW = 'DIFF'
 const TIMELINE_VIEW = 'TIMELINE'
 
+const ADVISE = 'advise'
+
 const EXHAUSTED = 'EXHAUSTED'
 const DEFAULT_TEMPLATE = 'MODERN'
 const ALIAS_LENGTH = 8
@@ -40,8 +42,6 @@ const diffLabels = {
   ...strings.pages.resume.labels,
   ...strings.jobDetail.tailorDialog.diff.fields,
 }
-
-const sectionNames = strings.pages.resume.sections
 
 const timeOf = (iso, locale) => {
   const at = new Date(iso)
@@ -135,18 +135,14 @@ const TailorResumeModal = ({
   const previewView = chosenPreviewView ?? (hasDiff ? DIFF_VIEW : DOCUMENT_VIEW)
   const timeline = useMemo(
     () =>
-      conversation.turns.map((entry) => {
-        const turnDiff = resumeDiff.compare(entry.before, entry.after, diffLabels)
-        return {
-          turn: entry.turn,
-          at: entry.at,
-          added: turnDiff.added,
-          removed: turnDiff.removed,
-          moved: turnDiff.moved,
-          rows: resumeChangeRows(turnDiff.groups),
-        }
-      }),
-    [conversation.turns],
+      conversation.turns.map((entry) => ({
+        turn: entry.turn,
+        at: entry.at,
+        intent: entry.intent,
+        message: entry.message,
+        lines: resumeChangeSummary.linesOf(entry, t.timeline.summary),
+      })),
+    [conversation.turns, t.timeline.summary],
   )
   const canApply =
     Boolean(shownResume) && (conversation.version > 0 || isExhausted) && !busy
@@ -372,16 +368,6 @@ const TailorResumeModal = ({
             className={`tailor-resume-message is-${message.role}`}
           >
             <p className="tailor-resume-bubble">{message.content}</p>
-            {message.warnings?.length > 0 && (
-              <div className="tailor-resume-warnings">
-                <span className="tailor-resume-warnings-title">{t.warningsTitle}</span>
-                <ul>
-                  {message.warnings.map((warning) => (
-                    <li key={warning}>{warning}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
         ))}
         {conversation.thinking && (
@@ -470,39 +456,6 @@ const TailorResumeModal = ({
     </div>
   )
 
-  const renderTimelineRow = (row, index) => (
-    <li className={`tailor-resume-timeline-row is-${row.kind}`} key={`${row.field}-${index}`}>
-      <span className="tailor-resume-timeline-place">
-        <span className={`tailor-resume-timeline-kind is-${row.kind}`}>
-          {t.timeline[row.kind]}
-        </span>
-        {[sectionNames[row.section], row.entry, row.field]
-          .filter(Boolean)
-          .filter((part, index, parts) => parts.indexOf(part) === index)
-          .join(' · ')}
-      </span>
-      <span className="tailor-resume-timeline-values">
-        {row.kind === 'moved' && (
-          <span className="tailor-resume-timeline-value is-after">
-            {t.diff.movedText.replace('{from}', row.from).replace('{to}', row.to)}
-          </span>
-        )}
-        {row.before && (
-          <span className="tailor-resume-timeline-value is-before">{row.before.text}</span>
-        )}
-        {row.before && row.after && (
-          <span className="tailor-resume-timeline-arrow">
-            <span aria-hidden="true">→</span>
-            <span className="tailor-resume-reader-only">{t.timeline.arrow}</span>
-          </span>
-        )}
-        {row.after && (
-          <span className="tailor-resume-timeline-value is-after">{row.after.text}</span>
-        )}
-      </span>
-    </li>
-  )
-
   const renderTimeline = () => {
     if (timeline.length === 0) {
       return <p className="tailor-resume-timeline-empty">{t.timeline.empty}</p>
@@ -518,26 +471,41 @@ const TailorResumeModal = ({
                 <span className="tailor-resume-timeline-turn-label">
                   {t.timeline.turn.replace('{turn}', entry.turn)}
                 </span>
+                {t.timeline.intent[entry.intent] && (
+                  <span
+                    className={`tailor-resume-timeline-intent is-${entry.intent}`}
+                  >
+                    {t.timeline.intent[entry.intent]}
+                  </span>
+                )}
                 <span className="tailor-resume-timeline-time">
                   {timeOf(entry.at, activeLocale)}
                 </span>
-                <span className="tailor-resume-changes-counts">
-                  <span className="tailor-resume-view-count is-added">+{entry.added}</span>
-                  <span className="tailor-resume-view-count is-removed">
-                    −{entry.removed}
-                  </span>
-                  {entry.moved > 0 && (
-                    <span className="tailor-resume-view-count is-moved">
-                      ⇅{entry.moved}
-                    </span>
-                  )}
-                </span>
               </div>
-              {entry.rows.length === 0 ? (
-                <p className="tailor-resume-timeline-empty">{t.timeline.noChanges}</p>
+
+              <p className="tailor-resume-timeline-asked">
+                <span className="tailor-resume-timeline-asked-label">
+                  {t.timeline.asked}
+                </span>
+                {entry.message}
+              </p>
+
+              {entry.lines.length === 0 ? (
+                <p className="tailor-resume-timeline-none">
+                  {entry.intent === ADVISE
+                    ? t.timeline.answered
+                    : t.timeline.noChanges}
+                </p>
               ) : (
-                <ul className="tailor-resume-timeline-rows">
-                  {entry.rows.map(renderTimelineRow)}
+                <ul className="tailor-resume-timeline-lines">
+                  {entry.lines.map((line, index) => (
+                    <li
+                      className="tailor-resume-timeline-line"
+                      key={`${entry.turn}-${index}`}
+                    >
+                      {line}
+                    </li>
+                  ))}
                 </ul>
               )}
             </div>
@@ -556,13 +524,19 @@ const TailorResumeModal = ({
       {(hasDiff || timeline.length > 0) && renderPreviewToggle()}
 
       {previewView === DIFF_VIEW && (
-        <div className="tailor-resume-document">
-          <ResumeDiff groups={diff.groups} />
-        </div>
+        <>
+          <p className="tailor-resume-view-caption">{t.diff.diffCaption}</p>
+          <div className="tailor-resume-document">
+            <ResumeDiff groups={diff.groups} />
+          </div>
+        </>
       )}
 
       {previewView === TIMELINE_VIEW && (
-        <div className="tailor-resume-document">{renderTimeline()}</div>
+        <>
+          <p className="tailor-resume-view-caption">{t.timeline.caption}</p>
+          <div className="tailor-resume-document">{renderTimeline()}</div>
+        </>
       )}
 
       {previewView === DOCUMENT_VIEW && (

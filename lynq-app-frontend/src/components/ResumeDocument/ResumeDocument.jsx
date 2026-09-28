@@ -58,9 +58,11 @@ const ResumeDocument = ({ resume, sections }) => {
   const personalInfo = resume?.personal_info ?? {}
   const links = personalInfo.links ?? {}
 
-  // Chip row shared by skills, languages and per-entry technology lists.
-  const renderChips = (items, tone) => (
-    <ul className={`resume-chips tone-${tone}`}>
+  // Chip row shared by skills, languages and per-entry technology lists. The
+  // three skill buckets each carry their own tone; a list without one — the
+  // technologies of an entry, which nothing classifies — stays neutral.
+  const renderChips = (items, tone = '') => (
+    <ul className={tone ? `resume-chips tone-${tone}` : 'resume-chips'}>
       {items.map((item) => (
         <li key={item} className="resume-chip">
           {item}
@@ -182,7 +184,7 @@ const ResumeDocument = ({ resume, sections }) => {
               {entriesOf(job.technologies).length > 0 && (
                 <div className="resume-entry-block">
                   <p className="resume-entry-block-title">{t.labels.technologies}</p>
-                  {renderChips(entriesOf(job.technologies), 'blue')}
+                  {renderChips(entriesOf(job.technologies))}
                 </div>
               )}
             </article>
@@ -229,7 +231,7 @@ const ResumeDocument = ({ resume, sections }) => {
           ({ key, label }) => (
             <div className="resume-skill-group" key={key}>
               <p className="resume-entry-block-title">{t.labels[label]}</p>
-              {renderChips(entriesOf(resume.skills[key]), key === 'soft' ? 'purple' : 'blue')}
+              {renderChips(entriesOf(resume.skills[key]), key)}
             </div>
           ),
         )}
@@ -296,7 +298,7 @@ const ResumeDocument = ({ resume, sections }) => {
               <p className="resume-card-title">{project.name}</p>
               <RichText text={project.description} className="resume-card-meta" />
               {entriesOf(project.technologies).length > 0 &&
-                renderChips(entriesOf(project.technologies), 'blue')}
+                renderChips(entriesOf(project.technologies))}
               {hasText(project.url) && (
                 <a
                   className="resume-link"

@@ -92,12 +92,12 @@
   border-radius: 50%;
 }
 
-.tone-blue .account-type-icon {
+.account-type-card.tone-blue .account-type-icon {
   background: rgb(var(--brand-teal-rgb) / 0.16);
   color: var(--brand-blue-dark);
 }
 
-.tone-purple .account-type-icon {
+.account-type-card.tone-purple .account-type-icon {
   background: rgb(var(--brand-violet-rgb) / 0.1);
   color: var(--brand-purple);
 }

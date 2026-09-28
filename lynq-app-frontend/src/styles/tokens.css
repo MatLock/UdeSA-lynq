@@ -33,9 +33,12 @@
   --brand-blue: var(--level-ingest);
   --brand-blue-dark: #085669;
   --brand-blue-light: #4a9bb0;
+  --brand-ochre: var(--level-snapshot);
+  --brand-ochre-dark: #6b4f0f;
 
   --brand-teal-rgb: 11 110 134;
   --brand-violet-rgb: 109 63 160;
+  --brand-ochre-rgb: 127 95 18;
   --wash-teal: #e8f0f3;
   --wash-violet: #efe9f5;
 
@@ -54,6 +57,8 @@
   --accent-border: rgb(var(--brand-violet-rgb) / 0.5);
   --accent-blue-bg: var(--level-ingest-wash);
   --accent-blue-border: rgb(var(--brand-teal-rgb) / 0.5);
+  --accent-ochre-bg: var(--level-snapshot-wash);
+  --accent-ochre-border: rgb(var(--brand-ochre-rgb) / 0.5);
 
   --score-red: #9b3324;
   --score-orange: #a8620f;

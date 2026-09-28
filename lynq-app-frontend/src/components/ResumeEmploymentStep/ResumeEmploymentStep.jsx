@@ -308,7 +308,6 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
                   id={`resume-achievements-${index}`}
                   value={entry.achievements}
                   placeholder={tw.achievementsPlaceholder}
-                  tone="purple"
                   onChange={(value) => jobs.patch(index, 'achievements', value)}
                 />
               </ResumeField>
@@ -348,7 +347,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
                 id={`resume-skills-${group}`}
                 value={skills[group]}
                 placeholder={tw[`${group}Placeholder`]}
-                tone={group === 'soft' ? 'purple' : 'blue'}
+                tone={group}
                 onChange={(value) =>
                   setSkills((prev) => ({ ...prev, [group]: value }))
                 }
