@@ -167,6 +167,13 @@ class JudgePromptTest(unittest.TestCase):
     def test_the_posting_is_not_evidence(self) -> None:
         self.assertIn("The resume is the only evidence. The posting is not", rendered_judge())
 
+    def test_it_has_to_quote_the_resume_before_approving(self) -> None:
+        prompt = rendered_judge()
+
+        self.assertIn("quote it in `evidence`", prompt)
+        self.assertIn("You may only approve a part whose `evidence` you quoted", prompt)
+        self.assertIn("A technology listed in the `technologies` of an entry", prompt)
+
     def test_the_reason_is_written_for_the_candidate_in_their_language(self) -> None:
         self.assertIn("Write each `reason` in Spanish (es)", rendered_judge())
         self.assertIn("not written in English (en), the language the resume is written in", rendered_judge())

@@ -56,6 +56,17 @@ class JudgeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(rejections, [f"summary: {JUDGE_REASON_ES}"])
         self.assertEqual((rejections[0].section, rejections[0].kind), ("summary", "invented"))
 
+    async def test_the_quoted_evidence_travels_in_the_trace(self) -> None:
+        model = scripted(tool_call("Verdict", {"parts": [
+            {"id": "entry:0", "evidence": "Built services deployed on Kubernetes.", "ok": True},
+        ]}, "1"))
+
+        state, _, approved, _, _ = await self.run_judge(model)
+
+        self.assertIn("entry:0", approved)
+        span = [s for s in state.spans if s.kind == SpanKind.LLM][0]
+        self.assertIn("Built services deployed on Kubernetes.", span.output or "")
+
     async def test_a_part_the_judge_did_not_answer_is_not_approved(self) -> None:
         model = scripted(tool_call("Verdict", {"parts": [{"id": "summary", "ok": True}]}, "1"))
 

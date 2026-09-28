@@ -26,6 +26,13 @@ The resume is the only evidence. The posting is not: a skill the posting asks fo
 not thereby something the candidate has. Judge each part on its own; approving one does
 not approve another.
 
+Before you decide on a part, look for its backing and quote it in `evidence`: the words
+of the resume — its summary, the `description`, `achievements` and `technologies` of an
+entry, its `skills` — that say what the change says. A technology listed in the
+`technologies` of an entry, or named in its description, is backed for that entry and for
+the summary and the skills. You may only approve a part whose `evidence` you quoted; a
+part with nothing to quote is rejected.
+
 Write each `reason` in {{ language }}, in one sentence the candidate can read: what the
 change claimed and why the resume does not support it. Leave `reason` and `kind` empty
 for a part you approve.
@@ -46,8 +53,8 @@ for a part you approve.
 </proposed_changes>
 
 Answer by calling `Verdict` once, with one entry in `parts` for every part above, by its
-`id`: `ok`, `kind` and `reason`.
+`id`: `evidence`, `ok`, `kind` and `reason`.
 {% if provider == 'ollama' %}
 If you cannot call it, answer with that same object as JSON and nothing else:
-{"parts": [{"id": "summary", "ok": false, "kind": "invented", "reason": "..."}]}
+{"parts": [{"id": "summary", "evidence": "...", "ok": false, "kind": "invented", "reason": "..."}]}
 {% endif %}

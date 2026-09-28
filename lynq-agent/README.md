@@ -136,6 +136,13 @@ ways of breaking it:
 | `padding` | much more text than the original, not a rephrasing |
 | `dropped_skill` | a bucket that leaves out a skill the current one has: a bucket may be reordered and grown, never shrunk |
 
+The judge has to **quote before it decides**: for every part it copies into `evidence`
+the words of the resume that back the change, and it may only approve what it quoted. A
+model that has to find the sentence is far less likely to say "the resume does not
+mention Kubernetes" when the Acme entry lists it — which is exactly what `qwen2.5:7b` did
+before this field existed. The quote stays in the trace, so a wrong verdict can be
+checked against what the judge thought it saw.
+
 The judge reads short texts and answers yes or no, so it runs on a cheaper model —
 `BEDROCK_JUDGE_MODEL_ID`, Nova Lite by default in `set_env.sh` — and its spans are
 priced with that model's sheet. A part the judge leaves out of its answer is **not**

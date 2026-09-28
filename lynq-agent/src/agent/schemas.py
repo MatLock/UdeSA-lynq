@@ -97,6 +97,10 @@ class Advice(BaseModel):
 
 class PartVerdict(BaseModel):
     id: str = Field(default="", description="The id of the part, as given")
+    evidence: str = Field(
+        default="",
+        description="The words of the resume that back the change, quoted; empty when nothing does",
+    )
     ok: bool = Field(default=False, description="true when the resume supports the change")
     kind: str = Field(
         default="",
