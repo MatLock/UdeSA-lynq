@@ -75,8 +75,11 @@ graph TD;
 	classDef last fill:#bfb6fc
 ```
 
+![The turn graph](docs/turn-graph.png)
+
 `python scripts/draw_turn_graph.py` prints that diagram from the compiled graph, so it
-never drifts from the code. `TurnGraphState` is what flows between the nodes: the
+never drifts from the code; `python scripts/draw_turn_graph.py --png` renders
+`docs/turn-graph.png` from it, for the thesis. `TurnGraphState` is what flows between the nodes: the
 context and the turn state the service built, the model handles, and what each node
 leaves for the next — the intent, the thread, the proposal, the rejections and how many
 passes the guard has made.
