@@ -127,6 +127,15 @@ the token carries. A caller without the role gets `403` with the usual `ErrorRes
 (`AccessDeniedException` is handled in `ControllerExceptionHandler`); the candidate/company axis
 lives in `lynq-iam` and reaches this service only in the token's `roles` claim.
 
+This service is the place the role is decided. lynq-bff used to mirror the same rules in a table of
+method + path templates and bounce a doomed request before it cost a hop; that table is gone, because
+a copy of an authorization rule is a copy that drifts. `DmzRoleContractTest` is what took its place:
+it scans every `@RestController` under `/dmz` and fails the build on an endpoint that names no role,
+unless the route is listed as one that needs none — `OPEN_TO_EVERY_CALLER` for what any signed-in
+caller may reach, `AUTHORIZED_BY_OWNERSHIP` for what the service authorizes by who owns the row
+("only the owner of the job post can close it"). A listed route that no longer exists fails the build
+too, so the list cannot rot into a wishlist.
+
 > The `lynq-request-uuid` header is forwarded on every downstream call to `lynq-iam` and `lynq-ml`, so a single logical request can be traced across all services by its UUID.
 
 ---
