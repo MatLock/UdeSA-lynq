@@ -302,6 +302,7 @@ class ConversationService:
                 version=_number_of(version),
                 status=conversation.status,
                 turns_left=self._turns_left(conversation),
+                intent=outcome.intent,
             )
 
     async def _version_of(
@@ -437,6 +438,7 @@ class ConversationService:
             version=_number_of(current),
             status=conversation.status,
             turns_left=self._turns_left(conversation),
+            intent=await repository.intent_of(session, existing.id),
         )
 
     async def _owned(

@@ -302,6 +302,19 @@ class EditToolsTest(unittest.IsolatedAsyncioTestCase):
             ["Acme", "Globex"],
         )
 
+    async def test_a_reorder_that_moves_nothing_is_not_a_change(self) -> None:
+        state = state_for()
+        answer = await self.call(
+            state, reorder_entries, section="work_experience", order=[0, 1]
+        )
+
+        self.assertEqual(answer, "OK")
+        self.assertEqual(state.changes, [])
+        self.assertEqual(
+            [entry["company"] for entry in state.resume["work_experience"]],
+            ["Globex", "Acme"],
+        )
+
     async def test_only_prose_fields_are_editable(self) -> None:
         state = state_for()
         answer = await self.call(

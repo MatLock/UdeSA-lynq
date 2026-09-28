@@ -347,6 +347,8 @@ def _reorder(state: TurnState, section: str, entries: list[Any], order: list[int
             f"order must list each of the {len(entries)} positions of {section} "
             f"exactly once, from 0 to {len(entries) - 1}"
         )
+    if order == sorted(order):
+        return OK
 
     state.resume[section] = [entries[position] for position in order]
     return _record_change(state, section, "reorder", f"reordered {section} as {order}")

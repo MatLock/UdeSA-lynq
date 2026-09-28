@@ -288,25 +288,6 @@
   font-style: italic;
 }
 
-.tailor-resume-warnings {
-  padding: 10px 14px;
-  font-size: 14px;
-  color: var(--text);
-  background: var(--accent-bg);
-  border: 1px solid var(--accent-border);
-  border-radius: var(--radius-bubble);
-}
-
-.tailor-resume-warnings ul {
-  margin: 4px 0 0;
-  padding-left: 18px;
-}
-
-.tailor-resume-warnings-title {
-  font-weight: 700;
-  color: var(--text-h);
-}
-
 .tailor-resume-composer {
   display: flex;
   gap: 8px;
@@ -408,9 +389,10 @@
   opacity: 0.85;
 }
 
-.tailor-resume-changes-counts {
-  display: flex;
-  gap: 8px;
+.tailor-resume-view-caption {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-muted);
 }
 
 .tailor-resume-document {
@@ -419,17 +401,6 @@
   overflow-y: auto;
   background: var(--surface-page);
   border: 1px solid var(--border);
-}
-
-.tailor-resume-reader-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 
 .tailor-resume-timeline {
@@ -489,104 +460,64 @@
 }
 
 .tailor-resume-timeline-time {
+  margin-left: auto;
   font-family: var(--mono);
   font-size: 12px;
   color: var(--ink-muted);
 }
 
-.tailor-resume-timeline-header .tailor-resume-changes-counts {
-  margin-left: auto;
+.tailor-resume-timeline-intent {
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+  border: 1px solid currentcolor;
+  border-radius: var(--radius-chip);
 }
 
-.tailor-resume-timeline-rows {
+.tailor-resume-timeline-intent.is-edit {
+  color: var(--action);
+}
+
+.tailor-resume-timeline-asked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.tailor-resume-timeline-asked-label {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+
+.tailor-resume-timeline-lines {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.tailor-resume-timeline-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 10px;
+.tailor-resume-timeline-line {
+  padding: 6px 10px;
   font-size: 14px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--border);
-  border-radius: var(--radius-square);
-}
-
-.tailor-resume-timeline-row.is-added {
-  border-left-color: var(--success-ink);
-}
-
-.tailor-resume-timeline-row.is-removed {
-  border-left-color: var(--danger-ink);
-}
-
-.tailor-resume-timeline-row.is-rewritten {
-  border-left-color: var(--action);
-}
-
-.tailor-resume-timeline-place {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--ink-muted);
-}
-
-.tailor-resume-timeline-kind {
-  padding: 1px 6px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border: 1px solid currentcolor;
-  border-radius: var(--radius-square);
-}
-
-.tailor-resume-timeline-kind.is-added {
-  color: var(--success-ink);
-}
-
-.tailor-resume-timeline-kind.is-removed {
-  color: var(--danger-ink);
-}
-
-.tailor-resume-timeline-kind.is-rewritten {
-  color: var(--action);
-}
-
-.tailor-resume-timeline-values {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
   color: var(--text);
+  background: var(--surface-sunken);
+  border-left: 3px solid var(--action);
 }
 
-.tailor-resume-timeline-value {
-  min-width: 0;
-}
-
-.tailor-resume-timeline-value.is-before {
-  color: var(--ink-muted);
-  text-decoration: line-through;
-  text-decoration-color: var(--danger-ink);
-}
-
-.tailor-resume-timeline-value.is-after {
-  font-weight: 600;
-}
-
-.tailor-resume-timeline-arrow {
-  flex: none;
-  font-family: var(--mono);
+.tailor-resume-timeline-none {
+  margin: 0;
+  font-size: 14px;
   color: var(--ink-muted);
 }
 

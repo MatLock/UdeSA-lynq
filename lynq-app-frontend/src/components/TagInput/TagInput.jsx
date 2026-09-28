@@ -10,7 +10,7 @@ import './TagInput.css'
 //
 // Controlled by `value` + `onChange`: the list belongs to the step's form state,
 // only the half-typed text is local.
-const TagInput = ({ id, value, onChange, placeholder, tone = 'blue' }) => {
+const TagInput = ({ id, value, onChange, placeholder, tone = '' }) => {
   const t = strings.pages.resume.create
   const [draft, setDraft] = useState('')
 
@@ -41,7 +41,7 @@ const TagInput = ({ id, value, onChange, placeholder, tone = 'blue' }) => {
   return (
     <div className="tag-input">
       {value.length > 0 && (
-        <ul className={`tag-input-chips tone-${tone}`}>
+        <ul className={tone ? `tag-input-chips tone-${tone}` : 'tag-input-chips'}>
           {value.map((item) => (
             <li key={item} className="tag-input-chip">
               {item}

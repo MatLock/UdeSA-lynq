@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 
 from tests.support import JOB, RESUME, STUB_REPLY, TemporaryDatabase, stub_loop
 
-from agent.context import SpanRecord, TurnOutcome
+from agent.context import Intent, SpanRecord, TurnOutcome
 from client.lynq_ml_client import SkillExtractionFailed
 from config import Settings, reset_settings
 from db import repository
@@ -196,7 +196,7 @@ class ConversationServiceTest(unittest.IsolatedAsyncioTestCase):
         conversation = await self._conversation(created.conversation_id)
         self.assertEqual(conversation.turn_count, 1)
         self.assertIsNone(conversation.run_token)
-        self.assertEqual(conversation.llm_calls, 1)
+        self.assertEqual(conversation.llm_calls, 2)
         self.assertGreater(conversation.total_prompt_tokens, 0)
         self.assertGreater(conversation.cost_usd, Decimal("0"))
 
@@ -207,7 +207,7 @@ class ConversationServiceTest(unittest.IsolatedAsyncioTestCase):
         )
 
         spans = await self._spans(created.conversation_id)
-        self.assertEqual(len(spans), 2)
+        self.assertEqual(len(spans), 3)
         self.assertTrue(all(s.message_id == messages[1].id for s in spans))
 
         self.assertEqual(await self._count(ResumeVersion), 1)
@@ -279,6 +279,17 @@ class ConversationServiceTest(unittest.IsolatedAsyncioTestCase):
         conversation = await self._conversation(created.conversation_id)
         self.assertEqual(conversation.turn_count, 1)
         self.assertEqual(await self._count(Message), 3)
+
+    async def test_a_replayed_turn_recovers_the_intent_it_was_read_with(self) -> None:
+        service = self.service()
+        created = await self._create(service)
+        request = TurnRequest(message="Go", turnKey="k1")
+
+        first = await service.turn(created.conversation_id, request, USER)
+        replay = await service.turn(created.conversation_id, request, USER)
+
+        self.assertEqual(first.intent, Intent.EDIT)
+        self.assertEqual(replay.intent, Intent.EDIT)
 
     async def test_an_orphan_user_message_is_reused(self) -> None:
         service = self.service()

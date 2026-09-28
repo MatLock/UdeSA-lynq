@@ -128,7 +128,7 @@ const useTailorConversation = (jobId) => {
         )
         setMessages((previous) => [
           ...previous,
-          { role: 'assistant', content: answer.reply, warnings: answer.warnings ?? [] },
+          { role: 'assistant', content: answer.reply },
         ])
         const before = resumeRef.current
         resumeRef.current = answer.resume
@@ -140,6 +140,8 @@ const useTailorConversation = (jobId) => {
             turn: previous.length + 1,
             at: new Date().toISOString(),
             message: text,
+            intent: answer.intent ?? '',
+            changes: answer.changes ?? [],
             before,
             after: answer.resume,
           },

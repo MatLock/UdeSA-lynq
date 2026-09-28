@@ -10,7 +10,7 @@ from tests.support import scripted, tool_call
 from tests.test_react_loop import JOB, RESUME, context_for
 
 from agent.answer import TurnAnswer
-from agent.context import build_turn_state, use_turn_state
+from agent.context import Intent, build_turn_state, use_turn_state
 from agent.graph import build_agent, recursion_limit
 from config import get_settings, reset_settings
 from llm.factory import build_model
@@ -38,6 +38,7 @@ def live_system_prompt(context) -> str:
         max_steps=context.max_steps,
         max_edits=context.max_edits,
         turns_left=context.turns_left,
+        intent=Intent.EDIT,
     )
 
 
@@ -50,7 +51,7 @@ class ToolChoiceTest(unittest.IsolatedAsyncioTestCase):
     async def test_the_agent_forces_a_tool_call_and_turn_answer_is_one_of_them(self) -> None:
         model = scripted(tool_call("TurnAnswer", {"reply": "listo"}, "1"))
 
-        agent = build_agent("rules", model)
+        agent = build_agent("rules", Intent.EDIT, model)
         await agent.ainvoke({"messages": [("user", "go ahead")]})
 
         binding = model.binds[0]
@@ -72,7 +73,7 @@ class ToolChoiceTest(unittest.IsolatedAsyncioTestCase):
             tool_call("TurnAnswer", {"reply": "listo", "warnings": ["no Go"]}, "1")
         )
 
-        agent = build_agent("rules", model)
+        agent = build_agent("rules", Intent.EDIT, model)
         result = await agent.ainvoke({"messages": [("user", "go ahead")]})
 
         answer = result["structured_response"]
@@ -95,7 +96,7 @@ class BedrockToolChoiceTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_real_turn_closes_with_the_turn_answer_tool_call(self) -> None:
         context = context_for()
         state = build_turn_state(context)
-        agent = build_agent(live_system_prompt(context), build_model())
+        agent = build_agent(live_system_prompt(context), Intent.EDIT, build_model())
 
         with use_turn_state(state):
             result = await agent.ainvoke(

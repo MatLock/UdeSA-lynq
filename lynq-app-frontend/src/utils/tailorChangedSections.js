@@ -23,3 +23,4 @@ const tailorChangedSections = (changes) => [
 ]
 
 export default tailorChangedSections
+export { documentSectionOf }

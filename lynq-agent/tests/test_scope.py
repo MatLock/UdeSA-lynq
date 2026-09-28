@@ -5,6 +5,7 @@ import unittest
 from tests.fixtures.spanish import OUT_OF_SCOPE_ES
 
 from agent.answer import TurnAnswer
+from agent.context import Intent
 from agent.scope import enforce, instructions_of, leaks
 from prompt.refusal import render as refusal
 from prompt.resume_tailor import render
@@ -30,6 +31,7 @@ def system_prompt() -> str:
         max_steps=12,
         max_edits=2,
         turns_left=9,
+        intent=Intent.EDIT,
     )
 
 
