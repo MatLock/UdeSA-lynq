@@ -288,6 +288,29 @@
   font-style: italic;
 }
 
+.tailor-resume-line {
+  margin: 0;
+}
+
+.tailor-resume-speaker {
+  font-weight: 600;
+}
+
+/* What the code could not apply, under the reply it belongs to: the chat never
+   promises what the document beside it does not say. */
+.tailor-resume-warnings {
+  margin: 8px 0 0;
+  padding: 6px 0 0 12px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.tailor-resume-warnings li + li {
+  margin-top: 4px;
+}
+
 .tailor-resume-composer {
   display: flex;
   gap: 8px;

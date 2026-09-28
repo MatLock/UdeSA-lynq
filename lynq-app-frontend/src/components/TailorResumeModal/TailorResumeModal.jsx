@@ -8,6 +8,7 @@ import ResumeDiff from '../ResumeDiff/ResumeDiff.jsx'
 import ResumeDocument from '../ResumeDocument/ResumeDocument.jsx'
 import Spinner from '../Spinner/Spinner.jsx'
 import useApi from '../../hooks/useApi'
+import useAuth from '../../hooks/useAuth'
 import useModalDialog from '../../hooks/useModalDialog'
 import useRotatingPhrase from '../../hooks/useRotatingPhrase'
 import useTailorConversation from '../../hooks/useTailorConversation'
@@ -61,6 +62,9 @@ const TailorResumeModal = ({
   onClose,
 }) => {
   const t = strings.jobDetail.tailorDialog
+  const { user } = useAuth()
+  const speakerOf = (role) =>
+    role === 'user' ? user?.fullName?.trim() || t.speaker.you : t.speaker.assistant
   const td = strings.jobDetail
   const { authFetch, freshAuthFetch } = useApi()
   const conversation = useTailorConversation(jobId)
@@ -367,12 +371,27 @@ const TailorResumeModal = ({
             key={`${message.role}-${index}`}
             className={`tailor-resume-message is-${message.role}`}
           >
-            <p className="tailor-resume-bubble">{message.content}</p>
+            <div className="tailor-resume-bubble">
+              <p className="tailor-resume-line">
+                <span className="tailor-resume-speaker">{speakerOf(message.role)}:</span>{' '}
+                {message.content}
+              </p>
+              {message.warnings?.length > 0 && (
+                <ul className="tailor-resume-warnings">
+                  {message.warnings.map((warning, position) => (
+                    <li key={position}>{warning}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         ))}
         {conversation.thinking && (
           <div className="tailor-resume-message is-assistant">
-            <p className="tailor-resume-bubble is-thinking">{thinkingPhrase}</p>
+            <p className="tailor-resume-bubble is-thinking">
+              <span className="tailor-resume-speaker">{speakerOf('assistant')}:</span>{' '}
+              {thinkingPhrase}
+            </p>
           </div>
         )}
       </div>

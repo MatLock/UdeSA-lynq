@@ -114,6 +114,7 @@ class Message(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     turn_key: Mapped[str | None] = mapped_column(String(36), nullable=True)
     warnings: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    recommendations: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_on: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     __table_args__ = (

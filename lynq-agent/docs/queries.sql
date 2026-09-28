@@ -50,14 +50,37 @@ SELECT m.seq, COUNT(*) AS steps, SUM(s.prompt_tokens) AS in_tk,
 FROM trace_span s JOIN message m ON m.id = s.message_id
 WHERE s.conversation_id = '3f8a1c2e-...' GROUP BY m.seq ORDER BY m.seq;
 
--- How much the model tries to invent, across every conversation. A quality
--- metric for the prompt: if it drops while iterating, the prompt is improving.
-SELECT COUNT(*) AS rejections,
-       SUBSTRING_INDEX(output, ': ', -1) AS reason
-FROM trace_span WHERE name IN ('rewrite_summary', 'rewrite_entry',
-                               'reorder_entries', 'replace_skills')
-  AND output LIKE 'REJECTED%'
-GROUP BY reason ORDER BY rejections DESC;
+-- How much the editing agent proposes that the judge does not let in, across
+-- every conversation, by kind. A quality metric for the edit prompt: if it
+-- drops while iterating, the prompt is improving. The `apply` span answers OK
+-- or the JSON list of rejections, each one `{where, kind}`.
+SELECT COUNT(*) AS rejections, r.kind
+FROM trace_span s
+  JOIN JSON_TABLE(s.output, '$[*]' COLUMNS (kind VARCHAR(32) PATH '$.kind')) r
+WHERE s.name = 'apply' AND s.output <> 'OK'
+GROUP BY r.kind ORDER BY rejections DESC;
+
+-- The turns where the editing agent had to correct itself: two apply spans on
+-- one message. The second one says whether the correction held.
+SELECT m.conversation_id, m.seq, COUNT(*) AS passes,
+       MAX(CASE WHEN s.output = 'OK' THEN 1 ELSE 0 END) AS ended_clean
+FROM trace_span s JOIN message m ON m.id = s.message_id
+WHERE s.name = 'apply'
+GROUP BY m.conversation_id, m.seq HAVING passes > 1
+ORDER BY m.conversation_id, m.seq;
+
+-- What the judge said, verbatim: its model span is the second `model` span of
+-- an edit turn, and its input names the template (judge@...).
+SELECT m.seq, LEFT(s.output, 200) AS verdict, s.prompt_tokens, s.cost_usd
+FROM trace_span s JOIN message m ON m.id = s.message_id
+WHERE s.conversation_id = '3f8a1c2e-...' AND s.kind = 'llm' AND s.input LIKE '%"prompt": "judge@%'
+ORDER BY s.created_on;
+
+-- The recommendations the advising agent left on a reply, the ones "do the
+-- second one" refers to in the next turn.
+SELECT seq, JSON_PRETTY(recommendations) FROM message
+WHERE conversation_id = '3f8a1c2e-...' AND recommendations IS NOT NULL
+ORDER BY seq;
 
 -- What the intent step reads, and how often a turn only answers. A turn read as
 -- `advise` holds no edit tool, so a version written on one is a bug.

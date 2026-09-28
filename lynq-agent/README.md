@@ -1,8 +1,9 @@
 # lynq-agent
 
 CV Tailor: the conversational agent that adapts a candidate's resume to a concrete
-job posting. FastAPI + LangChain (ReAct loop), MySQL for the conversation and its
-traces.
+job posting. FastAPI, a LangGraph of four agents — intent, advise, edit, judge — where the
+code decides only where a change goes and the judge decides whether it may, and MySQL
+for the conversation and its traces.
 
 The service listens on **8090** (8089 belongs to `lynq-feeders`) and exposes two
 prefixes: `/lynq-agent` for the health probe and `/lynq-agent/dmz` for the
@@ -43,100 +44,178 @@ means the turn itself failed — it does not cost the candidate a turn.
 
 ## The turn, inside
 
-A turn opens with the **intent step**, in `src/agent/intent.py`: one cheap model call
-that reads the message of the candidate together with the last four messages of the
-exchange and answers a single word, `edit` or `advise`. It exists because the agent used
-to treat every message as a request to change the resume — asked *what else do you
-suggest?*, it reordered the experience, rewrote the summary again and reported the work
-as done. An `advise` turn is built with `find_evidence` as its only tool, so the edit
-tools are not merely discouraged, they are not there; the resume cannot change, and the
-prompt tells the model to answer and then recommend rather than to apply. The call is
-the first thing the turn does, it does not spend a step of `AGENT_MAX_STEPS`, and it
-leaves a `step=0` span named `intent` whose output is the word that was read. Anything
-that goes wrong with it — a model that breaks, an answer that says neither word — falls
-back to `edit` and writes a `kind='error'` span: the classifier never takes a turn down,
-and the product keeps doing what it is for. `docs/queries.sql` reads that span back, and
-a `resume_version` written on an `advise` turn would be a bug.
+A turn is four agents, each with its own prompt and its own single answer, and no
+agent holds a tool. They are the nodes of a LangGraph `StateGraph` in
+`src/agent/graph.py`, together with the `apply` step; `src/agent/turn.py` builds the
+state and runs it. The graph is fixed and acyclic but for one edge: a rejected proposal
+goes back to the editor once.
 
-`src/agent/graph.py` then builds a ReAct loop with `langchain.agents.create_agent` over
-its tools, a system prompt rendered from `resources/prompts/resume_tailor/{bedrock,ollama}.jinja`
-and `response_format=TurnAnswer`, which LangChain binds as one more tool with
-`tool_choice="any"`, so the turn ends with the model calling it. When a model breaks
-that format — Ollama does, now and then — the JSON is unwrapped from the text before the
-candidate sees it, and plain prose becomes the reply as it is.
+```mermaid
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	classify(classify)
+	advise(advise)
+	propose(propose)
+	judge(judge)
+	apply(apply)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> classify;
+	apply -.-> __end__;
+	apply -.-> propose;
+	classify -.-> advise;
+	classify -.-> propose;
+	judge --> apply;
+	propose --> judge;
+	advise --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+```
 
-| Tool | What it does |
+`python scripts/draw_turn_graph.py` prints that diagram from the compiled graph, so it
+never drifts from the code; `--png` writes it as an image instead, for the thesis.
+
+[`docs/un-turno-por-dentro.html`](docs/un-turno-por-dentro.html) walks through a real
+conversation step by step — the message, the node the turn is on, what the model proposed
+and what was let in — with the trace spans each step leaves. Open it in a browser; it
+is one file with no build. The turns come from a run against `qwen2.5:7b` on
+2026-09-28, made under the earlier design where a set of rules in code stood where the
+judge stands now; the page shows the current graph and the rejections with the judge's
+kinds, and says so. `TurnGraphState` is what flows between the nodes: the
+context and the turn state the service built, the model handles, and what each node
+leaves for the next — the intent, the thread, the proposal, the parts, the verdict and how
+many passes have been made.
+
+**1. The intent agent** (`src/agent/intent.py`, prompt `resources/prompts/intent/`)
+reads the message of the candidate together with the last four messages of the exchange
+and answers one word, `edit` or `advise`. It exists because an agent that treats every
+message as a request to change the resume — asked *what else do you suggest?* — rewrites
+things and reports the work as done. It is the first thing the turn does and it leaves a
+`step=0` span named `intent` whose output is the word that was read. Anything that goes
+wrong with it — a model that breaks, an answer that says neither word — falls back to
+`edit` and writes a `kind='error'` span: the classifier never takes a turn down. It
+answers one word, so it may run on a cheaper model (`BEDROCK_INTENT_MODEL_ID`); its span
+is priced with that model's own sheet, not with the rates frozen on the conversation.
+
+**2. The advising agent** (`src/agent/advisor.py`, prompt `resources/prompts/advise.jinja`)
+takes an `advise` turn. It answers the question and recommends the edits it would apply
+next, as prose in `reply` and as data in `recommendations` — `{id, section, entry,
+what}`, numbered by the code, 1..n, whatever the model wrote. It is given no way to
+change the resume: its answer schema has no field for one, so a `resume_version` written
+on an `advise` turn would be a bug. The recommendations are stored on the assistant
+message, and the next turn's editing agent reads them, so *do the second one* means what
+the candidate read, not what the model reconstructs from the thread.
+
+**3. The editing agent** (`src/agent/editor.py`, prompt `resources/prompts/edit.jinja`)
+takes an `edit` turn. It answers **once**, with the whole change of the turn as one
+`EditProposal`: the new summary, the entries of the work experience it rewrites — each
+named by `company` and `position`, never by index — and the skill buckets it replaces,
+plus `reply` and `warnings`. That is the entire surface: the summary, the description and
+achievements of an experience entry, and the skills. Reordering, the education, the
+projects, the certifications, a company, a position, a date — the schema has no field for
+any of them, so they cannot be asked for, let alone done.
+
+**4. The judge** (`src/agent/judge.py`, prompt `resources/prompts/judge.jinja`) reads the
+proposal part by part, each part beside the text it replaces in the **base** resume, and
+says for each one whether the resume supports it. It never rewrites: `ok`, or a `kind`
+and a `reason` written in the candidate's language. The one rule it applies is that a
+change may only say what the candidate's own resume already says, and the kinds are the
+ways of breaking it:
+
+| kind | what the judge saw |
 | --- | --- |
-| `find_evidence(claims)` | Lexical search **in code** over the base resume, never the model judging itself: normalised (lowercase, no accents, no symbols), by prefix for claims of four characters or more and by exact word for the short ones (`Go`, `C#`, `AWS`). It takes up to 20 claims and answers one `{claim, hits}` per claim, each hit a `{path, matched}` with the wording the resume already uses, and it never looks at `personal_info`. The batch is deliberate: a call costs one step whatever it carries, so a turn that looked up eight skills one at a time used to burn eight of its `AGENT_MAX_STEPS` before editing anything |
-| `rewrite_summary(text)` | Replaces the summary |
-| `rewrite_entry(section, index, description, achievements)` | Rewrites the prose of one entry of the experience, the education or the projects |
-| `reorder_entries(section, order)` | Reorders a section without adding or dropping anything. An order that is already the one the section has answers `OK` and records nothing: a turn that "reordered" `[0, 1, 2, 3, 4, 5]` used to show up as a change that moved no line |
-| `replace_skills(technical, tools, soft)` | Replaces the skill buckets it is given, and keeps the ones it is not |
+| `invented` | a number, a duration, a result, a team size, a responsibility, a role or an employer the resume does not state |
+| `unsupported_skill` | a technology the resume names nowhere — and in an entry of the experience, one that entry does not name: a technology never moves into a job that never used it |
+| `wording` | the posting's spelling of a technology the resume spells otherwise (`PostgreSQL` over `Postgres`) |
+| `language` | prose not in the language of the resume |
+| `padding` | much more text than the original, not a rephrasing |
+| `dropped_skill` | a bucket that leaves out a skill the current one has: a bucket may be reordered and grown, never shrunk |
 
-The four edit tools are the only way the resume changes, and an `advise` turn is not
-given them at all. Each answers `OK` or
-`REJECTED: <reason>`, and the reasons are literal and stable because `docs/queries.sql`
-groups by them. They are four rather than one `apply_edit` carrying a free-form payload
-on purpose: Bedrock validates a tool call against the schema it was given, and an
-argument list of strings, integers and lists of strings is something a model can fill
-without inventing structure. The single tool took `payload: dict[str, Any]`, which
-reaches Converse as an object with no properties; a model that guesses that shape wrong
-takes the whole turn down with `ModelErrorException: Model produced invalid sequence as
-part of ToolUse`.
+The judge has to **quote before it decides**: for every part it copies into `evidence`
+the words of the resume that back the change, and it may only approve what it quoted. A
+model that has to find the sentence is far less likely to say "the resume does not
+mention Kubernetes" when the Acme entry lists it — which is exactly what `qwen2.5:7b` did
+before this field existed. The quote stays in the trace, so a wrong verdict can be
+checked against what the judge thought it saw.
 
-Some guardrails are now the schema's job: there is no argument for a date, for a new
-entry or for an operation, so none of those can even be asked for. The rest live in the
-tools, in code, not in the prompt: `personal_info is immutable`, `index out of range`,
-`field is not editable` — `achievements` belong to `work_experience` alone — `no
-evidence in base resume`, since a skill only enters if `find_evidence` backs it and it
-enters with the wording of the resume, so a posting asking for `PostgreSQL` over a resume
-saying `Postgres` adds `Postgres`, and `payload language (es) does not match resume
-language (en)`, a `langdetect` check bounded to prose longer than 80 characters once the
-skill names are taken out.
+The judge reads short texts and answers yes or no, so it runs on a cheaper model —
+`BEDROCK_JUDGE_MODEL_ID`, Nova Lite by default in `set_env.sh` — and its spans are
+priced with that model's sheet. A part the judge leaves out of its answer is **not**
+approved (`unjudged`): the safe default costs a correction pass, never an invention.
 
-**The model never sees `personal_info`.** The code splits it off before rendering the
+**The `apply` step** (`src/agent/apply.py`) is the only code that touches the resume, and
+it decides nothing about content. Before the judge, `plan` resolves each part to its
+place — which entry a `company`/`position` names (a paraphrased position still finds its
+entry by company when that is unambiguous), which bucket — and the one rejection the code
+makes on its own is an entry the resume does not have (`unknown_entry`). After the judge,
+`commit` writes the approved parts and records each as a change.
+
+The parts are independent — a summary the judge rejects does not hold back skills it
+approves — and a rejection goes back to the editor **once**, with its reason, as the next
+message of the same thread: the model re-proposes the rejected parts with the reason in
+hand, and what is still rejected after that stays out — and reaches the candidate as a
+warning, in their language (`resources/rejections/`), because the reply is the model's
+and the document is the judge's, and the chat must never promise what the resume beside it
+does not say. Each pass leaves a `kind='tool'` span named `apply` whose input is the
+parts and whose output is `OK` or the list of rejections with their kinds;
+`docs/queries.sql` groups by kind.
+
+What this design gives up, and what it gives: the previous guard was a set of lexical
+rules in code — digits, alias tables, prefix matches — that could be *proven* to stop an
+invented number or technology, and could not see an invented responsibility at all. The
+judge sees all of it, and none of it is provable: it is a model's reading, measured, not
+guaranteed. The trace keeps every verdict, so the thesis can report how often the judge
+agreed with a person on a labelled sample, which is a result the rules could never give.
+
+**The model never sees `personal_info`.** The code splits it off before rendering any
 prompt and pins it back when each version is serialized (§13.2 of the plan: it is the
 bias channel that gets closed by construction, not by asking the model nicely).
 
-The answer's `resume` comes from what the edit tools left behind, never from the text of
-the model, which only contributes `reply` and `warnings`.
+The answer's `resume` comes from what the judge let through, never from the text of the
+model, which only contributes `reply` and `warnings`. An edit turn that applied nothing
+gets a notice appended to its warnings (`resources/notices/`), so the candidate is told
+rather than left to wonder.
 
-`AGENT_MAX_STEPS` is a **soft** cap: `agent/callbacks.py` counts the steps, and once the
-budget is spent the tools answer `STEP LIMIT REACHED ...` and a `kind='limit'` span is
-written, so the candidate gets a partial but valid answer instead of a 502. The hard cap
-is LangGraph's `recursion_limit = 2 * max_steps + 6` — a ReAct cycle costs two graph
-steps, so anything tighter makes the hard cap fire first.
+Every agent answers through `with_structured_output`, which binds its schema as the only
+tool the model may call. When a model breaks that protocol and answers in text — Ollama
+does, now and then — the JSON is unwrapped from the text (`src/agent/answer.py`), and
+plain prose becomes the reply as it is. Bedrock answers `ModelErrorException: Model
+produced invalid sequence as part of ToolUse` when the model emits a tool call it cannot
+parse; it is intermittent, so `src/agent/structured.py` retries the call
+`AGENT_MODEL_RETRIES` times, and `llm/errors.py` decides what is worth retrying by the AWS
+error code, so an `AccessDenied` still fails at once.
 
-`AGENT_MAX_EDITS` is the other soft cap, and it counts edits rather than steps: once a
-turn has applied that many, the edit tools answer `EDIT LIMIT REACHED ...` and leave their
-own `kind='limit'` span. Two edits a turn keep each exchange reviewable, and the prompt
-has every reply close with the edits the agent would make next — the ones the budget left
-out and whatever else the posting still asks for — so the candidate decides what happens
-in the following turn. The last exchange is the exception: there is nothing left to
-recommend for, so it closes by suggesting the candidate applies with the resume as it is.
-
-Bedrock answers `ModelErrorException: Model produced invalid sequence as part of ToolUse`
-when the model emits a tool call it cannot parse — an ambiguous tool schema, a generation
-cut short, or plain bad luck. It is intermittent, so `ModelRetryMiddleware` retries the
-model call `AGENT_MODEL_RETRIES` times with backoff before the turn is given up on; the
-tools are not re-run, only the call that broke. `llm/errors.py` decides what is worth
-retrying by the AWS error code, so an `AccessDenied` still fails at once. Every attempt
-costs a step and leaves its own span, so a retried turn shows the failure and the recovery
-in its trace.
+Why no tools and no ReAct loop: the previous design ran one over edit tools, and the
+model decided when to stop, which entry an index pointed at after it had reordered the
+section, and whether to look for evidence before adding a skill. Each of those was a way
+for a turn to go wrong that no prompt closed. With the edit surface this small, the whole
+change fits in one schema, the code resolves every reference and checks every part, and
+a turn costs one or two model calls instead of up to twelve. LangGraph still runs the
+turn, but every edge of its graph is decided by code — the only decision a model takes
+is the intent — and its `recursion_limit` is a backstop the routes never reach, not a
+budget the model spends.
 
 The tokens of each call come from the `usage_metadata` of the `AIMessage`, never
 estimated, and the tariff of the model lives in `src/llm/pricing.py` and is frozen onto
 the conversation when it is created; a model that is not in the sheet costs zero and
 logs a warning. The LLM span does **not** store the system prompt: it stores the
 messages of the turn, the `resume_version_id` and the hash of the template
-(`resume_tailor/bedrock@<hash>`), which is enough to rebuild it exactly.
+(`edit@<hash>`, `advise@<hash>`), which is enough to rebuild it exactly.
 
 ## The database
 
 `lynq_agent_db` holds four tables — `conversation`, `message`, `resume_version` and
 `trace_span`. The conversation freezes the job posting, the base resume and the token
 prices in force when it was created: that is what makes a trace reproducible and what
-keeps an old conversation costing what it cost.
+keeps an old conversation costing what it cost. A message written by the advising agent
+also carries its `recommendations`, the list the next turn may refer to by number.
+`conversation.max_steps` is kept for the rows that were written under the loop design;
+nothing reads it any more.
 
 Migrations are **Liquibase** changesets under `changelog/ddl`, applied on startup when
 `DB_MIGRATE_ON_STARTUP` is true (`src/db/migrations.py` turns `DB_URL` into a JDBC URL
@@ -181,8 +260,8 @@ gets a 409 instead of blocking on the row lock for as long as the loop runs:
    turn in flight (409), an older one is a dead process and gets taken over. The
    conversation flips to `RUNNING` with a fresh `run_token`, the user message is
    inserted, commit.
-2. **The intent step and the loop**, with no transaction open, under
-   `AGENT_TURN_TIMEOUT - 30s`, so they die before anyone else can declare them dead.
+2. **The agents**, with no transaction open, under `AGENT_TURN_TIMEOUT - 30s`, so
+   they die before anyone else can declare them dead.
 3. **Persist.** `SELECT ... FOR UPDATE` again and compare the `run_token`: if it
    changed, this process is a zombie that another turn already superseded — its orphan
    user message is deleted, a `stale_run` span is written and it answers 502 without
@@ -228,27 +307,21 @@ coverage report -m
 `aiosqlite` is test-only: the suite runs against a throwaway SQLite file, so it never
 needs a MySQL container.
 
-Two tests talk to a real model and are skipped unless `AGENT_LIVE_LLM=true`:
+`tests/test_live.py` talks to a real model and is skipped unless `AGENT_LIVE_LLM=true`:
 
 ```bash
-AGENT_LIVE_LLM=true LLM_PROVIDER=ollama python -m unittest tests.test_structured_output
+AGENT_LIVE_LLM=true LLM_PROVIDER=ollama python -m unittest tests.test_live
 AGENT_LIVE_LLM=true LLM_PROVIDER=bedrock BEDROCK_MODEL_ID=amazon.nova-pro-v1:0 \
-  python -m unittest tests.test_structured_output
+  python -m unittest tests.test_live
 ```
 
-`tests/test_structured_output.py` is the one bet of the plan: that Nova Pro honours
-`tool_choice="any"` and closes the turn with the `TurnAnswer` tool call. Only the
-Bedrock run proves it — Ollama breaks the tool call format often enough that the test
-is skipped there on purpose, and the loop leans on the JSON fallback instead. If the
-Bedrock run fails, the fallback is already decided: drop `response_format`, ask for the
-JSON in the prompt and validate it with Pydantic plus one retry.
-
-Running the checkpoint turn of the prompt — a candidate asking for a skill the resume
-does not back — against the local models (`qwen2.5:7b`, `llama3.1`) shows the split
-clearly: the guardrails hold every time, the skill never enters the resume and
-`personal_info` is untouched, but neither model closes the turn with the `TurnAnswer`
-tool call and the reply they write is rough. That is the dev-only trade of the plan, not
-something to fix in the prompt: the loop is aimed at Nova Pro.
+It runs one edit turn and one advise turn end to end and checks what the code
+guarantees whatever the model does: the resume changed only where the schema allows,
+`personal_info` and the order of the experience are untouched, nothing without evidence
+entered, and the advise turn wrote no change. On Bedrock it also checks that the model
+answered through the schema's tool call rather than the text fallback — the one bet the
+design makes on Nova Pro. Ollama breaks the tool call format often enough that only the
+guarantees are checked there.
 
 ## Environment
 
@@ -264,9 +337,8 @@ something to fix in the prompt: the loop is aimed at Nova Pro.
 | `AGENT_TRACE_TTL_DAYS` | `30` | Days before the spans of a closed conversation lose their payload |
 | `AGENT_CONVERSATION_TTL_DAYS` | `180` | Days before a conversation is deleted outright |
 | `AGENT_MAX_TURNS` | `10` | Exchanges a conversation accepts; copied onto the row at creation |
-| `AGENT_MAX_STEPS` | `12` | Steps the loop may take in one turn; copied onto the row at creation |
-| `AGENT_MAX_EDITS` | `2` | Edits one turn may apply before the edit tools answer `EDIT LIMIT REACHED`; read live from the settings, never copied onto the row |
-| `AGENT_MODEL_RETRIES` | `2` | Times a model call is retried when Bedrock rejects what the model emitted; each attempt costs a step |
+| `AGENT_MAX_STEPS` | `12` | Copied onto the row at creation for the sake of old rows; nothing reads it since the loop went |
+| `AGENT_MODEL_RETRIES` | `2` | Times a model call is retried when Bedrock rejects what the model emitted |
 | `AGENT_TURN_TIMEOUT` | `600` | Seconds before a `RUNNING` turn is treated as a dead process. Operational, never copied onto the row |
 | `AGENT_JOB_DESCRIPTION_MAX_CHARS` | `6000` | The posting is truncated to this before it is frozen into the snapshot |
 | `LYNQ_ML_URL` | `http://localhost:8084/lynq-ml` | Where the skill extraction of the posting is asked for |
@@ -276,7 +348,11 @@ something to fix in the prompt: the loop is aimed at Nova Pro.
 | `LLM_TIMEOUT` | `300` | Seconds allowed for a single LLM call |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Local Ollama endpoint |
 | `OLLAMA_MODEL` | `qwen2.5:7b` | Model pulled into Ollama |
+| `OLLAMA_INTENT_MODEL` | _(empty)_ | Model for the intent agent; `OLLAMA_MODEL` when empty |
+| `OLLAMA_JUDGE_MODEL` | _(empty)_ | Model for the judge; `OLLAMA_MODEL` when empty |
 | `BEDROCK_MODEL_ID` | — | Any model id the Converse API accepts, e.g. `amazon.nova-pro-v1:0` |
+| `BEDROCK_INTENT_MODEL_ID` | _(empty)_ | Model for the intent agent, e.g. `amazon.nova-lite-v1:0`; `BEDROCK_MODEL_ID` when empty |
+| `BEDROCK_JUDGE_MODEL_ID` | `amazon.nova-lite-v1:0` in `set_env.sh` | Model for the judge; `BEDROCK_MODEL_ID` when empty |
 | `BEDROCK_REGION` | `us-east-1` | Bedrock region |
 | `BEDROCK_MAX_TOKENS` | `4096` | Cap on a single completion |
 | `BEDROCK_TEMPERATURE` | `0` | Sampling temperature |

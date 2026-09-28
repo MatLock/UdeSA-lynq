@@ -1,147 +1,166 @@
 from __future__ import annotations
 
+import json
 import logging
-from itertools import dropwhile
+from typing import Any, TypedDict
 
-from langchain.agents import create_agent
-from langchain.agents.middleware import ModelRetryMiddleware
-from langchain_core.messages import AIMessage, HumanMessage
+from langgraph.graph import END, START, StateGraph
 
-from agent.answer import TurnAnswer, from_result
-from agent.callbacks import TraceCollector
-from agent.context import (
-    Intent,
-    SpanRecord,
-    TurnContext,
-    TurnOutcome,
-    build_turn_state,
-    use_turn_state,
-)
+from agent import apply, editor
+from agent.advisor import advise
+from agent.context import Intent, SpanRecord, TurnContext
 from agent.intent import classify
-from agent.scope import SPAN_NAME, SPAN_REASON, enforce
-from agent.tools import EDIT_TOOLS, find_evidence
-from config import BEDROCK, OLLAMA, get_settings
-from db.models import MessageRole, SpanKind
-from llm.errors import retryable
-from llm.factory import build_model
-from prompt.notice import render as no_change_notice
-from prompt.resume_tailor import reference, render
+from agent.judge import judge
+from agent.schemas import Advice, EditProposal
+from agent.state import TurnState
+from db.models import SpanKind
+from prompt.tailor import ADVISE as ADVISE_PROMPT, EDIT as EDIT_PROMPT, JUDGE as JUDGE_PROMPT, reference
 
 log = logging.getLogger(__name__)
 
-RECURSION_HEADROOM = 6
+CLASSIFY = "classify"
+ADVISE = "advise"
+PROPOSE = "propose"
+JUDGE = "judge"
+APPLY = "apply"
+APPLY_SPAN = "apply"
+OK = "OK"
 
 
-def template_provider(provider: str) -> str:
-    return BEDROCK if provider == BEDROCK else OLLAMA
+class PromptReference:
+    """The trace records which template a model span ran under. Three templates
+    take turns inside one graph run, so the node about to call the model sets the
+    family and the collector stringifies it when it writes the span."""
+
+    def __init__(self) -> None:
+        self.family = EDIT_PROMPT
+
+    def __str__(self) -> str:
+        return reference(self.family)
 
 
-def recursion_limit(max_steps: int) -> int:
-    return 2 * max_steps + RECURSION_HEADROOM
+class TurnGraphState(TypedDict, total=False):
+    """What flows between the nodes. The context and the state are the same
+    objects the service built; the rest is what each node leaves for the next."""
+
+    context: TurnContext
+    state: TurnState
+    provider: str
+    model: Any
+    intent_model: Any
+    judge_model: Any
+    callbacks: list
+    retries: int
+    messages: list
+    prompt: PromptReference
+    intent: str
+    thread: list
+    proposal: EditProposal
+    parts: list
+    approved: set
+    rejections: list
+    passes: int
+    advice: Advice
 
 
-def retry_middleware() -> ModelRetryMiddleware:
-    return ModelRetryMiddleware(
-        max_retries=get_settings().model_retries,
-        retry_on=retryable,
-        on_failure="error",
+async def classify_node(graph: TurnGraphState) -> TurnGraphState:
+    intent = await classify(graph["context"], graph["provider"], graph.get("intent_model"))
+    return {"intent": intent}
+
+
+async def advise_node(graph: TurnGraphState) -> TurnGraphState:
+    graph["prompt"].family = ADVISE_PROMPT
+    advice = await advise(
+        graph["context"], graph["state"], graph["model"],
+        provider=graph["provider"], callbacks=graph["callbacks"],
+        retries=graph["retries"], messages=graph["messages"],
     )
+    return {"advice": advice}
 
 
-def tools_for(intent: str) -> list:
-    if intent == Intent.ADVISE:
-        return [find_evidence]
-    return [find_evidence, *EDIT_TOOLS]
-
-
-def build_agent(system_prompt: str, intent: str, model=None):
-    return create_agent(
-        model=model if model is not None else build_model(),
-        tools=tools_for(intent),
-        system_prompt=system_prompt,
-        response_format=TurnAnswer,
-        middleware=[retry_middleware()],
-    )
-
-
-def turn_messages(context: TurnContext) -> list:
-    history = list(context.history)
-    if history and history[-1] == (MessageRole.USER, context.message):
-        history = history[:-1]
-
-    history = list(dropwhile(lambda entry: entry[0] != MessageRole.USER, history))
-
-    messages = [
-        HumanMessage(content) if role == MessageRole.USER else AIMessage(content)
-        for role, content in history
-    ]
-    messages.append(HumanMessage(context.message))
-    return messages
-
-
-async def run_turn(
-    context: TurnContext, model=None, intent_model=None
-) -> TurnOutcome:
-    settings = get_settings()
-    provider = template_provider(settings.llm_provider)
-    intent = await classify(context, provider, intent_model)
-    state = build_turn_state(context)
-
-    system_prompt = render(
-        provider,
-        job=context.job_snapshot,
-        resume=state.resume,
-        language=context.language,
-        resume_language=context.resume_language,
-        max_steps=context.max_steps,
-        max_edits=context.max_edits,
-        turns_left=context.turns_left,
-        intent=intent,
-    )
-    collector = TraceCollector(
-        state, reference(provider), context.resume_version_id
-    )
-    agent = build_agent(system_prompt, intent, model)
-
-    with use_turn_state(state):
-        result = await agent.ainvoke(
-            {"messages": turn_messages(context)},
-            config={
-                "callbacks": [collector],
-                "recursion_limit": recursion_limit(context.max_steps),
-            },
+async def propose_node(graph: TurnGraphState) -> TurnGraphState:
+    graph["prompt"].family = EDIT_PROMPT
+    thread = graph.get("thread")
+    if thread is None:
+        thread = editor.opening_thread(
+            graph["context"], graph["state"], graph["provider"], graph["messages"]
         )
+    else:
+        thread = editor.retry_thread(thread, graph["proposal"], graph["rejections"])
+    proposal = await editor.propose(
+        graph["model"], thread, callbacks=graph["callbacks"], retries=graph["retries"]
+    )
+    return {"thread": thread, "proposal": proposal}
 
-    raw_answer = from_result(result)
-    answer = enforce(raw_answer, system_prompt, context.language)
-    if answer is not raw_answer:
-        state.spans.append(
-            SpanRecord(
-                step=state.steps,
-                kind=SpanKind.ERROR,
-                name=SPAN_NAME,
-                output=answer.reply,
-                error=SPAN_REASON,
-            )
-        )
-    elif intent == Intent.EDIT and not state.changes:
-        answer = answer.model_copy(
-            update={"warnings": [*answer.warnings, no_change_notice(context.language)]}
-        )
-    log.info(
-        "message= Turn finished, conversationId=%s, intent=%s, steps=%s, edits=%s, "
-        "warnings=%s",
-        context.conversation_id,
-        intent,
-        state.steps,
-        len(state.changes),
-        len(answer.warnings),
+
+async def judge_node(graph: TurnGraphState) -> TurnGraphState:
+    """The judging agent reads the proposal part by part beside the text each part
+    replaces. A part with nowhere to go (an entry the resume does not have) never
+    reaches it: that is the one thing the code decides."""
+    graph["prompt"].family = JUDGE_PROMPT
+    state, context = graph["state"], graph["context"]
+    parts, misplaced = apply.plan(state, graph["proposal"])
+    approved, rejected = await judge(
+        state, parts, graph.get("judge_model") or graph["model"],
+        provider=graph["provider"], language=context.language,
+        job_skills=state.job_skills, callbacks=graph["callbacks"], retries=graph["retries"],
     )
-    return TurnOutcome(
-        reply=answer.reply,
-        resume=state.serialize_resume(),
-        changes=state.changes,
-        warnings=answer.warnings,
-        spans=state.spans,
-        intent=intent,
+    return {"parts": parts, "approved": approved, "rejections": [*misplaced, *rejected]}
+
+
+def apply_node(graph: TurnGraphState) -> TurnGraphState:
+    state = graph["state"]
+    apply.commit(state, graph["parts"], graph["approved"])
+    rejections = graph["rejections"]
+    state.spans.append(
+        SpanRecord(
+            step=state.next_step(), kind=SpanKind.TOOL, name=APPLY_SPAN,
+            input=json.dumps(
+                [{"id": part.id, "proposed": part.proposed} for part in graph["parts"]],
+                ensure_ascii=False,
+            ),
+            output=OK if not rejections else json.dumps(
+                [{"where": str(r), "kind": r.kind} for r in rejections], ensure_ascii=False
+            ),
+        )
     )
+    return {"passes": graph.get("passes", 0) + 1}
+
+
+def route_intent(graph: TurnGraphState) -> str:
+    return ADVISE if graph["intent"] == Intent.ADVISE else PROPOSE
+
+
+def route_apply(graph: TurnGraphState) -> str:
+    if graph["rejections"] and graph["passes"] < editor.MAX_PASSES:
+        return PROPOSE
+    return END
+
+
+def build_graph():
+    graph = StateGraph(TurnGraphState)
+    graph.add_node(CLASSIFY, classify_node)
+    graph.add_node(ADVISE, advise_node)
+    graph.add_node(PROPOSE, propose_node)
+    graph.add_node(JUDGE, judge_node)
+    graph.add_node(APPLY, apply_node)
+
+    graph.add_edge(START, CLASSIFY)
+    graph.add_conditional_edges(CLASSIFY, route_intent, [ADVISE, PROPOSE])
+    graph.add_edge(ADVISE, END)
+    graph.add_edge(PROPOSE, JUDGE)
+    graph.add_edge(JUDGE, APPLY)
+    graph.add_conditional_edges(APPLY, route_apply, [PROPOSE, END])
+    return graph.compile()
+
+
+TURN_GRAPH = build_graph()
+
+# A pass through propose, judge and apply is three nodes; the cap is a hard
+# backstop the apply route never reaches, so it never turns a valid turn into
+# an error.
+RECURSION_LIMIT = 2 + 3 * editor.MAX_PASSES + 4
+
+
+def mermaid() -> str:
+    return TURN_GRAPH.get_graph().draw_mermaid()

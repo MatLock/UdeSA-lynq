@@ -16,14 +16,15 @@ def bedrock_guardrail_config(settings: Settings) -> dict[str, str] | None:
     }
 
 
-def build_model(settings: Settings | None = None):
+def build_model(settings: Settings | None = None, model: str | None = None):
     settings = settings or get_settings()
+    model = model or settings.llm_model
 
     if settings.llm_provider == BEDROCK:
-        if not settings.llm_model:
+        if not model:
             raise ValueError("BEDROCK_MODEL_ID is required when LLM_PROVIDER=bedrock")
         return ChatBedrockConverse(
-            model=settings.llm_model,
+            model=model,
             region_name=settings.bedrock_region,
             max_tokens=settings.bedrock_max_tokens,
             temperature=settings.bedrock_temperature,
@@ -32,6 +33,6 @@ def build_model(settings: Settings | None = None):
 
     return ChatOllama(
         base_url=settings.ollama_base_url,
-        model=settings.llm_model,
+        model=model,
         temperature=0,
     )

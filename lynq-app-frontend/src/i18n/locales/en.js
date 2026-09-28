@@ -199,8 +199,8 @@ const en = {
       externalApplying: 'Downloading…',
     },
     tailorDialog: {
-      open: 'Apply with CV Tailor',
-      title: 'CV Tailor',
+      open: 'Apply with Resume Tailor',
+      title: 'Resume Tailor',
       subtitle: 'We adapt your resume to this posting',
       untitled: 'Untitled resume',
       loading: 'Loading your resumes…',
@@ -218,6 +218,10 @@ const en = {
       startError: 'We could not open the conversation. Try again.',
       basedOn: 'Working on {resume}',
       restart: 'Start over',
+      speaker: {
+        assistant: 'Resume Tailor',
+        you: 'You',
+      },
       messagePlaceholder: 'Ask for a change to your resume…',
       send: 'Send',
       thinking: [

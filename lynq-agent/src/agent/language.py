@@ -4,6 +4,7 @@ import logging
 
 from langdetect import LangDetectException, detect
 
+
 log = logging.getLogger(__name__)
 
 _MIN_SAMPLE_CHARS = 24
@@ -17,7 +18,7 @@ def _sample(resume: dict) -> str:
     return " ".join(piece.strip() for piece in pieces if piece).strip()
 
 
-def _base(code: str) -> str:
+def bare(code: str) -> str:
     return code.split("-")[0].split("_")[0].strip().lower()
 
 
@@ -32,7 +33,7 @@ def verify_resume_language(resume: dict, declared: str) -> str:
         log.warning("message= Could not detect the resume language, %s", exc)
         return declared
 
-    if _base(detected) != _base(declared):
+    if bare(detected) != bare(declared):
         log.warning(
             "message= Resume language mismatch, declared=%s, detected=%s. "
             "Keeping the declared one",

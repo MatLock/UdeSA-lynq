@@ -204,7 +204,10 @@ class ScriptedChatModel(BaseChatModel):
     def bind_tools(self, tools, **kwargs):
         self.binds.append(
             {
-                "tools": [getattr(tool, "name", str(tool)) for tool in tools],
+                "tools": [
+                    getattr(tool, "name", None) or getattr(tool, "__name__", str(tool))
+                    for tool in tools
+                ],
                 **kwargs,
             }
         )

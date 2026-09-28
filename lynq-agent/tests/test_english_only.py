@@ -12,6 +12,7 @@ EXEMPT = (
     os.path.join("resources", "greetings", "es.jinja"),
     os.path.join("resources", "refusals", "es.jinja"),
     os.path.join("resources", "notices", "es.jinja"),
+    os.path.join("resources", "rejections", "es.jinja"),
     os.path.join("tests", "fixtures"),
     os.path.join("tests", "test_english_only.py"),
 )
@@ -81,9 +82,9 @@ class EnglishOnlyTest(unittest.TestCase):
     def test_it_looks_at_the_prompts_the_sources_and_the_queries(self) -> None:
         scanned = scanned_files()
 
-        self.assertIn(os.path.join("src", "agent", "graph.py"), scanned)
+        self.assertIn(os.path.join("src", "agent", "turn.py"), scanned)
         self.assertIn(
-            os.path.join("resources", "prompts", "resume_tailor", "bedrock.jinja"),
+            os.path.join("resources", "prompts", "edit.jinja"),
             scanned,
         )
         self.assertIn(os.path.join("resources", "greetings", "en.jinja"), scanned)

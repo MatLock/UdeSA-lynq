@@ -14,7 +14,9 @@ from agent.context import (
     Intent,
     SpanRecord,
     TurnContext,
+    span_cost,
 )
+from config import get_settings
 from db.models import MessageRole, SpanKind
 from llm.factory import build_model
 from prompt.intent import reference, render
@@ -61,22 +63,32 @@ def _span(
     usage: dict,
     error: str | None = None,
 ) -> None:
-    context.spans.append(
-        SpanRecord(
-            step=0,
-            kind=SpanKind.ERROR if error is not None else SpanKind.LLM,
-            name=INTENT_SPAN,
-            input=json.dumps(
-                {"message": context.message, "prompt": reference(provider)},
-                ensure_ascii=False,
-            ),
-            output=output,
-            prompt_tokens=usage.get("input_tokens"),
-            completion_tokens=usage.get("output_tokens"),
-            latency_ms=int((time.monotonic() - started_at) * 1000),
-            error=error,
-        )
+    settings = get_settings()
+    record = SpanRecord(
+        step=0,
+        kind=SpanKind.ERROR if error is not None else SpanKind.LLM,
+        name=INTENT_SPAN,
+        input=json.dumps(
+            {
+                "message": context.message,
+                "prompt": reference(provider),
+                "model": settings.intent_model,
+            },
+            ensure_ascii=False,
+        ),
+        output=output,
+        prompt_tokens=usage.get("input_tokens"),
+        completion_tokens=usage.get("output_tokens"),
+        latency_ms=int((time.monotonic() - started_at) * 1000),
+        error=error,
     )
+    # The intent model may not be the conversation's model, so its span is priced
+    # here, with its own sheet, instead of with the rates frozen on the conversation.
+    if record.prompt_tokens or record.completion_tokens:
+        record.cost_usd = span_cost(
+            record, settings.intent_input_price_per_1m, settings.intent_output_price_per_1m
+        )
+    context.spans.append(record)
 
 
 async def classify(context: TurnContext, provider: str, model=None) -> str:
@@ -84,9 +96,10 @@ async def classify(context: TurnContext, provider: str, model=None) -> str:
     started_at = time.monotonic()
 
     try:
-        answer = await (model if model is not None else build_model()).ainvoke(
-            [HumanMessage(prompt)]
+        intent_model = model if model is not None else build_model(
+            model=get_settings().intent_model
         )
+        answer = await intent_model.ainvoke([HumanMessage(prompt)])
     except Exception as exc:
         log.warning(
             "message= The intent step failed, falling back to %s, conversationId=%s, %s",

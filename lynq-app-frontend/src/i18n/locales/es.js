@@ -218,6 +218,10 @@ const es = {
       startError: 'No pudimos abrir la conversación. Probá de nuevo.',
       basedOn: 'Trabajando sobre {resume}',
       restart: 'Empezar de nuevo',
+      speaker: {
+        assistant: 'CV Tailor',
+        you: 'Vos',
+      },
       messagePlaceholder: 'Pedile un cambio a tu CV…',
       send: 'Enviar',
       thinking: [

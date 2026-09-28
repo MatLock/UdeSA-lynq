@@ -8,10 +8,11 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.outputs import ChatGeneration, LLMResult
 
 from agent.callbacks import TraceCollector
-from agent.context import TurnContext, build_turn_state
+from agent.context import TurnContext
+from agent.state import build_turn_state
 from db.models import SpanKind
 
-PROMPT_REFERENCE = "resume_tailor/bedrock@0123456789ab"
+PROMPT_REFERENCE = "edit@0123456789ab"
 
 
 def state_for():
@@ -25,7 +26,6 @@ def state_for():
         current_resume={"summary": "Backend engineer."},
         history=[],
         message="go ahead",
-        max_steps=12,
         turns_left=9,
         resume_version_id="version-1",
     )

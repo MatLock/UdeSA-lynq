@@ -33,3 +33,9 @@ SUMMARY_REWRITE = (
     "Ingeniero de backend con ocho anios liderando servicios distribuidos, "
     "migraciones de bases de datos y equipos de producto en empresas grandes."
 )
+
+REJECTION_OPENING_ES = "Parte de lo propuesto no entró al CV:"
+REJECTED_SKILL_ES = "sin respaldo en el CV"
+JUDGE_REASON_ES = "El CV dice ocho años, no doce."
+UNKNOWN_ENTRY_ES = "el CV no tiene esa entrada"
+REJECTED_SUMMARY_ES = "el resumen"
