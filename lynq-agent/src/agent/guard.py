@@ -23,8 +23,8 @@ ENTRY_BACKING_FIELDS = ("description", "achievements", "technologies", "start_da
 LENGTH_RATIO = 2
 LENGTH_SLACK = 120
 
-# The reasons are literal and stable: docs/queries.sql groups by them.
-EMPTY_TEXT = "nothing to write"
+# The reasons are literal and stable: docs/queries.sql groups by them, and the
+# templates under resources/rejections translate them for the candidate.
 UNKNOWN_ENTRY = "no such entry in work_experience"
 UNBACKED_NUMBER = "a number the base resume does not carry"
 UNBACKED_SKILL = "a posting skill the base resume does not back"
@@ -39,11 +39,24 @@ _DATE_FIELDS = ("start_date", "end_date", "issue_date")
 
 
 class Rejection(str):
-    """`where: reason` — what was proposed and why it did not enter the resume."""
+    """`where: reason (detail)` — what was proposed and why it did not enter the
+    resume. A string, so the trace and the queries read it as one; with its parts
+    on the side, so the notice to the candidate can say it in their language."""
+
+    section: str
+    label: str
+    reason: str
+    detail: str
+
+    def __new__(cls, section: str, label: str, reason: str, detail: str = "") -> "Rejection":
+        where = section if not label else (f"{section}.{label}" if section == SKILLS else f"{section} {label}")
+        rejection = super().__new__(cls, f"{where}: {reason}" + (f" ({detail})" if detail else ""))
+        rejection.section, rejection.label, rejection.reason, rejection.detail = section, label, reason, detail
+        return rejection
 
 
-def _rejection(where: str, reason: str, detail: str = "") -> Rejection:
-    return Rejection(f"{where}: {reason}" + (f" ({detail})" if detail else ""))
+def _rejection(section: str, reason: str, detail: str = "", label: str = "") -> Rejection:
+    return Rejection(section, label, reason, detail)
 
 
 def _texts(*values: Any) -> list[str]:
@@ -88,7 +101,8 @@ def _vocabulary(state: TurnState) -> set[str]:
 
 def _check_prose(
     state: TurnState,
-    where: str,
+    section: str,
+    label: str,
     proposed: list[str],
     base: list[str],
     backing: dict[str, Any],
@@ -97,16 +111,19 @@ def _check_prose(
     no number the base does not carry, it names no posting skill the base does not
     back, and it does not double the original. `backing` is the part of the base
     resume the rewrite is allowed to draw on."""
+    def rejected(reason: str, detail: str = "") -> Rejection:
+        return _rejection(section, reason, detail, label=label)
+
     unbacked_numbers = _numbers(proposed) - _backed_numbers(backing)
     if unbacked_numbers:
-        return _rejection(where, UNBACKED_NUMBER, ", ".join(sorted(unbacked_numbers)))
+        return rejected(UNBACKED_NUMBER, ", ".join(sorted(unbacked_numbers)))
 
     for skill in state.job_skills:
         if any(find_match(text, skill) for text in proposed) and backing_for(backing, skill) is None:
-            return _rejection(where, UNBACKED_SKILL, skill)
+            return rejected(UNBACKED_SKILL, skill)
 
     if sum(map(len, proposed)) > LENGTH_RATIO * sum(map(len, base)) + LENGTH_SLACK:
-        return _rejection(where, TOO_LONG)
+        return rejected(TOO_LONG)
 
     detected = detected_conflict(
         proposed,
@@ -115,17 +132,14 @@ def _check_prose(
         vocabulary=_vocabulary(state),
     )
     if detected is not None:
-        return _rejection(where, LANGUAGE_MISMATCH, f"{detected}, not {bare(state.resume_language)}")
+        return rejected(LANGUAGE_MISMATCH, f"{detected}, not {bare(state.resume_language)}")
     return None
 
 
 def _apply_summary(state: TurnState, text: str) -> Rejection | None:
     proposed = text.strip()
-    if not proposed:
-        return _rejection(SUMMARY, EMPTY_TEXT)
-
     base = str(state.base_resume.get(SUMMARY) or "")
-    rejection = _check_prose(state, SUMMARY, [proposed], [base], state.base_resume)
+    rejection = _check_prose(state, SUMMARY, "", [proposed], [base], state.base_resume)
     if rejection is not None:
         return rejection
 
@@ -154,18 +168,10 @@ def _find_entry(entries: list[Any], edit: EntryEdit) -> int | None:
 
 
 def _apply_entry(state: TurnState, edit: EntryEdit) -> Rejection | None:
-    where = f"{WORK_EXPERIENCE} {_label({'company': edit.company, 'position': edit.position})}"
-    entries = state.resume.get(WORK_EXPERIENCE)
-    base_entries = state.base_resume.get(WORK_EXPERIENCE)
-    if not isinstance(entries, list) or not isinstance(base_entries, list):
-        return _rejection(where, UNKNOWN_ENTRY)
+    label = _label({"company": edit.company, "position": edit.position})
 
-    # Entries are never added, dropped or reordered, so the index is the same in
-    # the base resume and in the one being edited.
-    index = _find_entry(entries, edit)
-    if index is None or index >= len(base_entries):
-        return _rejection(where, UNKNOWN_ENTRY)
-    entry, base = entries[index], base_entries[index]
+    def rejected(reason: str, detail: str = "") -> Rejection:
+        return _rejection(WORK_EXPERIENCE, reason, detail, label=label)
 
     fields: dict[str, Any] = {}
     if edit.description.strip():
@@ -174,11 +180,26 @@ def _apply_entry(state: TurnState, edit: EntryEdit) -> Rejection | None:
     if achievements:
         fields["achievements"] = achievements
     if not fields:
-        return _rejection(where, EMPTY_TEXT)
+        # The model lists the entries it leaves alone with nothing written, as
+        # the prompt tells it to: that is "keep it", not a proposal.
+        return None
+
+    entries = state.resume.get(WORK_EXPERIENCE)
+    base_entries = state.base_resume.get(WORK_EXPERIENCE)
+    if not isinstance(entries, list) or not isinstance(base_entries, list):
+        return rejected(UNKNOWN_ENTRY)
+
+    # Entries are never added, dropped or reordered, so the index is the same in
+    # the base resume and in the one being edited.
+    index = _find_entry(entries, edit)
+    if index is None or index >= len(base_entries):
+        return rejected(UNKNOWN_ENTRY)
+    entry, base = entries[index], base_entries[index]
 
     rejection = _check_prose(
         state,
-        where,
+        WORK_EXPERIENCE,
+        label,
         _texts(*fields.values()),
         _texts(*(base.get(field) for field in ENTRY_TEXT_FIELDS)),
         {field: base.get(field) for field in ENTRY_BACKING_FIELDS},
@@ -206,7 +227,7 @@ def _apply_skills(state: TurnState, buckets: dict[str, list[str]]) -> Rejection 
         for name in names:
             backing = backing_for(state.base_resume, name)
             if backing is None:
-                return _rejection(f"{SKILLS}.{bucket}", NO_EVIDENCE, name)
+                return _rejection(SKILLS, NO_EVIDENCE, name, label=bucket)
             if backing not in resolved:
                 resolved.append(backing)
         accepted[bucket] = resolved
@@ -220,7 +241,7 @@ def _apply_skills(state: TurnState, buckets: dict[str, list[str]]) -> Rejection 
     for bucket, names in accepted.items():
         for listed in current.get(bucket) or []:
             if isinstance(listed, str) and not any(same_skill(listed, name) for name in names):
-                return _rejection(f"{SKILLS}.{bucket}", DROPPED_SKILL, listed)
+                return _rejection(SKILLS, DROPPED_SKILL, listed, label=bucket)
 
     if all(current.get(bucket) == names for bucket, names in accepted.items()):
         return None

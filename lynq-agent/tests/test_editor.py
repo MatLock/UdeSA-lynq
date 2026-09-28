@@ -61,7 +61,8 @@ class CorrectionPassTest(unittest.IsolatedAsyncioTestCase):
         guards = [span for span in outcome.spans if span.name == GUARD_SPAN]
         self.assertEqual(json.loads(guards[-1].output), [f"summary: {guard.UNBACKED_NUMBER} (15)"])
         self.assertIn(
-            rejection_notice("es", [f"summary: {guard.UNBACKED_NUMBER} (15)"]), outcome.warnings
+            rejection_notice("es", [guard.Rejection("summary", "", guard.UNBACKED_NUMBER, "15")]),
+            outcome.warnings,
         )
 
     async def test_a_correction_that_held_leaves_no_rejection_warning(self) -> None:

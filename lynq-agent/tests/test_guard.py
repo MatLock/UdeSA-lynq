@@ -176,12 +176,21 @@ class EntryGuardTest(unittest.TestCase):
         self.assertEqual(state.resume["work_experience"][1]["achievements"], ["Shipped services on Kubernetes.", "Kept them running."])
         self.assertEqual(state.changes[0]["fields"], ["achievements"])
 
-    def test_an_entry_with_nothing_written_is_rejected(self) -> None:
+    def test_an_entry_with_nothing_written_is_kept_as_it_is(self) -> None:
         state = state_for()
 
         rejections = guard.apply(state, proposal(entries=[EntryEdit(company="Acme", position="Backend Engineer")]))
 
-        self.assertEqual(rejections, [f"work_experience Backend Engineer at Acme: {guard.EMPTY_TEXT}"])
+        self.assertEqual(rejections, [])
+        self.assertEqual(state.changes, [])
+        self.assertEqual(state.resume["work_experience"], RESUME["work_experience"])
+
+    def test_a_rejection_keeps_its_parts_for_the_notice(self) -> None:
+        state = state_for()
+
+        rejection = guard.apply(state, proposal(skills=SkillsEdit(technical=["Java", "Go"])))[0]
+
+        self.assertEqual((rejection.section, rejection.label, rejection.reason, rejection.detail), ("skills", "technical", guard.NO_EVIDENCE, "Go"))
 
 
 class SkillsGuardTest(unittest.TestCase):

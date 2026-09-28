@@ -1,1 +1,11 @@
-Part of what was proposed did not enter the resume, because the resume does not back it: {{ rejections | join('; ') }}.
+{% set sections = {'summary': 'the summary', 'work_experience': 'the experience', 'skills': 'the skills'} %}
+{% set reasons = {
+  'a number the base resume does not carry': 'a number the resume does not back',
+  'a posting skill the base resume does not back': 'a skill of the posting the resume does not back',
+  'more than twice the original': 'more than twice as long as the original',
+  'not written in the language of the resume': 'not written in the language of the resume',
+  'no such entry in work_experience': 'no such entry in the experience',
+  'no evidence in base resume': 'no evidence in the resume',
+  'drops a skill the resume lists': 'it would drop a skill the resume already lists'
+} %}
+Part of what was proposed did not enter the resume: {% for r in rejections %}{{ sections.get(r.section, r.section) }}{% if r.label %} ({{ r.label }}){% endif %}, {{ reasons.get(r.reason, r.reason) }}{% if r.detail %}: {{ r.detail }}{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}.
