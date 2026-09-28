@@ -26,9 +26,12 @@ AUTHORIZATION_HEADER = "Authorization"
 
 ROLE_PREFIX = "R_"
 
+CANDIDATE_ROLE = "CANDIDATE"
+
 MISSING_AUTHORIZATION_ERROR = "Missing Authorization header"
 INVALID_TOKEN_ERROR = "Invalid or expired access token"
 IAM_UNAVAILABLE_ERROR = "Authentication service is unavailable"
+NOT_A_CANDIDATE_ERROR = "Only users of type CANDIDATE can perform this action"
 
 
 class Principal(BaseModel):
@@ -127,3 +130,12 @@ async def require_principal(
 
 
 CallerPrincipal = Annotated[Principal, Depends(require_principal)]
+
+
+async def require_candidate(principal: CallerPrincipal) -> Principal:
+    if not principal.has_role(CANDIDATE_ROLE):
+        raise HTTPException(status_code=403, detail=NOT_A_CANDIDATE_ERROR)
+    return principal
+
+
+CandidatePrincipal = Annotated[Principal, Depends(require_candidate)]

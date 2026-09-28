@@ -90,6 +90,40 @@ class ConversationRouterTest(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["reason"], "Missing Authorization header")
 
+    def test_a_caller_without_the_candidate_role_is_a_403(self) -> None:
+        app.dependency_overrides[require_principal] = lambda: Principal(
+            id=_USER_ID, username="acme", email="hr@acme.com", roles=["R_COMPANY"]
+        )
+
+        response = self.client.post(_BASE, json=_CREATE_BODY, headers=_HEADERS)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            response.json()["reason"],
+            "Only users of type CANDIDATE can perform this action",
+        )
+        self.service.create.assert_not_awaited()
+
+    def test_every_conversation_route_needs_the_candidate_role(self) -> None:
+        app.dependency_overrides[require_principal] = lambda: Principal(
+            id=_USER_ID, username="acme", email="hr@acme.com", roles=["R_COMPANY"]
+        )
+        routes = [
+            ("post", _BASE, _CREATE_BODY),
+            ("post", f"{_BASE}/{_CONVERSATION_ID}/turn", {"message": "hi", "turnKey": "k"}),
+            ("get", f"{_BASE}/{_CONVERSATION_ID}", None),
+            ("patch", f"{_BASE}/{_CONVERSATION_ID}/applied", {"resumeVersionId": "v1"}),
+        ]
+
+        for method, url, body in routes:
+            with self.subTest(route=f"{method.upper()} {url}"):
+                kwargs = {"headers": _HEADERS}
+                if body is not None:
+                    kwargs["json"] = body
+                response = getattr(self.client, method)(url, **kwargs)
+
+                self.assertEqual(response.status_code, 403)
+
     def test_turn_returns_the_tailored_resume(self) -> None:
         self.service.turn.return_value = TurnResponse(
             reply="done",

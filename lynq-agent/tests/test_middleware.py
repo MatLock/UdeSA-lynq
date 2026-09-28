@@ -15,7 +15,9 @@ _BEARER = "Bearer access-token"
 class RequestUuidMiddlewareTests(unittest.TestCase):
 
     def setUp(self) -> None:
-        app.dependency_overrides[require_principal] = lambda: Principal(id="u1")
+        app.dependency_overrides[require_principal] = lambda: Principal(
+            id="u1", roles=["R_CANDIDATE"]
+        )
         self.client = TestClient(app)
 
     def tearDown(self) -> None:

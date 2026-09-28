@@ -242,7 +242,6 @@ lynq-ml and lynq-app-backend through their `/internal/**` routes, which the shar
 | 0     | `RequestUuidFilter`        | all routes except Swagger      | 403 if `lynq-request-uuid` is missing/blank; echoes it back and binds it to the logging context (MDC). |
 | 1     | `AuthHeaderExistenceFilter`| all routes except Swagger and the anonymous auth routes | 401 if the `Authorization` header is missing.                          |
 | 2     | `JwtSignatureFilter`       | as above, and also not `/auth/refresh` | 401 if the token's signature does not verify, it has expired, or it carries no subject. Builds a `LynqUserPrincipal` from the token's `sub`, `username`, `email` and `roles` claims — carrying the raw `Authorization` header so a controller can relay it — and loads it into the `SecurityContext`. |
-| 3     | `RelayRoleFilter`          | as `JwtSignatureFilter`        | 403 for the relayed routes whose role is structural (`RelayRoleRules`). **Default allow**: a route no rule covers is relayed untouched. |
 
 `PublicPaths` holds those two exceptions, and the difference between them matters:
 
@@ -264,28 +263,26 @@ resume flow candidate-only, read from the token instead of asking lynq-app-backe
 Spring Security's own filter chain is `permitAll` and stateless — the filters above are what enforce
 authentication.
 
-### Roles on the relayed routes
+### Roles
 
-The flows the gateway owns are authorized here, but the relayed routes belong to the service that
-owns the data: lynq-app-backend carries its own `@HasRole` on every endpoint that belongs to one kind
-of user, and it is the only place that can also enforce ownership ("this resume is yours"). So the
-role check downstream is the one that decides.
+A role is checked once, by the service that runs the operation, with an annotation on the method that
+runs it. Never here, against a table of paths.
 
-`RelayRoleFilter` is an **optimization, not the enforcement point**: it bounces the requests it knows
-are doomed before they cost a hop to lynq-app-backend and another from there to lynq-iam. Everything
-it does not recognize is relayed, so a rule missing from `RelayRoleRules` can never open a hole nor
-invent a `403` — the worst case is the request travelling one service further to get the same answer.
+- **Flows this gateway owns** are authorized here, because here is where they are composed.
+  `@HasRole(Role.CANDIDATE)` on `ResumeControllerImpl` covers the whole resume flow — preview, import,
+  translate, alias, delete and the four CV Tailor routes. lynq-agent checks the same role on its own
+  conversation routes, so the guarantee does not rest on this gateway alone.
+- **Relayed routes** are authorized by the service that owns the data. lynq-app-backend carries its
+  own `@HasRole` on every endpoint that belongs to one kind of user, and it is the only place that can
+  also enforce ownership ("this resume is yours"). This gateway relays the request and passes its
+  answer back, 403 included.
 
-| Role | Relayed routes |
-| ---- | -------------- |
-| `R_COMPANY` | `POST /job`, `GET /job/mine`, `POST /company` |
-| `R_CANDIDATE` | `POST /job/{jobId}/apply`, `GET /job/{jobId}/upskilling-suggestion`, `GET /user/generate-upload-resume`, `POST /user/confirm-upload-resume`, `GET|POST /user/resume`, `GET /user/resume/languages`, `PUT /user/resume/{resumeId}/alias`, `DELETE /user/resume/{resumeId}`, `GET /user/application`, `GET /user/upskilling-suggestion/{jobPostId}` |
-
-The rules are exact method + path templates on purpose, never prefixes. A prefix would bounce
-whatever appears under it later, and the gateway is the one place that cannot tell an endpoint it has
-never heard of from one that is open by design — the downstream service can. Adding a role-scoped
-endpoint there without adding a rule here is a missed optimization; adding a prefix rule here is a
-bug waiting for the next endpoint.
+There used to be a `RelayRoleFilter` here, driven by a table of method + path templates, bouncing the
+requests it knew were doomed before they cost a hop. It was default-allow, so it could never open a
+hole — but every one of its rules was a hand-kept copy of a `@HasRole` in lynq-app-backend, and a copy
+of an authorization rule is a copy that drifts. The saved hop was not worth a second place to
+remember. What replaces it is a test in lynq-app-backend: a `/dmz` endpoint that names no role fails
+the build unless it is declared as open to every caller.
 
 ---
 

@@ -256,6 +256,11 @@ header names nobody. A missing `Authorization` is a 401, a token lynq-iam refuse
 and lynq-iam being unreachable is a 503. Creating a conversation relays the same credential
 to lynq-ml, which resolves it for itself.
 
+The roles that token carries are read too: tailoring a resume is a candidate's operation, so
+the four conversation routes sit behind `CandidatePrincipal` and answer 403 to anyone else.
+lynq-bff carries the same check on `ResumeControllerImpl` and reaches these routes first —
+this one is here so the guarantee does not depend on who the caller came through.
+
 ### A turn, transaction by transaction
 
 A turn is **two** transactions with the expensive work outside both, so a second click
