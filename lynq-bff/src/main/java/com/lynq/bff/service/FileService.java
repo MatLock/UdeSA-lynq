@@ -33,7 +33,7 @@ public class FileService {
 
     return DownstreamErrors.call(
         () -> lynqFileStorageClient
-            .createUpload(request, caller.requestUuid(), caller.userId())
+            .createUpload(request, caller.requestUuid(), caller.authorization())
             .getData(),
         UPLOAD_NOT_REGISTERED);
   }
@@ -43,7 +43,7 @@ public class FileService {
 
     return DownstreamErrors.call(
         () -> lynqFileStorageClient
-            .confirmUpload(fileId, caller.requestUuid(), caller.userId())
+            .confirmUpload(fileId, caller.requestUuid(), caller.authorization())
             .getData(),
         UPLOAD_NOT_CONFIRMED);
   }
@@ -51,7 +51,7 @@ public class FileService {
   public FileResponse findOwnedFile(String fileId, Caller caller) {
     return DownstreamErrors.call(
         () -> lynqFileStorageClient
-            .findOwnedFile(fileId, caller.requestUuid(), caller.userId())
+            .findOwnedFile(fileId, caller.requestUuid(), caller.authorization())
             .getData(),
         FILE_UNREADABLE);
   }
@@ -59,7 +59,7 @@ public class FileService {
   public CreateFileDownloadResponse createDownloadUrl(String fileId, Caller caller) {
     return DownstreamErrors.call(
         () -> lynqFileStorageClient
-            .createDownloadUrl(fileId, caller.requestUuid())
+            .createDownloadUrl(fileId, caller.requestUuid(), caller.authorization())
             .getData(),
         DOWNLOAD_URL_NOT_ISSUED);
   }
@@ -68,7 +68,7 @@ public class FileService {
                                                 Caller caller) {
     return DownstreamErrors.call(
         () -> lynqFileStorageClient
-            .createDownloadUrls(request, caller.requestUuid())
+            .createDownloadUrls(request, caller.requestUuid(), caller.authorization())
             .getData(),
         DOWNLOAD_URLS_NOT_ISSUED);
   }
@@ -77,7 +77,7 @@ public class FileService {
     log.info("message= Deleting file, user_id={}, file_id={}", caller.userId(), fileId);
 
     DownstreamErrors.run(
-        () -> lynqFileStorageClient.deleteFile(fileId, caller.requestUuid(), caller.userId()),
+        () -> lynqFileStorageClient.deleteFile(fileId, caller.requestUuid(), caller.authorization()),
         FILE_NOT_DELETED);
   }
 }

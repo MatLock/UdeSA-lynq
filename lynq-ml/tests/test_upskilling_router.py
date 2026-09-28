@@ -7,17 +7,15 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-from fastapi.testclient import TestClient
-
 from llm_client import LLMError, LLMProvider
-from main import app
+from tests.support import authenticated_client, clear_overrides
 from udemy_client import Course
 
 _ENDPOINT = "/lynq-ml/dmz/upskilling_suggestion"
 
 _HEADERS = {
     "lynq-request-uuid": "req-123",
-    "user-id": "user-1",
+    "Authorization": "Bearer access-token",
     "company-id": "company-1",
 }
 
@@ -69,7 +67,10 @@ class UpskillingRouterTests(unittest.TestCase):
     """Happy path, perfect-match short-circuit, and failure branches."""
 
     def setUp(self) -> None:
-        self.client = TestClient(app)
+        self.client = authenticated_client()
+
+    def tearDown(self) -> None:
+        clear_overrides()
 
     def test_returns_outcome_and_courses_on_valid_output(self) -> None:
         reasons = ["Missing Kubernetes experience.", "No GraphQL exposure."]

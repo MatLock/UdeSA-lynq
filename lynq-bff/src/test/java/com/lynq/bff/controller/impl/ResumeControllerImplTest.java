@@ -18,6 +18,7 @@ import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
 import com.lynq.bff.controller.response.ResumeTailorApplyRestResponse;
 import com.lynq.bff.enums.ResumeTemplate;
+import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.ResumeAliasService;
 import com.lynq.bff.service.ResumeDeletionService;
@@ -26,6 +27,7 @@ import com.lynq.bff.service.ResumeTailorService;
 import com.lynq.bff.service.ResumeTranslationService;
 import com.lynq.bff.service.ResumePreviewService;
 import java.util.Map;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +36,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @ExtendWith(MockitoExtension.class)
 class ResumeControllerImplTest {
@@ -47,6 +50,10 @@ class ResumeControllerImplTest {
   private static final String JOB_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a61";
   private static final String CONVERSATION_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42";
   private static final String TURN_KEY = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d43";
+
+  private static final LynqUserPrincipal PRINCIPAL = new LynqUserPrincipal(
+      USER_ID, "janedoe", "jane@lynq.com",
+      List.of(new SimpleGrantedAuthority("R_CANDIDATE")), AUTHORIZATION);
 
   @Mock
   private ResumePreviewService resumePreviewService;
@@ -83,7 +90,7 @@ class ResumeControllerImplTest {
         new Caller(USER_ID, REQUEST_UUID, AUTHORIZATION))).thenReturn(updated);
 
     ResponseEntity<GlobalRestResponse<Object>> response = resumeController.updateResumeAlias(
-        RESUME_ID, request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        RESUME_ID, request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody(), is(notNullValue()));
@@ -95,7 +102,7 @@ class ResumeControllerImplTest {
   void updateResumeAliasDelegatesToTheServiceWithTheCaller() {
     UpdateResumeAliasRestRequest request = new UpdateResumeAliasRestRequest("Backend roles");
 
-    resumeController.updateResumeAlias(RESUME_ID, request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+    resumeController.updateResumeAlias(RESUME_ID, request, REQUEST_UUID, PRINCIPAL);
 
     ArgumentCaptor<Caller> caller = ArgumentCaptor.forClass(Caller.class);
     verify(resumeAliasService).assign(eq(RESUME_ID), eq("Backend roles"), caller.capture());
@@ -113,7 +120,7 @@ class ResumeControllerImplTest {
         new Caller(USER_ID, REQUEST_UUID, AUTHORIZATION))).thenReturn(translated);
 
     ResponseEntity<GlobalRestResponse<Object>> response = resumeController.translateResume(
-        "resume-1", request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        "resume-1", request, REQUEST_UUID, PRINCIPAL);
 
     // Nothing is created here: the translated JSON goes back for the preview step.
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
@@ -126,7 +133,7 @@ class ResumeControllerImplTest {
   void translateResumeDelegatesToTheServiceWithTheCaller() {
     TranslateResumeRestRequest request = new TranslateResumeRestRequest("FR");
 
-    resumeController.translateResume("resume-1", request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+    resumeController.translateResume("resume-1", request, REQUEST_UUID, PRINCIPAL);
 
     verify(resumeTranslationService).translate("resume-1", "FR",
         new Caller(USER_ID, REQUEST_UUID, AUTHORIZATION));
@@ -135,14 +142,14 @@ class ResumeControllerImplTest {
   @Test
   void deleteResumeRespondsWithNoContent() {
     ResponseEntity<Void> response =
-        resumeController.deleteResume(RESUME_ID, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        resumeController.deleteResume(RESUME_ID, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.NO_CONTENT));
   }
 
   @Test
   void deleteResumeDelegatesToTheServiceWithTheCaller() {
-    resumeController.deleteResume(RESUME_ID, REQUEST_UUID, AUTHORIZATION, USER_ID);
+    resumeController.deleteResume(RESUME_ID, REQUEST_UUID, PRINCIPAL);
 
     ArgumentCaptor<Caller> caller = ArgumentCaptor.forClass(Caller.class);
     verify(resumeDeletionService).delete(eq(RESUME_ID), caller.capture());
@@ -163,7 +170,7 @@ class ResumeControllerImplTest {
         .thenReturn(preview);
 
     ResponseEntity<GlobalRestResponse<ResumePreviewRestResponse>> response =
-        resumeController.previewResume(request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        resumeController.previewResume(request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
     GlobalRestResponse<ResumePreviewRestResponse> body = response.getBody();
@@ -178,7 +185,7 @@ class ResumeControllerImplTest {
     when(resumePreviewService.preview(eq(request), any()))
         .thenReturn(ResumePreviewRestResponse.builder().build());
 
-    resumeController.previewResume(request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+    resumeController.previewResume(request, REQUEST_UUID, PRINCIPAL);
 
     ArgumentCaptor<Caller> captor = ArgumentCaptor.forClass(Caller.class);
     verify(resumePreviewService).preview(eq(request), captor.capture());
@@ -191,14 +198,14 @@ class ResumeControllerImplTest {
   @Test
   void discardResumePreviewRespondsWithNoContent() {
     ResponseEntity<Void> response =
-        resumeController.discardResumePreview(FILE_ID, REQUEST_UUID, USER_ID);
+        resumeController.discardResumePreview(FILE_ID, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.NO_CONTENT));
   }
 
   @Test
   void discardResumePreviewCallsTheFlowWithTheVerifiedCaller() {
-    resumeController.discardResumePreview(FILE_ID, REQUEST_UUID, USER_ID);
+    resumeController.discardResumePreview(FILE_ID, REQUEST_UUID, PRINCIPAL);
 
     ArgumentCaptor<Caller> captor = ArgumentCaptor.forClass(Caller.class);
     verify(resumePreviewService).discard(eq(FILE_ID), captor.capture());
@@ -214,7 +221,7 @@ class ResumeControllerImplTest {
         .thenReturn(stored);
 
     ResponseEntity<GlobalRestResponse<Object>> response = resumeController.importResumeDocument(
-        FILE_ID, UI_LANGUAGE, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        FILE_ID, UI_LANGUAGE, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
     GlobalRestResponse<Object> body = response.getBody();
@@ -229,7 +236,7 @@ class ResumeControllerImplTest {
         .thenReturn(Map.of());
 
     resumeController.importResumeDocument(
-        FILE_ID, UI_LANGUAGE, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        FILE_ID, UI_LANGUAGE, REQUEST_UUID, PRINCIPAL);
 
     ArgumentCaptor<Caller> captor = ArgumentCaptor.forClass(Caller.class);
     verify(resumeImportService).importUploadedDocument(eq(FILE_ID), eq(UI_LANGUAGE), captor.capture());
@@ -251,7 +258,7 @@ class ResumeControllerImplTest {
         new Caller(USER_ID, REQUEST_UUID, AUTHORIZATION))).thenReturn(conversation);
 
     ResponseEntity<GlobalRestResponse<Object>> response = resumeController.startResumeTailoring(
-        RESUME_ID, JOB_ID, UI_LANGUAGE, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        RESUME_ID, JOB_ID, UI_LANGUAGE, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
     assertThat(response.getBody(), is(notNullValue()));
@@ -267,8 +274,7 @@ class ResumeControllerImplTest {
         any(Caller.class))).thenReturn(turn);
 
     ResponseEntity<GlobalRestResponse<Object>> response =
-        resumeController.takeResumeTailoringTurn(CONVERSATION_ID, request, REQUEST_UUID,
-            AUTHORIZATION, USER_ID);
+        resumeController.takeResumeTailoringTurn(CONVERSATION_ID, request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody(), is(notNullValue()));
@@ -283,8 +289,7 @@ class ResumeControllerImplTest {
         .thenReturn(conversation);
 
     ResponseEntity<GlobalRestResponse<Map<String, Object>>> response =
-        resumeController.getResumeTailoringConversation(CONVERSATION_ID, REQUEST_UUID,
-            AUTHORIZATION, USER_ID);
+        resumeController.getResumeTailoringConversation(CONVERSATION_ID, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody(), is(notNullValue()));
@@ -304,8 +309,7 @@ class ResumeControllerImplTest {
         .thenReturn(applied);
 
     ResponseEntity<GlobalRestResponse<ResumeTailorApplyRestResponse>> response =
-        resumeController.applyWithTailoredResume(CONVERSATION_ID, request, REQUEST_UUID,
-            AUTHORIZATION, USER_ID);
+        resumeController.applyWithTailoredResume(CONVERSATION_ID, request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
     assertThat(response.getBody(), is(notNullValue()));
@@ -315,7 +319,7 @@ class ResumeControllerImplTest {
   @Test
   void theTailoringRoutesCarryTheCallerTheTokenWasVerifiedFor() {
     resumeController.applyWithTailoredResume(CONVERSATION_ID,
-        new TailorApplyRestRequest(), REQUEST_UUID, AUTHORIZATION, USER_ID);
+        new TailorApplyRestRequest(), REQUEST_UUID, PRINCIPAL);
 
     ArgumentCaptor<Caller> caller = ArgumentCaptor.forClass(Caller.class);
     verify(resumeTailorService).apply(eq(CONVERSATION_ID),

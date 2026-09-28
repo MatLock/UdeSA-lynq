@@ -69,7 +69,6 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
   private static final String AUTHORIZATION_HEADER = "Authorization";
   private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
-  private static final String USER_ID_HEADER = "user-id";
   private static final String COMPANY_ID_HEADER = "company-id";
   private static final String OUTPUT_LANGUAGE_HEADER = "output-language";
   private static final String CONTENT_TYPE_HEADER = "Content-Type";
@@ -460,12 +459,12 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     lynqFileStorageMock.verify(request()
         .withMethod("POST")
         .withPath(FILE_STORAGE_UPLOAD_URL_PATH)
-        .withHeader(USER_ID_HEADER, USER_ID)
+        .withHeader(AUTHORIZATION_HEADER, BEARER_TOKEN)
         .withBody(subString(UPLOAD_FILE_NAME)), VerificationTimes.exactly(1));
     lynqFileStorageMock.verify(request()
         .withMethod("DELETE")
         .withPath("/dmz/files/" + PROFILE_FILE_ID)
-        .withHeader(USER_ID_HEADER, USER_ID), VerificationTimes.exactly(1));
+        .withHeader(AUTHORIZATION_HEADER, BEARER_TOKEN), VerificationTimes.exactly(1));
   }
 
   @Test
@@ -480,7 +479,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     lynqFileStorageMock.verify(request()
         .withMethod("POST")
         .withPath("/dmz/files/" + PROFILE_FILE_ID + "/confirm")
-        .withHeader(USER_ID_HEADER, USER_ID), VerificationTimes.exactly(1));
+        .withHeader(AUTHORIZATION_HEADER, BEARER_TOKEN), VerificationTimes.exactly(1));
   }
 
   @Test
@@ -883,7 +882,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .withMethod("POST")
         .withPath(ML_UPSKILLING_PATH)
         .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .withHeader(USER_ID_HEADER, USER_ID)
+        .withHeader(AUTHORIZATION_HEADER, BEARER_TOKEN)
         .withHeader(COMPANY_ID_HEADER, COMPANY_ID)
         .withHeader(OUTPUT_LANGUAGE_HEADER, "en")
         .withBody(subString("\"candidate\"")));
@@ -976,7 +975,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .withMethod("POST")
         .withPath(ML_CANDIDATE_EXPLANATION_PATH)
         .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .withHeader(USER_ID_HEADER, USER_ID)
+        .withHeader(AUTHORIZATION_HEADER, BEARER_TOKEN)
         .withHeader(COMPANY_ID_HEADER, COMPANY_ID)
         .withBody(subString("\"candidate\"")));
   }

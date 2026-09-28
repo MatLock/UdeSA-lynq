@@ -323,7 +323,7 @@ public class JobService {
         .orElseThrow(() -> new BadRequestException(USER_NOT_LINKED_TO_COMPANY));
 
     GlobalRestResponse<CandidateExplanationResponse> response = lynqMLClient.candidateExplanation(
-        toEvaluationRequest(job, candidate), requestUuid, owner.getId(), company.getId());
+        toEvaluationRequest(job, candidate), requestUuid, callerAuthorization(), company.getId());
 
     return response.getData();
   }
@@ -340,7 +340,8 @@ public class JobService {
     String companyId = job.getCompany() != null ? job.getCompany().getId() : "";
 
     GlobalRestResponse<UpskillingSuggestionResponse> response = lynqMLClient.upskillingSuggestion(
-        toEvaluationRequest(job, user), requestUuid, user.getId(), companyId, outputLanguage);
+        toEvaluationRequest(job, user), requestUuid, callerAuthorization(), companyId,
+        outputLanguage);
 
     return response.getData();
   }
@@ -638,6 +639,10 @@ public class JobService {
 
   private boolean callerIsCandidate() {
     return getAuthenticatedPrincipal().hasRole(Role.CANDIDATE);
+  }
+
+  private String callerAuthorization() {
+    return getAuthenticatedPrincipal().getAuthorization();
   }
 
   private LynqUserPrincipal getAuthenticatedPrincipal() {

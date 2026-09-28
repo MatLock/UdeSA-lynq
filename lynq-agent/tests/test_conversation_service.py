@@ -28,6 +28,7 @@ from prompt import greeting as greeting_template
 
 USER = "user-1"
 REQUEST_UUID = "req-1"
+BEARER = "Bearer access-token"
 
 NO_EDIT_REPLY = "Your resume already says everything this posting asks for."
 
@@ -108,7 +109,9 @@ class ConversationServiceTest(unittest.IsolatedAsyncioTestCase):
 
     async def _create(self, service=None, **overrides):
         service = service or self.service()
-        return await service.create(create_request(**overrides), REQUEST_UUID, USER)
+        return await service.create(
+            create_request(**overrides), REQUEST_UUID, USER, BEARER
+        )
 
     async def _count(self, entity) -> int:
         async with self.database.session_factory() as session:

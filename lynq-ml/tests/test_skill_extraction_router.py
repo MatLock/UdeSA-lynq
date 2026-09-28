@@ -6,16 +6,14 @@ import json
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from fastapi.testclient import TestClient
-
 from llm_client import LLMError, LLMProvider
-from main import app
+from tests.support import anonymous_client, authenticated_client, clear_overrides
 
 _ENDPOINT = "/lynq-ml/dmz/resume/skill-extraction"
 
 _HEADERS = {
     "lynq-request-uuid": "req-123",
-    "user-id": "user-1",
+    "Authorization": "Bearer access-token",
 }
 
 _BODY = {
@@ -46,7 +44,10 @@ class SkillExtractionRouterTests(unittest.TestCase):
     """Covers the happy path plus the LLM/validation failure branches."""
 
     def setUp(self) -> None:
-        self.client = TestClient(app)
+        self.client = authenticated_client()
+
+    def tearDown(self) -> None:
+        clear_overrides()
 
     def test_returns_bucketed_skills_on_valid_llm_output(self) -> None:
         payload = {
@@ -186,18 +187,16 @@ class SkillExtractionRouterTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         fake.generate.assert_not_awaited()
 
-    def test_missing_user_id_header_returns_400(self) -> None:
+    def test_missing_authorization_header_returns_401(self) -> None:
         fake = _fake_client(generate_return=json.dumps({"skills": [], "tools": [], "soft": []}))
 
         with patch("router.user_resume_skill_extraction.get_llm_client", return_value=fake):
-            response = self.client.post(
+            response = anonymous_client().post(
                 _ENDPOINT, json=_BODY, headers={"lynq-request-uuid": "req-123"}
             )
 
-        # Missing user-id header fails validation, which the app's
-        # RequestValidationError handler maps to a 400 error envelope.
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["reason"], "Invalid Fields Found")
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["reason"], "Missing Authorization header")
         fake.generate.assert_not_awaited()
 
 

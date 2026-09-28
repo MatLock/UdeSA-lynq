@@ -117,14 +117,14 @@ class ResumeTailorServiceTest {
   void startSendsTheAgentTheJobTheGatewayReadAndTheCallersOwnResume() {
     givenTheCallersResumes();
     givenTheJob();
-    when(lynqAgentClient.startConversation(any(), eq(REQUEST_UUID), eq(USER_ID)))
+    when(lynqAgentClient.startConversation(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, Map.of("conversationId", CONVERSATION_ID)));
 
     Object conversation = resumeTailorService.start(RESUME_ID, JOB_ID, "es", CALLER);
 
     ArgumentCaptor<StartTailorConversationRequest> captor =
         ArgumentCaptor.forClass(StartTailorConversationRequest.class);
-    verify(lynqAgentClient).startConversation(captor.capture(), eq(REQUEST_UUID), eq(USER_ID));
+    verify(lynqAgentClient).startConversation(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     StartTailorConversationRequest request = captor.getValue();
     assertThat(request.getJob().getId(), is(JOB_ID));
     assertThat(request.getJob().getTitle(), is(JOB_TITLE));
@@ -141,14 +141,14 @@ class ResumeTailorServiceTest {
   void startTellsTheAgentToSpeakTheUiLanguageAndEditInTheResumesOwn() {
     givenTheCallersResumes();
     givenTheJob();
-    when(lynqAgentClient.startConversation(any(), eq(REQUEST_UUID), eq(USER_ID)))
+    when(lynqAgentClient.startConversation(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, Map.of()));
 
     resumeTailorService.start(RESUME_ID, JOB_ID, "es", CALLER);
 
     ArgumentCaptor<StartTailorConversationRequest> captor =
         ArgumentCaptor.forClass(StartTailorConversationRequest.class);
-    verify(lynqAgentClient).startConversation(captor.capture(), eq(REQUEST_UUID), eq(USER_ID));
+    verify(lynqAgentClient).startConversation(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     assertThat(captor.getValue().getLanguage(), is("ES"));
     assertThat(captor.getValue().getResumeLanguage(), is(RESUME_LANGUAGE));
   }
@@ -179,7 +179,7 @@ class ResumeTailorServiceTest {
   void startReportsABadGatewayWhenTheAgentFails() {
     givenTheCallersResumes();
     givenTheJob();
-    when(lynqAgentClient.startConversation(any(), eq(REQUEST_UUID), eq(USER_ID)))
+    when(lynqAgentClient.startConversation(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenThrow(feignFailure(502, "{\"reason\":\"The LLM failed\"}"));
 
     assertThrows(BadGatewayException.class,
@@ -188,7 +188,7 @@ class ResumeTailorServiceTest {
 
   @Test
   void turnRelaysTheMessageAndTheIdempotencyKey() {
-    when(lynqAgentClient.takeTurn(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(USER_ID)))
+    when(lynqAgentClient.takeTurn(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, Map.of("reply", "Done")));
 
     Object turn = resumeTailorService.turn(CONVERSATION_ID, " Highlight Kubernetes ",
@@ -196,7 +196,7 @@ class ResumeTailorServiceTest {
 
     ArgumentCaptor<TailorTurnRequest> captor = ArgumentCaptor.forClass(TailorTurnRequest.class);
     verify(lynqAgentClient).takeTurn(eq(CONVERSATION_ID), captor.capture(), eq(REQUEST_UUID),
-        eq(USER_ID));
+        eq(AUTHORIZATION));
     assertThat(captor.getValue().getMessage(), is("Highlight Kubernetes"));
     assertThat(captor.getValue().getTurnKey(), is(TURN_KEY));
     assertThat(turn, is(Map.of("reply", "Done")));
@@ -222,7 +222,7 @@ class ResumeTailorServiceTest {
 
   @Test
   void turnKeepsTheAgentsConflictCode() {
-    when(lynqAgentClient.takeTurn(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(USER_ID)))
+    when(lynqAgentClient.takeTurn(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenThrow(feignFailure(409, "{\"success\":false,\"reason\":\"A turn is already running "
             + "on this conversation\",\"code\":\"TURN_IN_PROGRESS\"}"));
 
@@ -235,7 +235,7 @@ class ResumeTailorServiceTest {
 
   @Test
   void turnKeepsTheExhaustedConflictCode() {
-    when(lynqAgentClient.takeTurn(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(USER_ID)))
+    when(lynqAgentClient.takeTurn(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenThrow(feignFailure(409, "{\"reason\":\"No turns left\","
             + "\"code\":\"CONVERSATION_EXHAUSTED\"}"));
 
@@ -255,7 +255,7 @@ class ResumeTailorServiceTest {
 
   @Test
   void viewAnswersNotFoundForAConversationThatDoesNotExist() {
-    when(lynqAgentClient.getConversation(CONVERSATION_ID, REQUEST_UUID, USER_ID))
+    when(lynqAgentClient.getConversation(CONVERSATION_ID, REQUEST_UUID, AUTHORIZATION))
         .thenThrow(feignFailure(404, "{\"reason\":\"Conversation does not exist\"}"));
 
     NotFoundException failure = assertThrows(NotFoundException.class,
@@ -266,7 +266,7 @@ class ResumeTailorServiceTest {
 
   @Test
   void viewAnswersForbiddenForSomeoneElsesConversation() {
-    when(lynqAgentClient.getConversation(CONVERSATION_ID, REQUEST_UUID, USER_ID))
+    when(lynqAgentClient.getConversation(CONVERSATION_ID, REQUEST_UUID, AUTHORIZATION))
         .thenThrow(feignFailure(403, "{\"reason\":\"Conversation belongs to another user\"}"));
 
     assertThrows(ForbiddenException.class,
@@ -293,7 +293,7 @@ class ResumeTailorServiceTest {
     ArgumentCaptor<MarkConversationAppliedRequest> closed =
         ArgumentCaptor.forClass(MarkConversationAppliedRequest.class);
     verify(lynqAgentClient).markApplied(eq(CONVERSATION_ID), closed.capture(), eq(REQUEST_UUID),
-        eq(USER_ID));
+        eq(AUTHORIZATION));
     assertThat(closed.getValue().getAppliedResumeId(), is(TAILORED_FILE_ID));
 
     assertThat(applied.getApplication(), is(APPLICATION));
@@ -311,7 +311,7 @@ class ResumeTailorServiceTest {
 
     resumeTailorService.apply(CONVERSATION_ID, new TailorApplyRestRequest(), CALLER);
 
-    verify(lynqAgentClient).getConversation(CONVERSATION_ID, REQUEST_UUID, USER_ID);
+    verify(lynqAgentClient).getConversation(CONVERSATION_ID, REQUEST_UUID, AUTHORIZATION);
     verify(lynqBackendClient).applyToJob(eq(JOB_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
   }
 
@@ -329,7 +329,7 @@ class ResumeTailorServiceTest {
     assertThat(applied.isAlreadyApplied(), is(true));
     assertThat(applied.getApplication(), is(nullValue()));
     assertThat(applied.getConversationStatus(), is("APPLIED"));
-    verify(lynqAgentClient).markApplied(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(USER_ID));
+    verify(lynqAgentClient).markApplied(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
   }
 
   @Test
@@ -378,7 +378,7 @@ class ResumeTailorServiceTest {
 
   @Test
   void applyFailsWhenTheConversationCarriesNoResumeToApplyWith() {
-    when(lynqAgentClient.getConversation(CONVERSATION_ID, REQUEST_UUID, USER_ID))
+    when(lynqAgentClient.getConversation(CONVERSATION_ID, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, Map.of("jobId", JOB_ID)));
 
     assertThrows(BadGatewayException.class,
@@ -394,7 +394,7 @@ class ResumeTailorServiceTest {
     givenTheResumeRenders();
     when(lynqBackendClient.applyToJob(eq(JOB_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, APPLICATION));
-    when(lynqAgentClient.markApplied(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(USER_ID)))
+    when(lynqAgentClient.markApplied(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenThrow(feignFailure(502, "{\"reason\":\"The agent is down\"}"));
 
     ResumeTailorApplyRestResponse applied =
@@ -410,7 +410,7 @@ class ResumeTailorServiceTest {
     givenTheResumeRenders();
     when(lynqBackendClient.applyToJob(eq(JOB_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, APPLICATION));
-    when(lynqAgentClient.markApplied(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(USER_ID)))
+    when(lynqAgentClient.markApplied(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenThrow(feignFailure(409, "{\"reason\":\"Already applied with another resume\","
             + "\"code\":\"ALREADY_APPLIED\"}"));
 
@@ -434,7 +434,7 @@ class ResumeTailorServiceTest {
 
   @Test
   void applyReportsABadGatewayWhenTheConversationCarriesNoJob() {
-    when(lynqAgentClient.getConversation(CONVERSATION_ID, REQUEST_UUID, USER_ID))
+    when(lynqAgentClient.getConversation(CONVERSATION_ID, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, Map.of("status", "ACTIVE")));
 
     assertThrows(BadGatewayException.class,
@@ -478,13 +478,13 @@ class ResumeTailorServiceTest {
   }
 
   private void givenTheConversation() {
-    when(lynqAgentClient.getConversation(CONVERSATION_ID, REQUEST_UUID, USER_ID))
+    when(lynqAgentClient.getConversation(CONVERSATION_ID, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, CONVERSATION));
   }
 
   private void givenTheConversationCloses() {
     lenient().when(lynqAgentClient.markApplied(eq(CONVERSATION_ID), any(), eq(REQUEST_UUID),
-            eq(USER_ID)))
+            eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, Map.of("status", "APPLIED")));
   }
 

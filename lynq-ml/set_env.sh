@@ -63,4 +63,16 @@ export UDEMY_MAX_COURSES="${UDEMY_MAX_COURSES:-2}"
 export UDEMY_BASE_URL="${UDEMY_BASE_URL:-https://www.udemy.com}"
 export COURSE_SEARCH_TIMEOUT="${COURSE_SEARCH_TIMEOUT:-15}"
 
+# ----------------------------------------------------------------------------
+# Caller authentication.
+#
+# Every /dmz route resolves who is calling against lynq-iam from the request's
+# Authorization header — the service no longer trusts a caller-supplied user id.
+# The internal token guards /internal, which lynq-feeders uses: a scheduled
+# scrape has no user to speak for, so it carries the shared token instead.
+# ----------------------------------------------------------------------------
+export LYNQ_IAM_URL="${LYNQ_IAM_URL:-http://localhost:8080/lynq-iam}"
+export LYNQ_IAM_TIMEOUT="${LYNQ_IAM_TIMEOUT:-10}"
+export LYNQ_INTERNAL_TOKEN="${LYNQ_INTERNAL_TOKEN:-local-internal-token-not-a-secret}"
+
 echo "lynq-ml env set: LLM_PROVIDER=$LLM_PROVIDER"

@@ -6,17 +6,23 @@ from fastapi.testclient import TestClient
 
 from main import app
 from middleware.request_uuid import REQUEST_UUID_HEADER
+from security import Principal, require_principal
 
 _DMZ_PATH = "/lynq-agent/dmz/conversation"
+_BEARER = "Bearer access-token"
 
 
 class RequestUuidMiddlewareTests(unittest.TestCase):
 
     def setUp(self) -> None:
+        app.dependency_overrides[require_principal] = lambda: Principal(id="u1")
         self.client = TestClient(app)
 
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+
     def test_missing_uuid_header_is_rejected_with_403(self) -> None:
-        response = self.client.post(_DMZ_PATH, json={}, headers={"user-id": "u1"})
+        response = self.client.post(_DMZ_PATH, json={}, headers={"Authorization": _BEARER})
 
         self.assertEqual(response.status_code, 403)
         payload = response.json()
@@ -27,7 +33,7 @@ class RequestUuidMiddlewareTests(unittest.TestCase):
         response = self.client.post(
             _DMZ_PATH,
             json={},
-            headers={REQUEST_UUID_HEADER: "", "user-id": "u1"},
+            headers={REQUEST_UUID_HEADER: "", "Authorization": _BEARER},
         )
 
         self.assertEqual(response.status_code, 403)
@@ -36,7 +42,7 @@ class RequestUuidMiddlewareTests(unittest.TestCase):
         response = self.client.post(
             _DMZ_PATH,
             json={},
-            headers={REQUEST_UUID_HEADER: "req-1", "user-id": "u1"},
+            headers={REQUEST_UUID_HEADER: "req-1", "Authorization": _BEARER},
         )
 
         self.assertEqual(response.status_code, 400)

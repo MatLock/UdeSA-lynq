@@ -55,11 +55,13 @@ Machine-learning service for the Lynq platform. A FastAPI app that augments the 
                         ┌───────────────────────────┐
                         │       Client (HTTP)       │
                         └─────────────┬─────────────┘
-                                      │  lynq-request-uuid, user-id, company-id?
+                                      │  lynq-request-uuid, Authorization, company-id?
                                       ▼
                 ┌───────────────────────────────────────────┐
                 │            HTTP middleware                │
                 │   require_request_uuid   (all routes)     │
+                │   require_principal      (/dmz  routes)   │
+                │   require_internal_caller(/internal)      │
                 │   + standard error-envelope handlers      │
                 └─────────────┬─────────────────────────────┘
                               │
@@ -130,7 +132,7 @@ sequenceDiagram
     participant P as render_key_extractor_prompt
     participant L as LLM (Ollama / Bedrock)
 
-    C->>M: POST /lynq-ml/dmz/skill-enhance<br/>headers: lynq-request-uuid, user-id<br/>body: {title, description, work_type}
+    C->>M: POST /lynq-ml/dmz/skill-enhance<br/>headers: lynq-request-uuid, Authorization<br/>body: {title, description, work_type}
     M->>R: forward (request UUID bound to logging context)
     R->>F: get_llm_client()  (reads LLM_PROVIDER)
     F-->>R: LLMClient (Ollama or Bedrock)
@@ -160,9 +162,20 @@ from inside the platform — either through **lynq-bff**, the gateway that valid
 signature, or from **lynq-app-backend** for the evaluations it assembles from its own database.
 `/lynq-ml/health` stays outside the DMZ so infra probes can call it directly.
 
-`user-id` and `company-id` are **log fields only**: neither reaches a prompt or any decision. That is
-why `company-id` is optional on `skill-enhance`, which lynq-bff calls directly and which therefore
-has no company to report.
+Every `/dmz` route resolves **who is calling** from the `Authorization` header, against lynq-iam's
+`/auth/user-info`, exactly as lynq-app-backend does. A caller-supplied `user-id` header buys nothing
+any more: the token is the only thing that names a user. A missing header is a 401, a token lynq-iam
+refuses is a 401, and lynq-iam being unreachable is a 503.
+
+The resolved user id and `company-id` are **log fields only**: neither reaches a prompt or any
+decision. That is why `company-id` is optional on `skill-enhance`, which lynq-bff calls directly and
+which therefore has no company to report.
+
+`/lynq-ml/internal` is the one exception. **lynq-feeders** scrapes postings on a schedule and has no
+user to speak for, so the skill extraction it needs is exposed there and guarded by the shared
+`lynq-internal-token` — the same arrangement it already uses to reach lynq-app-backend's
+`/internal/**`. An access token does not open that route, and the internal token does not open
+`/dmz`.
 
 > `parse-resume` and `resume-template-creation` take a URL (`preSignedUrl`, `profile_url`,
 > `put_resume_url`) and hand it to `urllib.request.urlopen` server-side without validating the
@@ -174,14 +187,15 @@ All routes require the `lynq-request-uuid` header **except** `/lynq-ml/health`.
 
 | Method | Path                       | Extra headers required          | Description                                            |
 | ------ | -------------------------- | ------------------------------- | ------------------------------------------------------ |
-| POST   | `/dmz/skill-enhance`           | `user-id` (`company-id` optional) | Extract 5–15 key skills from a job posting plus 5–12 similarity tags. Called straight through lynq-bff. |
-| POST   | `/dmz/resume/skill-extraction` | `user-id`                       | Consolidate a whole resume's skills into technical/tools/soft buckets plus similarity tags. Called straight through lynq-bff. |
-| POST   | `/dmz/upskilling_suggestion`   | `user-id`, `company-id`         | Assess a candidate vs. a job; return a verdict + Udemy courses for each gap. |
-| POST   | `/dmz/candidate-explanation`   | `user-id`, `company-id`         | Assess a candidate vs. a job; return a hiring verdict with strengths and concerns. |
-| POST   | `/dmz/parse-resume`            | `user-id`                       | Download a resume (PDF/DOCX) from a presigned URL and structure it into JSON. |
-| POST   | `/dmz/translate`               | `user-id`                       | Translate every value of a structured resume into a target language. |
-| POST   | `/dmz/detect-language`         | `user-id`                       | Detect the main language of a text; feeds straight into `/translate`. |
-| POST   | `/dmz/resume-template-creation`| `user-id`                       | Render a structured resume into a styled PDF and upload it to a presigned URL. |
+| POST   | `/dmz/skill-enhance`           | `Authorization` (`company-id` optional) | Extract 5–15 key skills from a job posting plus 5–12 similarity tags. Called straight through lynq-bff. |
+| POST   | `/dmz/resume/skill-extraction` | `Authorization`                 | Consolidate a whole resume's skills into technical/tools/soft buckets plus similarity tags. Called straight through lynq-bff. |
+| POST   | `/dmz/upskilling_suggestion`   | `Authorization`, `company-id`   | Assess a candidate vs. a job; return a verdict + Udemy courses for each gap. |
+| POST   | `/dmz/candidate-explanation`   | `Authorization`, `company-id`   | Assess a candidate vs. a job; return a hiring verdict with strengths and concerns. |
+| POST   | `/dmz/parse-resume`            | `Authorization`                 | Download a resume (PDF/DOCX) from a presigned URL and structure it into JSON. |
+| POST   | `/dmz/translate`               | `Authorization`                 | Translate every value of a structured resume into a target language. |
+| POST   | `/dmz/detect-language`         | `Authorization`                 | Detect the main language of a text; feeds straight into `/translate`. |
+| POST   | `/dmz/resume-template-creation`| `Authorization`                 | Render a structured resume into a styled PDF and upload it to a presigned URL. |
+| POST   | `/internal/skill-enhance`      | `lynq-internal-token` (`user-id`, `company-id` optional) | The same extraction for lynq-feeders, which carries no user token. |
 | GET    | `/health`                  | —                               | Liveness/readiness probe; reports service + LLM status.|
 
 **`POST /dmz/skill-enhance`** request body:
@@ -460,7 +474,9 @@ surfaced rather than pulling the whole service out of rotation.
 
 ## Sample requests
 
-> Substitute `$UUID` with any UUID you generate per request (e.g. `uuidgen`).
+> Substitute `$UUID` with any UUID you generate per request (e.g. `uuidgen`), and `$TOKEN`
+> with an access token from lynq-iam (`POST /lynq-iam/auth/login/email` returns it as
+> `data.accessToken`). The `/internal` route takes `lynq-internal-token` instead.
 
 **Extract skills**
 
@@ -468,7 +484,7 @@ surfaced rather than pulling the whole service out of rotation.
 curl -X POST http://localhost:8084/lynq-ml/dmz/skill-enhance \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
-  -H "user-id: user-1" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "company-id: company-1" \
   -d '{
     "title": "Senior Backend Java Developer",
@@ -483,7 +499,7 @@ curl -X POST http://localhost:8084/lynq-ml/dmz/skill-enhance \
 curl -X POST "http://localhost:8084/lynq-ml/dmz/resume/skill-extraction?language=es" \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
-  -H "user-id: user-1" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "personal_info": { "full_name": "Ada Lovelace" },
     "summary": "Backend engineer with 5 years building Java services.",
@@ -497,7 +513,7 @@ curl -X POST "http://localhost:8084/lynq-ml/dmz/resume/skill-extraction?language
 curl -X POST http://localhost:8084/lynq-ml/dmz/upskilling_suggestion \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
-  -H "user-id: user-1" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "company-id: company-1" \
   -d '{
     "job": {
@@ -517,7 +533,7 @@ curl -X POST http://localhost:8084/lynq-ml/dmz/upskilling_suggestion \
 curl -X POST http://localhost:8084/lynq-ml/dmz/candidate-explanation \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
-  -H "user-id: user-1" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "company-id: company-1" \
   -d '{
     "job": {
@@ -537,7 +553,7 @@ curl -X POST http://localhost:8084/lynq-ml/dmz/candidate-explanation \
 curl -X POST http://localhost:8084/lynq-ml/dmz/parse-resume \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
-  -H "user-id: user-1" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{ "preSignedUrl": "https://s3.amazonaws.com/bucket/cv.pdf?X-Amz-Signature=..." }'
 ```
 
@@ -547,7 +563,7 @@ curl -X POST http://localhost:8084/lynq-ml/dmz/parse-resume \
 curl -X POST http://localhost:8084/lynq-ml/dmz/translate \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
-  -H "user-id: user-1" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "resume": { "personal_info": { "full_name": "Ada Lovelace" }, "summary": "Backend engineer..." },
     "language": "ES"
@@ -560,7 +576,7 @@ curl -X POST http://localhost:8084/lynq-ml/dmz/translate \
 curl -X POST http://localhost:8084/lynq-ml/dmz/detect-language \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
-  -H "user-id: user-1" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{ "text": "Ingeniero backend con 5 años construyendo servicios en Java." }'
 ```
 
@@ -570,7 +586,7 @@ curl -X POST http://localhost:8084/lynq-ml/dmz/detect-language \
 curl -X POST http://localhost:8084/lynq-ml/dmz/resume-template-creation \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
-  -H "user-id: user-1" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "resume_content": { "personal_info": { "full_name": "Ada Lovelace" }, "summary": "Backend engineer..." },
     "put_resume_url": "https://s3.amazonaws.com/bucket/cv.pdf?X-Amz-Signature=...",
@@ -689,6 +705,9 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 | `UDEMY_MAX_COURSES` | `2`                       | `/upskilling_suggestion` | Max courses returned per topic.                   |
 | `UDEMY_BASE_URL`  | `https://www.udemy.com`     | `/upskilling_suggestion` | Udemy base URL (course + search links).          |
 | `COURSE_SEARCH_TIMEOUT` | `15`                  | `/upskilling_suggestion` | Web-search request timeout, in seconds.          |
+| `LYNQ_IAM_URL`    | `http://localhost:8080/lynq-iam` | always          | Where `/dmz` routes resolve the caller's token.      |
+| `LYNQ_IAM_TIMEOUT`| `10`                        | always               | Timeout of that lookup, in seconds.                  |
+| `LYNQ_INTERNAL_TOKEN` | — (required)            | `/internal/**`       | Shared secret lynq-feeders presents; same value as in lynq-app-backend. |
 | `HOST`            | `0.0.0.0`                   | always               | Bind host (`python src/main.py`).                    |
 | `PORT`            | `8084`                      | always               | Bind port.                                           |
 | `LOG_LEVEL`       | `INFO`                      | always               | Root log level.                                      |

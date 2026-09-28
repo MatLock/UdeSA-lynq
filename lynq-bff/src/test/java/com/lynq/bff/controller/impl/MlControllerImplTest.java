@@ -3,7 +3,6 @@ package com.lynq.bff.controller.impl;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -21,9 +20,11 @@ import com.lynq.bff.client.response.SkillEnhanceResponse;
 import com.lynq.bff.client.response.SkillExtractionResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.exceptions.ForbiddenException;
+import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.MlService;
 import java.util.Map;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +35,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,6 +43,11 @@ class MlControllerImplTest {
 
   private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
   private static final String REQUEST_UUID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a99";
+  private static final String AUTHORIZATION = "Bearer access-token";
+
+  private static final LynqUserPrincipal PRINCIPAL = new LynqUserPrincipal(
+      USER_ID, "janedoe", "jane@lynq.com",
+      List.of(new SimpleGrantedAuthority("R_CANDIDATE")), AUTHORIZATION);
   private static final Object RESUME = Map.of("fullName", "Jane Doe");
 
   @Mock
@@ -60,7 +67,7 @@ class MlControllerImplTest {
     when(mlService.enhanceSkills(eq(request), any())).thenReturn(skills);
 
     ResponseEntity<GlobalRestResponse<SkillEnhanceResponse>> response =
-        mlController.enhanceSkills(request, REQUEST_UUID, USER_ID);
+        mlController.enhanceSkills(request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(skills)));
@@ -68,16 +75,16 @@ class MlControllerImplTest {
 
   /** lynq-ml names its caller with a header, so the gateway relays no token to it. */
   @Test
-  void callsTheServiceAsTheVerifiedCallerWithoutRelayingAToken() {
+  void callsTheServiceAsTheVerifiedCallerRelayingTheirToken() {
     SkillEnhanceRequest request = SkillEnhanceRequest.builder().title("Backend").build();
 
-    mlController.enhanceSkills(request, REQUEST_UUID, USER_ID);
+    mlController.enhanceSkills(request, REQUEST_UUID, PRINCIPAL);
 
     ArgumentCaptor<Caller> caller = ArgumentCaptor.forClass(Caller.class);
     verify(mlService).enhanceSkills(eq(request), caller.capture());
     assertThat(caller.getValue().userId(), is(USER_ID));
     assertThat(caller.getValue().requestUuid(), is(REQUEST_UUID));
-    assertThat(caller.getValue().authorization(), is(nullValue()));
+    assertThat(caller.getValue().authorization(), is(AUTHORIZATION));
   }
 
   @Test
@@ -88,7 +95,7 @@ class MlControllerImplTest {
     when(mlService.translateResume(eq(request), any())).thenReturn(translated);
 
     ResponseEntity<GlobalRestResponse<Object>> response =
-        mlController.translateResume(request, REQUEST_UUID, USER_ID);
+        mlController.translateResume(request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(translated)));
@@ -102,7 +109,7 @@ class MlControllerImplTest {
     when(mlService.detectLanguage(eq(request), any())).thenReturn(detected);
 
     ResponseEntity<GlobalRestResponse<LanguageDetectionResponse>> response =
-        mlController.detectLanguage(request, REQUEST_UUID, USER_ID);
+        mlController.detectLanguage(request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(detected)));
@@ -114,7 +121,7 @@ class MlControllerImplTest {
     when(mlService.extractResumeSkills(eq(RESUME), eq("es"), any())).thenReturn(extracted);
 
     ResponseEntity<GlobalRestResponse<SkillExtractionResponse>> response =
-        mlController.extractResumeSkills(RESUME, "es", REQUEST_UUID, USER_ID);
+        mlController.extractResumeSkills(RESUME, "es", REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(extracted)));
@@ -122,7 +129,7 @@ class MlControllerImplTest {
 
   @Test
   void extractsTheResumeSkillsWithoutALanguageWhenTheCallerNamesNone() {
-    mlController.extractResumeSkills(RESUME, null, REQUEST_UUID, USER_ID);
+    mlController.extractResumeSkills(RESUME, null, REQUEST_UUID, PRINCIPAL);
 
     verify(mlService).extractResumeSkills(eq(RESUME), isNull(), any());
   }

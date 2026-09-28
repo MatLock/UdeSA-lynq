@@ -36,6 +36,8 @@ spring:
       enabled: false
 
 lynq:
+  iam:
+    url: http://localhost:8080/lynq-iam
   aws:
     region: ${AWS_REGION:us-east-1}
     access-key-id: ${AWS_ACCESS_KEY_ID:test}

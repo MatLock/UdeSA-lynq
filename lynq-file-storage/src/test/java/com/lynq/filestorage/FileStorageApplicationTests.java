@@ -36,12 +36,10 @@ class FileStorageApplicationTests extends AbstractE2ETest {
   private static final String UPLOAD_URL_PATH = FILES_PATH + "/upload-url";
 
   private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
-  private static final String USER_ID_HEADER = "user-id";
+  private static final String AUTHORIZATION_HEADER = "Authorization";
   private static final String CONTENT_TYPE_HEADER = "Content-Type";
   private static final String APPLICATION_JSON = "application/json";
   private static final String REQUEST_UUID = "550e8400-e29b-41d4-a716-446655440000";
-  private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
-  private static final String OTHER_USER_ID = "99999999-9999-9999-9999-999999999999";
 
   private static final String FILE_NAME = "cv.pdf";
   private static final String CONTENT_TYPE = "application/pdf";
@@ -86,7 +84,7 @@ class FileStorageApplicationTests extends AbstractE2ETest {
     HttpRequest request = HttpRequest.newBuilder()
         .uri(URI.create(baseUrl() + UPLOAD_URL_PATH))
         .header(CONTENT_TYPE_HEADER, APPLICATION_JSON)
-        .header(USER_ID_HEADER, USER_ID)
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
         .POST(HttpRequest.BodyPublishers.ofString(uploadRequestBody(FILE_NAME)))
         .build();
 
@@ -227,7 +225,7 @@ class FileStorageApplicationTests extends AbstractE2ETest {
     Map<String, Object> upload = data(postUploadUrl(FILE_NAME));
     String fileId = (String) upload.get("fileId");
 
-    HttpRequest request = requestBuilder(FILES_PATH + "/" + fileId, OTHER_USER_ID).DELETE().build();
+    HttpRequest request = requestBuilder(FILES_PATH + "/" + fileId, OTHER_BEARER_TOKEN).DELETE().build();
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
     assertThat(response.statusCode(), is(403));
@@ -240,7 +238,7 @@ class FileStorageApplicationTests extends AbstractE2ETest {
     putBytesToPreSignedUrl((String) upload.get("uploadUrl"));
     String fileId = (String) upload.get("fileId");
 
-    HttpRequest request = requestBuilder(FILES_PATH + "/" + fileId + "/confirm", OTHER_USER_ID)
+    HttpRequest request = requestBuilder(FILES_PATH + "/" + fileId + "/confirm", OTHER_BEARER_TOKEN)
         .POST(HttpRequest.BodyPublishers.noBody())
         .build();
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -258,7 +256,7 @@ class FileStorageApplicationTests extends AbstractE2ETest {
     post(FILES_PATH + "/" + fileId + "/confirm");
 
     HttpRequest request =
-        requestBuilder(FILES_PATH + "/" + fileId + "/download-url", OTHER_USER_ID).GET().build();
+        requestBuilder(FILES_PATH + "/" + fileId + "/download-url", OTHER_BEARER_TOKEN).GET().build();
     HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
     assertThat(response.statusCode(), is(200));
@@ -330,14 +328,14 @@ class FileStorageApplicationTests extends AbstractE2ETest {
   }
 
   private HttpRequest.Builder requestBuilder(String path) {
-    return requestBuilder(path, USER_ID);
+    return requestBuilder(path, BEARER_TOKEN);
   }
 
-  private HttpRequest.Builder requestBuilder(String path, String userId) {
+  private HttpRequest.Builder requestBuilder(String path, String bearerToken) {
     return HttpRequest.newBuilder()
         .uri(URI.create(baseUrl() + path))
         .header(REQUEST_UUID_HEADER, REQUEST_UUID)
-        .header(USER_ID_HEADER, userId);
+        .header(AUTHORIZATION_HEADER, bearerToken);
   }
 
   private int putBytesToPreSignedUrl(String uploadUrl) throws Exception {

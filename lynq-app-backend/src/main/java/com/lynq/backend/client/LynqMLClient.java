@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 public interface LynqMLClient {
 
   String REQUEST_UUID_HEADER = "lynq-request-uuid";
-  String USER_ID_HEADER = "user-id";
+  String AUTHORIZATION_HEADER = "Authorization";
   String COMPANY_ID_HEADER = "company-id";
   String OUTPUT_LANGUAGE_HEADER = "output-language";
 
@@ -21,7 +21,7 @@ public interface LynqMLClient {
   GlobalRestResponse<UpskillingSuggestionResponse> upskillingSuggestion(
       @RequestBody CandidateEvaluationRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId,
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
       @RequestHeader(COMPANY_ID_HEADER) String companyId,
       @RequestHeader(OUTPUT_LANGUAGE_HEADER) String outputLanguage);
 
@@ -29,6 +29,6 @@ public interface LynqMLClient {
   GlobalRestResponse<CandidateExplanationResponse> candidateExplanation(
       @RequestBody CandidateEvaluationRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId,
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
       @RequestHeader(COMPANY_ID_HEADER) String companyId);
 }

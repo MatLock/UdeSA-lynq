@@ -79,7 +79,7 @@ class ResumeTranslationServiceTest {
 
     ArgumentCaptor<TranslateResumeRequest> captor =
         ArgumentCaptor.forClass(TranslateResumeRequest.class);
-    verify(lynqMlClient).translateResume(captor.capture(), eq(REQUEST_UUID), eq(USER_ID));
+    verify(lynqMlClient).translateResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     assertThat(captor.getValue().getResume(), is(SOURCE_RESUME));
     assertThat(captor.getValue().getLanguage(), is(TARGET_LANGUAGE));
   }
@@ -152,7 +152,7 @@ class ResumeTranslationServiceTest {
   void translateAnswersBadGatewayWhenTheTranslationFails() {
     givenResumes(resume(RESUME_ID, RESUME_NAME, SOURCE_LANGUAGE));
     givenSupportedLanguages("EN", "FR");
-    when(lynqMlClient.translateResume(any(), eq(REQUEST_UUID), eq(USER_ID)))
+    when(lynqMlClient.translateResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenThrow(new IllegalStateException("llm exploded"));
 
     BadGatewayException exception = assertThrows(BadGatewayException.class,
@@ -181,7 +181,7 @@ class ResumeTranslationServiceTest {
   }
 
   private void givenTranslation() {
-    lenient().when(lynqMlClient.translateResume(any(), eq(REQUEST_UUID), eq(USER_ID)))
+    lenient().when(lynqMlClient.translateResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, TRANSLATED_RESUME));
   }
 

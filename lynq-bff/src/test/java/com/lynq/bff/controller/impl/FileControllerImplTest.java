@@ -15,6 +15,7 @@ import com.lynq.bff.client.response.CreateFileDownloadResponse;
 import com.lynq.bff.client.response.CreateFileUploadResponse;
 import com.lynq.bff.client.response.FileResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
+import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.FileService;
 import java.util.List;
@@ -27,13 +28,19 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @ExtendWith(MockitoExtension.class)
 class FileControllerImplTest {
 
   private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
   private static final String REQUEST_UUID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a99";
+  private static final String AUTHORIZATION = "Bearer access-token";
   private static final String FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
+
+  private static final LynqUserPrincipal PRINCIPAL = new LynqUserPrincipal(
+      USER_ID, "janedoe", "jane@lynq.com",
+      List.of(new SimpleGrantedAuthority("R_CANDIDATE")), AUTHORIZATION);
 
   @Mock
   private FileService fileService;
@@ -54,7 +61,7 @@ class FileControllerImplTest {
     when(fileService.createUpload(eq(request), any())).thenReturn(upload);
 
     ResponseEntity<GlobalRestResponse<CreateFileUploadResponse>> response =
-        fileController.createUpload(request, REQUEST_UUID, USER_ID);
+        fileController.createUpload(request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
     assertThat(response.getBody().getData(), is(sameInstance(upload)));
@@ -65,17 +72,17 @@ class FileControllerImplTest {
    * verified user and carries no Authorization of its own.
    */
   @Test
-  void callsTheServiceAsTheVerifiedCallerWithoutRelayingAToken() {
+  void callsTheServiceAsTheVerifiedCallerRelayingTheirToken() {
     CreateFileUploadRequest request =
         CreateFileUploadRequest.builder().fileName("cv.pdf").build();
 
-    fileController.createUpload(request, REQUEST_UUID, USER_ID);
+    fileController.createUpload(request, REQUEST_UUID, PRINCIPAL);
 
     ArgumentCaptor<Caller> caller = ArgumentCaptor.forClass(Caller.class);
     verify(fileService).createUpload(eq(request), caller.capture());
     assertThat(caller.getValue().userId(), is(USER_ID));
     assertThat(caller.getValue().requestUuid(), is(REQUEST_UUID));
-    assertThat(caller.getValue().authorization(), is(nullValue()));
+    assertThat(caller.getValue().authorization(), is(AUTHORIZATION));
   }
 
   @Test
@@ -84,7 +91,7 @@ class FileControllerImplTest {
     when(fileService.confirmUpload(eq(FILE_ID), any())).thenReturn(file);
 
     ResponseEntity<GlobalRestResponse<FileResponse>> response =
-        fileController.confirmUpload(FILE_ID, REQUEST_UUID, USER_ID);
+        fileController.confirmUpload(FILE_ID, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(file)));
@@ -96,7 +103,7 @@ class FileControllerImplTest {
     when(fileService.findOwnedFile(eq(FILE_ID), any())).thenReturn(file);
 
     ResponseEntity<GlobalRestResponse<FileResponse>> response =
-        fileController.findOwnedFile(FILE_ID, REQUEST_UUID, USER_ID);
+        fileController.findOwnedFile(FILE_ID, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(file)));
@@ -109,7 +116,7 @@ class FileControllerImplTest {
     when(fileService.createDownloadUrl(eq(FILE_ID), any())).thenReturn(download);
 
     ResponseEntity<GlobalRestResponse<CreateFileDownloadResponse>> response =
-        fileController.createDownloadUrl(FILE_ID, REQUEST_UUID, USER_ID);
+        fileController.createDownloadUrl(FILE_ID, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(download)));
@@ -123,7 +130,7 @@ class FileControllerImplTest {
     when(fileService.createDownloadUrls(eq(request), any())).thenReturn(urls);
 
     ResponseEntity<GlobalRestResponse<Map<String, String>>> response =
-        fileController.createDownloadUrls(request, REQUEST_UUID, USER_ID);
+        fileController.createDownloadUrls(request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(urls)));
@@ -131,7 +138,7 @@ class FileControllerImplTest {
 
   @Test
   void answersADeletedFileWithNoContentAndNoBody() {
-    ResponseEntity<Void> response = fileController.deleteFile(FILE_ID, REQUEST_UUID, USER_ID);
+    ResponseEntity<Void> response = fileController.deleteFile(FILE_ID, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.NO_CONTENT));
     assertThat(response.getBody(), is(nullValue()));

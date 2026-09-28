@@ -93,7 +93,7 @@ class ResumePreviewServiceTest {
 
     ArgumentCaptor<CreateFileUploadRequest> captor =
         ArgumentCaptor.forClass(CreateFileUploadRequest.class);
-    verify(lynqFileStorageClient).createUpload(captor.capture(), eq(REQUEST_UUID), eq(USER_ID));
+    verify(lynqFileStorageClient).createUpload(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     assertThat(captor.getValue().getFileName(), is(RESUME_FILE_NAME));
     assertThat(captor.getValue().getContentType(), is(PDF_CONTENT_TYPE));
   }
@@ -108,7 +108,7 @@ class ResumePreviewServiceTest {
 
     ArgumentCaptor<ResumeTemplateCreationRequest> captor =
         ArgumentCaptor.forClass(ResumeTemplateCreationRequest.class);
-    verify(lynqMlClient).createResumeTemplate(captor.capture(), eq(REQUEST_UUID), eq(USER_ID));
+    verify(lynqMlClient).createResumeTemplate(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     ResumeTemplateCreationRequest render = captor.getValue();
     assertThat(render.getPutResumeUrl(), is(UPLOAD_URL));
     assertThat(render.getProfileUrl(), is(AVATAR_URL));
@@ -126,7 +126,7 @@ class ResumePreviewServiceTest {
 
     ArgumentCaptor<ResumeTemplateCreationRequest> captor =
         ArgumentCaptor.forClass(ResumeTemplateCreationRequest.class);
-    verify(lynqMlClient).createResumeTemplate(captor.capture(), eq(REQUEST_UUID), eq(USER_ID));
+    verify(lynqMlClient).createResumeTemplate(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     assertThat(captor.getValue().getProfileUrl(), is((String) null));
   }
 
@@ -139,10 +139,10 @@ class ResumePreviewServiceTest {
     resumePreviewService.preview(request(ResumeTemplate.MODERN), CALLER);
 
     InOrder order = inOrder(lynqFileStorageClient, lynqMlClient);
-    order.verify(lynqFileStorageClient).createUpload(any(), eq(REQUEST_UUID), eq(USER_ID));
-    order.verify(lynqMlClient).createResumeTemplate(any(), eq(REQUEST_UUID), eq(USER_ID));
-    order.verify(lynqFileStorageClient).confirmUpload(FILE_ID, REQUEST_UUID, USER_ID);
-    order.verify(lynqFileStorageClient).createDownloadUrl(FILE_ID, REQUEST_UUID);
+    order.verify(lynqFileStorageClient).createUpload(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    order.verify(lynqMlClient).createResumeTemplate(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    order.verify(lynqFileStorageClient).confirmUpload(FILE_ID, REQUEST_UUID, AUTHORIZATION);
+    order.verify(lynqFileStorageClient).createDownloadUrl(FILE_ID, REQUEST_UUID, AUTHORIZATION);
   }
 
   @Test
@@ -150,14 +150,14 @@ class ResumePreviewServiceTest {
     givenCandidate(AVATAR_URL);
     givenRegisteredUpload();
     doThrow(new IllegalStateException("render exploded"))
-        .when(lynqMlClient).createResumeTemplate(any(), eq(REQUEST_UUID), eq(USER_ID));
+        .when(lynqMlClient).createResumeTemplate(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
 
     BadGatewayException exception = assertThrows(BadGatewayException.class,
         () -> resumePreviewService.preview(request(ResumeTemplate.MODERN), CALLER));
 
     assertThat(exception.getMessage(), is(RENDER_FAILED));
-    verify(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, USER_ID);
-    verify(lynqFileStorageClient, never()).createDownloadUrl(any(), any());
+    verify(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, AUTHORIZATION);
+    verify(lynqFileStorageClient, never()).createDownloadUrl(any(), any(), any());
   }
 
   @Test
@@ -165,12 +165,12 @@ class ResumePreviewServiceTest {
     givenCandidate(AVATAR_URL);
     givenRegisteredUpload();
     doThrow(new IllegalStateException("still not in the bucket"))
-        .when(lynqFileStorageClient).confirmUpload(FILE_ID, REQUEST_UUID, USER_ID);
+        .when(lynqFileStorageClient).confirmUpload(FILE_ID, REQUEST_UUID, AUTHORIZATION);
 
     assertThrows(BadGatewayException.class,
         () -> resumePreviewService.preview(request(ResumeTemplate.MODERN), CALLER));
 
-    verify(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, USER_ID);
+    verify(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, AUTHORIZATION);
   }
 
   @Test
@@ -178,9 +178,9 @@ class ResumePreviewServiceTest {
     givenCandidate(AVATAR_URL);
     givenRegisteredUpload();
     doThrow(new IllegalStateException("render exploded"))
-        .when(lynqMlClient).createResumeTemplate(any(), eq(REQUEST_UUID), eq(USER_ID));
+        .when(lynqMlClient).createResumeTemplate(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     doThrow(new IllegalStateException("delete exploded"))
-        .when(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, USER_ID);
+        .when(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, AUTHORIZATION);
 
     BadGatewayException exception = assertThrows(BadGatewayException.class,
         () -> resumePreviewService.preview(request(ResumeTemplate.MODERN), CALLER));
@@ -234,7 +234,7 @@ class ResumePreviewServiceTest {
   @Test
   void previewReportsABadGatewayWhenTheFileCannotBeRegistered() {
     givenCandidate(AVATAR_URL);
-    when(lynqFileStorageClient.createUpload(any(), eq(REQUEST_UUID), eq(USER_ID)))
+    when(lynqFileStorageClient.createUpload(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenThrow(new IllegalStateException("file storage down"));
 
     assertThrows(BadGatewayException.class,
@@ -247,13 +247,13 @@ class ResumePreviewServiceTest {
   void discardDeletesTheFileAsTheVerifiedCaller() {
     resumePreviewService.discard(FILE_ID, CALLER);
 
-    verify(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, USER_ID);
+    verify(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, AUTHORIZATION);
   }
 
   @Test
   void discardReportsABadGatewayWhenTheFileCannotBeDeleted() {
     doThrow(new IllegalStateException("file storage down"))
-        .when(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, USER_ID);
+        .when(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, AUTHORIZATION);
 
     assertThrows(BadGatewayException.class,
         () -> resumePreviewService.discard(FILE_ID, CALLER));
@@ -272,7 +272,7 @@ class ResumePreviewServiceTest {
   }
 
   private void givenRegisteredUpload() {
-    when(lynqFileStorageClient.createUpload(any(), eq(REQUEST_UUID), eq(USER_ID)))
+    when(lynqFileStorageClient.createUpload(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, CreateFileUploadResponse.builder()
             .fileId(FILE_ID)
             .uploadUrl(UPLOAD_URL)
@@ -280,7 +280,7 @@ class ResumePreviewServiceTest {
   }
 
   private void givenReadUrl() {
-    when(lynqFileStorageClient.createDownloadUrl(FILE_ID, REQUEST_UUID))
+    when(lynqFileStorageClient.createDownloadUrl(FILE_ID, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, CreateFileDownloadResponse.builder()
             .fileId(FILE_ID)
             .downloadUrl(PDF_URL)

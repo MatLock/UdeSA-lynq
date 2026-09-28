@@ -72,7 +72,7 @@ The service never touches the database. `lynq-app-backend` owns `lynq_backend_db
 
 1. For every configured source and category, scrape the latest `FEEDER_JOBS_PER_CATEGORY` postings.
 2. Drop duplicates by `(source, external_id)` — Bumeran merges administración and contabilidad into one area, so the same posting can surface under two categories.
-3. For every posting with a description, call `lynq-ml` `/dmz/skill-enhance` to get `skills` and `similarity_tags`. Calls are bounded by `ML_CONCURRENCY`.
+3. For every posting with a description, call `lynq-ml` `/internal/skill-enhance` to get `skills` and `similarity_tags`, presenting `LYNQ_INTERNAL_TOKEN` — a scheduled scrape has no user token, and lynq-ml's `/dmz` routes want one. Calls are bounded by `ML_CONCURRENCY`.
 4. Post the whole batch to `lynq-app-backend` — only if every posting came back enriched.
 
 Steps 1-4 run in the background, after the caller has been answered: nothing downstream
@@ -240,8 +240,8 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 | ------------------------------ | -------------------------------------------------- | -------------------------------------------------------------- |
 | `LYNQ_ML_URL`                  | `http://localhost:8084/lynq-ml`                    | Base URL of the skill-extraction service.                      |
 | `LYNQ_BACKEND_URL`             | `http://localhost:8082/lynq-backend-app`           | Base URL of the service that owns the database.                |
-| `LYNQ_INTERNAL_TOKEN`          | `local-internal-token-not-a-secret`                | Shared secret for the backend's `/internal/**` routes.         |
-| `LYNQ_FEEDERS_SYSTEM_USER_ID`  | `00000000-0000-0000-0000-00000000feed`             | Sent as `user-id` to `lynq-ml`; only reaches its logs.         |
+| `LYNQ_INTERNAL_TOKEN`          | `local-internal-token-not-a-secret`                | Shared secret for the `/internal/**` routes of lynq-app-backend **and** lynq-ml. |
+| `LYNQ_FEEDERS_SYSTEM_USER_ID`  | `00000000-0000-0000-0000-00000000feed`             | Sent as `user-id` to `lynq-ml`'s internal route; only reaches its logs. |
 | `FEEDER_CATEGORIES`                | `ADMINISTRACION,TECNOLOGIA,CONTABILIDAD,RECURSOS_HUMANOS` | Categories scraped per run.                                 |
 | `FEEDER_SOURCES`               | `bumeran,computrabajo`                             | Portals scraped per run.                                       |
 | `FEEDER_JOBS_PER_CATEGORY`        | `10`                                               | Postings kept per category per portal, newest first.              |

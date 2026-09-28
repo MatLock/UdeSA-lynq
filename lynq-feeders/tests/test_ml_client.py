@@ -10,10 +10,16 @@ from ml_client import MlClient, MlError
 BASE_URL = "http://lynq-ml:8084/lynq-ml"
 REQUEST_UUID = "11111111-2222-3333-4444-555555555555"
 SYSTEM_USER_ID = "00000000-0000-0000-0000-00000000feed"
+INTERNAL_TOKEN = "local-internal-token-not-a-secret"
 
 
 def _client():
-    return MlClient(base_url=BASE_URL, system_user_id=SYSTEM_USER_ID, timeout=1.0)
+    return MlClient(
+        base_url=BASE_URL,
+        system_user_id=SYSTEM_USER_ID,
+        internal_token=INTERNAL_TOKEN,
+        timeout=1.0,
+    )
 
 
 def _response(payload, raise_for_status=None):
@@ -44,7 +50,7 @@ class SkillEnhanceTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.similarity_tags, ["Backend"])
         self.assertFalse(result.is_empty)
 
-    async def test_sends_the_request_uuid_and_system_user_id_headers(self):
+    async def test_sends_the_request_uuid_the_internal_token_and_the_system_user_id(self):
         payload = {"data": {"skills": [], "similarity_tags": []}}
         patcher, async_client = _patched_post(_response(payload))
         with patcher:
@@ -53,9 +59,10 @@ class SkillEnhanceTest(unittest.IsolatedAsyncioTestCase):
         headers = async_client.post.call_args.kwargs["headers"]
         self.assertEqual(headers["lynq-request-uuid"], REQUEST_UUID)
         self.assertEqual(headers["user-id"], SYSTEM_USER_ID)
+        self.assertEqual(headers["lynq-internal-token"], INTERNAL_TOKEN)
         body = async_client.post.call_args.kwargs["json"]
         self.assertEqual(body, {"title": "Dev", "description": "Desc", "work_type": "IN_OFFICE"})
-        self.assertTrue(async_client.post.call_args.args[0].endswith("/dmz/skill-enhance"))
+        self.assertTrue(async_client.post.call_args.args[0].endswith("/internal/skill-enhance"))
 
     async def test_malformed_lists_are_ignored_rather_than_fatal(self):
         payload = {"data": {"skills": "Python", "similarity_tags": [1, 2]}}

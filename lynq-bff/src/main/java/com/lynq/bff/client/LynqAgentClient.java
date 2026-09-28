@@ -17,31 +17,31 @@ import org.springframework.web.bind.annotation.RequestHeader;
 public interface LynqAgentClient {
 
   String REQUEST_UUID_HEADER = "lynq-request-uuid";
-  String USER_ID_HEADER = "user-id";
+  String AUTHORIZATION_HEADER = "Authorization";
 
   @PostMapping("/dmz/conversation")
   GlobalRestResponse<Object> startConversation(
       @RequestBody StartTailorConversationRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 
   @PostMapping("/dmz/conversation/{conversationId}/turn")
   GlobalRestResponse<Object> takeTurn(
       @PathVariable("conversationId") String conversationId,
       @RequestBody TailorTurnRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 
   @GetMapping("/dmz/conversation/{conversationId}")
   GlobalRestResponse<Map<String, Object>> getConversation(
       @PathVariable("conversationId") String conversationId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 
   @PatchMapping("/dmz/conversation/{conversationId}/applied")
   GlobalRestResponse<Map<String, Object>> markApplied(
       @PathVariable("conversationId") String conversationId,
       @RequestBody MarkConversationAppliedRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 }

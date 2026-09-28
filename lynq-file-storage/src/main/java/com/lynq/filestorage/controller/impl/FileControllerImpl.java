@@ -8,19 +8,20 @@ import com.lynq.filestorage.controller.response.CreateFileUploadRestResponse;
 import com.lynq.filestorage.controller.response.FileRestResponse;
 import com.lynq.filestorage.controller.response.GlobalRestResponse;
 import com.lynq.filestorage.model.StoredFileEntity;
+import com.lynq.filestorage.security.LynqUserPrincipal;
 import com.lynq.filestorage.service.FileService;
 import com.lynq.filestorage.service.PreSignedUploadUrl;
 import jakarta.validation.Valid;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -28,8 +29,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/dmz/files")
 @Validated
 public class FileControllerImpl implements com.lynq.filestorage.controller.FileController {
-
-  private static final String USER_ID_HEADER = "user-id";
 
   private final FileService fileService;
 
@@ -42,8 +41,8 @@ public class FileControllerImpl implements com.lynq.filestorage.controller.FileC
   @AuditLog
   public ResponseEntity<GlobalRestResponse<CreateFileUploadRestResponse>> createUpload(
       @Valid @RequestBody CreateFileUploadRequest request,
-      @RequestHeader(USER_ID_HEADER) String userId) {
-    StoredFileEntity storedFile = fileService.createUpload(request, userId);
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
+    StoredFileEntity storedFile = fileService.createUpload(request, principal.getId());
     PreSignedUploadUrl preSignedUploadUrl = fileService.createUploadUrl(storedFile);
 
     CreateFileUploadRestResponse response = CreateFileUploadRestResponse.builder()
@@ -61,8 +60,8 @@ public class FileControllerImpl implements com.lynq.filestorage.controller.FileC
   @PostMapping("/{fileId}/confirm")
   @AuditLog
   public ResponseEntity<GlobalRestResponse<FileRestResponse>> confirmUpload(
-      @PathVariable String fileId, @RequestHeader(USER_ID_HEADER) String userId) {
-    StoredFileEntity storedFile = fileService.confirmUpload(fileId, userId);
+      @PathVariable String fileId, @AuthenticationPrincipal LynqUserPrincipal principal) {
+    StoredFileEntity storedFile = fileService.confirmUpload(fileId, principal.getId());
 
     return ResponseEntity.ok(new GlobalRestResponse<>(true, toResponse(storedFile)));
   }
@@ -71,8 +70,8 @@ public class FileControllerImpl implements com.lynq.filestorage.controller.FileC
   @GetMapping("/{fileId}")
   @AuditLog
   public ResponseEntity<GlobalRestResponse<FileRestResponse>> findOwnedFile(
-      @PathVariable String fileId, @RequestHeader(USER_ID_HEADER) String userId) {
-    StoredFileEntity storedFile = fileService.findOwnedFile(fileId, userId);
+      @PathVariable String fileId, @AuthenticationPrincipal LynqUserPrincipal principal) {
+    StoredFileEntity storedFile = fileService.findOwnedFile(fileId, principal.getId());
 
     return ResponseEntity.ok(new GlobalRestResponse<>(true, toResponse(storedFile)));
   }
@@ -119,8 +118,8 @@ public class FileControllerImpl implements com.lynq.filestorage.controller.FileC
   @DeleteMapping("/{fileId}")
   @AuditLog
   public ResponseEntity<Void> deleteFile(
-      @PathVariable String fileId, @RequestHeader(USER_ID_HEADER) String userId) {
-    fileService.deleteFile(fileId, userId);
+      @PathVariable String fileId, @AuthenticationPrincipal LynqUserPrincipal principal) {
+    fileService.deleteFile(fileId, principal.getId());
 
     return ResponseEntity.noContent().build();
   }

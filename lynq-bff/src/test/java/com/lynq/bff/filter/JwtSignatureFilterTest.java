@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynq.bff.security.JwtSignatureVerifier;
+import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.security.Role;
 import com.lynq.bff.security.VerifiedCaller;
 import jakarta.servlet.FilterChain;
@@ -38,8 +39,10 @@ class JwtSignatureFilterTest {
   private static final String AUTHORIZATION_HEADER = "Authorization";
   private static final String RAW_TOKEN = "eyJhbGciOiJIUzI1NiJ9.access.token";
   private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
+  private static final String USERNAME = "janedoe";
+  private static final String EMAIL = "jane@lynq.com";
   private static final VerifiedCaller CANDIDATE_CALLER =
-      new VerifiedCaller(USER_ID, List.of(Role.PREFIX + Role.CANDIDATE));
+      new VerifiedCaller(USER_ID, USERNAME, EMAIL, List.of(Role.PREFIX + Role.CANDIDATE));
   private static final String BEARER_HEADER_VALUE = "Bearer " + RAW_TOKEN;
   private static final String EXPECTED_INVALID_TOKEN_REASON = "Invalid or expired access token";
   private static final int EXPECTED_UNAUTHORIZED_STATUS_CODE = HttpStatus.UNAUTHORIZED.value();
@@ -92,20 +95,28 @@ class JwtSignatureFilterTest {
   }
 
   @Test
-  void publishesTheVerifiedSubjectOnTheRequest() throws Exception {
+  void carriesTheAuthorizationHeaderOnThePrincipalSoItCanBeRelayed() throws Exception {
     when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(BEARER_HEADER_VALUE);
     when(jwtSignatureVerifier.verify(RAW_TOKEN)).thenReturn(Optional.of(CANDIDATE_CALLER));
 
+    Object[] principalDuringChain = new Object[1];
+    doAnswer(invocation -> {
+      principalDuringChain[0] =
+          SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+      return null;
+    }).when(filterChain).doFilter(request, response);
+
     filter.doFilterInternal(request, response, filterChain);
 
-    verify(request).setAttribute(JwtSignatureFilter.VERIFIED_USER_ID, USER_ID);
+    assertThat(((LynqUserPrincipal) principalDuringChain[0]).getAuthorization(),
+        is(BEARER_HEADER_VALUE));
   }
 
   @Test
   void loadsTheRolesOfTheTokenIntoTheSecurityContext() throws Exception {
     when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(BEARER_HEADER_VALUE);
     when(jwtSignatureVerifier.verify(RAW_TOKEN))
-        .thenReturn(Optional.of(new VerifiedCaller(USER_ID, List.of("R_COMPANY"))));
+        .thenReturn(Optional.of(new VerifiedCaller(USER_ID, USERNAME, EMAIL, List.of("R_COMPANY"))));
 
     List<String> authoritiesDuringChain = new ArrayList<>();
     doAnswer(invocation -> {
@@ -135,7 +146,10 @@ class JwtSignatureFilterTest {
 
     filter.doFilterInternal(request, response, filterChain);
 
-    assertThat(principalDuringChain[0], is(USER_ID));
+    LynqUserPrincipal principal = (LynqUserPrincipal) principalDuringChain[0];
+    assertThat(principal.getId(), is(USER_ID));
+    assertThat(principal.getUsername(), is(USERNAME));
+    assertThat(principal.getEmail(), is(EMAIL));
   }
 
   @Test

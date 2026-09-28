@@ -87,6 +87,7 @@ class JobServiceTest {
   private static final String USER_ID = "550e8400-e29b-41d4-a716-446655440000";
   private static final String USERNAME = "janedoe";
   private static final String EMAIL = "jane@lynq.com";
+  private static final String BEARER_TOKEN = "Bearer test-access-token";
   private static final String TITLE = "Senior Backend Engineer";
   private static final String DESCRIPTION = "Build and scale the Lynq hiring platform.";
   private static final WorkType WORK_TYPE = WorkType.REMOTE;
@@ -1377,7 +1378,7 @@ class JobServiceTest {
         .thenReturn(Optional.of(application(job, candidate)));
     when(companyRepository.findByOwner(owner))
         .thenReturn(Optional.of(CompanyEntity.builder().id(COMPANY_ID).owner(owner).build()));
-    when(lynqMLClient.candidateExplanation(any(), eq(REQUEST_UUID), eq(USER_ID), eq(COMPANY_ID)))
+    when(lynqMLClient.candidateExplanation(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(COMPANY_ID)))
         .thenReturn(new GlobalRestResponse<>(true, explanationResponse()));
     ArgumentCaptor<CandidateEvaluationRequest> requestCaptor =
         ArgumentCaptor.forClass(CandidateEvaluationRequest.class);
@@ -1385,7 +1386,7 @@ class JobServiceTest {
     jobService.explainCandidate(JOB_ID, CANDIDATE_ID, REQUEST_UUID);
 
     verify(lynqMLClient).candidateExplanation(requestCaptor.capture(), eq(REQUEST_UUID),
-        eq(USER_ID), eq(COMPANY_ID));
+        eq(BEARER_TOKEN), eq(COMPANY_ID));
     CandidateEvaluationRequest forwarded = requestCaptor.getValue();
     assertThat(forwarded.getJob().getSkills(), contains(SKILL_JAVA, SKILL_SPRING, SKILL_POSTGRES));
     assertThat(forwarded.getJob().getDescription(), is(TITLE + "\n\n" + DESCRIPTION));
@@ -1405,7 +1406,7 @@ class JobServiceTest {
     when(companyRepository.findByOwner(owner))
         .thenReturn(Optional.of(CompanyEntity.builder().id(COMPANY_ID).owner(owner).build()));
     CandidateExplanationResponse mlResponse = explanationResponse();
-    when(lynqMLClient.candidateExplanation(any(), eq(REQUEST_UUID), eq(USER_ID), eq(COMPANY_ID)))
+    when(lynqMLClient.candidateExplanation(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(COMPANY_ID)))
         .thenReturn(new GlobalRestResponse<>(true, mlResponse));
 
     CandidateExplanationResponse result =
@@ -1465,7 +1466,7 @@ class JobServiceTest {
     stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA, SKILL_SPRING)));
     JobPostEntity job = jobWithCompany(List.of(SKILL_JAVA, SKILL_SPRING, SKILL_POSTGRES));
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
-    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(COMPANY_ID),
+    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(COMPANY_ID),
         eq(OUTPUT_LANGUAGE)))
         .thenReturn(new GlobalRestResponse<>(true, upskillingResponse()));
     ArgumentCaptor<CandidateEvaluationRequest> requestCaptor =
@@ -1474,7 +1475,7 @@ class JobServiceTest {
     jobService.suggestUpskilling(JOB_ID, REQUEST_UUID, OUTPUT_LANGUAGE);
 
     verify(lynqMLClient).upskillingSuggestion(requestCaptor.capture(), eq(REQUEST_UUID),
-        eq(USER_ID), eq(COMPANY_ID), eq(OUTPUT_LANGUAGE));
+        eq(BEARER_TOKEN), eq(COMPANY_ID), eq(OUTPUT_LANGUAGE));
     CandidateEvaluationRequest forwarded = requestCaptor.getValue();
     assertThat(forwarded.getJob().getSkills(), contains(SKILL_JAVA, SKILL_SPRING, SKILL_POSTGRES));
     assertThat(forwarded.getJob().getDescription(), is(TITLE + "\n\n" + DESCRIPTION));
@@ -1489,7 +1490,7 @@ class JobServiceTest {
     when(jobPostRepository.findById(JOB_ID))
         .thenReturn(Optional.of(jobWithCompany(List.of(SKILL_JAVA, SKILL_SPRING))));
     UpskillingSuggestionResponse mlResponse = upskillingResponse();
-    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(COMPANY_ID),
+    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(COMPANY_ID),
         eq(OUTPUT_LANGUAGE)))
         .thenReturn(new GlobalRestResponse<>(true, mlResponse));
 
@@ -1504,13 +1505,13 @@ class JobServiceTest {
     stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA)));
     JobPostEntity job = ownedJob(companyUser(), List.of(SKILL_JAVA));
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
-    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(""),
+    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(""),
         eq(OUTPUT_LANGUAGE)))
         .thenReturn(new GlobalRestResponse<>(true, upskillingResponse()));
 
     jobService.suggestUpskilling(JOB_ID, REQUEST_UUID, OUTPUT_LANGUAGE);
 
-    verify(lynqMLClient).upskillingSuggestion(any(), eq(REQUEST_UUID), eq(USER_ID), eq(""),
+    verify(lynqMLClient).upskillingSuggestion(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(""),
         eq(OUTPUT_LANGUAGE));
   }
 
@@ -1694,7 +1695,7 @@ class JobServiceTest {
   private void stubAuthenticatedPrincipalWithRole(String role) {
     when(securityContext.getAuthentication()).thenReturn(authentication);
     when(authentication.getPrincipal()).thenReturn(new LynqUserPrincipal(USER_ID, USERNAME, EMAIL,
-        List.of(new SimpleGrantedAuthority(Role.PREFIX + role))));
+        List.of(new SimpleGrantedAuthority(Role.PREFIX + role)), BEARER_TOKEN));
   }
 
   private void stubAuthenticatedCompanyCaller(UserEntity user) {

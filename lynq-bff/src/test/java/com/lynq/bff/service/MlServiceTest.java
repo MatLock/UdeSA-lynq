@@ -29,7 +29,8 @@ class MlServiceTest {
 
   private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
   private static final String REQUEST_UUID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a99";
-  private static final Caller CALLER = new Caller(USER_ID, REQUEST_UUID, null);
+  private static final String AUTHORIZATION = "Bearer access-token";
+  private static final Caller CALLER = new Caller(USER_ID, REQUEST_UUID, AUTHORIZATION);
 
   private static final Object RESUME = Map.of("fullName", "Jane Doe");
 
@@ -43,7 +44,7 @@ class MlServiceTest {
     mlService = new MlService(lynqMlClient);
   }
 
-  /** lynq-ml reads the caller from the {@code user-id} header; there is no token to relay. */
+  /** lynq-ml resolves the caller against lynq-iam, so the credential is what is relayed. */
   @Test
   void enhancesTheSkillsOfAJobPostAsTheVerifiedCaller() {
     SkillEnhanceRequest request = SkillEnhanceRequest.builder()
@@ -51,7 +52,7 @@ class MlServiceTest {
         .workType(WorkType.REMOTE)
         .build();
     SkillEnhanceResponse skills = SkillEnhanceResponse.builder().build();
-    when(lynqMlClient.enhanceSkills(request, REQUEST_UUID, USER_ID))
+    when(lynqMlClient.enhanceSkills(request, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, skills));
 
     assertThat(mlService.enhanceSkills(request, CALLER), is(sameInstance(skills)));
@@ -62,7 +63,7 @@ class MlServiceTest {
     TranslateResumeRequest request =
         TranslateResumeRequest.builder().resume(RESUME).language("FR").build();
     Object translated = Map.of("fullName", "Jane Doe");
-    when(lynqMlClient.translateResume(request, REQUEST_UUID, USER_ID))
+    when(lynqMlClient.translateResume(request, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, translated));
 
     assertThat(mlService.translateResume(request, CALLER), is(sameInstance(translated)));
@@ -73,7 +74,7 @@ class MlServiceTest {
     LanguageDetectionRequest request = LanguageDetectionRequest.builder().text("hola").build();
     LanguageDetectionResponse detected =
         LanguageDetectionResponse.builder().language("ES").build();
-    when(lynqMlClient.detectLanguage(request, REQUEST_UUID, USER_ID))
+    when(lynqMlClient.detectLanguage(request, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, detected));
 
     assertThat(mlService.detectLanguage(request, CALLER), is(sameInstance(detected)));
@@ -82,7 +83,7 @@ class MlServiceTest {
   @Test
   void extractsTheResumeSkillsInTheLanguageAsked() {
     SkillExtractionResponse extracted = SkillExtractionResponse.builder().build();
-    when(lynqMlClient.extractResumeSkills(RESUME, "es", REQUEST_UUID, USER_ID))
+    when(lynqMlClient.extractResumeSkills(RESUME, "es", REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, extracted));
 
     assertThat(mlService.extractResumeSkills(RESUME, "es", CALLER), is(sameInstance(extracted)));
@@ -91,7 +92,7 @@ class MlServiceTest {
   @Test
   void letsTheLanguageGoUnsetWhenTheCallerNamesNone() {
     SkillExtractionResponse extracted = SkillExtractionResponse.builder().build();
-    when(lynqMlClient.extractResumeSkills(RESUME, null, REQUEST_UUID, USER_ID))
+    when(lynqMlClient.extractResumeSkills(RESUME, null, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, extracted));
 
     assertThat(mlService.extractResumeSkills(RESUME, null, CALLER), is(sameInstance(extracted)));
@@ -100,7 +101,7 @@ class MlServiceTest {
   @Test
   void keepsTheBadRequestWhenLynqMlRejectsThePayload() {
     LanguageDetectionRequest request = LanguageDetectionRequest.builder().build();
-    when(lynqMlClient.detectLanguage(request, REQUEST_UUID, USER_ID))
+    when(lynqMlClient.detectLanguage(request, REQUEST_UUID, AUTHORIZATION))
         .thenThrow(FeignErrors.status(400, """
             {"success": false, "reason": "text is required"}"""));
 
@@ -118,7 +119,7 @@ class MlServiceTest {
   void answersBadGatewayWhenTheModelBehindLynqMlFails() {
     TranslateResumeRequest request =
         TranslateResumeRequest.builder().resume(RESUME).language("FR").build();
-    when(lynqMlClient.translateResume(request, REQUEST_UUID, USER_ID))
+    when(lynqMlClient.translateResume(request, REQUEST_UUID, AUTHORIZATION))
         .thenThrow(FeignErrors.status(502, """
             {"detail": "LLM request failed"}"""));
 

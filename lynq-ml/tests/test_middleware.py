@@ -5,10 +5,9 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from fastapi.testclient import TestClient
 
 from llm_client import LLMProvider
-from main import app
+from tests.support import authenticated_client, clear_overrides
 from middleware.request_uuid import REQUEST_UUID_HEADER
 
 _SKILL_ENHANCE = "/lynq-ml/dmz/skill-enhance"
@@ -24,13 +23,16 @@ class RequestUuidMiddlewareTests(unittest.TestCase):
     """Non-exempt paths require the ``lynq-request-uuid`` header."""
 
     def setUp(self) -> None:
-        self.client = TestClient(app)
+        self.client = authenticated_client()
+
+    def tearDown(self) -> None:
+        clear_overrides()
 
     def test_missing_uuid_header_is_rejected_with_403(self) -> None:
         response = self.client.post(
             _SKILL_ENHANCE,
             json=_BODY,
-            headers={"user-id": "u1", "company-id": "c1"},
+            headers={"Authorization": "Bearer access-token", "company-id": "c1"},
         )
 
         self.assertEqual(response.status_code, 403)
@@ -42,7 +44,11 @@ class RequestUuidMiddlewareTests(unittest.TestCase):
         response = self.client.post(
             _SKILL_ENHANCE,
             json=_BODY,
-            headers={REQUEST_UUID_HEADER: "", "user-id": "u1", "company-id": "c1"},
+            headers={
+                REQUEST_UUID_HEADER: "",
+                "Authorization": "Bearer access-token",
+                "company-id": "c1",
+            },
         )
 
         self.assertEqual(response.status_code, 403)
@@ -60,7 +66,7 @@ class RequestUuidMiddlewareTests(unittest.TestCase):
                 json=_BODY,
                 headers={
                     REQUEST_UUID_HEADER: "req-1",
-                    "user-id": "u1",
+                    "Authorization": "Bearer access-token",
                     "company-id": "c1",
                 },
             )

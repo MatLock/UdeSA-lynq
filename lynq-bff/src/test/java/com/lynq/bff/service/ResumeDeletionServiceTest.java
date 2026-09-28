@@ -57,7 +57,7 @@ class ResumeDeletionServiceTest {
     // once it is gone is the PDF unreachable from the product.
     InOrder order = inOrder(lynqBackendClient, lynqFileStorageClient);
     order.verify(lynqBackendClient).deleteResume(RESUME_ID, REQUEST_UUID, AUTHORIZATION);
-    order.verify(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, USER_ID);
+    order.verify(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, AUTHORIZATION);
   }
 
   @Test
@@ -79,11 +79,11 @@ class ResumeDeletionServiceTest {
     // happen; the orphaned file is logged instead.
     stubDeleted(FILE_ID);
     doThrow(new IllegalStateException("storage down"))
-        .when(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, USER_ID);
+        .when(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, AUTHORIZATION);
 
     resumeDeletionService.delete(RESUME_ID, CALLER);
 
-    verify(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, USER_ID);
+    verify(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, AUTHORIZATION);
   }
 
   @Test

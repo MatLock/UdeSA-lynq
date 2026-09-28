@@ -30,7 +30,7 @@ public class MlService {
 
     return DownstreamErrors.call(
         () -> lynqMlClient
-            .enhanceSkills(request, caller.requestUuid(), caller.userId())
+            .enhanceSkills(request, caller.requestUuid(), caller.authorization())
             .getData(),
         SKILLS_NOT_ENHANCED);
   }
@@ -41,7 +41,7 @@ public class MlService {
 
     return DownstreamErrors.call(
         () -> lynqMlClient
-            .translateResume(request, caller.requestUuid(), caller.userId())
+            .translateResume(request, caller.requestUuid(), caller.authorization())
             .getData(),
         TRANSLATE_FAILED);
   }
@@ -49,7 +49,7 @@ public class MlService {
   public LanguageDetectionResponse detectLanguage(LanguageDetectionRequest request, Caller caller) {
     return DownstreamErrors.call(
         () -> lynqMlClient
-            .detectLanguage(request, caller.requestUuid(), caller.userId())
+            .detectLanguage(request, caller.requestUuid(), caller.authorization())
             .getData(),
         LANGUAGE_NOT_DETECTED);
   }
@@ -58,7 +58,7 @@ public class MlService {
                                                      Caller caller) {
     return DownstreamErrors.call(
         () -> lynqMlClient
-            .extractResumeSkills(resume, language, caller.requestUuid(), caller.userId())
+            .extractResumeSkills(resume, language, caller.requestUuid(), caller.authorization())
             .getData(),
         SKILLS_NOT_EXTRACTED);
   }

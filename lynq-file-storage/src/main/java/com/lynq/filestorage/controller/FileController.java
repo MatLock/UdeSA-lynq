@@ -6,6 +6,7 @@ import com.lynq.filestorage.controller.response.CreateFileDownloadRestResponse;
 import com.lynq.filestorage.controller.response.CreateFileUploadRestResponse;
 import com.lynq.filestorage.controller.response.FileRestResponse;
 import com.lynq.filestorage.controller.response.GlobalRestResponse;
+import com.lynq.filestorage.security.LynqUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -24,7 +25,7 @@ public interface FileController {
       @ApiResponse(responseCode = "403", description = "Missing lynq-request-uuid header")
   })
   ResponseEntity<GlobalRestResponse<CreateFileUploadRestResponse>> createUpload(
-      @Valid CreateFileUploadRequest request, String userId);
+      @Valid CreateFileUploadRequest request, LynqUserPrincipal principal);
 
   @Operation(summary = "Confirm a finished upload and mark the file as AVAILABLE")
   @ApiResponses({
@@ -33,7 +34,7 @@ public interface FileController {
       @ApiResponse(responseCode = "403", description = "The file belongs to another user"),
       @ApiResponse(responseCode = "404", description = "Unknown file")
   })
-  ResponseEntity<GlobalRestResponse<FileRestResponse>> confirmUpload(String fileId, String userId);
+  ResponseEntity<GlobalRestResponse<FileRestResponse>> confirmUpload(String fileId, LynqUserPrincipal principal);
 
   @Operation(summary = "Read a file the caller owns. It is the question \"is this file "
       + "mine?\": a service that is handed a file id by a browser asks this before it "
@@ -43,7 +44,7 @@ public interface FileController {
       @ApiResponse(responseCode = "403", description = "The file belongs to another user"),
       @ApiResponse(responseCode = "404", description = "Unknown file")
   })
-  ResponseEntity<GlobalRestResponse<FileRestResponse>> findOwnedFile(String fileId, String userId);
+  ResponseEntity<GlobalRestResponse<FileRestResponse>> findOwnedFile(String fileId, LynqUserPrincipal principal);
 
   @Operation(summary = "Get a pre-signed download URL for a file")
   @ApiResponses({
@@ -68,6 +69,6 @@ public interface FileController {
       @ApiResponse(responseCode = "403",
           description = "Missing lynq-request-uuid header, or the file belongs to another user")
   })
-  ResponseEntity<Void> deleteFile(String fileId, String userId);
+  ResponseEntity<Void> deleteFile(String fileId, LynqUserPrincipal principal);
 
 }

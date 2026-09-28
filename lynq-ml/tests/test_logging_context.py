@@ -7,11 +7,10 @@ import logging
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from fastapi.testclient import TestClient
 
 from llm_client import LLMProvider
+from tests.support import authenticated_client, clear_overrides
 from logging_context import NO_REQUEST_UUID, RequestUuidFilter, request_uuid_ctx
-from main import app
 
 
 def _make_record() -> logging.LogRecord:
@@ -45,7 +44,10 @@ class RequestUuidContextIntegrationTests(unittest.TestCase):
     """The middleware exposes the header value to logging during a request."""
 
     def setUp(self) -> None:
-        self.client = TestClient(app)
+        self.client = authenticated_client()
+
+    def tearDown(self) -> None:
+        clear_overrides()
 
     def test_request_uuid_is_visible_to_handler_logs_and_reset_after(self) -> None:
         captured: list[str] = []
@@ -72,7 +74,7 @@ class RequestUuidContextIntegrationTests(unittest.TestCase):
                     json={"title": "t", "description": "d", "work_type": "REMOTE"},
                     headers={
                         "lynq-request-uuid": "req-abc",
-                        "user-id": "u1",
+                        "Authorization": "Bearer access-token",
                         "company-id": "c1",
                     },
                 )

@@ -30,7 +30,8 @@ class FileServiceTest {
 
   private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
   private static final String REQUEST_UUID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a99";
-  private static final Caller CALLER = new Caller(USER_ID, REQUEST_UUID, null);
+  private static final String AUTHORIZATION = "Bearer access-token";
+  private static final Caller CALLER = new Caller(USER_ID, REQUEST_UUID, AUTHORIZATION);
 
   private static final String FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
 
@@ -45,8 +46,8 @@ class FileServiceTest {
   }
 
   /**
-   * lynq-file-storage reads the caller from the {@code user-id} header, not from a token, so the
-   * verified id is what has to reach it.
+   * lynq-file-storage resolves the caller against lynq-iam for itself, so what has to reach it is
+   * the credential the request arrived with, not the id this service already verified.
    */
   @Test
   void registersTheUploadAsTheVerifiedCaller() {
@@ -54,7 +55,7 @@ class FileServiceTest {
         CreateFileUploadRequest.builder().fileName("cv.pdf").build();
     CreateFileUploadResponse upload =
         CreateFileUploadResponse.builder().fileId(FILE_ID).build();
-    when(lynqFileStorageClient.createUpload(request, REQUEST_UUID, USER_ID))
+    when(lynqFileStorageClient.createUpload(request, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, upload));
 
     assertThat(fileService.createUpload(request, CALLER), is(sameInstance(upload)));
@@ -63,7 +64,7 @@ class FileServiceTest {
   @Test
   void confirmsTheUploadAndAnswersTheStoredFile() {
     FileResponse file = FileResponse.builder().fileId(FILE_ID).build();
-    when(lynqFileStorageClient.confirmUpload(FILE_ID, REQUEST_UUID, USER_ID))
+    when(lynqFileStorageClient.confirmUpload(FILE_ID, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, file));
 
     assertThat(fileService.confirmUpload(FILE_ID, CALLER), is(sameInstance(file)));
@@ -72,7 +73,7 @@ class FileServiceTest {
   @Test
   void readsAFileTheCallerOwns() {
     FileResponse file = FileResponse.builder().fileId(FILE_ID).build();
-    when(lynqFileStorageClient.findOwnedFile(FILE_ID, REQUEST_UUID, USER_ID))
+    when(lynqFileStorageClient.findOwnedFile(FILE_ID, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, file));
 
     assertThat(fileService.findOwnedFile(FILE_ID, CALLER), is(sameInstance(file)));
@@ -83,7 +84,7 @@ class FileServiceTest {
   void issuesTheDownloadUrlWithoutNamingACaller() {
     CreateFileDownloadResponse download =
         CreateFileDownloadResponse.builder().fileId(FILE_ID).build();
-    when(lynqFileStorageClient.createDownloadUrl(FILE_ID, REQUEST_UUID))
+    when(lynqFileStorageClient.createDownloadUrl(FILE_ID, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, download));
 
     assertThat(fileService.createDownloadUrl(FILE_ID, CALLER), is(sameInstance(download)));
@@ -94,7 +95,7 @@ class FileServiceTest {
     CreateFileDownloadBatchRequest request =
         CreateFileDownloadBatchRequest.builder().fileIds(List.of(FILE_ID)).build();
     Map<String, String> urls = Map.of(FILE_ID, "https://s3.local/get");
-    when(lynqFileStorageClient.createDownloadUrls(request, REQUEST_UUID))
+    when(lynqFileStorageClient.createDownloadUrls(request, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, urls));
 
     assertThat(fileService.createDownloadUrls(request, CALLER), is(sameInstance(urls)));
@@ -104,14 +105,14 @@ class FileServiceTest {
   void deletesAFile() {
     fileService.deleteFile(FILE_ID, CALLER);
 
-    verify(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, USER_ID);
+    verify(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, AUTHORIZATION);
   }
 
   @Test
   void keepsTheForbiddenWhenTheFileBelongsToAnotherUser() {
     doThrow(FeignErrors.status(403, """
         {"success": false, "reason": "The file belongs to another user"}"""))
-        .when(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, USER_ID);
+        .when(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, AUTHORIZATION);
 
     ForbiddenException thrown =
         assertThrows(ForbiddenException.class, () -> fileService.deleteFile(FILE_ID, CALLER));
@@ -121,7 +122,7 @@ class FileServiceTest {
 
   @Test
   void answersBadGatewayWhenLynqFileStorageCannotBeReached() {
-    when(lynqFileStorageClient.createDownloadUrl(FILE_ID, REQUEST_UUID))
+    when(lynqFileStorageClient.createDownloadUrl(FILE_ID, REQUEST_UUID, AUTHORIZATION))
         .thenThrow(FeignErrors.unreachable());
 
     BadGatewayException thrown = assertThrows(BadGatewayException.class,

@@ -16,8 +16,10 @@ import com.lynq.bff.client.response.GenerateUploadImageResponse;
 import com.lynq.bff.client.response.GetCompanyDetailResponse;
 import com.lynq.bff.client.response.UpdateCompanyResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
+import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.CompanyService;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @ExtendWith(MockitoExtension.class)
 class CompanyControllerImplTest {
@@ -36,6 +39,10 @@ class CompanyControllerImplTest {
   private static final String COMPANY_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a62";
   private static final String FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
   private static final String FILE_NAME = "logo.png";
+
+  private static final LynqUserPrincipal PRINCIPAL = new LynqUserPrincipal(
+      USER_ID, "janedoe", "jane@lynq.com",
+      List.of(new SimpleGrantedAuthority("R_CANDIDATE")), AUTHORIZATION);
 
   @Mock
   private CompanyService companyService;
@@ -56,7 +63,7 @@ class CompanyControllerImplTest {
     when(companyService.createUserWithCompany(eq(request), any())).thenReturn(created);
 
     ResponseEntity<GlobalRestResponse<CreateUserWithCompanyResponse>> response =
-        companyController.createUserWithCompany(request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        companyController.createUserWithCompany(request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
     assertThat(response.getBody().getData(), is(sameInstance(created)));
@@ -67,7 +74,7 @@ class CompanyControllerImplTest {
     CreateUserWithCompanyRequest request =
         CreateUserWithCompanyRequest.builder().companyName("Lynq").build();
 
-    companyController.createUserWithCompany(request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+    companyController.createUserWithCompany(request, REQUEST_UUID, PRINCIPAL);
 
     ArgumentCaptor<Caller> caller = ArgumentCaptor.forClass(Caller.class);
     verify(companyService).createUserWithCompany(eq(request), caller.capture());
@@ -83,7 +90,7 @@ class CompanyControllerImplTest {
     when(companyService.updateCompany(eq(request), any())).thenReturn(updated);
 
     ResponseEntity<GlobalRestResponse<UpdateCompanyResponse>> response =
-        companyController.updateCompany(request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        companyController.updateCompany(request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(updated)));
@@ -96,7 +103,7 @@ class CompanyControllerImplTest {
     when(companyService.generateImageUploadUrl(eq(FILE_NAME), any())).thenReturn(upload);
 
     ResponseEntity<GlobalRestResponse<GenerateUploadImageResponse>> response =
-        companyController.generateImageUploadUrl(FILE_NAME, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        companyController.generateImageUploadUrl(FILE_NAME, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(upload)));
@@ -105,7 +112,7 @@ class CompanyControllerImplTest {
   @Test
   void answersAConfirmedImageUploadWithNoContentAndNoBody() {
     ResponseEntity<Void> response =
-        companyController.confirmImageUpload(FILE_ID, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        companyController.confirmImageUpload(FILE_ID, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.NO_CONTENT));
     assertThat(response.getBody(), is(nullValue()));
@@ -118,7 +125,7 @@ class CompanyControllerImplTest {
     when(companyService.getCompanyDetail(eq(COMPANY_ID), any())).thenReturn(company);
 
     ResponseEntity<GlobalRestResponse<GetCompanyDetailResponse>> response =
-        companyController.getCompanyDetail(COMPANY_ID, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        companyController.getCompanyDetail(COMPANY_ID, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(company)));

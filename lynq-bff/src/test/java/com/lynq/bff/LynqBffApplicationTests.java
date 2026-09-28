@@ -247,7 +247,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     assertThat(payloadOf(response).path("data").path("skills").get(0).asText(), is("Java"));
     lynqMlMock.verify(request()
         .withPath("/dmz/skill-enhance")
-        .withHeader(USER_ID_HEADER, TOKEN_SUBJECT), VerificationTimes.once());
+        .withHeader(AUTHORIZATION_HEADER, "Bearer " + accessToken), VerificationTimes.once());
     lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
   }
 
@@ -268,7 +268,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     lynqMlMock.verify(request()
         .withPath("/dmz/resume/skill-extraction")
         .withQueryStringParameter(Parameter.param("language", "es"))
-        .withHeader(USER_ID_HEADER, TOKEN_SUBJECT), VerificationTimes.once());
+        .withHeader(AUTHORIZATION_HEADER, "Bearer " + accessToken), VerificationTimes.once());
     lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
   }
 
@@ -352,7 +352,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void forwardsTheTokenSubjectAsTheUserIdHeaderToLynqFileStorage() throws Exception {
+  void relaysTheCallersBearerToLynqFileStorageSoItResolvesThemItself() throws Exception {
     lynqFileStorageMock.when(request().withMethod("POST").withPath("/dmz/files/upload-url"))
         .respond(response().withStatusCode(201)
             .withContentType(MediaType.APPLICATION_JSON)
@@ -362,7 +362,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
     lynqFileStorageMock.verify(request()
         .withPath("/dmz/files/upload-url")
-        .withHeader(USER_ID_HEADER, TOKEN_SUBJECT), VerificationTimes.once());
+        .withHeader(AUTHORIZATION_HEADER, "Bearer " + accessToken), VerificationTimes.once());
   }
 
   @Test

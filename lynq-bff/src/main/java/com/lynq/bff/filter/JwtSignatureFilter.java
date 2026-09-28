@@ -3,6 +3,7 @@ package com.lynq.bff.filter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynq.bff.controller.response.ErrorRestResponse;
 import com.lynq.bff.security.JwtSignatureVerifier;
+import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.security.VerifiedCaller;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,8 +23,6 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.web.filter.OncePerRequestFilter;
 
 public class JwtSignatureFilter extends OncePerRequestFilter {
-
-  public static final String VERIFIED_USER_ID = "com.lynq.bff.verifiedUserId";
 
   private static final String AUTHORIZATION_HEADER = "Authorization";
   private static final String BEARER_PREFIX = "Bearer ";
@@ -57,9 +56,7 @@ public class JwtSignatureFilter extends OncePerRequestFilter {
       return;
     }
 
-    VerifiedCaller caller = verifiedCaller.get();
-    request.setAttribute(VERIFIED_USER_ID, caller.userId());
-    loadSecurityContext(caller, request);
+    loadSecurityContext(verifiedCaller.get(), authHeader, request);
 
     try {
       filterChain.doFilter(request, response);
@@ -68,10 +65,13 @@ public class JwtSignatureFilter extends OncePerRequestFilter {
     }
   }
 
-  private void loadSecurityContext(VerifiedCaller caller, HttpServletRequest request) {
+  private void loadSecurityContext(VerifiedCaller caller, String authorization,
+                                   HttpServletRequest request) {
     List<GrantedAuthority> authorities = toAuthorities(caller.roles());
+    LynqUserPrincipal principal = new LynqUserPrincipal(
+        caller.userId(), caller.username(), caller.email(), authorities, authorization);
     UsernamePasswordAuthenticationToken authentication =
-        new UsernamePasswordAuthenticationToken(caller.userId(), null, authorities);
+        new UsernamePasswordAuthenticationToken(principal, null, authorities);
     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
     SecurityContextHolder.getContext().setAuthentication(authentication);
   }

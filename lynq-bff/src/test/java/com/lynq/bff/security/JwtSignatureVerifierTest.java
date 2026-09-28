@@ -23,6 +23,8 @@ class JwtSignatureVerifierTest {
       "0000000000000000000000000000000000000000000000000000000000000000";
 
   private static final String SUBJECT = "11111111-1111-1111-1111-111111111111";
+  private static final String USERNAME = "janedoe";
+  private static final String EMAIL = "jane@lynq.com";
   private static final List<String> ROLES = List.of("R_CANDIDATE");
   private static final String NOT_A_JWT = "definitely-not-a-jwt";
   private static final String BLANK_TOKEN = "   ";
@@ -38,7 +40,7 @@ class JwtSignatureVerifierTest {
   void returnsTheSubjectOfATokenSignedWithTheSharedSecret() {
     String token = token(SECRET, SUBJECT, Instant.now().plus(15, ChronoUnit.MINUTES));
 
-    assertThat(verifier.verify(token), is(Optional.of(new VerifiedCaller(SUBJECT, ROLES))));
+    assertThat(verifier.verify(token), is(Optional.of(new VerifiedCaller(SUBJECT, USERNAME, EMAIL, ROLES))));
   }
 
   @Test
@@ -111,6 +113,8 @@ class JwtSignatureVerifierTest {
     SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     var builder = Jwts.builder()
         .subject(subject)
+        .claim("username", USERNAME)
+        .claim("email", EMAIL)
         .issuedAt(Date.from(Instant.now().minus(1, ChronoUnit.MINUTES)))
         .expiration(Date.from(expiration));
 

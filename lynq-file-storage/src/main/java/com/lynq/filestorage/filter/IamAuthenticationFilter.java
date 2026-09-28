@@ -1,0 +1,102 @@
+package com.lynq.filestorage.filter;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lynq.filestorage.client.LynqIamClient;
+import com.lynq.filestorage.client.response.UserInfoResponse;
+import com.lynq.filestorage.controller.response.ErrorRestResponse;
+import com.lynq.filestorage.controller.response.GlobalRestResponse;
+import com.lynq.filestorage.security.LynqUserPrincipal;
+import feign.FeignException;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.List;
+import java.util.Objects;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+public class IamAuthenticationFilter extends OncePerRequestFilter {
+
+  private static final String AUTHORIZATION_HEADER = "Authorization";
+  private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
+
+  private static final String INVALID_TOKEN_ERROR = "Invalid or expired access token";
+  private static final String IAM_UNAVAILABLE_ERROR = "Authentication service is unavailable";
+
+  private final LynqIamClient lynqIamClient;
+  private final ObjectMapper objectMapper;
+
+  public IamAuthenticationFilter(LynqIamClient lynqIamClient, ObjectMapper objectMapper) {
+    this.lynqIamClient = lynqIamClient;
+    this.objectMapper = objectMapper;
+  }
+
+  @Override
+  protected boolean shouldNotFilter(HttpServletRequest request) {
+    return PublicPaths.isPublic(request);
+  }
+
+  @Override
+  protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                                  FilterChain filterChain) throws ServletException, IOException {
+
+    String authHeader = request.getHeader(AUTHORIZATION_HEADER);
+    String requestUuid = request.getHeader(REQUEST_UUID_HEADER);
+
+    try {
+      GlobalRestResponse<UserInfoResponse> userInfo =
+          lynqIamClient.getUserInfo(authHeader, requestUuid);
+      if (userInfo == null || userInfo.getData() == null) {
+        writeError(response, HttpStatus.UNAUTHORIZED, INVALID_TOKEN_ERROR);
+        return;
+      }
+
+      loadSecurityContext(userInfo.getData(), request);
+    } catch (FeignException.Unauthorized | FeignException.Forbidden e) {
+      writeError(response, HttpStatus.UNAUTHORIZED, INVALID_TOKEN_ERROR);
+      return;
+    } catch (FeignException e) {
+      writeError(response, HttpStatus.SERVICE_UNAVAILABLE, IAM_UNAVAILABLE_ERROR);
+      return;
+    }
+
+    try {
+      filterChain.doFilter(request, response);
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
+  }
+
+  private void loadSecurityContext(UserInfoResponse userInfo, HttpServletRequest request) {
+    List<GrantedAuthority> authorities = toAuthorities(userInfo.getRoles());
+    LynqUserPrincipal principal = new LynqUserPrincipal(
+        userInfo.getId(), userInfo.getUsername(), userInfo.getEmail(), authorities);
+    UsernamePasswordAuthenticationToken authentication =
+        new UsernamePasswordAuthenticationToken(principal, null, authorities);
+    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+    SecurityContextHolder.getContext().setAuthentication(authentication);
+  }
+
+  private static List<GrantedAuthority> toAuthorities(List<String> roles) {
+    return roles == null ? List.of() : roles.stream()
+        .filter(Objects::nonNull)
+        .<GrantedAuthority>map(SimpleGrantedAuthority::new)
+        .toList();
+  }
+
+  private void writeError(HttpServletResponse response, HttpStatus status, String reason)
+      throws IOException {
+    response.setStatus(status.value());
+    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+    ErrorRestResponse<Void> errorResponse = new ErrorRestResponse<>(null, reason);
+    objectMapper.writeValue(response.getWriter(), errorResponse);
+  }
+}

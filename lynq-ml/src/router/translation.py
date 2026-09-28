@@ -14,6 +14,7 @@ from model.resume_extractor import Resume
 from model.translation import TranslateRequest
 from prompt.translation import render_translation_prompt
 from response import GlobalRestResponse
+from security import CallerPrincipal
 
 log = logging.getLogger(__name__)
 
@@ -33,8 +34,9 @@ _LOG_CONTEXT = "user_id=%s, language=%s"
 async def translate(
     body: TranslateRequest,
     lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
-    user_id: Annotated[str, Header(alias="user-id")],
+    principal: CallerPrincipal,
 ) -> GlobalRestResponse[Resume]:
+    user_id = principal.id
     log.info(
         "message= Started translate, " + _LOG_CONTEXT,
         user_id,

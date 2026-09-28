@@ -250,8 +250,13 @@ empties the database.
 > EVAL_CORPUS_SALT=<salt> python scripts/export_eval_corpus.py corpus.jsonl --only-applied
 > ```
 
-Every route but the health probe requires the `lynq-request-uuid` and `user-id`
-headers, and answers with the platform-wide `GlobalRestResponse` envelope.
+Every route but the health probe requires the `lynq-request-uuid` and `Authorization`
+headers, and answers with the platform-wide `GlobalRestResponse` envelope. The caller is
+resolved from the token against lynq-iam's `/auth/user-info`, the same way lynq-app-backend
+resolves it, and that resolved user is the one a conversation belongs to — a `user-id`
+header names nobody. A missing `Authorization` is a 401, a token lynq-iam refuses is a 401,
+and lynq-iam being unreachable is a 503. Creating a conversation relays the same credential
+to lynq-ml, which resolves it for itself.
 
 ### A turn, transaction by transaction
 
@@ -345,7 +350,8 @@ guarantees are checked there.
 | `AGENT_JOB_DESCRIPTION_MAX_CHARS` | `6000` | The posting is truncated to this before it is frozen into the snapshot |
 | `LYNQ_ML_URL` | `http://localhost:8084/lynq-ml` | Where the skill extraction of the posting is asked for |
 | `ML_TIMEOUT` | `300` | Seconds allowed for the lynq-ml call |
-| `LYNQ_AGENT_SYSTEM_USER_ID` | — | The `user-id` the agent presents to lynq-ml; the caller's own is forwarded when empty |
+| `LYNQ_IAM_URL` | `http://localhost:8080/lynq-iam` | Where the caller's token is resolved |
+| `LYNQ_IAM_TIMEOUT` | `10` | Seconds allowed for that lookup |
 | `LLM_PROVIDER` | `ollama` | `ollama` for local development, `bedrock` in the cloud |
 | `LLM_TIMEOUT` | `300` | Seconds allowed for a single LLM call |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Local Ollama endpoint |

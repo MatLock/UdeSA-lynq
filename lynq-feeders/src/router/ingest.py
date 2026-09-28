@@ -42,6 +42,7 @@ def build_service() -> IngestService:
         ml_client=MlClient(
             base_url=settings.ml_url,
             system_user_id=settings.system_user_id,
+            internal_token=settings.internal_token,
             timeout=settings.ml_timeout,
         ),
         backend_client=BackendClient(

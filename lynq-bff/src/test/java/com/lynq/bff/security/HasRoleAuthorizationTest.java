@@ -6,7 +6,6 @@ import com.lynq.bff.controller.handler.ControllerExceptionHandler;
 import com.lynq.bff.controller.impl.UserControllerImpl;
 import com.lynq.bff.controller.impl.ResumeControllerImpl;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
-import com.lynq.bff.filter.JwtSignatureFilter;
 import com.lynq.bff.service.UserService;
 import com.lynq.bff.service.ResumeAliasService;
 import com.lynq.bff.service.ResumeDeletionService;
@@ -44,6 +43,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class HasRoleAuthorizationTest {
 
   private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
+  private static final String USERNAME = "janedoe";
+  private static final String EMAIL = "jane@lynq.com";
   private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
   private static final String REQUEST_UUID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a99";
   private static final String AUTHORIZATION_HEADER = "Authorization";
@@ -160,7 +161,6 @@ class HasRoleAuthorizationTest {
     MockHttpServletRequestBuilder builder = request(method, path)
         .header(REQUEST_UUID_HEADER, REQUEST_UUID)
         .header(AUTHORIZATION_HEADER, AUTHORIZATION)
-        .requestAttr(JwtSignatureFilter.VERIFIED_USER_ID, USER_ID)
         .with(authentication(authenticationWith(role)));
 
     if (body != null) {
@@ -174,6 +174,8 @@ class HasRoleAuthorizationTest {
     List<GrantedAuthority> authorities = role == null
         ? List.of()
         : List.of(new SimpleGrantedAuthority(Role.PREFIX + role));
-    return new UsernamePasswordAuthenticationToken(USER_ID, null, authorities);
+    LynqUserPrincipal principal =
+        new LynqUserPrincipal(USER_ID, USERNAME, EMAIL, authorities, AUTHORIZATION);
+    return new UsernamePasswordAuthenticationToken(principal, null, authorities);
   }
 }
