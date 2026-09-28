@@ -118,16 +118,20 @@ and only what passes enters the resume:
 | A number the base resume does not carry (`12 years`, `40%`, `a team of 8`). A date backs only its year: `2020-12` backs `2020`, not `12` | `a number the base resume does not carry` |
 | A skill the posting asks for, named in prose the base resume does not back — in the summary, checked against the whole base resume; in an entry, against that entry alone, so a technology never moves into a job that never used it | `a posting skill the base resume does not back` |
 | Text more than twice the original, plus slack for a one-line summary | `more than twice the original` |
-| Prose in the language of the chat when the resume is in another (`langdetect`, bounded to prose longer than 80 characters once the skill names are taken out) | `not written in the language of the resume` |
+| Prose in the language of the chat when the resume is in another (`langdetect`, bounded to prose longer than 40 characters once the skill names are taken out) | `not written in the language of the resume` |
 | An entry no `company`/`position` of the resume matches (a paraphrased position still finds its entry by company when that is unambiguous) | `no such entry in work_experience` |
 | A skill nothing in the base resume backs. A skill that is backed enters with the wording of the resume: a posting asking for `PostgreSQL` over a resume saying `Postgres` adds `Postgres` | `no evidence in base resume` |
+| A bucket that leaves out a skill the resume lists. Replacing a bucket may reorder it and grow it, never take from it: a skill the candidate listed is theirs | `drops a skill the resume lists` |
 
 The parts are independent — a summary that fails does not hold back skills that pass —
 and a rejection goes back to the model **once**, with its reason, as the next message of
 the same thread: the model re-proposes the rejected parts with the reason in hand, and
-what is still rejected after that stays out. Each pass leaves a `kind='tool'` span named
-`guard` whose input is the proposal and whose output is `OK` or the list of rejections;
-`docs/queries.sql` groups by them, so the reasons are literal and stable.
+what is still rejected after that stays out — and reaches the candidate as a warning, in
+their language (`resources/rejections/`), because the reply is the model's and the
+document is the guard's, and the chat must never promise what the resume beside it does
+not say. Each pass leaves a `kind='tool'` span named `guard` whose input is the proposal
+and whose output is `OK` or the list of rejections; `docs/queries.sql` groups by them, so
+the reasons are literal and stable.
 
 What backs a skill is decided by `src/agent/evidence.py` and `src/agent/lexical.py`: a
 lexical search over the base resume, normalised (lowercase, no accents, no symbols but

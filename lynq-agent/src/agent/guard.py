@@ -6,7 +6,7 @@ from typing import Any
 
 from agent.evidence import backing_for, searchable, skill_names
 from agent.language import bare, detected_conflict
-from agent.lexical import find_match, normalize
+from agent.lexical import find_match, normalize, same_skill
 from agent.schemas import EditProposal, EntryEdit
 from agent.state import TurnState
 
@@ -31,6 +31,7 @@ UNBACKED_SKILL = "a posting skill the base resume does not back"
 TOO_LONG = "more than twice the original"
 LANGUAGE_MISMATCH = "not written in the language of the resume"
 NO_EVIDENCE = "no evidence in base resume"
+DROPPED_SKILL = "drops a skill the resume lists"
 
 _DIGITS = re.compile(r"\d+")
 _YEAR = re.compile(r"\d{4}")
@@ -213,6 +214,14 @@ def _apply_skills(state: TurnState, buckets: dict[str, list[str]]) -> Rejection 
     current = state.resume.get(SKILLS)
     if not isinstance(current, dict):
         current = {}
+
+    # Replacing a bucket may reorder it and add to it, never take from it: a skill
+    # the candidate listed is theirs, and dropping it is not tailoring.
+    for bucket, names in accepted.items():
+        for listed in current.get(bucket) or []:
+            if isinstance(listed, str) and not any(same_skill(listed, name) for name in names):
+                return _rejection(f"{SKILLS}.{bucket}", DROPPED_SKILL, listed)
+
     if all(current.get(bucket) == names for bucket, names in accepted.items()):
         return None
     current.update(accepted)

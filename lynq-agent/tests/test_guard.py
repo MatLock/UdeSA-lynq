@@ -204,12 +204,38 @@ class SkillsGuardTest(unittest.TestCase):
         self.assertEqual(rejections, [f"skills.technical: {guard.NO_EVIDENCE} (Go)"])
         self.assertEqual(state.resume["skills"], RESUME["skills"])
 
+    def test_a_skill_the_resume_lists_cannot_be_dropped(self) -> None:
+        state = state_for()
+
+        rejections = guard.apply(state, proposal(skills=SkillsEdit(technical=["Kubernetes", "Postgres"])))
+
+        self.assertEqual(rejections, [f"skills.technical: {guard.DROPPED_SKILL} (Java)"])
+        self.assertEqual(state.resume["skills"], RESUME["skills"])
+
+    def test_a_bucket_may_be_reordered_and_grown(self) -> None:
+        state = state_for()
+
+        rejections = guard.apply(state, proposal(skills=SkillsEdit(technical=["Kubernetes", "PostgreSQL", "Java"])))
+
+        self.assertEqual(rejections, [])
+        self.assertEqual(state.resume["skills"]["technical"], ["Kubernetes", "Postgres", "Java"])
+
+    def test_a_short_summary_in_the_language_of_the_chat_is_still_caught(self) -> None:
+        state = state_for()
+
+        rejections = guard.apply(
+            state,
+            proposal(summary="Experiencia de ocho anios como ingeniero backend, especializado en Kubernetes y Postgres."),
+        )
+
+        self.assertEqual(rejections, [f"summary: {guard.LANGUAGE_MISMATCH} (es, not en)"])
+
     def test_two_spellings_of_one_technology_enter_once(self) -> None:
         state = state_for()
 
-        guard.apply(state, proposal(skills=SkillsEdit(technical=["Postgres", "PostgreSQL"])))
+        guard.apply(state, proposal(skills=SkillsEdit(technical=["Java", "Postgres", "PostgreSQL"])))
 
-        self.assertEqual(state.resume["skills"]["technical"], ["Postgres"])
+        self.assertEqual(state.resume["skills"]["technical"], ["Java", "Postgres"])
 
     def test_the_same_buckets_again_are_not_a_change(self) -> None:
         state = state_for()
@@ -227,12 +253,12 @@ class IndependenceTest(unittest.TestCase):
 
         rejections = guard.apply(
             state,
-            proposal(summary="Backend engineer with 12 years.", skills=SkillsEdit(technical=["Kubernetes"])),
+            proposal(summary="Backend engineer with 12 years.", skills=SkillsEdit(technical=["Kubernetes", "Java", "Postgres"])),
         )
 
         self.assertEqual(rejections, [f"summary: {guard.UNBACKED_NUMBER} (12)"])
         self.assertEqual(state.resume["summary"], BASE_SUMMARY)
-        self.assertEqual(state.resume["skills"]["technical"], ["Kubernetes"])
+        self.assertEqual(state.resume["skills"]["technical"], ["Kubernetes", "Java", "Postgres"])
 
     def test_a_part_rewritten_twice_in_a_turn_is_one_change(self) -> None:
         state = state_for()

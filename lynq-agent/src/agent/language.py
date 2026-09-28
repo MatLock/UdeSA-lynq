@@ -9,7 +9,7 @@ from agent.lexical import normalize
 log = logging.getLogger(__name__)
 
 _MIN_SAMPLE_CHARS = 24
-MIN_DETECTABLE_CHARS = 80
+MIN_DETECTABLE_CHARS = 40
 
 
 def _sample(resume: dict) -> str:

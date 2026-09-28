@@ -12,6 +12,7 @@ EXEMPT = (
     os.path.join("resources", "greetings", "es.jinja"),
     os.path.join("resources", "refusals", "es.jinja"),
     os.path.join("resources", "notices", "es.jinja"),
+    os.path.join("resources", "rejections", "es.jinja"),
     os.path.join("tests", "fixtures"),
     os.path.join("tests", "test_english_only.py"),
 )

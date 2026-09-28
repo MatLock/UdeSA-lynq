@@ -13,6 +13,7 @@ from config import BEDROCK, OLLAMA, get_settings
 from db.models import MessageRole
 from llm.factory import build_model
 from prompt.notice import render as no_change_notice
+from prompt.rejection import render as rejection_notice
 
 log = logging.getLogger(__name__)
 
@@ -72,6 +73,11 @@ async def run_turn(context: TurnContext, model=None, intent_model=None) -> TurnO
         proposal = result["proposal"]
         reply, warnings = proposal.reply, list(proposal.warnings)
         recommendations = []
+        # The reply is the model's; the document is the guard's. When they differ,
+        # the candidate is told which parts stayed out, so the chat never promises
+        # what the resume beside it does not say.
+        if result.get("rejections"):
+            warnings.append(rejection_notice(context.language, result["rejections"]))
         if not state.changes:
             warnings.append(no_change_notice(context.language))
 

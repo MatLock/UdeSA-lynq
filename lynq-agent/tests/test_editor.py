@@ -16,6 +16,7 @@ from agent.state import build_turn_state
 from agent.turn import run_turn
 from config import reset_settings
 from db.models import SpanKind
+from prompt.rejection import render as rejection_notice
 
 FIXED = "Backend engineer with eight years on distributed systems, Postgres and Kubernetes."
 INVENTED = "Backend engineer with 12 years."
@@ -32,7 +33,7 @@ class CorrectionPassTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_rejection_goes_back_once_with_its_reason(self) -> None:
         model = scripted(
-            tool_call("EditProposal", {"reply": "first", "summary": INVENTED, "skills": {"technical": ["Kubernetes"]}}, "1"),
+            tool_call("EditProposal", {"reply": "first", "summary": INVENTED, "skills": {"technical": ["Kubernetes", "Java", "Postgres"]}}, "1"),
             tool_call("EditProposal", {"reply": "second", "summary": FIXED}, "2"),
         )
 
@@ -40,7 +41,7 @@ class CorrectionPassTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(outcome.reply, "second")
         self.assertEqual(outcome.resume["summary"], FIXED)
-        self.assertEqual(outcome.resume["skills"]["technical"], ["Kubernetes"])
+        self.assertEqual(outcome.resume["skills"]["technical"], ["Kubernetes", "Java", "Postgres"])
         self.assertEqual(len(model.prompts), 2)
         note = model.prompts[1][-1].content
         self.assertIn(guard.UNBACKED_NUMBER, note)
@@ -59,6 +60,19 @@ class CorrectionPassTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(model.prompts), 2)
         guards = [span for span in outcome.spans if span.name == GUARD_SPAN]
         self.assertEqual(json.loads(guards[-1].output), [f"summary: {guard.UNBACKED_NUMBER} (15)"])
+        self.assertIn(
+            rejection_notice("es", [f"summary: {guard.UNBACKED_NUMBER} (15)"]), outcome.warnings
+        )
+
+    async def test_a_correction_that_held_leaves_no_rejection_warning(self) -> None:
+        model = scripted(
+            tool_call("EditProposal", {"reply": "first", "summary": INVENTED}, "1"),
+            tool_call("EditProposal", {"reply": "second", "summary": FIXED}, "2"),
+        )
+
+        outcome = await run_turn(context_for(), model=model, intent_model=intending())
+
+        self.assertEqual(outcome.warnings, [])
 
     async def test_a_clean_proposal_costs_one_call(self) -> None:
         model = scripted(tool_call("EditProposal", {"reply": "done", "summary": FIXED}, "1"))
