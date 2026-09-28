@@ -133,7 +133,9 @@ class RequirePrincipalTests(unittest.IsolatedAsyncioTestCase):
     def test_the_iam_client_is_built_once(self) -> None:
         reset_iam_client()
 
-        self.assertIs(get_iam_client(), get_iam_client())
+        client = get_iam_client()
+
+        self.assertIs(get_iam_client(), client)
 
 
 class RequireInternalCallerTests(unittest.IsolatedAsyncioTestCase):
