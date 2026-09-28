@@ -76,7 +76,13 @@ graph TD;
 ```
 
 `python scripts/draw_turn_graph.py` prints that diagram from the compiled graph, so it
-never drifts from the code; `--png` writes it as an image instead, for the thesis. `TurnGraphState` is what flows between the nodes: the
+never drifts from the code; `--png` writes it as an image instead, for the thesis.
+
+[`docs/un-turno-por-dentro.html`](docs/un-turno-por-dentro.html) walks through a real
+conversation step by step — the message, the node the turn is on, what the model proposed
+and what the guard let in — with the trace spans each step leaves. Open it in a browser;
+it is one file with no build. The turns come from a run against `qwen2.5:7b` on
+2026-09-28, and the last one is a worked example of the `advise` branch. `TurnGraphState` is what flows between the nodes: the
 context and the turn state the service built, the model handles, and what each node
 leaves for the next — the intent, the thread, the proposal, the rejections and how many
 passes the guard has made.
