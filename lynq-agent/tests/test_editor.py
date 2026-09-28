@@ -6,11 +6,13 @@ from unittest.mock import patch
 
 from langchain_core.messages import HumanMessage
 
+from tests.fixtures.spanish import JUDGE_REASON_ES
 from tests.support import intending, scripted, tool_call
 from tests.test_turn import RESUME, context_for
 
-from agent import editor, guard
-from agent.editor import GUARD_SPAN
+from agent import editor
+from agent.apply import Rejection
+from agent.graph import APPLY_SPAN
 from agent.schemas import EditProposal
 from agent.state import build_turn_state
 from agent.turn import run_turn
@@ -20,6 +22,10 @@ from prompt.rejection import render as rejection_notice
 
 FIXED = "Backend engineer with eight years on distributed systems, Postgres and Kubernetes."
 INVENTED = "Backend engineer with 12 years."
+
+
+def verdict(*parts):
+    return tool_call("Verdict", {"parts": [dict(p) for p in parts]}, "v")
 
 
 class CorrectionPassTest(unittest.IsolatedAsyncioTestCase):
@@ -33,79 +39,86 @@ class CorrectionPassTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_rejection_goes_back_once_with_its_reason(self) -> None:
         model = scripted(
-            tool_call("EditProposal", {"reply": "first", "summary": INVENTED, "skills": {"technical": ["Kubernetes", "Java", "Postgres"]}}, "1"),
+            tool_call("EditProposal", {"reply": "first", "summary": INVENTED, "skills": {"technical": ["Java", "Postgres", "Kubernetes"]}}, "1"),
+            verdict({"id": "summary", "ok": False, "kind": "invented", "reason": JUDGE_REASON_ES}, {"id": "skills:technical", "ok": True}),
             tool_call("EditProposal", {"reply": "second", "summary": FIXED}, "2"),
+            verdict({"id": "summary", "ok": True}),
         )
 
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
         self.assertEqual(outcome.reply, "second")
         self.assertEqual(outcome.resume["summary"], FIXED)
-        self.assertEqual(outcome.resume["skills"]["technical"], ["Kubernetes", "Java", "Postgres"])
-        self.assertEqual(len(model.prompts), 2)
-        note = model.prompts[1][-1].content
-        self.assertIn(guard.UNBACKED_NUMBER, note)
+        self.assertEqual(outcome.resume["skills"]["technical"], ["Java", "Postgres", "Kubernetes"])
+        self.assertEqual(outcome.warnings, [])
+        self.assertEqual(len(model.prompts), 4)
+        note = model.prompts[2][-1].content
+        self.assertIn(JUDGE_REASON_ES, note)
         self.assertIn("Everything else was applied and stays", note)
 
-    async def test_what_is_still_rejected_after_the_correction_stays_out(self) -> None:
+    async def test_what_is_still_rejected_after_the_correction_stays_out_and_is_told(self) -> None:
         model = scripted(
             tool_call("EditProposal", {"reply": "first", "summary": INVENTED}, "1"),
+            verdict({"id": "summary", "ok": False, "kind": "invented", "reason": JUDGE_REASON_ES}),
             tool_call("EditProposal", {"reply": "second", "summary": "Backend engineer with 15 years."}, "2"),
+            verdict({"id": "summary", "ok": False, "kind": "invented", "reason": JUDGE_REASON_ES}),
         )
 
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
         self.assertEqual(outcome.resume["summary"], RESUME["summary"])
         self.assertEqual(outcome.changes, [])
-        self.assertEqual(len(model.prompts), 2)
-        guards = [span for span in outcome.spans if span.name == GUARD_SPAN]
-        self.assertEqual(json.loads(guards[-1].output), [f"summary: {guard.UNBACKED_NUMBER} (15)"])
-        self.assertIn(
-            rejection_notice("es", [guard.Rejection("summary", "", guard.UNBACKED_NUMBER, "15")]),
-            outcome.warnings,
-        )
+        self.assertEqual(len(model.prompts), 4)
+        self.assertIn(rejection_notice("es", [Rejection("summary", "", "invented", JUDGE_REASON_ES)]), outcome.warnings)
 
-    async def test_a_correction_that_held_leaves_no_rejection_warning(self) -> None:
+    async def test_a_clean_proposal_costs_two_calls(self) -> None:
         model = scripted(
-            tool_call("EditProposal", {"reply": "first", "summary": INVENTED}, "1"),
-            tool_call("EditProposal", {"reply": "second", "summary": FIXED}, "2"),
+            tool_call("EditProposal", {"reply": "done", "summary": FIXED}, "1"),
+            verdict({"id": "summary", "ok": True}),
         )
 
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
-        self.assertEqual(outcome.warnings, [])
-
-    async def test_a_clean_proposal_costs_one_call(self) -> None:
-        model = scripted(tool_call("EditProposal", {"reply": "done", "summary": FIXED}, "1"))
-
-        outcome = await run_turn(context_for(), model=model, intent_model=intending())
-
-        self.assertEqual(len(model.prompts), 1)
+        self.assertEqual(len(model.prompts), 2)
         self.assertEqual(
             [(span.kind, span.name) for span in outcome.spans[1:]],
-            [(SpanKind.LLM, "model"), (SpanKind.TOOL, GUARD_SPAN)],
+            [(SpanKind.LLM, "model"), (SpanKind.LLM, "model"), (SpanKind.TOOL, APPLY_SPAN)],
         )
+        self.assertEqual(outcome.spans[-1].output, "OK")
 
-    async def test_the_guard_span_carries_the_edits_and_the_verdict(self) -> None:
+    async def test_the_apply_span_carries_the_parts_and_the_verdict(self) -> None:
         model = scripted(
             tool_call("EditProposal", {"reply": "done", "summary": INVENTED}, "1"),
+            verdict({"id": "summary", "ok": False, "kind": "invented", "reason": JUDGE_REASON_ES}),
             tool_call("EditProposal", {"reply": "done"}, "2"),
+            verdict(),
         )
 
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
-        first = [span for span in outcome.spans if span.name == GUARD_SPAN][0]
-        self.assertEqual(json.loads(first.input)["summary"], INVENTED)
-        self.assertNotIn("reply", json.loads(first.input))
-        self.assertEqual(json.loads(first.output), [f"summary: {guard.UNBACKED_NUMBER} (12)"])
+        first = [span for span in outcome.spans if span.name == APPLY_SPAN][0]
+        self.assertEqual(json.loads(first.input), [{"id": "summary", "proposed": INVENTED}])
+        self.assertEqual(json.loads(first.output), [{"where": f"summary: {JUDGE_REASON_ES}", "kind": "invented"}])
 
-    async def test_the_model_span_says_which_template_it_ran_under(self) -> None:
-        model = scripted(tool_call("EditProposal", {"reply": "done"}, "1"))
+    async def test_each_model_span_says_which_template_it_ran_under(self) -> None:
+        model = scripted(
+            tool_call("EditProposal", {"reply": "done", "summary": FIXED}, "1"),
+            verdict({"id": "summary", "ok": True}),
+        )
 
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
-        model_span = [span for span in outcome.spans if span.name == "model"][0]
-        self.assertTrue(json.loads(model_span.input)["prompt"].startswith("edit@"))
+        references = [json.loads(s.input)["prompt"].split("@")[0] for s in outcome.spans if s.name == "model"]
+        self.assertEqual(references, ["edit", "judge"])
+
+    async def test_a_separate_judge_model_may_be_given(self) -> None:
+        editor_model = scripted(tool_call("EditProposal", {"reply": "done", "summary": FIXED}, "1"))
+        judge_model = scripted(verdict({"id": "summary", "ok": True}))
+
+        outcome = await run_turn(context_for(), model=editor_model, intent_model=intending(), judge_model=judge_model)
+
+        self.assertEqual(outcome.resume["summary"], FIXED)
+        self.assertEqual(judge_model.binds[0]["tools"], ["Verdict"])
 
 
 class ThreadTest(unittest.TestCase):

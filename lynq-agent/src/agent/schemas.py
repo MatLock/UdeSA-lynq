@@ -93,3 +93,21 @@ class Advice(BaseModel):
     recommendations: list[Recommendation] = Field(
         default_factory=list, description="The edits you would apply next, best first"
     )
+
+
+class PartVerdict(BaseModel):
+    id: str = Field(default="", description="The id of the part, as given")
+    ok: bool = Field(default=False, description="true when the resume supports the change")
+    kind: str = Field(
+        default="",
+        description="When rejected: invented, unsupported_skill, dropped_skill, wording, language or padding",
+    )
+    reason: str = Field(
+        default="", description="When rejected: one sentence for the candidate, in their language"
+    )
+
+
+class Verdict(BaseModel):
+    parts: list[PartVerdict] = Field(
+        default_factory=list, description="One verdict per part, every part answered"
+    )

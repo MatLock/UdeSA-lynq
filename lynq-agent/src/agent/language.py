@@ -4,12 +4,10 @@ import logging
 
 from langdetect import LangDetectException, detect
 
-from agent.lexical import normalize
 
 log = logging.getLogger(__name__)
 
 _MIN_SAMPLE_CHARS = 24
-MIN_DETECTABLE_CHARS = 40
 
 
 def _sample(resume: dict) -> str:
@@ -43,32 +41,3 @@ def verify_resume_language(resume: dict, declared: str) -> str:
             detected,
         )
     return declared
-
-
-def detected_conflict(
-    texts: list[str],
-    *,
-    language: str,
-    resume_language: str,
-    vocabulary: set[str],
-) -> str | None:
-    """The language a text was written in when it is the conversation's and not the
-    resume's. Skill names are taken out first: `Kubernetes` speaks no language, and
-    a detector fed a list of them guesses. Short prose is left alone for the same
-    reason."""
-    if bare(language) == bare(resume_language):
-        return None
-
-    for text in texts:
-        prose = " ".join(
-            word for word in text.split() if normalize(word) not in vocabulary
-        )
-        if len(prose) <= MIN_DETECTABLE_CHARS:
-            continue
-        try:
-            detected = bare(detect(prose))
-        except LangDetectException:
-            continue
-        if detected == bare(language) != bare(resume_language):
-            return detected
-    return None

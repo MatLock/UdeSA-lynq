@@ -1,12 +1,3 @@
 {% set sections = {'summary': 'el resumen', 'work_experience': 'la experiencia', 'skills': 'las skills'} %}
-{% set reasons = {
-  'a number the base resume does not carry': 'un número que el CV no respalda',
-  'a posting skill the base resume does not back': 'una skill del aviso que el CV no respalda',
-  'more than twice the original': 'más del doble de largo que el original',
-  'not written in the language of the resume': 'no está escrito en el idioma del CV',
-  'no such entry in work_experience': 'no existe esa entrada en la experiencia',
-  'no evidence in base resume': 'sin respaldo en el CV',
-  "the posting's spelling of a skill the resume spells otherwise": "la grafía del aviso para una skill que el CV escribe distinto",
-  'drops a skill the resume lists': 'borraría una skill que el CV ya lista'
-} %}
-Parte de lo propuesto no entró al CV: {% for r in rejections %}{{ sections.get(r.section, r.section) }}{% if r.label %} ({{ r.label }}){% endif %}, {{ reasons.get(r.reason, r.reason) }}{% if r.detail %}: {{ r.detail }}{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}.
+{% set kinds = {'unknown_entry': 'el CV no tiene esa entrada', 'unjudged': 'el juez no se pronunció'} %}
+Parte de lo propuesto no entró al CV: {% for r in rejections %}{{ sections.get(r.section, r.section) }}{% if r.label %} ({{ r.label }}){% endif %}, {{ kinds.get(r.kind, r.reason) }}{% if not loop.last %}; {% endif %}{% endfor %}.

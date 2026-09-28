@@ -7,7 +7,7 @@ from tests.fixtures.spanish import ASK_FOR_ADVICE, ASK_FOR_GO
 from tests.test_turn import RESUME, context_for
 
 from agent.context import Intent
-from agent.editor import GUARD_SPAN
+from agent.graph import APPLY_SPAN
 from config import BEDROCK, get_settings, reset_settings
 from db.models import SpanKind
 
@@ -46,8 +46,8 @@ class LiveTurnTest(unittest.IsolatedAsyncioTestCase):
         for bucket in outcome.resume["skills"].values():
             self.assertNotIn("Go", bucket, "the resume does not back Go")
         self.assertTrue(
-            [span for span in outcome.spans if span.name == GUARD_SPAN],
-            "every edit turn runs the guard",
+            [span for span in outcome.spans if span.name == APPLY_SPAN],
+            "every edit turn is judged and applied",
         )
         if bedrock_enabled():
             model_spans = [span for span in outcome.spans if span.kind == SpanKind.LLM and span.name == "model"]
@@ -56,6 +56,11 @@ class LiveTurnTest(unittest.IsolatedAsyncioTestCase):
                 "EditProposal",
                 model_spans[0].output or "",
                 "Nova Pro is expected to answer through the schema tool, not in text",
+            )
+            self.assertIn(
+                "Verdict",
+                model_spans[1].output or "",
+                "the judge is expected to answer through the schema tool, not in text",
             )
 
     async def test_an_advise_turn_cannot_write(self) -> None:

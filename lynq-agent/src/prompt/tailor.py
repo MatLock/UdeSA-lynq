@@ -13,7 +13,8 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__f
 TEMPLATE_DIR = os.path.join(_REPO_ROOT, "resources", "prompts")
 EDIT = "edit"
 ADVISE = "advise"
-FAMILIES = (EDIT, ADVISE)
+JUDGE = "judge"
+FAMILIES = (EDIT, ADVISE, JUDGE)
 LANGUAGE_NAMES = {"en": "English", "es": "Spanish", "pt": "Portuguese"}
 HASH_LENGTH = 12
 
@@ -68,4 +69,28 @@ def render(
         resume_language=language_name(resume_language),
         turns_left=turns_left,
         recommendations=recommendations or [],
+    )
+
+
+def render_judge(
+    *,
+    provider: str,
+    resume: dict[str, Any],
+    job_skills: list[str],
+    language: str,
+    resume_language: str,
+    parts: list,
+) -> str:
+    template = _environment.get_template(f"{JUDGE}.jinja")
+    return template.render(
+        provider=provider,
+        resume=json.dumps(
+            {key: value for key, value in resume.items() if key != "personal_info"},
+            ensure_ascii=False,
+            indent=2,
+        ),
+        job_skills=job_skills,
+        language=language_name(language),
+        resume_language=language_name(resume_language),
+        parts=parts,
     )

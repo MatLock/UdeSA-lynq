@@ -40,10 +40,14 @@ def turn_messages(context: TurnContext) -> list:
     return messages
 
 
-async def run_turn(context: TurnContext, model=None, intent_model=None) -> TurnOutcome:
+async def run_turn(
+    context: TurnContext, model=None, intent_model=None, judge_model=None
+) -> TurnOutcome:
     """One turn through the graph: the intent agent reads the message, then
-    either the advising agent answers or the editing agent proposes and the
-    guard applies, with one correction pass when something is rejected."""
+    either the advising agent answers or the editing agent proposes, the judge
+    decides part by part and the code applies what it approved, with one
+    correction pass when something is rejected. A scripted `model` serves the
+    judge too, so a test scripts both answers in order."""
     settings = get_settings()
     state = build_turn_state(context)
     prompt = PromptReference()
@@ -56,6 +60,9 @@ async def run_turn(context: TurnContext, model=None, intent_model=None) -> TurnO
             "provider": template_provider(settings.llm_provider),
             "model": model if model is not None else build_model(),
             "intent_model": intent_model,
+            "judge_model": judge_model if judge_model is not None else (
+                None if model is not None else build_model(model=settings.judge_model)
+            ),
             "callbacks": [collector],
             "retries": settings.model_retries,
             "messages": turn_messages(context),

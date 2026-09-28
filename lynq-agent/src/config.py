@@ -68,6 +68,12 @@ class Settings:
             if self.llm_provider == BEDROCK
             else os.getenv("OLLAMA_INTENT_MODEL", "").strip()
         ) or self.llm_model
+        # The judge reads short texts and answers yes or no; a cheap model does.
+        self.judge_model: str = (
+            os.getenv("BEDROCK_JUDGE_MODEL_ID", "").strip()
+            if self.llm_provider == BEDROCK
+            else os.getenv("OLLAMA_JUDGE_MODEL", "").strip()
+        ) or self.llm_model
         self.ollama_base_url: str = os.getenv(
             "OLLAMA_BASE_URL", DEFAULT_OLLAMA_BASE_URL
         )
@@ -86,6 +92,9 @@ class Settings:
         self.input_price_per_1m, self.output_price_per_1m = self._prices(self.llm_model)
         self.intent_input_price_per_1m, self.intent_output_price_per_1m = self._prices(
             self.intent_model
+        )
+        self.judge_input_price_per_1m, self.judge_output_price_per_1m = self._prices(
+            self.judge_model
         )
 
         self.lynq_ml_url: str = os.getenv("LYNQ_ML_URL", DEFAULT_LYNQ_ML_URL).rstrip("/")

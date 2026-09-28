@@ -1,30 +1,36 @@
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from agent import editor
+from agent import apply, editor
 from agent.advisor import advise
-from agent.context import Intent, TurnContext
+from agent.context import Intent, SpanRecord, TurnContext
 from agent.intent import classify
+from agent.judge import judge
 from agent.schemas import Advice, EditProposal
 from agent.state import TurnState
-from prompt.tailor import ADVISE as ADVISE_PROMPT, EDIT as EDIT_PROMPT, reference
+from db.models import SpanKind
+from prompt.tailor import ADVISE as ADVISE_PROMPT, EDIT as EDIT_PROMPT, JUDGE as JUDGE_PROMPT, reference
 
 log = logging.getLogger(__name__)
 
 CLASSIFY = "classify"
 ADVISE = "advise"
 PROPOSE = "propose"
-GUARD = "guard"
+JUDGE = "judge"
+APPLY = "apply"
+APPLY_SPAN = "apply"
+OK = "OK"
 
 
 class PromptReference:
-    """The trace records which template a model span ran under. The family is
-    only known once the intent is read, so the reference resolves itself late:
-    the collector stringifies it when it writes the span."""
+    """The trace records which template a model span ran under. Three templates
+    take turns inside one graph run, so the node about to call the model sets the
+    family and the collector stringifies it when it writes the span."""
 
     def __init__(self) -> None:
         self.family = EDIT_PROMPT
@@ -42,6 +48,7 @@ class TurnGraphState(TypedDict, total=False):
     provider: str
     model: Any
     intent_model: Any
+    judge_model: Any
     callbacks: list
     retries: int
     messages: list
@@ -49,31 +56,30 @@ class TurnGraphState(TypedDict, total=False):
     intent: str
     thread: list
     proposal: EditProposal
-    rejections: list[str]
+    parts: list
+    approved: set
+    rejections: list
     passes: int
     advice: Advice
 
 
 async def classify_node(graph: TurnGraphState) -> TurnGraphState:
     intent = await classify(graph["context"], graph["provider"], graph.get("intent_model"))
-    graph["prompt"].family = ADVISE_PROMPT if intent == Intent.ADVISE else EDIT_PROMPT
     return {"intent": intent}
 
 
 async def advise_node(graph: TurnGraphState) -> TurnGraphState:
+    graph["prompt"].family = ADVISE_PROMPT
     advice = await advise(
-        graph["context"],
-        graph["state"],
-        graph["model"],
-        provider=graph["provider"],
-        callbacks=graph["callbacks"],
-        retries=graph["retries"],
-        messages=graph["messages"],
+        graph["context"], graph["state"], graph["model"],
+        provider=graph["provider"], callbacks=graph["callbacks"],
+        retries=graph["retries"], messages=graph["messages"],
     )
     return {"advice": advice}
 
 
 async def propose_node(graph: TurnGraphState) -> TurnGraphState:
+    graph["prompt"].family = EDIT_PROMPT
     thread = graph.get("thread")
     if thread is None:
         thread = editor.opening_thread(
@@ -87,16 +93,45 @@ async def propose_node(graph: TurnGraphState) -> TurnGraphState:
     return {"thread": thread, "proposal": proposal}
 
 
-def guard_node(graph: TurnGraphState) -> TurnGraphState:
-    rejections = editor.check(graph["state"], graph["proposal"])
-    return {"rejections": rejections, "passes": graph.get("passes", 0) + 1}
+async def judge_node(graph: TurnGraphState) -> TurnGraphState:
+    """The judging agent reads the proposal part by part beside the text each part
+    replaces. A part with nowhere to go (an entry the resume does not have) never
+    reaches it: that is the one thing the code decides."""
+    graph["prompt"].family = JUDGE_PROMPT
+    state, context = graph["state"], graph["context"]
+    parts, misplaced = apply.plan(state, graph["proposal"])
+    approved, rejected = await judge(
+        state, parts, graph.get("judge_model") or graph["model"],
+        provider=graph["provider"], language=context.language,
+        job_skills=state.job_skills, callbacks=graph["callbacks"], retries=graph["retries"],
+    )
+    return {"parts": parts, "approved": approved, "rejections": [*misplaced, *rejected]}
+
+
+def apply_node(graph: TurnGraphState) -> TurnGraphState:
+    state = graph["state"]
+    apply.commit(state, graph["parts"], graph["approved"])
+    rejections = graph["rejections"]
+    state.spans.append(
+        SpanRecord(
+            step=state.next_step(), kind=SpanKind.TOOL, name=APPLY_SPAN,
+            input=json.dumps(
+                [{"id": part.id, "proposed": part.proposed} for part in graph["parts"]],
+                ensure_ascii=False,
+            ),
+            output=OK if not rejections else json.dumps(
+                [{"where": str(r), "kind": r.kind} for r in rejections], ensure_ascii=False
+            ),
+        )
+    )
+    return {"passes": graph.get("passes", 0) + 1}
 
 
 def route_intent(graph: TurnGraphState) -> str:
     return ADVISE if graph["intent"] == Intent.ADVISE else PROPOSE
 
 
-def route_guard(graph: TurnGraphState) -> str:
+def route_apply(graph: TurnGraphState) -> str:
     if graph["rejections"] and graph["passes"] < editor.MAX_PASSES:
         return PROPOSE
     return END
@@ -107,21 +142,24 @@ def build_graph():
     graph.add_node(CLASSIFY, classify_node)
     graph.add_node(ADVISE, advise_node)
     graph.add_node(PROPOSE, propose_node)
-    graph.add_node(GUARD, guard_node)
+    graph.add_node(JUDGE, judge_node)
+    graph.add_node(APPLY, apply_node)
 
     graph.add_edge(START, CLASSIFY)
     graph.add_conditional_edges(CLASSIFY, route_intent, [ADVISE, PROPOSE])
     graph.add_edge(ADVISE, END)
-    graph.add_edge(PROPOSE, GUARD)
-    graph.add_conditional_edges(GUARD, route_guard, [PROPOSE, END])
+    graph.add_edge(PROPOSE, JUDGE)
+    graph.add_edge(JUDGE, APPLY)
+    graph.add_conditional_edges(APPLY, route_apply, [PROPOSE, END])
     return graph.compile()
 
 
 TURN_GRAPH = build_graph()
 
-# Every pass through propose+guard is two nodes; the cap is a hard backstop the
-# guard's own route never reaches, so it does not turn a valid turn into an error.
-RECURSION_LIMIT = 2 + 2 * editor.MAX_PASSES + 4
+# A pass through propose, judge and apply is three nodes; the cap is a hard
+# backstop the apply route never reaches, so it never turns a valid turn into
+# an error.
+RECURSION_LIMIT = 2 + 3 * editor.MAX_PASSES + 4
 
 
 def mermaid() -> str:

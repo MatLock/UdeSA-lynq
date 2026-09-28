@@ -1,8 +1,8 @@
 # lynq-agent
 
 CV Tailor: the conversational agent that adapts a candidate's resume to a concrete
-job posting. FastAPI, three model calls per turn at most — an intent agent, and then
-either an advising or an editing agent — with the rules enforced in code, and MySQL
+job posting. FastAPI, a LangGraph of four agents — intent, advise, edit, judge — where the
+code decides only where a change goes and the judge decides whether it may, and MySQL
 for the conversation and its traces.
 
 The service listens on **8090** (8089 belongs to `lynq-feeders`) and exposes two
@@ -44,11 +44,11 @@ means the turn itself failed — it does not cost the candidate a turn.
 
 ## The turn, inside
 
-A turn is three agents, each with its own prompt and its own single answer, and no
+A turn is four agents, each with its own prompt and its own single answer, and no
 agent holds a tool. They are the nodes of a LangGraph `StateGraph` in
-`src/agent/graph.py`, together with the guard; `src/agent/turn.py` builds the state and
-runs it. The graph is fixed and acyclic but for one edge: the guard sends a rejected
-proposal back to the editor once.
+`src/agent/graph.py`, together with the `apply` step; `src/agent/turn.py` builds the
+state and runs it. The graph is fixed and acyclic but for one edge: a rejected proposal
+goes back to the editor once.
 
 ```mermaid
 ---
@@ -61,14 +61,16 @@ graph TD;
 	classify(classify)
 	advise(advise)
 	propose(propose)
-	guard(guard)
+	judge(judge)
+	apply(apply)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> classify;
+	apply -.-> __end__;
+	apply -.-> propose;
 	classify -.-> advise;
 	classify -.-> propose;
-	guard -.-> __end__;
-	guard -.-> propose;
-	propose --> guard;
+	judge --> apply;
+	propose --> judge;
 	advise --> __end__;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0
@@ -80,12 +82,13 @@ never drifts from the code; `--png` writes it as an image instead, for the thesi
 
 [`docs/un-turno-por-dentro.html`](docs/un-turno-por-dentro.html) walks through a real
 conversation step by step — the message, the node the turn is on, what the model proposed
-and what the guard let in — with the trace spans each step leaves. Open it in a browser;
-it is one file with no build. The turns come from a run against `qwen2.5:7b` on
-2026-09-28, and the last one is a worked example of the `advise` branch. `TurnGraphState` is what flows between the nodes: the
+and what was let in — with the trace spans each step leaves. Open it in a browser; it
+is one file with no build. The turns come from a run against `qwen2.5:7b` on
+2026-09-28, under the earlier design where a set of rules in code (the "guard") stood
+where the judge stands now; the flow is the same, the verdicts were the rules'. `TurnGraphState` is what flows between the nodes: the
 context and the turn state the service built, the model handles, and what each node
-leaves for the next — the intent, the thread, the proposal, the rejections and how many
-passes the guard has made.
+leaves for the next — the intent, the thread, the proposal, the parts, the verdict and how
+many passes have been made.
 
 **1. The intent agent** (`src/agent/intent.py`, prompt `resources/prompts/intent/`)
 reads the message of the candidate together with the last four messages of the exchange
@@ -116,43 +119,56 @@ achievements of an experience entry, and the skills. Reordering, the education, 
 projects, the certifications, a company, a position, a date — the schema has no field for
 any of them, so they cannot be asked for, let alone done.
 
-The proposal goes through **the guard** (`src/agent/guard.py`), in code, part by part,
-and only what passes enters the resume:
+**4. The judge** (`src/agent/judge.py`, prompt `resources/prompts/judge.jinja`) reads the
+proposal part by part, each part beside the text it replaces in the **base** resume, and
+says for each one whether the resume supports it. It never rewrites: `ok`, or a `kind`
+and a `reason` written in the candidate's language. The one rule it applies is that a
+change may only say what the candidate's own resume already says, and the kinds are the
+ways of breaking it:
 
-| Rule | Rejection |
+| kind | what the judge saw |
 | --- | --- |
-| A number the base resume does not carry (`12 years`, `40%`, `a team of 8`). A date backs only its year: `2020-12` backs `2020`, not `12` | `a number the base resume does not carry` |
-| A skill the posting asks for, named in prose the base resume does not back — in the summary, checked against the whole base resume; in an entry, against that entry alone, so a technology never moves into a job that never used it | `a posting skill the base resume does not back` |
-| The posting's spelling of a skill the candidate spells otherwise, in prose: `PostgreSQL` over a resume that says `Postgres` is the posting's voice, not the candidate's. Any spelling the backing part of the base resume already uses is fine | `the posting's spelling of a skill the resume spells otherwise` |
-| Text more than twice the original, plus slack for a one-line summary | `more than twice the original` |
-| Prose in the language of the chat when the resume is in another (`langdetect`, bounded to prose longer than 40 characters once the skill names are taken out) | `not written in the language of the resume` |
-| An entry no `company`/`position` of the resume matches (a paraphrased position still finds its entry by company when that is unambiguous) | `no such entry in work_experience` |
-| A skill nothing in the base resume backs. A skill that is backed enters with the wording of the resume: a posting asking for `PostgreSQL` over a resume saying `Postgres` adds `Postgres` | `no evidence in base resume` |
-| A bucket that leaves out a skill the resume lists. Replacing a bucket may reorder it and grow it, never take from it: a skill the candidate listed is theirs | `drops a skill the resume lists` |
+| `invented` | a number, a duration, a result, a team size, a responsibility, a role or an employer the resume does not state |
+| `unsupported_skill` | a technology the resume names nowhere — and in an entry of the experience, one that entry does not name: a technology never moves into a job that never used it |
+| `wording` | the posting's spelling of a technology the resume spells otherwise (`PostgreSQL` over `Postgres`) |
+| `language` | prose not in the language of the resume |
+| `padding` | much more text than the original, not a rephrasing |
+| `dropped_skill` | a bucket that leaves out a skill the current one has: a bucket may be reordered and grown, never shrunk |
 
-The parts are independent — a summary that fails does not hold back skills that pass —
-and a rejection goes back to the model **once**, with its reason, as the next message of
-the same thread: the model re-proposes the rejected parts with the reason in hand, and
-what is still rejected after that stays out — and reaches the candidate as a warning, in
-their language (`resources/rejections/`), because the reply is the model's and the
-document is the guard's, and the chat must never promise what the resume beside it does
-not say. Each pass leaves a `kind='tool'` span named `guard` whose input is the proposal
-and whose output is `OK` or the list of rejections; `docs/queries.sql` groups by them, so
-the reasons are literal and stable.
+The judge reads short texts and answers yes or no, so it runs on a cheaper model —
+`BEDROCK_JUDGE_MODEL_ID`, Nova Lite by default in `set_env.sh` — and its spans are
+priced with that model's sheet. A part the judge leaves out of its answer is **not**
+approved (`unjudged`): the safe default costs a correction pass, never an invention.
 
-What backs a skill is decided by `src/agent/evidence.py` and `src/agent/lexical.py`: a
-lexical search over the base resume, normalised (lowercase, no accents, no symbols but
-`#` and `+`), by **exact word**, with a curated alias table deciding which names are the
-same technology (`k8s`/`Kubernetes`, `Postgres`/`PostgreSQL`, `JS`/`JavaScript`). Not by
-prefix: `Java` is not `JavaScript` and `React` does not authorise `React Native`. A claim
-of one or two characters (`Go`, `C`, `R`) matches only its exact spelling, because it is
-also an ordinary word. It never looks at `personal_info`.
+**The `apply` step** (`src/agent/apply.py`) is the only code that touches the resume, and
+it decides nothing about content. Before the judge, `plan` resolves each part to its
+place — which entry a `company`/`position` names (a paraphrased position still finds its
+entry by company when that is unambiguous), which bucket — and the one rejection the code
+makes on its own is an entry the resume does not have (`unknown_entry`). After the judge,
+`commit` writes the approved parts and records each as a change.
+
+The parts are independent — a summary the judge rejects does not hold back skills it
+approves — and a rejection goes back to the editor **once**, with its reason, as the next
+message of the same thread: the model re-proposes the rejected parts with the reason in
+hand, and what is still rejected after that stays out — and reaches the candidate as a
+warning, in their language (`resources/rejections/`), because the reply is the model's
+and the document is the judge's, and the chat must never promise what the resume beside it
+does not say. Each pass leaves a `kind='tool'` span named `apply` whose input is the
+parts and whose output is `OK` or the list of rejections with their kinds;
+`docs/queries.sql` groups by kind.
+
+What this design gives up, and what it gives: the previous guard was a set of lexical
+rules in code — digits, alias tables, prefix matches — that could be *proven* to stop an
+invented number or technology, and could not see an invented responsibility at all. The
+judge sees all of it, and none of it is provable: it is a model's reading, measured, not
+guaranteed. The trace keeps every verdict, so the thesis can report how often the judge
+agreed with a person on a labelled sample, which is a result the rules could never give.
 
 **The model never sees `personal_info`.** The code splits it off before rendering any
 prompt and pins it back when each version is serialized (§13.2 of the plan: it is the
 bias channel that gets closed by construction, not by asking the model nicely).
 
-The answer's `resume` comes from what the guard let through, never from the text of the
+The answer's `resume` comes from what the judge let through, never from the text of the
 model, which only contributes `reply` and `warnings`. An edit turn that applied nothing
 gets a notice appended to its warnings (`resources/notices/`), so the candidate is told
 rather than left to wonder.
@@ -325,8 +341,10 @@ guarantees are checked there.
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Local Ollama endpoint |
 | `OLLAMA_MODEL` | `qwen2.5:7b` | Model pulled into Ollama |
 | `OLLAMA_INTENT_MODEL` | _(empty)_ | Model for the intent agent; `OLLAMA_MODEL` when empty |
+| `OLLAMA_JUDGE_MODEL` | _(empty)_ | Model for the judge; `OLLAMA_MODEL` when empty |
 | `BEDROCK_MODEL_ID` | — | Any model id the Converse API accepts, e.g. `amazon.nova-pro-v1:0` |
 | `BEDROCK_INTENT_MODEL_ID` | _(empty)_ | Model for the intent agent, e.g. `amazon.nova-lite-v1:0`; `BEDROCK_MODEL_ID` when empty |
+| `BEDROCK_JUDGE_MODEL_ID` | `amazon.nova-lite-v1:0` in `set_env.sh` | Model for the judge; `BEDROCK_MODEL_ID` when empty |
 | `BEDROCK_REGION` | `us-east-1` | Bedrock region |
 | `BEDROCK_MAX_TOKENS` | `4096` | Cap on a single completion |
 | `BEDROCK_TEMPERATURE` | `0` | Sampling temperature |

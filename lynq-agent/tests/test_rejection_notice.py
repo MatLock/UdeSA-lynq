@@ -2,54 +2,40 @@ from __future__ import annotations
 
 import unittest
 
-from tests.fixtures.spanish import REJECTED_SKILL_ES, REJECTION_OPENING_ES
+from tests.fixtures.spanish import JUDGE_REASON_ES, REJECTED_SUMMARY_ES, REJECTION_OPENING_ES, UNKNOWN_ENTRY_ES
 
-from agent import guard
+from agent.apply import UNKNOWN_ENTRY, Rejection
+from agent.judge import UNJUDGED
 from prompt.rejection import render
-
-REASONS = (
-    guard.UNBACKED_NUMBER,
-    guard.UNBACKED_SKILL,
-    guard.POSTING_WORDING,
-    guard.TOO_LONG,
-    guard.LANGUAGE_MISMATCH,
-    guard.UNKNOWN_ENTRY,
-    guard.NO_EVIDENCE,
-    guard.DROPPED_SKILL,
-)
 
 
 class RejectionNoticeTest(unittest.TestCase):
 
-    def test_the_candidate_reads_the_rejection_in_their_language(self) -> None:
-        notice = render("es", [guard.Rejection("skills", "technical", guard.NO_EVIDENCE, "Go")])
+    def test_the_judges_reason_is_already_in_the_candidates_language(self) -> None:
+        notice = render("es", [Rejection("summary", "", "invented", JUDGE_REASON_ES)])
 
-        self.assertTrue(notice.startswith(REJECTION_OPENING_ES))
-        self.assertIn(f"(technical), {REJECTED_SKILL_ES}: Go", notice)
-        self.assertNotIn(guard.NO_EVIDENCE, notice)
+        self.assertEqual(notice, f"{REJECTION_OPENING_ES} {REJECTED_SUMMARY_ES}, {JUDGE_REASON_ES}.")
 
-    def test_every_reason_of_the_guard_is_translated(self) -> None:
-        for language in ("en", "es"):
-            for reason in REASONS:
-                with self.subTest(language=language, reason=reason):
-                    notice = render(language, [guard.Rejection("summary", "", reason)])
-                    self.assertNotIn(reason, notice.replace("not written in the language of the resume", ""))
+    def test_the_codes_own_rejections_are_translated(self) -> None:
+        notice = render("es", [Rejection("work_experience", "CTO at Initech", UNKNOWN_ENTRY, UNKNOWN_ENTRY)])
+
+        self.assertIn(f"(CTO at Initech), {UNKNOWN_ENTRY_ES}", notice)
+        self.assertNotIn(UNKNOWN_ENTRY, notice)
 
     def test_several_rejections_are_one_notice(self) -> None:
         notice = render(
             "en",
             [
-                guard.Rejection("summary", "", guard.UNBACKED_NUMBER, "12"),
-                guard.Rejection("work_experience", "Backend Engineer at Acme", guard.UNBACKED_SKILL, "PostgreSQL"),
+                Rejection("summary", "", "invented", "The resume says eight years, not twelve."),
+                Rejection("skills", "technical", UNJUDGED, UNJUDGED),
             ],
         )
 
         self.assertEqual(
             notice,
-            "Part of what was proposed did not enter the resume: the summary, a number the "
-            "resume does not back: 12; the experience (Backend Engineer at Acme), a skill of "
-            "the posting the resume does not back: PostgreSQL.",
+            "Part of what was proposed did not enter the resume: the summary, The resume says "
+            "eight years, not twelve.; the skills (technical), the judge gave no verdict on it.",
         )
 
     def test_an_unknown_language_falls_back_to_english(self) -> None:
-        self.assertTrue(render("pt", [guard.Rejection("summary", "", guard.TOO_LONG)]).startswith("Part of what"))
+        self.assertTrue(render("pt", [Rejection("summary", "", "padding", "x")]).startswith("Part of what"))

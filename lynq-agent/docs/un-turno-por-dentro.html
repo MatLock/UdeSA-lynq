@@ -215,7 +215,7 @@
     </section>
   </div>
 
-  <p class="foot">Turnos 1 a 3: corrida real del 28/09/2026 contra <code>qwen2.5:7b</code> en Ollama (2–3 minutos por turno en CPU). El turno 4 es un ejemplo de la rama <code>advise</code>: el modelo local leyó la pregunta del turno 2 como un pedido de edición, así que la rama real no apareció en la corrida. La regla que rechaza la grafía del aviso en prosa (<code>PostgreSQL</code> donde el CV dice <code>Postgres</code>) se agregó después de la corrida; hoy el summary del turno 3 habría rebotado una vez más.</p>
+  <p class="foot">Turnos 1 a 3: corrida real del 28/09/2026 contra <code>qwen2.5:7b</code> en Ollama (2–3 minutos por turno en CPU). El turno 4 es un ejemplo de la rama <code>advise</code>: el modelo local leyó la pregunta del turno 2 como un pedido de edición, así que la rama real no apareció en la corrida. La regla que rechaza la grafía del aviso en prosa (<code>PostgreSQL</code> donde el CV dice <code>Postgres</code>) se agregó después de la corrida; hoy el summary del turno 3 habría rebotado una vez más. Después de esta corrida, el guard de reglas en código fue reemplazado por un agente juez (Nova Lite) que decide parte por parte; el nodo <code>guard</code> de este recorrido es hoy <code>judge → apply</code>, con el mismo flujo.</p>
 </div>
 
 <script>

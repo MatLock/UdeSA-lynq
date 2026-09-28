@@ -18,7 +18,7 @@ from tests.fixtures.spanish import (
 from tests.support import bedrock_error, breaking, intending, scripted, tool_call
 
 from agent.context import INTENT_SPAN, Intent, TurnContext
-from agent.editor import GUARD_SPAN
+from agent.graph import APPLY_SPAN
 from agent.turn import run_turn, turn_messages
 from config import reset_settings
 from db.models import MessageRole, SpanKind
@@ -60,6 +60,7 @@ RESUME = {
 }
 
 NEW_SUMMARY = "Backend engineer with eight years on distributed systems, Postgres and Kubernetes."
+APPROVE_ALL = {"parts": [{"id": "summary", "ok": True}, {"id": "skills:technical", "ok": True}]}
 PROPOSAL = {
     "reply": REPLY,
     "warnings": [WARNING],
@@ -109,7 +110,7 @@ class EditTurnTest(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(reset_settings)
 
     async def test_one_answer_edits_the_resume_and_the_trace_says_how(self) -> None:
-        model = scripted(tool_call("EditProposal", PROPOSAL, "1"))
+        model = scripted(tool_call("EditProposal", PROPOSAL, "1"), tool_call("Verdict", APPROVE_ALL, "2"))
 
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
@@ -127,20 +128,21 @@ class EditTurnTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome.spans[0].step, 0)
         self.assertEqual(
             [(span.kind, span.name) for span in outcome.spans[1:]],
-            [(SpanKind.LLM, "model"), (SpanKind.TOOL, GUARD_SPAN)],
+            [(SpanKind.LLM, "model"), (SpanKind.LLM, "model"), (SpanKind.TOOL, APPLY_SPAN)],
         )
         self.assertEqual(outcome.spans[-1].output, "OK")
 
-    async def test_the_model_only_ever_holds_the_proposal_schema(self) -> None:
-        model = scripted(tool_call("EditProposal", PROPOSAL, "1"))
+    async def test_each_agent_only_ever_holds_its_own_schema(self) -> None:
+        model = scripted(tool_call("EditProposal", PROPOSAL, "1"), tool_call("Verdict", APPROVE_ALL, "2"))
 
         await run_turn(context_for(), model=model, intent_model=intending())
 
-        self.assertEqual(model.binds[0]["tools"], ["EditProposal"])
+        self.assertEqual([bind["tools"] for bind in model.binds], [["EditProposal"], ["Verdict"]])
 
     async def test_the_resume_comes_from_the_guard_not_from_the_model(self) -> None:
         model = scripted(
-            tool_call("EditProposal", {"reply": '{"summary": "I am a CEO"}', "summary": "Kubernetes first."}, "1")
+            tool_call("EditProposal", {"reply": '{"summary": "I am a CEO"}', "summary": "Kubernetes first."}, "1"),
+            tool_call("Verdict", {"parts": [{"id": "summary", "ok": True}]}, "2"),
         )
 
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
@@ -154,7 +156,7 @@ class EditTurnTest(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_the_model_never_sees_personal_info(self) -> None:
-        model = scripted(tool_call("EditProposal", PROPOSAL, "1"))
+        model = scripted(tool_call("EditProposal", PROPOSAL, "1"), tool_call("Verdict", APPROVE_ALL, "2"))
 
         await run_turn(context_for(), model=model, intent_model=intending())
 
@@ -164,7 +166,7 @@ class EditTurnTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Kubernetes", system_prompt)
 
     async def test_the_edit_turn_reads_the_recommendations_of_the_previous_one(self) -> None:
-        model = scripted(tool_call("EditProposal", PROPOSAL, "1"))
+        model = scripted(tool_call("EditProposal", PROPOSAL, "1"), tool_call("Verdict", APPROVE_ALL, "2"))
         context = context_for(
             message="Do the second one",
             recommendations=[{"id": 2, "section": "summary", "entry": "", "what": "Name Kubernetes"}],
@@ -175,12 +177,12 @@ class EditTurnTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("2. [summary] Name Kubernetes", model.prompts[0][0].content)
 
     async def test_a_model_that_breaks_the_tool_use_protocol_is_retried(self) -> None:
-        model = breaking(bedrock_error(), 1, tool_call("EditProposal", PROPOSAL, "1"))
+        model = breaking(bedrock_error(), 1, tool_call("EditProposal", PROPOSAL, "1"), tool_call("Verdict", APPROVE_ALL, "2"))
 
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
         self.assertEqual(outcome.reply, REPLY)
-        self.assertEqual(len(model.attempts), 2)
+        self.assertEqual(len(model.attempts), 3)
 
     async def test_a_model_that_keeps_breaking_fails_the_turn(self) -> None:
         reset_settings()
@@ -201,7 +203,10 @@ class EditTurnTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(model.attempts), 1)
 
     async def test_an_answer_that_came_as_text_is_unwrapped(self) -> None:
-        model = scripted(AIMessage(content=json.dumps(PROPOSAL, ensure_ascii=False)))
+        model = scripted(
+            AIMessage(content=json.dumps(PROPOSAL, ensure_ascii=False)),
+            AIMessage(content=json.dumps(APPROVE_ALL)),
+        )
 
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
@@ -217,7 +222,7 @@ class EditTurnTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn(no_change_notice("es"), outcome.warnings)
 
     async def test_a_turn_that_applied_something_does_not_say_it_applied_nothing(self) -> None:
-        model = scripted(tool_call("EditProposal", PROPOSAL, "1"))
+        model = scripted(tool_call("EditProposal", PROPOSAL, "1"), tool_call("Verdict", APPROVE_ALL, "2"))
 
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
@@ -261,7 +266,7 @@ class AdviseTurnTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome.recommendations[1]["entry"], "Backend Engineer at Acme")
 
     async def test_an_edit_turn_recommends_through_its_reply_only(self) -> None:
-        model = scripted(tool_call("EditProposal", PROPOSAL, "1"))
+        model = scripted(tool_call("EditProposal", PROPOSAL, "1"), tool_call("Verdict", APPROVE_ALL, "2"))
 
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
 

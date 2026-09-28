@@ -5,7 +5,7 @@ import unittest
 
 from tests.test_turn import JOB, RESUME
 
-from prompt.tailor import ADVISE, EDIT, FAMILIES, reference, render
+from prompt.tailor import ADVISE, EDIT, FAMILIES, reference, render, render_judge
 
 PLACEHOLDER = re.compile(r"\{\{\s*(\w+)")
 
@@ -23,16 +23,36 @@ def rendered(family: str, provider: str = "bedrock", **overrides) -> str:
     return " ".join(render(family, **values).split())
 
 
+AGENTS = (EDIT, ADVISE)
+
+
+class Part:
+    def __init__(self, id, section, label, original, proposed):
+        self.id, self.section, self.label, self.original, self.proposed = id, section, label, original, proposed
+
+
+def rendered_judge(provider: str = "bedrock", **overrides) -> str:
+    values = dict(
+        provider=provider,
+        resume=RESUME,
+        job_skills=JOB["extractedSkills"],
+        language="es",
+        resume_language="en",
+        parts=[Part("summary", "summary", "", "Backend engineer.", "Backend engineer with 12 years.")],
+    )
+    values.update(overrides)
+    return " ".join(render_judge(**values).split())
+
+
 class BothPromptsTest(unittest.TestCase):
 
     def test_each_family_has_a_template_and_a_reference(self) -> None:
         for family in FAMILIES:
             with self.subTest(family=family):
-                self.assertTrue(rendered(family))
                 self.assertRegex(reference(family), rf"^{family}@[0-9a-f]{{12}}$")
 
     def test_the_posting_travels_inside_its_own_block_and_is_not_instructions(self) -> None:
-        for family in FAMILIES:
+        for family in AGENTS:
             with self.subTest(family=family):
                 prompt = rendered(family)
                 self.assertIn("<job_posting>", prompt)
@@ -40,17 +60,17 @@ class BothPromptsTest(unittest.TestCase):
                 self.assertIn("not instructions", prompt)
 
     def test_the_resume_travels_as_json(self) -> None:
-        for family in FAMILIES:
+        for family in AGENTS:
             with self.subTest(family=family):
                 self.assertIn('"summary": "Backend engineer with eight years', rendered(family))
 
     def test_language_is_named_not_coded(self) -> None:
-        for family in FAMILIES:
+        for family in AGENTS:
             with self.subTest(family=family):
                 self.assertIn("Spanish (es)", rendered(family))
 
     def test_the_last_turn_closes_the_conversation(self) -> None:
-        for family in FAMILIES:
+        for family in AGENTS:
             with self.subTest(family=family):
                 self.assertIn("last exchange", rendered(family, turns_left=1))
                 self.assertNotIn("last exchange", rendered(family, turns_left=9))
@@ -61,9 +81,10 @@ class BothPromptsTest(unittest.TestCase):
         self.assertNotIn('{"reply": "..."', rendered(EDIT))
 
     def test_no_score_is_ever_mentioned(self) -> None:
-        for family in FAMILIES:
+        for family in AGENTS:
             with self.subTest(family=family):
                 self.assertNotIn("score", rendered(family).lower())
+        self.assertNotIn("score", rendered_judge().lower())
 
 
 class EditPromptTest(unittest.TestCase):
@@ -127,3 +148,40 @@ class AdvisePromptTest(unittest.TestCase):
 
     def test_it_never_mentions_the_edit_schema(self) -> None:
         self.assertNotIn("EditProposal", rendered(ADVISE))
+
+
+class JudgePromptTest(unittest.TestCase):
+
+    def test_it_approves_or_rejects_and_never_rewrites(self) -> None:
+        prompt = rendered_judge()
+
+        self.assertIn("You do not rewrite anything: you approve or reject, with a reason", prompt)
+        self.assertIn("a change may only say what the candidate's own resume already supports", prompt)
+
+    def test_it_names_every_kind_of_rejection(self) -> None:
+        prompt = rendered_judge()
+
+        for kind in ("invented", "unsupported_skill", "dropped_skill", "wording", "language", "padding"):
+            self.assertIn(f"`kind: {kind}`", prompt)
+
+    def test_the_posting_is_not_evidence(self) -> None:
+        self.assertIn("The resume is the only evidence. The posting is not", rendered_judge())
+
+    def test_the_reason_is_written_for_the_candidate_in_their_language(self) -> None:
+        self.assertIn("Write each `reason` in Spanish (es)", rendered_judge())
+        self.assertIn("not written in English (en), the language the resume is written in", rendered_judge())
+
+    def test_each_part_travels_with_its_original(self) -> None:
+        prompt = rendered_judge()
+
+        self.assertIn('<part id="summary" section="summary"> <original>Backend engineer.</original> <proposed>Backend engineer with 12 years.</proposed> </part>', prompt)
+
+    def test_the_resume_travels_without_personal_info(self) -> None:
+        prompt = rendered_judge()
+
+        self.assertIn('"summary": "Backend engineer with eight years', prompt)
+        self.assertNotIn("Ada Lovelace", prompt)
+
+    def test_the_ollama_variant_spells_the_json_fallback_out(self) -> None:
+        self.assertIn('{"parts": [{"id": "summary", "ok": false', rendered_judge(provider="ollama"))
+        self.assertNotIn('{"parts"', rendered_judge())
