@@ -15,6 +15,7 @@ _CHANGELOG_DDL = os.path.join(
 _CREATE_TABLE = re.compile(
     r"CREATE TABLE IF NOT EXISTS (\w+) \((.*?)\n\);", re.DOTALL
 )
+_ADD_COLUMN = re.compile(r"ALTER TABLE (\w+) ADD COLUMN (\w+)")
 _NOT_A_COLUMN = ("CONSTRAINT", "INDEX", "PRIMARY", "UNIQUE", "FOREIGN", "KEY")
 
 
@@ -22,12 +23,15 @@ def changelog_tables() -> dict[str, set[str]]:
     tables: dict[str, set[str]] = {}
     for path in sorted(glob.glob(os.path.join(_CHANGELOG_DDL, "*.sql"))):
         with open(path, "r", encoding="utf-8") as changeset:
-            for name, body in _CREATE_TABLE.findall(changeset.read()):
+            source = changeset.read()
+            for name, body in _CREATE_TABLE.findall(source):
                 tables[name] = {
                     line.split()[0]
                     for line in (raw.strip() for raw in body.splitlines())
                     if line and not line.upper().startswith(_NOT_A_COLUMN)
                 }
+            for name, column in _ADD_COLUMN.findall(source):
+                tables.setdefault(name, set()).add(column)
     return tables
 
 

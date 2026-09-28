@@ -7,7 +7,7 @@ from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agent.context import SpanRecord, TurnContext, TurnOutcome, apply_pricing, utc_now
-from agent.graph import run_turn
+from agent.turn import run_turn
 from agent.language import verify_resume_language
 from client.lynq_ml_client import SkillExtractionFailed
 from config import Settings
@@ -164,6 +164,7 @@ class ConversationService:
                         role=message.role,
                         content=message.content,
                         warnings=message.warnings or [],
+                        recommendations=message.recommendations or [],
                         created_on=message.created_on,
                     )
                     for message in messages
@@ -278,6 +279,7 @@ class ConversationService:
                 MessageRole.ASSISTANT,
                 outcome.reply,
                 warnings=outcome.warnings or None,
+                recommendations=outcome.recommendations or None,
             )
             version = await self._version_of(
                 session, conversation_id, outcome, assistant.id
@@ -303,6 +305,7 @@ class ConversationService:
                 status=conversation.status,
                 turns_left=self._turns_left(conversation),
                 intent=outcome.intent,
+                recommendations=outcome.recommendations,
             )
 
     async def _version_of(
@@ -413,11 +416,19 @@ class ConversationService:
             current_resume=current.resume if current else conversation.base_resume,
             history=[(message.role, message.content) for message in history],
             message=request.message,
-            max_steps=conversation.max_steps,
-            max_edits=self._settings.max_edits,
             turns_left=self._turns_left(conversation),
+            recommendations=self._last_recommendations(history),
             resume_version_id=current.id if current else None,
         )
+
+    @staticmethod
+    def _last_recommendations(history: list[Message]) -> list[dict]:
+        """The recommendations of the latest reply, so that "do the second one" in
+        this turn means what the candidate read in the previous one."""
+        for message in reversed(history):
+            if message.role == MessageRole.ASSISTANT:
+                return list(message.recommendations or [])
+        return []
 
     async def _replay(
         self, session: AsyncSession, conversation: Conversation, existing: Message
@@ -439,6 +450,7 @@ class ConversationService:
             status=conversation.status,
             turns_left=self._turns_left(conversation),
             intent=await repository.intent_of(session, existing.id),
+            recommendations=reply.recommendations or [],
         )
 
     async def _owned(

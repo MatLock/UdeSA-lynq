@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage
 
 from tests.fixtures.spanish import ASK_FOR_ADVICE, ASK_FOR_GO, GO_AHEAD, GREETING
 from tests.support import bedrock_error, breaking, intending, scripted
-from tests.test_react_loop import context_for
+from tests.test_turn import context_for
 
 from agent.context import INTENT_SPAN, Intent
 from agent.intent import EXCHANGE_MESSAGES, classify, read, recent_exchange
@@ -98,7 +98,7 @@ class ClassifyTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(span.output, Intent.ADVISE)
         self.assertEqual(
             json.loads(span.input),
-            {"message": ASK_FOR_ADVICE, "prompt": reference("ollama")},
+            {"message": ASK_FOR_ADVICE, "prompt": reference("ollama"), "model": "qwen2.5:7b"},
         )
 
     async def test_the_message_of_the_candidate_is_never_quoted_back(self) -> None:

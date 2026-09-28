@@ -50,7 +50,6 @@ class Settings:
 
         self.max_turns: int = _int("AGENT_MAX_TURNS", 10)
         self.max_steps: int = _int("AGENT_MAX_STEPS", 12)
-        self.max_edits: int = _int("AGENT_MAX_EDITS", 2)
         self.model_retries: int = _int("AGENT_MODEL_RETRIES", 2)
         self.turn_timeout_seconds: int = _int("AGENT_TURN_TIMEOUT", 600)
         self.job_description_max_chars: int = _int(
@@ -63,6 +62,12 @@ class Settings:
             if self.llm_provider == BEDROCK
             else os.getenv("OLLAMA_MODEL", DEFAULT_OLLAMA_MODEL)
         )
+        # The intent agent answers one word; it may run on a cheaper model.
+        self.intent_model: str = (
+            os.getenv("BEDROCK_INTENT_MODEL_ID", "").strip()
+            if self.llm_provider == BEDROCK
+            else os.getenv("OLLAMA_INTENT_MODEL", "").strip()
+        ) or self.llm_model
         self.ollama_base_url: str = os.getenv(
             "OLLAMA_BASE_URL", DEFAULT_OLLAMA_BASE_URL
         )
@@ -78,16 +83,19 @@ class Settings:
             "BEDROCK_GUARDRAIL_VERSION", "DRAFT"
         ).strip()
 
-        self.input_price_per_1m, self.output_price_per_1m = self._prices()
+        self.input_price_per_1m, self.output_price_per_1m = self._prices(self.llm_model)
+        self.intent_input_price_per_1m, self.intent_output_price_per_1m = self._prices(
+            self.intent_model
+        )
 
         self.lynq_ml_url: str = os.getenv("LYNQ_ML_URL", DEFAULT_LYNQ_ML_URL).rstrip("/")
         self.lynq_ml_timeout_seconds: int = _int("ML_TIMEOUT", 300)
         self.system_user_id: str = os.getenv("LYNQ_AGENT_SYSTEM_USER_ID", "").strip()
 
-    def _prices(self) -> tuple[Decimal, Decimal]:
+    def _prices(self, model: str) -> tuple[Decimal, Decimal]:
         if self.llm_provider == OLLAMA:
             return FREE
-        return prices_for(self.llm_model)
+        return prices_for(model)
 
 
 _settings: Settings | None = None

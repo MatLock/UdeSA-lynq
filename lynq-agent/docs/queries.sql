@@ -50,14 +50,31 @@ SELECT m.seq, COUNT(*) AS steps, SUM(s.prompt_tokens) AS in_tk,
 FROM trace_span s JOIN message m ON m.id = s.message_id
 WHERE s.conversation_id = '3f8a1c2e-...' GROUP BY m.seq ORDER BY m.seq;
 
--- How much the model tries to invent, across every conversation. A quality
--- metric for the prompt: if it drops while iterating, the prompt is improving.
+-- How much the editing agent proposes that the resume does not back, across
+-- every conversation. A quality metric for the prompt: if it drops while
+-- iterating, the prompt is improving. The `guard` span answers OK or the JSON
+-- list of rejections, each one `where: reason (detail)`.
 SELECT COUNT(*) AS rejections,
-       SUBSTRING_INDEX(output, ': ', -1) AS reason
-FROM trace_span WHERE name IN ('rewrite_summary', 'rewrite_entry',
-                               'reorder_entries', 'replace_skills')
-  AND output LIKE 'REJECTED%'
+       SUBSTRING_INDEX(SUBSTRING_INDEX(r.rejection, ': ', -1), ' (', 1) AS reason
+FROM trace_span s
+  JOIN JSON_TABLE(s.output, '$[*]' COLUMNS (rejection TEXT PATH '$')) r
+WHERE s.name = 'guard' AND s.output <> 'OK'
 GROUP BY reason ORDER BY rejections DESC;
+
+-- The turns where the editing agent had to correct itself: two guard spans on
+-- one message. The second one says whether the correction held.
+SELECT m.conversation_id, m.seq, COUNT(*) AS guard_passes,
+       MAX(CASE WHEN s.output = 'OK' THEN 1 ELSE 0 END) AS ended_clean
+FROM trace_span s JOIN message m ON m.id = s.message_id
+WHERE s.name = 'guard'
+GROUP BY m.conversation_id, m.seq HAVING guard_passes > 1
+ORDER BY m.conversation_id, m.seq;
+
+-- The recommendations the advising agent left on a reply, the ones "do the
+-- second one" refers to in the next turn.
+SELECT seq, JSON_PRETTY(recommendations) FROM message
+WHERE conversation_id = '3f8a1c2e-...' AND recommendations IS NOT NULL
+ORDER BY seq;
 
 -- What the intent step reads, and how often a turn only answers. A turn read as
 -- `advise` holds no edit tool, so a version written on one is a bug.

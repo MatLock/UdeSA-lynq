@@ -54,6 +54,15 @@ class ResumeChange(BaseModel):
     index: int | None = None
 
 
+class Recommendation(BaseModel):
+    model_config = _CAMEL
+
+    id: int
+    section: str
+    entry: str = ""
+    what: str
+
+
 class TurnResponse(BaseModel):
     model_config = _CAMEL
 
@@ -61,6 +70,7 @@ class TurnResponse(BaseModel):
     resume: dict[str, Any]
     changes: list[ResumeChange] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    recommendations: list[Recommendation] = Field(default_factory=list)
     version: int
     status: str
     turns_left: int = Field(alias="turnsLeft")
@@ -74,6 +84,7 @@ class MessageView(BaseModel):
     role: str
     content: str
     warnings: list[str] = Field(default_factory=list)
+    recommendations: list[Recommendation] = Field(default_factory=list)
     created_on: datetime = Field(alias="createdOn")
 
 

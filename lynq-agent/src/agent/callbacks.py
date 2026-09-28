@@ -11,7 +11,8 @@ from langchain_core.callbacks import AsyncCallbackHandler
 from langchain_core.messages import BaseMessage, SystemMessage
 from langchain_core.outputs import LLMResult
 
-from agent.context import SpanRecord, TurnState
+from agent.context import SpanRecord
+from agent.state import TurnState
 from db.models import SpanKind
 
 log = logging.getLogger(__name__)

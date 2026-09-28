@@ -95,6 +95,7 @@ async def append_message(
     content: str,
     turn_key: str | None = None,
     warnings: list[str] | None = None,
+    recommendations: list[dict] | None = None,
     created_on: datetime | None = None,
 ) -> Message:
     message = Message(
@@ -105,6 +106,7 @@ async def append_message(
         content=content,
         turn_key=turn_key,
         warnings=warnings,
+        recommendations=recommendations,
         created_on=created_on or utc_now(),
     )
     session.add(message)
