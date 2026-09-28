@@ -190,5 +190,5 @@ class JudgePromptTest(unittest.TestCase):
         self.assertNotIn("Ada Lovelace", prompt)
 
     def test_the_ollama_variant_spells_the_json_fallback_out(self) -> None:
-        self.assertIn('{"parts": [{"id": "summary", "ok": false', rendered_judge(provider="ollama"))
+        self.assertIn('{"parts": [{"id": "summary", "evidence": "...", "ok": false', rendered_judge(provider="ollama"))
         self.assertNotIn('{"parts"', rendered_judge())
