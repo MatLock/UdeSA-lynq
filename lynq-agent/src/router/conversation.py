@@ -19,7 +19,7 @@ from model.conversation import (
     TurnResponse,
 )
 from response import GlobalRestResponse
-from security import AUTHORIZATION_HEADER, CallerPrincipal
+from security import AUTHORIZATION_HEADER, CandidatePrincipal
 from service.conversation_service import ConversationService
 
 log = logging.getLogger(__name__)
@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 _ERRORS = {
-    403: {"description": "The caller is not the owner of the conversation."},
+    403: {"description": "The caller is not a candidate, or not the owner of the conversation."},
     404: {"description": "The conversation does not exist."},
     409: {"description": "A turn is running, the conversation is closed, or it was already applied."},
     502: {"description": "The agent could not finish the turn."},
@@ -53,7 +53,7 @@ Authorization = Annotated[str, Header(alias=AUTHORIZATION_HEADER)]
 async def create_conversation(
     body: CreateConversationRequest,
     lynq_request_uuid: RequestUuid,
-    principal: CallerPrincipal,
+    principal: CandidatePrincipal,
     authorization: Authorization,
     service: Service,
 ) -> GlobalRestResponse[CreateConversationResponse]:
@@ -74,7 +74,7 @@ async def take_turn(
     conversation_id: str,
     body: TurnRequest,
     lynq_request_uuid: RequestUuid,
-    principal: CallerPrincipal,
+    principal: CandidatePrincipal,
     service: Service,
 ) -> GlobalRestResponse[TurnResponse]:
     log.info(
@@ -90,7 +90,7 @@ async def take_turn(
 async def get_conversation(
     conversation_id: str,
     lynq_request_uuid: RequestUuid,
-    principal: CallerPrincipal,
+    principal: CandidatePrincipal,
     service: Service,
 ) -> GlobalRestResponse[ConversationView]:
     return GlobalRestResponse(data=await service.view(conversation_id, principal.id))
@@ -101,7 +101,7 @@ async def mark_applied(
     conversation_id: str,
     body: AppliedRequest,
     lynq_request_uuid: RequestUuid,
-    principal: CallerPrincipal,
+    principal: CandidatePrincipal,
     service: Service,
 ) -> GlobalRestResponse[AppliedResponse]:
     log.info(
