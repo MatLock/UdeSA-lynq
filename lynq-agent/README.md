@@ -117,6 +117,7 @@ and only what passes enters the resume:
 | --- | --- |
 | A number the base resume does not carry (`12 years`, `40%`, `a team of 8`). A date backs only its year: `2020-12` backs `2020`, not `12` | `a number the base resume does not carry` |
 | A skill the posting asks for, named in prose the base resume does not back — in the summary, checked against the whole base resume; in an entry, against that entry alone, so a technology never moves into a job that never used it | `a posting skill the base resume does not back` |
+| The posting's spelling of a skill the candidate spells otherwise, in prose: `PostgreSQL` over a resume that says `Postgres` is the posting's voice, not the candidate's. Any spelling the backing part of the base resume already uses is fine | `the posting's spelling of a skill the resume spells otherwise` |
 | Text more than twice the original, plus slack for a one-line summary | `more than twice the original` |
 | Prose in the language of the chat when the resume is in another (`langdetect`, bounded to prose longer than 40 characters once the skill names are taken out) | `not written in the language of the resume` |
 | An entry no `company`/`position` of the resume matches (a paraphrased position still finds its entry by company when that is unambiguous) | `no such entry in work_experience` |

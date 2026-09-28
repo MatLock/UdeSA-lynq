@@ -48,6 +48,13 @@ class SummaryGuardTest(unittest.TestCase):
         self.assertEqual(state.resume["summary"], BASE_SUMMARY)
         self.assertEqual(state.changes, [])
 
+    def test_digits_inside_a_name_are_not_a_number(self) -> None:
+        state = state_for(base_resume={**RESUME, "summary": "Backend engineer on Kubernetes and S3."})
+
+        rejections = guard.apply(state, proposal(summary="Backend engineer on Kubernetes, S3 and Python3."))
+
+        self.assertEqual(rejections, [])
+
     def test_a_number_the_resume_does_carry_is_fine(self) -> None:
         state = state_for(base_resume={**RESUME, "summary": "Backend engineer, 8 years."})
 
@@ -65,7 +72,24 @@ class SummaryGuardTest(unittest.TestCase):
     def test_a_posting_skill_the_prose_backs_may_enter_the_summary(self) -> None:
         state = state_for()
 
+        rejections = guard.apply(state, proposal(summary="Backend engineer on Kubernetes and Postgres."))
+
+        self.assertEqual(rejections, [])
+
+    def test_the_postings_spelling_of_a_skill_stays_out_of_the_prose(self) -> None:
+        state = state_for()
+
         rejections = guard.apply(state, proposal(summary="Backend engineer on Kubernetes and PostgreSQL."))
+
+        self.assertEqual(
+            rejections,
+            [f"summary: {guard.POSTING_WORDING} (PostgreSQL, the resume says Postgres)"],
+        )
+
+    def test_a_spelling_the_resume_uses_anywhere_in_the_backing_is_fine(self) -> None:
+        state = state_for(base_resume={**RESUME, "summary": "Backend engineer on PostgreSQL."})
+
+        rejections = guard.apply(state, proposal(summary="Backend engineer on PostgreSQL and Postgres."))
 
         self.assertEqual(rejections, [])
 
@@ -149,6 +173,17 @@ class EntryGuardTest(unittest.TestCase):
         rejections = guard.apply(state, proposal(entries=[edit]))
 
         self.assertEqual(rejections, [f"work_experience Semi Senior at Globex: {guard.UNBACKED_SKILL} (PostgreSQL)"])
+
+    def test_an_entry_keeps_the_spelling_it_already_uses(self) -> None:
+        state = state_for()
+        edit = EntryEdit(company="Acme", position="Backend Engineer", description="Ran services on k8s.")
+
+        rejections = guard.apply(state, proposal(entries=[edit]))
+
+        self.assertEqual(
+            rejections,
+            [f"work_experience Backend Engineer at Acme: {guard.POSTING_WORDING} (k8s, the resume says Kubernetes)"],
+        )
 
     def test_an_achievement_with_a_result_the_resume_never_stated_is_an_invention(self) -> None:
         state = state_for()

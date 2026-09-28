@@ -10,6 +10,7 @@ from prompt.rejection import render
 REASONS = (
     guard.UNBACKED_NUMBER,
     guard.UNBACKED_SKILL,
+    guard.POSTING_WORDING,
     guard.TOO_LONG,
     guard.LANGUAGE_MISMATCH,
     guard.UNKNOWN_ENTRY,

@@ -6,6 +6,7 @@
   'not written in the language of the resume': 'no está escrito en el idioma del CV',
   'no such entry in work_experience': 'no existe esa entrada en la experiencia',
   'no evidence in base resume': 'sin respaldo en el CV',
+  "the posting's spelling of a skill the resume spells otherwise": "la grafía del aviso para una skill que el CV escribe distinto",
   'drops a skill the resume lists': 'borraría una skill que el CV ya lista'
 } %}
 Parte de lo propuesto no entró al CV: {% for r in rejections %}{{ sections.get(r.section, r.section) }}{% if r.label %} ({{ r.label }}){% endif %}, {{ reasons.get(r.reason, r.reason) }}{% if r.detail %}: {{ r.detail }}{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}.

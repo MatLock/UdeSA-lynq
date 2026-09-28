@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Any
 
-from agent.evidence import backing_for, searchable, skill_names
+from agent.evidence import backing_for, hits_for, searchable, skill_names
 from agent.language import bare, detected_conflict
 from agent.lexical import find_match, normalize, same_skill
 from agent.schemas import EditProposal, EntryEdit
@@ -28,12 +28,14 @@ LENGTH_SLACK = 120
 UNKNOWN_ENTRY = "no such entry in work_experience"
 UNBACKED_NUMBER = "a number the base resume does not carry"
 UNBACKED_SKILL = "a posting skill the base resume does not back"
+POSTING_WORDING = "the posting's spelling of a skill the resume spells otherwise"
 TOO_LONG = "more than twice the original"
 LANGUAGE_MISMATCH = "not written in the language of the resume"
 NO_EVIDENCE = "no evidence in base resume"
 DROPPED_SKILL = "drops a skill the resume lists"
 
-_DIGITS = re.compile(r"\d+")
+# A number is digits standing on their own: `k8s`, `S3` and `Python3` are names.
+_DIGITS = re.compile(r"(?<![A-Za-z0-9])\d+(?![A-Za-z0-9])")
 _YEAR = re.compile(r"\d{4}")
 _DATE_FIELDS = ("start_date", "end_date", "issue_date")
 
@@ -93,6 +95,13 @@ def _label(entry: dict[str, Any]) -> str:
     ) or "?"
 
 
+def _wordings_of(backing: dict[str, Any], skill: str) -> set[str]:
+    """Every spelling the backing part of the base resume uses for a skill."""
+    wordings = {normalize(hit["matched"]) for hit in hits_for(backing, skill)}
+    wordings.update(normalize(name) for name in skill_names(backing) if same_skill(name, skill))
+    return wordings
+
+
 def _vocabulary(state: TurnState) -> set[str]:
     return {
         normalize(name) for name in skill_names(state.base_resume) + list(state.job_skills)
@@ -119,8 +128,17 @@ def _check_prose(
         return rejected(UNBACKED_NUMBER, ", ".join(sorted(unbacked_numbers)))
 
     for skill in state.job_skills:
-        if any(find_match(text, skill) for text in proposed) and backing_for(backing, skill) is None:
+        matched = next((m for m in (find_match(text, skill) for text in proposed) if m), None)
+        if matched is None:
+            continue
+        wording = backing_for(backing, skill)
+        if wording is None:
             return rejected(UNBACKED_SKILL, skill)
+        # The posting's spelling of a technology the candidate spells otherwise
+        # stays out of the prose too: `PostgreSQL` over a resume that says
+        # `Postgres` is the posting's voice, not the candidate's.
+        if normalize(matched) not in _wordings_of(backing, skill):
+            return rejected(POSTING_WORDING, f"{matched}, the resume says {wording}")
 
     if sum(map(len, proposed)) > LENGTH_RATIO * sum(map(len, base)) + LENGTH_SLACK:
         return rejected(TOO_LONG)

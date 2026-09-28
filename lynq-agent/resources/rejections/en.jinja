@@ -6,6 +6,7 @@
   'not written in the language of the resume': 'not written in the language of the resume',
   'no such entry in work_experience': 'no such entry in the experience',
   'no evidence in base resume': 'no evidence in the resume',
+  "the posting's spelling of a skill the resume spells otherwise": "a skill spelled the posting's way, not the way the resume spells it",
   'drops a skill the resume lists': 'it would drop a skill the resume already lists'
 } %}
 Part of what was proposed did not enter the resume: {% for r in rejections %}{{ sections.get(r.section, r.section) }}{% if r.label %} ({{ r.label }}){% endif %}, {{ reasons.get(r.reason, r.reason) }}{% if r.detail %}: {{ r.detail }}{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}.
