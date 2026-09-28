@@ -218,6 +218,10 @@ const en = {
       startError: 'We could not open the conversation. Try again.',
       basedOn: 'Working on {resume}',
       restart: 'Start over',
+      speaker: {
+        assistant: 'Resume Tailor',
+        you: 'You',
+      },
       messagePlaceholder: 'Ask for a change to your resume…',
       send: 'Send',
       thinking: [

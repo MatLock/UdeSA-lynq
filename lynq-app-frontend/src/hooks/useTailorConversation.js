@@ -128,7 +128,11 @@ const useTailorConversation = (jobId) => {
         )
         setMessages((previous) => [
           ...previous,
-          { role: 'assistant', content: answer.reply },
+          {
+            role: 'assistant',
+            content: answer.reply,
+            warnings: answer.warnings ?? [],
+          },
         ])
         const before = resumeRef.current
         resumeRef.current = answer.resume
