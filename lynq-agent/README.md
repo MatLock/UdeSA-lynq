@@ -77,8 +77,6 @@ graph TD;
 	classDef last fill:#bfb6fc
 ```
 
-`python scripts/draw_turn_graph.py` prints that diagram from the compiled graph, so it
-never drifts from the code; `--png` writes it as an image instead, for the thesis.
 
 [`docs/un-turno-por-dentro.html`](docs/un-turno-por-dentro.html) walks through a real
 conversation step by step — the message, the node the turn is on, what the model proposed

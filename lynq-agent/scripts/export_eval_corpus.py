@@ -42,11 +42,14 @@ def build_row(conversation: Conversation, current: ResumeVersion, salt: str) -> 
 
 
 def safe_output_path(raw: str) -> str:
-    base = os.path.realpath(os.getcwd())
-    resolved = os.path.realpath(os.path.join(base, raw))
-    if os.path.commonpath([base, resolved]) != base:
-        raise ValueError(f"the corpus must be written inside {base}")
-    return resolved
+    file_name = os.path.basename(raw)
+    if file_name != raw:
+        raise ValueError(
+            f"the corpus takes a file name written in {os.getcwd()}, not a path: {raw}"
+        )
+    if not file_name.endswith(".jsonl"):
+        raise ValueError(f"the corpus must be a .jsonl file: {raw}")
+    return os.path.join(os.path.realpath(os.getcwd()), file_name)
 
 
 def write_rows(output_path: str, rows: list[dict]) -> int:
