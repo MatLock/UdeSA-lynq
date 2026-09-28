@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: lynq-analytics-test
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+  datasource:
+    url: jdbc:h2:mem:lynq_analytics_test;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ''
+    driver-class-name: org.h2.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        show_sql: false
+  liquibase:
+    enabled: false
+
+lynq:
+  iam:
+    url: http://localhost:9999/lynq-iam
+
+server:
+  port: 0
+  servlet:
+    context-path: '/lynq-analytics'
+
+management:
+  server:
+    port: -1
+
+logging:
+  level:
+    root: WARN
+    com.lynq: INFO
