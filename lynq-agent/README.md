@@ -163,7 +163,9 @@ warning, in their language (`resources/rejections/`), because the reply is the m
 and the document is the judge's, and the chat must never promise what the resume beside it
 does not say. Each pass leaves a `kind='tool'` span named `apply` whose input is the
 parts and whose output is `OK` or the list of rejections with their kinds;
-`docs/queries.sql` groups by kind.
+`docs/queries.sql` groups by kind. The `tool` kind is the trace's word for "a step the
+code ran", kept from the loop design: no agent holds a tool, and nothing a model says can
+call `apply`.
 
 What this design gives up, and what it gives: the previous guard was a set of lexical
 rules in code — digits, alias tables, prefix matches — that could be *proven* to stop an
