@@ -6,6 +6,7 @@ import httpx
 
 from config import Settings, get_settings
 from middleware.request_uuid import REQUEST_UUID_HEADER
+from security import AUTHORIZATION_HEADER
 
 log = logging.getLogger(__name__)
 
@@ -23,10 +24,9 @@ class LynqMlClient:
         settings = settings or get_settings()
         self._url = settings.lynq_ml_url + SKILL_ENHANCE_PATH
         self._timeout = settings.lynq_ml_timeout_seconds
-        self._system_user_id = settings.system_user_id
 
     async def extract_skills(
-        self, job: dict, request_uuid: str, user_id: str
+        self, job: dict, request_uuid: str, authorization: str
     ) -> list[str]:
         body = {
             "title": job.get("title", ""),
@@ -35,7 +35,7 @@ class LynqMlClient:
         }
         headers = {
             REQUEST_UUID_HEADER: request_uuid,
-            "user-id": self._system_user_id or user_id,
+            AUTHORIZATION_HEADER: authorization,
         }
 
         try:

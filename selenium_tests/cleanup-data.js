@@ -46,6 +46,16 @@ const FILE_STORAGE_URL = (
 // FileControllerImpl maps every route under /dmz/files.
 const FILES_ENDPOINT = `${FILE_STORAGE_URL}/dmz/files`
 
+// The file-storage no longer takes a "user-id" header: it resolves the caller
+// from the Authorization header against lynq-iam, like every other service. So
+// the cleanup has to log in as each file's owner to delete that owner's files.
+// Every account test.js creates shares one password.
+const IAM_URL = (
+  process.env.IAM_URL ?? 'http://localhost:8080/lynq-iam'
+).replace(/\/$/, '')
+
+const TEST_PASSWORD = process.env.TEST_PASSWORD ?? 'Lynq2026!'
+
 // The email domain test.js uses for every account it creates.
 const DEFAULT_EMAIL_PATTERN = '%@lynq.test'
 
@@ -218,8 +228,9 @@ const survey = async (connection, emailPattern) => {
     ]),
   ]
 
-  // 6. The file-storage checks that the caller owns the file, so the owner of
-  //    each one is needed to build the "user-id" header of the DELETE.
+  // 6. The file-storage checks that the caller owns the file, so each file's
+  //    owner is needed — and, since the check now runs against a token, their
+  //    email too, to log in as them.
   const storedFiles = await queryByIds(
     connection,
     `SELECT id, owner_user_id FROM ${STORAGE_DB}.stored_files WHERE id IN (?)`,
@@ -227,6 +238,9 @@ const survey = async (connection, emailPattern) => {
   )
   const fileOwners = new Map(
     storedFiles.map((row) => [row.id, row.owner_user_id]),
+  )
+  const ownerEmails = new Map(
+    accounts.map((account) => [account.id, account.email]),
   )
 
   return {
@@ -247,6 +261,7 @@ const survey = async (connection, emailPattern) => {
     profileIds: idsOf(profiles),
     fileIds,
     fileOwners,
+    ownerEmails,
   }
 }
 
@@ -278,16 +293,47 @@ const printPlan = (plan) => {
 // Files go through the file-storage API because that endpoint also removes the
 // S3 object. Failures are collected rather than thrown so the caller can decide
 // what to do with them.
-const CLEANUP_USER_ID = 'cleanup-script'
+// One login per owner, reused for every file they own. A file whose owner is
+// not among the accounts being cleaned cannot be deleted through the API: only
+// its owner's token opens it.
+const accessTokens = async (ownerEmails) => {
+  const tokens = new Map()
+  for (const [userId, email] of ownerEmails) {
+    try {
+      const response = await fetch(`${IAM_URL}/auth/login/email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'lynq-request-uuid': randomUUID(),
+        },
+        body: JSON.stringify({ email, password: TEST_PASSWORD }),
+      })
+      if (!response.ok) continue
+      const payload = await response.json()
+      const token = payload?.data?.accessToken
+      if (token) tokens.set(userId, `Bearer ${token}`)
+    } catch {
+      // Left out of the map: the delete below reports it as a failure.
+    }
+  }
+  return tokens
+}
 
-const deleteFiles = async (fileIds, fileOwners) => {
+const deleteFiles = async (fileIds, fileOwners, ownerEmails) => {
   if (fileIds.length === 0) return { deleted: 0, failed: [] }
+
+  const tokens = await accessTokens(ownerEmails)
 
   heading('Deleting files from the file-storage (database + S3)')
   let deleted = 0
   const failed = []
 
   for (const fileId of fileIds) {
+    const authorization = tokens.get(fileOwners.get(fileId))
+    if (!authorization) {
+      failed.push(`${fileId} (no access token for its owner)`)
+      continue
+    }
     try {
       const response = await fetch(`${FILES_ENDPOINT}/${fileId}`, {
         method: 'DELETE',
@@ -295,9 +341,9 @@ const deleteFiles = async (fileIds, fileOwners) => {
           // The file-storage requires the correlation header on every route
           // (RequestUuidFilter); without it the answer is a 403.
           'lynq-request-uuid': randomUUID(),
-          // And the owner of the file, otherwise it answers 403 (a file with
-          // no owner accepts any caller).
-          'user-id': fileOwners.get(fileId) ?? CLEANUP_USER_ID,
+          // And the owner's own token: it resolves the caller against lynq-iam
+          // and refuses a file belonging to somebody else with a 403.
+          Authorization: authorization,
         },
       })
       if (response.ok) {
@@ -407,7 +453,7 @@ const deleteData = async (connection, plan) => {
 // With --ignore-files the accounts are deleted anyway, so the pictures that
 // could not be removed end up referenced by nobody. Their ids are listed so they
 // can be deleted by hand later on.
-const reportOrphanFiles = async (connection, fileIds, fileOwners) => {
+const reportOrphanFiles = async (connection, fileIds) => {
   const remaining = await queryByIds(
     connection,
     `SELECT id FROM ${STORAGE_DB}.stored_files WHERE id IN (?)`,
@@ -416,12 +462,15 @@ const reportOrphanFiles = async (connection, fileIds, fileOwners) => {
   if (remaining.length === 0) return
 
   heading(`${remaining.length} orphan files left in the file-storage`)
-  detail('no user or company references them anymore. To delete them:')
+  detail(
+    'no user or company references them anymore. Deleting one needs an access ' +
+      'token of its owner; with $TOKEN holding it:',
+  )
   for (const row of remaining) {
     detail(
       `curl -X DELETE ${FILES_ENDPOINT}/${row.id} ` +
         '-H "lynq-request-uuid: $(uuidgen)" ' +
-        `-H "user-id: ${fileOwners.get(row.id) ?? CLEANUP_USER_ID}"`,
+        '-H "Authorization: Bearer $TOKEN"',
     )
   }
 }
@@ -479,7 +528,7 @@ const run = async () => {
     // Files go first: once the accounts are gone there is no way to tell which
     // stored_files rows belonged to them, so if the file-storage is unreachable
     // we stop here and leave the database untouched for a full retry.
-    const { failed } = await deleteFiles(plan.fileIds, plan.fileOwners)
+    const { failed } = await deleteFiles(plan.fileIds, plan.fileOwners, plan.ownerEmails)
     if (failed.length > 0 && !options.ignoreFiles) {
       throw new Error(
         'Not every picture could be deleted, so the database was left untouched ' +
@@ -492,7 +541,7 @@ const run = async () => {
     await deleteData(connection, plan)
 
     if (failed.length > 0) {
-      await reportOrphanFiles(connection, plan.fileIds, plan.fileOwners)
+      await reportOrphanFiles(connection, plan.fileIds)
     }
 
     log('\n═══════════════════════════════════════════════════════════')

@@ -29,6 +29,8 @@ k8s_namespace: prod
 #     AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   (omit if using IRSA)
 #
 #   lynq-ml-secret              (Opaque)
+#     LYNQ_INTERNAL_TOKEN       -> same value as in lynq-feeders-secret; guards
+#                                  lynq-ml's /internal/** routes
 #     AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   (only if LLM_PROVIDER=bedrock;
 #                                                 omit if using IRSA)
 #
@@ -102,6 +104,8 @@ lynq_ml:
     UDEMY_MAX_COURSES: "2"
     UDEMY_BASE_URL: https://www.udemy.com
     COURSE_SEARCH_TIMEOUT: "15"
+    LYNQ_IAM_URL: http://lynq-iam-service:8080/lynq-iam
+    LYNQ_IAM_TIMEOUT: "10"
 
 lynq_agent:
   replicas: 1
@@ -121,7 +125,8 @@ lynq_agent:
     DB_MIGRATE_ON_STARTUP: "true"
     LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
     ML_TIMEOUT: "300"
-    LYNQ_AGENT_SYSTEM_USER_ID: 00000000-0000-0000-0000-0000000a6e17
+    LYNQ_IAM_URL: http://lynq-iam-service:8080/lynq-iam
+    LYNQ_IAM_TIMEOUT: "10"
     # Both limits are copied onto each conversation row at creation, so changing
     # them here never rewrites a conversation already under way.
     AGENT_MAX_STEPS: "12"
@@ -241,6 +246,7 @@ lynq_file_storage:
   config:
     SPRING_PROFILES_ACTIVE: production
     DB_URL: "jdbc:mysql://REPLACE_DB_HOST:3306/lynq_file_storage_db"
+    LYNQ_IAM_URL: http://lynq-iam-service:8080/lynq-iam
     AWS_REGION: us-east-1
     AWS_BUCKET_NAME: "REPLACE_BUCKET_NAME"
     # Empty = real AWS endpoints.

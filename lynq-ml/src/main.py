@@ -10,6 +10,7 @@ from router.health import router as health_router
 from router.language_detection import router as language_detection_router
 from router.resume_extractor import router as resume_extractor_router
 from router.resume_template import router as resume_template_router
+from router.skill_enhance import internal_router as internal_skill_enhance_router
 from router.skill_enhance import router as skill_enhance_router
 from router.translation import router as translation_router
 from router.upskilling_suggestion import router as upskilling_suggestion_router
@@ -68,6 +69,10 @@ dmz.include_router(translation_router)
 dmz.include_router(resume_template_router)
 dmz.include_router(language_detection_router)
 app.include_router(dmz)
+
+internal = APIRouter(prefix="/lynq-ml/internal")
+internal.include_router(internal_skill_enhance_router)
+app.include_router(internal)
 
 
 if __name__ == "__main__":

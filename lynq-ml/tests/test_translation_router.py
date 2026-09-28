@@ -6,16 +6,14 @@ import json
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from fastapi.testclient import TestClient
-
 from llm_client import LLMError, LLMProvider
-from main import app
+from tests.support import anonymous_client, authenticated_client, clear_overrides
 
 _ENDPOINT = "/lynq-ml/dmz/translate"
 
 _HEADERS = {
     "lynq-request-uuid": "req-123",
-    "user-id": "user-1",
+    "Authorization": "Bearer access-token",
 }
 
 _RESUME = {
@@ -53,7 +51,10 @@ class TranslateRouterTests(unittest.TestCase):
     """Covers the happy path plus the LLM/validation/enum failure branches."""
 
     def setUp(self) -> None:
-        self.client = TestClient(app)
+        self.client = authenticated_client()
+
+    def tearDown(self) -> None:
+        clear_overrides()
 
     def test_returns_translated_resume_on_valid_output(self) -> None:
         fake = _fake_client(generate_return=json.dumps(_TRANSLATED))
@@ -131,16 +132,16 @@ class TranslateRouterTests(unittest.TestCase):
         self.assertEqual(response.status_code, 502)
         self.assertEqual(response.json()["reason"], "LLM returned malformed output")
 
-    def test_missing_required_headers_returns_400(self) -> None:
+    def test_missing_authorization_header_returns_401(self) -> None:
         fake = _fake_client(generate_return=json.dumps(_TRANSLATED))
 
         with patch("router.translation.get_llm_client", return_value=fake):
-            response = self.client.post(
+            response = anonymous_client().post(
                 _ENDPOINT, json=_BODY, headers={"lynq-request-uuid": "req-123"}
             )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["reason"], "Invalid Fields Found")
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["reason"], "Missing Authorization header")
         fake.generate.assert_not_awaited()
 
 

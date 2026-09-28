@@ -179,13 +179,22 @@ class CommandLineTest(unittest.TestCase):
         self.assertIn(destination, printed.getvalue())
         self.assertIn("7 triples", printed.getvalue())
 
-    def test_a_relative_destination_resolves_inside_the_working_directory(self) -> None:
-        resolved = self.script.safe_output_path("out/corpus.jsonl")
+    def test_the_destination_is_a_file_name_in_the_working_directory(self) -> None:
+        resolved = self.script.safe_output_path("corpus.jsonl")
 
         self.assertEqual(
-            resolved,
-            os.path.join(os.path.realpath(os.getcwd()), "out", "corpus.jsonl"),
+            resolved, os.path.join(os.path.realpath(os.getcwd()), "corpus.jsonl")
         )
+
+    def test_a_destination_carrying_a_directory_is_refused(self) -> None:
+        for destination in ("out/corpus.jsonl", "../corpus.jsonl", "/tmp/corpus.jsonl"):
+            with self.subTest(destination=destination):
+                with self.assertRaises(ValueError):
+                    self.script.safe_output_path(destination)
+
+    def test_a_destination_that_is_not_jsonl_is_refused(self) -> None:
+        with self.assertRaises(ValueError):
+            self.script.safe_output_path("corpus.txt")
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from file_reader.resume_reader import read_resume
 from llm_client import LLMError, get_llm_client
 from response import GlobalRestResponse
+from security import CallerPrincipal
 
 from model.resume_extractor import ParseResumeRequest, Resume
 from prompt.resume_extractor import render_resume_extractor_prompt
@@ -39,7 +40,7 @@ _LOG_CONTEXT = "user_id=%s"
 async def parse_resume(
     body: ParseResumeRequest,
     lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
-    user_id: Annotated[str, Header(alias="user-id")],
+    principal: CallerPrincipal,
 ) -> GlobalRestResponse[Resume]:
     """Download a resume, extract its text, and structure it into JSON.
 
@@ -47,6 +48,7 @@ async def parse_resume(
     it to the configured LLM, and returns the parsed CV wrapped in the standard
     ``GlobalRestResponse`` envelope.
     """
+    user_id = principal.id
     log.info(
         "message= Started parse-resume, " + _LOG_CONTEXT,
         user_id,

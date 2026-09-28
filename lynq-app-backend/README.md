@@ -250,7 +250,7 @@ sequenceDiagram
     Ctrl->>Svc: explainCandidate(...)
     Svc->>DB: load application → job post + candidate
     Svc->>Svc: caller must own the job post
-    Svc->>ML: POST /dmz/candidate-explanation<br/>headers: lynq-request-uuid, user-id, company-id
+    Svc->>ML: POST /dmz/candidate-explanation<br/>headers: lynq-request-uuid, Authorization, company-id
     ML-->>Svc: { outcome, strengths, concerns }
     Svc-->>Ctrl: CandidateExplanationResponse
     Ctrl-->>C: 200 OK

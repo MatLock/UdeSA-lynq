@@ -59,7 +59,7 @@ public class IamAuthenticationFilter extends OncePerRequestFilter {
         return;
       }
 
-      loadSecurityContext(userInfo.getData(), request);
+      loadSecurityContext(userInfo.getData(), authHeader, request);
     } catch (FeignException.Unauthorized | FeignException.Forbidden e) {
       writeError(response, HttpStatus.UNAUTHORIZED, INVALID_TOKEN_ERROR);
       return;
@@ -75,10 +75,11 @@ public class IamAuthenticationFilter extends OncePerRequestFilter {
     }
   }
 
-  private void loadSecurityContext(UserInfoResponse userInfo, HttpServletRequest request) {
+  private void loadSecurityContext(UserInfoResponse userInfo, String authorization,
+                                   HttpServletRequest request) {
     List<GrantedAuthority> authorities = toAuthorities(userInfo.getRoles());
     LynqUserPrincipal principal = new LynqUserPrincipal(
-        userInfo.getId(), userInfo.getUsername(), userInfo.getEmail(), authorities);
+        userInfo.getId(), userInfo.getUsername(), userInfo.getEmail(), authorities, authorization);
     UsernamePasswordAuthenticationToken authentication =
         new UsernamePasswordAuthenticationToken(principal, null, authorities);
     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

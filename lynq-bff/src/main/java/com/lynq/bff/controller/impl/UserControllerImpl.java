@@ -18,19 +18,19 @@ import com.lynq.bff.client.response.UserApplicationResponse;
 import com.lynq.bff.client.response.UserResumeResponse;
 import com.lynq.bff.controller.UserController;
 import com.lynq.bff.controller.response.GlobalRestResponse;
-import com.lynq.bff.filter.JwtSignatureFilter;
+import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.UserService;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,7 +42,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserControllerImpl implements UserController {
 
   private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
-  private static final String AUTHORIZATION_HEADER = "Authorization";
 
   private final UserService userService;
 
@@ -54,9 +53,8 @@ public class UserControllerImpl implements UserController {
   @GetMapping
   public ResponseEntity<GlobalRestResponse<GetUserResponse>> getUser(
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
-    GetUserResponse user = userService.getUser(caller(userId, requestUuid, authorization));
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
+    GetUserResponse user = userService.getUser(caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -68,10 +66,9 @@ public class UserControllerImpl implements UserController {
   public ResponseEntity<GlobalRestResponse<CreateUserResponse>> createUser(
       @RequestBody CreateUserRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     CreateUserResponse created =
-        userService.createUser(request, caller(userId, requestUuid, authorization));
+        userService.createUser(request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.CREATED)
@@ -83,10 +80,9 @@ public class UserControllerImpl implements UserController {
   public ResponseEntity<GlobalRestResponse<UpdateUserProfileResponse>> updateUserProfile(
       @RequestBody UpdateUserProfileRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     UpdateUserProfileResponse updated =
-        userService.updateProfile(request, caller(userId, requestUuid, authorization));
+        userService.updateProfile(request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -98,10 +94,9 @@ public class UserControllerImpl implements UserController {
   public ResponseEntity<GlobalRestResponse<GenerateUploadImageResponse>> generateImageUploadUrl(
       @RequestParam("file-name") String fileName,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     GenerateUploadImageResponse upload =
-        userService.generateImageUploadUrl(fileName, caller(userId, requestUuid, authorization));
+        userService.generateImageUploadUrl(fileName, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -113,9 +108,8 @@ public class UserControllerImpl implements UserController {
   public ResponseEntity<Void> confirmImageUpload(
       @RequestParam("file-id") String fileId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
-    userService.confirmImageUpload(fileId, caller(userId, requestUuid, authorization));
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
+    userService.confirmImageUpload(fileId, caller(principal, requestUuid));
 
     return ResponseEntity.noContent().build();
   }
@@ -125,10 +119,9 @@ public class UserControllerImpl implements UserController {
   public ResponseEntity<GlobalRestResponse<GenerateUploadResumeResponse>> generateResumeUploadUrl(
       @RequestParam("file-name") String fileName,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     GenerateUploadResumeResponse upload =
-        userService.generateResumeUploadUrl(fileName, caller(userId, requestUuid, authorization));
+        userService.generateResumeUploadUrl(fileName, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -140,9 +133,8 @@ public class UserControllerImpl implements UserController {
   public ResponseEntity<Void> confirmResumeUpload(
       @RequestParam("file-id") String fileId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
-    userService.confirmResumeUpload(fileId, caller(userId, requestUuid, authorization));
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
+    userService.confirmResumeUpload(fileId, caller(principal, requestUuid));
 
     return ResponseEntity.noContent().build();
   }
@@ -151,10 +143,9 @@ public class UserControllerImpl implements UserController {
   @GetMapping("/resume")
   public ResponseEntity<GlobalRestResponse<List<UserResumeResponse>>> getResumes(
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     List<UserResumeResponse> resumes =
-        userService.getResumes(caller(userId, requestUuid, authorization));
+        userService.getResumes(caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -166,10 +157,9 @@ public class UserControllerImpl implements UserController {
   public ResponseEntity<GlobalRestResponse<List<SupportedLanguageResponse>>>
       getSupportedResumeLanguages(
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     List<SupportedLanguageResponse> languages =
-        userService.getSupportedResumeLanguages(caller(userId, requestUuid, authorization));
+        userService.getSupportedResumeLanguages(caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -181,10 +171,9 @@ public class UserControllerImpl implements UserController {
   public ResponseEntity<GlobalRestResponse<UserResumeResponse>> createResume(
       @RequestBody CreateResumeRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     UserResumeResponse created =
-        userService.createResume(request, caller(userId, requestUuid, authorization));
+        userService.createResume(request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.CREATED)
@@ -197,10 +186,9 @@ public class UserControllerImpl implements UserController {
       @PathVariable String resumeId,
       @RequestBody UpdateResumeAliasRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     UserResumeResponse renamed = userService.updateResumeAlias(
-        resumeId, request, caller(userId, requestUuid, authorization));
+        resumeId, request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -212,10 +200,9 @@ public class UserControllerImpl implements UserController {
   public ResponseEntity<GlobalRestResponse<DeletedResumeResponse>> deleteResume(
       @PathVariable String resumeId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     DeletedResumeResponse deleted =
-        userService.deleteResume(resumeId, caller(userId, requestUuid, authorization));
+        userService.deleteResume(resumeId, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -228,10 +215,9 @@ public class UserControllerImpl implements UserController {
       @RequestParam(defaultValue = "0") Integer page,
       @RequestParam(defaultValue = "10") Integer size,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     PagedResponse<UserApplicationResponse> applications =
-        userService.getApplications(page, size, caller(userId, requestUuid, authorization));
+        userService.getApplications(page, size, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -244,10 +230,9 @@ public class UserControllerImpl implements UserController {
       @PathVariable String jobPostId,
       @RequestParam(defaultValue = "en") String language,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     UpskillingSuggestionResponse suggestion = userService.suggestUpskilling(
-        jobPostId, language, caller(userId, requestUuid, authorization));
+        jobPostId, language, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -259,17 +244,16 @@ public class UserControllerImpl implements UserController {
   public ResponseEntity<GlobalRestResponse<GetUserProfileResponse>> getUserProfile(
       @PathVariable String userId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String callerId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     GetUserProfileResponse profile =
-        userService.getProfile(userId, caller(callerId, requestUuid, authorization));
+        userService.getProfile(userId, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, profile));
   }
 
-  private static Caller caller(String userId, String requestUuid, String authorization) {
-    return new Caller(userId, requestUuid, authorization);
+  private static Caller caller(LynqUserPrincipal principal, String requestUuid) {
+    return new Caller(principal.getId(), requestUuid, principal.getAuthorization());
   }
 }

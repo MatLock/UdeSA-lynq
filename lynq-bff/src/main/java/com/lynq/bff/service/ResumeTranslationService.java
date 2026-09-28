@@ -119,7 +119,7 @@ public class ResumeTranslationService {
 
     try {
       return lynqMlClient
-          .translateResume(request, caller.requestUuid(), caller.userId())
+          .translateResume(request, caller.requestUuid(), caller.authorization())
           .getData();
     } catch (RuntimeException e) {
       throw new BadGatewayException(TRANSLATE_FAILED, e);

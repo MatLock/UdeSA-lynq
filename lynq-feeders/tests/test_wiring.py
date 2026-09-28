@@ -111,20 +111,20 @@ class ReachabilityTest(unittest.IsolatedAsyncioTestCase):
         response = MagicMock()
         response.status_code = 200
         with patch("ml_client.client.httpx.AsyncClient", return_value=_patched_get(response)):
-            client = MlClient("http://ml/lynq-ml", "system", 1.0)
+            client = MlClient("http://ml/lynq-ml", "system", "internal-token", 1.0)
             self.assertTrue(await client.is_reachable())
 
     async def test_ml_is_unreachable_on_a_transport_error(self):
         context = _patched_get(side_effect=httpx.ConnectError("refused"))
         with patch("ml_client.client.httpx.AsyncClient", return_value=context):
-            client = MlClient("http://ml/lynq-ml", "system", 1.0)
+            client = MlClient("http://ml/lynq-ml", "system", "internal-token", 1.0)
             self.assertFalse(await client.is_reachable())
 
     async def test_ml_is_unreachable_when_health_returns_a_server_error(self):
         response = MagicMock()
         response.status_code = 503
         with patch("ml_client.client.httpx.AsyncClient", return_value=_patched_get(response)):
-            client = MlClient("http://ml/lynq-ml", "system", 1.0)
+            client = MlClient("http://ml/lynq-ml", "system", "internal-token", 1.0)
             self.assertFalse(await client.is_reachable())
 
     async def test_backend_is_reachable_when_the_server_answers_at_all(self):

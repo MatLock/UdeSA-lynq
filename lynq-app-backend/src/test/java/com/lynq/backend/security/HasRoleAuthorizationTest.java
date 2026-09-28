@@ -46,6 +46,7 @@ class HasRoleAuthorizationTest {
   private static final String USER_ID = "550e8400-e29b-41d4-a716-446655440000";
   private static final String USERNAME = "johndoe";
   private static final String EMAIL = "johndoe@example.com";
+  private static final String BEARER_TOKEN = "Bearer test-access-token";
   private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
   private static final String REQUEST_UUID = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
   private static final String JOB_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
@@ -172,7 +173,7 @@ class HasRoleAuthorizationTest {
     List<GrantedAuthority> authorities = role == null
         ? List.of()
         : List.of(new SimpleGrantedAuthority(Role.PREFIX + role));
-    LynqUserPrincipal principal = new LynqUserPrincipal(USER_ID, USERNAME, EMAIL, authorities);
+    LynqUserPrincipal principal = new LynqUserPrincipal(USER_ID, USERNAME, EMAIL, authorities, BEARER_TOKEN);
     return new UsernamePasswordAuthenticationToken(principal, null, authorities);
   }
 }

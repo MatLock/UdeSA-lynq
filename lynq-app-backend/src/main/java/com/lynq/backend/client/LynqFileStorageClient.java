@@ -19,39 +19,41 @@ import org.springframework.web.bind.annotation.RequestHeader;
 public interface LynqFileStorageClient {
 
   String REQUEST_UUID_HEADER = "lynq-request-uuid";
-  String USER_ID_HEADER = "user-id";
+  String AUTHORIZATION_HEADER = "Authorization";
 
   @PostMapping("/dmz/files/upload-url")
   GlobalRestResponse<CreateFileUploadResponse> createUpload(
       @RequestBody CreateFileUploadRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 
   @PostMapping("/dmz/files/{fileId}/confirm")
   GlobalRestResponse<StoredFileResponse> confirmUpload(
       @PathVariable("fileId") String fileId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 
   @GetMapping("/dmz/files/{fileId}")
   GlobalRestResponse<StoredFileResponse> findOwnedFile(
       @PathVariable("fileId") String fileId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 
   @GetMapping("/dmz/files/{fileId}/download-url")
   GlobalRestResponse<CreateFileDownloadResponse> createDownloadUrl(
       @PathVariable("fileId") String fileId,
-      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 
   @PostMapping("/dmz/files/download-urls")
   GlobalRestResponse<Map<String, String>> createDownloadUrls(
       @RequestBody CreateFileDownloadBatchRequest request,
-      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid);
+      @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 
   @DeleteMapping("/dmz/files/{fileId}")
   void deleteFile(
       @PathVariable("fileId") String fileId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 }

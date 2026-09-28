@@ -7,6 +7,7 @@ import com.lynq.bff.client.response.LanguageDetectionResponse;
 import com.lynq.bff.client.response.SkillEnhanceResponse;
 import com.lynq.bff.client.response.SkillExtractionResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
+import com.lynq.bff.security.LynqUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -30,26 +31,26 @@ public interface MlController {
   ResponseEntity<GlobalRestResponse<SkillEnhanceResponse>> enhanceSkills(
       SkillEnhanceRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Translate a resume into another language")
   ResponseEntity<GlobalRestResponse<Object>> translateResume(
       TranslateResumeRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Detect the main language of a text")
   ResponseEntity<GlobalRestResponse<LanguageDetectionResponse>> detectLanguage(
       LanguageDetectionRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Bucket a resume's skills and derive its capability tags")
   ResponseEntity<GlobalRestResponse<SkillExtractionResponse>> extractResumeSkills(
       Object resume,
       String language,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
       summary = "Refuse a lynq-ml endpoint the gateway does not relay",

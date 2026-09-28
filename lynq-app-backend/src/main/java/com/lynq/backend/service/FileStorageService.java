@@ -38,14 +38,14 @@ public class FileStorageService {
         .build();
 
     CreateFileUploadResponse response =
-        lynqFileStorageClient.createUpload(request, requestUuid(), authenticatedUserId()).getData();
+        lynqFileStorageClient.createUpload(request, requestUuid(), callerAuthorization()).getData();
 
     return new RegisteredUpload(response.getFileId(), response.getUploadUrl());
   }
 
   @AuditLog
   public void confirmUpload(String fileId) {
-    lynqFileStorageClient.confirmUpload(fileId, requestUuid(), authenticatedUserId());
+    lynqFileStorageClient.confirmUpload(fileId, requestUuid(), callerAuthorization());
   }
 
   @AuditLog
@@ -55,7 +55,7 @@ public class FileStorageService {
     }
     try {
       return lynqFileStorageClient
-          .findOwnedFile(fileId, requestUuid(), authenticatedUserId())
+          .findOwnedFile(fileId, requestUuid(), callerAuthorization())
           .getData() != null;
     } catch (FeignException e) {
       if (e.status() == HttpStatus.FORBIDDEN.value() || e.status() == HttpStatus.NOT_FOUND.value()) {
@@ -70,7 +70,7 @@ public class FileStorageService {
     if (isBlank(fileId)) {
       return null;
     }
-    return lynqFileStorageClient.createDownloadUrl(fileId, requestUuid())
+    return lynqFileStorageClient.createDownloadUrl(fileId, requestUuid(), callerAuthorization())
         .getData()
         .getDownloadUrl();
   }
@@ -87,7 +87,8 @@ public class FileStorageService {
       List<String> batch =
           distinctIds.subList(from, Math.min(from + DOWNLOAD_BATCH_SIZE, distinctIds.size()));
       downloadUrls.putAll(lynqFileStorageClient.createDownloadUrls(
-          CreateFileDownloadBatchRequest.builder().fileIds(batch).build(), requestUuid()).getData());
+          CreateFileDownloadBatchRequest.builder().fileIds(batch).build(), requestUuid(),
+          callerAuthorization()).getData());
     }
 
     return downloadUrls;
@@ -98,7 +99,7 @@ public class FileStorageService {
     if (isBlank(fileId)) {
       return;
     }
-    lynqFileStorageClient.deleteFile(fileId, requestUuid(), authenticatedUserId());
+    lynqFileStorageClient.deleteFile(fileId, requestUuid(), callerAuthorization());
   }
 
   private static boolean isBlank(String value) {
@@ -110,12 +111,12 @@ public class FileStorageService {
     return isBlank(requestUuid) ? UUID.randomUUID().toString() : requestUuid;
   }
 
-  private static String authenticatedUserId() {
+  private static String callerAuthorization() {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
     if (authentication == null || !(authentication.getPrincipal() instanceof LynqUserPrincipal principal)) {
       throw new IllegalStateException("No authenticated user to attribute the file operation to");
     }
-    return principal.getId();
+    return principal.getAuthorization();
   }
 
 }

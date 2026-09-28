@@ -6,7 +6,11 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-SKILL_ENHANCE_PATH = "/dmz/skill-enhance"
+# A scheduled scrape has no user to speak for, so it reaches lynq-ml through
+# the internal route the shared token guards, the same way it reaches
+# lynq-app-backend. The /dmz routes now want an access token instead.
+SKILL_ENHANCE_PATH = "/internal/skill-enhance"
+INTERNAL_TOKEN_HEADER = "lynq-internal-token"
 
 
 class MlError(RuntimeError):
@@ -36,9 +40,12 @@ def _string_list(payload: dict, key: str) -> list[str]:
 
 class MlClient:
 
-    def __init__(self, base_url: str, system_user_id: str, timeout: float) -> None:
+    def __init__(
+        self, base_url: str, system_user_id: str, internal_token: str, timeout: float
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.system_user_id = system_user_id
+        self.internal_token = internal_token
         self.timeout = timeout
 
     async def skill_enhance(
@@ -79,6 +86,7 @@ class MlClient:
     def _headers(self, request_uuid: str) -> dict[str, str]:
         return {
             "lynq-request-uuid": request_uuid,
+            INTERNAL_TOKEN_HEADER: self.internal_token,
             "user-id": self.system_user_id,
             "Content-Type": "application/json",
         }

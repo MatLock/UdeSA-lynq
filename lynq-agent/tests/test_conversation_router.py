@@ -16,9 +16,12 @@ from model.conversation import (
 )
 from model.errors import AlreadyApplied, ConversationNotFound, TurnInProgress
 from router.conversation import get_conversation_service
+from security import Principal, require_principal
 
 _BASE = "/lynq-agent/dmz/conversation"
-_HEADERS = {"lynq-request-uuid": "req-1", "user-id": "user-1"}
+_BEARER = "Bearer access-token"
+_HEADERS = {"lynq-request-uuid": "req-1", "Authorization": _BEARER}
+_USER_ID = "user-1"
 _CONVERSATION_ID = "0195f2c1-0000-0000-0000-000000000001"
 
 _CREATE_BODY = {
@@ -41,6 +44,9 @@ class ConversationRouterTest(unittest.TestCase):
     def setUp(self) -> None:
         self.service = AsyncMock()
         app.dependency_overrides[get_conversation_service] = lambda: self.service
+        app.dependency_overrides[require_principal] = lambda: Principal(
+            id=_USER_ID, username="janedoe", email="jane@lynq.com", roles=["R_CANDIDATE"]
+        )
         self.client = TestClient(app)
 
     def tearDown(self) -> None:
@@ -68,17 +74,21 @@ class ConversationRouterTest(unittest.TestCase):
 
         self.client.post(_BASE, json=_CREATE_BODY, headers=_HEADERS)
 
-        request, request_uuid, user_id = self.service.create.await_args.args
+        request, request_uuid, user_id, authorization = self.service.create.await_args.args
         self.assertEqual(request_uuid, "req-1")
-        self.assertEqual(user_id, "user-1")
+        self.assertEqual(user_id, _USER_ID)
+        self.assertEqual(authorization, _BEARER)
         self.assertEqual(request.base_resume_id, "resume-1")
 
-    def test_create_without_the_user_id_header_is_a_400(self) -> None:
+    def test_create_without_an_authorization_header_is_a_401(self) -> None:
+        app.dependency_overrides.pop(require_principal)
+
         response = self.client.post(
             _BASE, json=_CREATE_BODY, headers={"lynq-request-uuid": "req-1"}
         )
 
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["reason"], "Missing Authorization header")
 
     def test_turn_returns_the_tailored_resume(self) -> None:
         self.service.turn.return_value = TurnResponse(

@@ -63,7 +63,7 @@ public class ResumeDeletionService {
     }
 
     try {
-      lynqFileStorageClient.deleteFile(deleted.getFileId(), caller.requestUuid(), caller.userId());
+      lynqFileStorageClient.deleteFile(deleted.getFileId(), caller.requestUuid(), caller.authorization());
     } catch (RuntimeException e) {
       log.warn("message= Deleted resume but its PDF could not be dropped, "
           + "user_id={}, resume_id={}, file_id={}",

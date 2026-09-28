@@ -19,6 +19,7 @@ from model.conversation import (
     TurnResponse,
 )
 from response import GlobalRestResponse
+from security import AUTHORIZATION_HEADER, CallerPrincipal
 from service.conversation_service import ConversationService
 
 log = logging.getLogger(__name__)
@@ -43,23 +44,28 @@ def get_conversation_service() -> ConversationService:
 
 Service = Annotated[ConversationService, Depends(get_conversation_service)]
 RequestUuid = Annotated[str, Header(alias="lynq-request-uuid")]
-UserId = Annotated[str, Header(alias="user-id")]
+# Creating a conversation calls lynq-ml, which resolves the caller for itself:
+# the credential is relayed rather than the id the gateway already verified.
+Authorization = Annotated[str, Header(alias=AUTHORIZATION_HEADER)]
 
 
 @router.post("/conversation", responses=_ERRORS)
 async def create_conversation(
     body: CreateConversationRequest,
     lynq_request_uuid: RequestUuid,
-    user_id: UserId,
+    principal: CallerPrincipal,
+    authorization: Authorization,
     service: Service,
 ) -> GlobalRestResponse[CreateConversationResponse]:
     log.info(
         "message= Started conversation creation, user_id=%s, job_id=%s",
-        user_id,
+        principal.id,
         body.job.id,
     )
     return GlobalRestResponse(
-        data=await service.create(body, lynq_request_uuid, user_id)
+        data=await service.create(
+            body, lynq_request_uuid, principal.id, authorization
+        )
     )
 
 
@@ -68,26 +74,26 @@ async def take_turn(
     conversation_id: str,
     body: TurnRequest,
     lynq_request_uuid: RequestUuid,
-    user_id: UserId,
+    principal: CallerPrincipal,
     service: Service,
 ) -> GlobalRestResponse[TurnResponse]:
     log.info(
         "message= Started turn, user_id=%s, conversation_id=%s, turn_key=%s",
-        log_safe(user_id),
+        log_safe(principal.id),
         log_safe(conversation_id),
         log_safe(body.turn_key),
     )
-    return GlobalRestResponse(data=await service.turn(conversation_id, body, user_id))
+    return GlobalRestResponse(data=await service.turn(conversation_id, body, principal.id))
 
 
 @router.get("/conversation/{conversation_id}", responses=_ERRORS)
 async def get_conversation(
     conversation_id: str,
     lynq_request_uuid: RequestUuid,
-    user_id: UserId,
+    principal: CallerPrincipal,
     service: Service,
 ) -> GlobalRestResponse[ConversationView]:
-    return GlobalRestResponse(data=await service.view(conversation_id, user_id))
+    return GlobalRestResponse(data=await service.view(conversation_id, principal.id))
 
 
 @router.patch("/conversation/{conversation_id}/applied", responses=_ERRORS)
@@ -95,14 +101,14 @@ async def mark_applied(
     conversation_id: str,
     body: AppliedRequest,
     lynq_request_uuid: RequestUuid,
-    user_id: UserId,
+    principal: CallerPrincipal,
     service: Service,
 ) -> GlobalRestResponse[AppliedResponse]:
     log.info(
         "message= Marking a conversation as applied, user_id=%s, conversation_id=%s",
-        log_safe(user_id),
+        log_safe(principal.id),
         log_safe(conversation_id),
     )
     return GlobalRestResponse(
-        data=await service.mark_applied(conversation_id, body, user_id)
+        data=await service.mark_applied(conversation_id, body, principal.id)
     )

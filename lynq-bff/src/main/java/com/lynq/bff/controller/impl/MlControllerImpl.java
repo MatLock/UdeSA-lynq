@@ -9,15 +9,15 @@ import com.lynq.bff.client.response.SkillExtractionResponse;
 import com.lynq.bff.controller.MlController;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.exceptions.ForbiddenException;
-import com.lynq.bff.filter.JwtSignatureFilter;
+import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.MlService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -52,9 +52,9 @@ public class MlControllerImpl implements MlController {
   public ResponseEntity<GlobalRestResponse<SkillEnhanceResponse>> enhanceSkills(
       @RequestBody SkillEnhanceRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     SkillEnhanceResponse skills =
-        mlService.enhanceSkills(request, new Caller(userId, requestUuid, null));
+        mlService.enhanceSkills(request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -66,9 +66,9 @@ public class MlControllerImpl implements MlController {
   public ResponseEntity<GlobalRestResponse<Object>> translateResume(
       @RequestBody TranslateResumeRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     Object translated =
-        mlService.translateResume(request, new Caller(userId, requestUuid, null));
+        mlService.translateResume(request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -80,9 +80,9 @@ public class MlControllerImpl implements MlController {
   public ResponseEntity<GlobalRestResponse<LanguageDetectionResponse>> detectLanguage(
       @RequestBody LanguageDetectionRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     LanguageDetectionResponse detected =
-        mlService.detectLanguage(request, new Caller(userId, requestUuid, null));
+        mlService.detectLanguage(request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -95,9 +95,9 @@ public class MlControllerImpl implements MlController {
       @RequestBody Object resume,
       @RequestParam(required = false) String language,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     SkillExtractionResponse skills = mlService.extractResumeSkills(
-        resume, language, new Caller(userId, requestUuid, null));
+        resume, language, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -112,5 +112,9 @@ public class MlControllerImpl implements MlController {
         EVALUATIONS_OWNED_BY_BACKEND.contains(request.getServletPath())
             ? USE_BACKEND_JOB_ENDPOINTS_INSTEAD
             : URL_TAKING_ENDPOINT_NOT_RELAYED);
+  }
+
+  private static Caller caller(LynqUserPrincipal principal, String requestUuid) {
+    return new Caller(principal.getId(), requestUuid, principal.getAuthorization());
   }
 }

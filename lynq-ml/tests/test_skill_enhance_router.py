@@ -6,16 +6,14 @@ import json
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from fastapi.testclient import TestClient
-
 from llm_client import LLMError, LLMProvider
-from main import app
+from tests.support import anonymous_client, authenticated_client, clear_overrides
 
 _ENDPOINT = "/lynq-ml/dmz/skill-enhance"
 
 _HEADERS = {
     "lynq-request-uuid": "req-123",
-    "user-id": "user-1",
+    "Authorization": "Bearer access-token",
     "company-id": "company-1",
 }
 
@@ -40,7 +38,10 @@ class SkillEnhanceRouterTests(unittest.TestCase):
     """Covers the happy path plus the LLM/validation failure branches."""
 
     def setUp(self) -> None:
-        self.client = TestClient(app)
+        self.client = authenticated_client()
+
+    def tearDown(self) -> None:
+        clear_overrides()
 
     def test_returns_skills_on_valid_llm_output(self) -> None:
         skills = ["Java", "Spring", "AWS", "REST", "Docker"]
@@ -153,18 +154,16 @@ class SkillEnhanceRouterTests(unittest.TestCase):
         self.assertEqual(response.status_code, 502)
         self.assertEqual(response.json()["reason"], "LLM returned malformed output")
 
-    def test_missing_required_headers_returns_400(self) -> None:
+    def test_missing_authorization_header_returns_401(self) -> None:
         fake = _fake_client(generate_return=json.dumps({"skills": ["Java"]}))
 
         with patch("router.skill_enhance.get_llm_client", return_value=fake):
-            response = self.client.post(
+            response = anonymous_client().post(
                 _ENDPOINT, json=_BODY, headers={"lynq-request-uuid": "req-123"}
             )
 
-        # Missing user-id / company-id headers fail validation, which the app's
-        # RequestValidationError handler maps to a 400 error envelope.
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["reason"], "Invalid Fields Found")
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["reason"], "Missing Authorization header")
         fake.generate.assert_not_awaited()
 
     def test_invalid_work_type_returns_400(self) -> None:
@@ -177,6 +176,61 @@ class SkillEnhanceRouterTests(unittest.TestCase):
         self.assertFalse(payload["success"])
         self.assertEqual(payload["reason"], "Invalid Fields Found")
         self.assertIn("work_type", payload["data"])
+
+
+class InternalSkillEnhanceRouteTests(unittest.TestCase):
+    """lynq-feeders reaches the same extraction with the shared internal token."""
+
+    _ENDPOINT = "/lynq-ml/internal/skill-enhance"
+
+    def tearDown(self) -> None:
+        clear_overrides()
+
+    def test_extracts_skills_for_a_caller_holding_the_internal_token(self) -> None:
+        fake = _fake_client(generate_return=json.dumps({"skills": ["Java"]}))
+
+        with patch.dict("os.environ", {"LYNQ_INTERNAL_TOKEN": "s3cret"}), patch(
+            "router.skill_enhance.get_llm_client", return_value=fake
+        ):
+            response = anonymous_client().post(
+                self._ENDPOINT,
+                json=_BODY,
+                headers={
+                    "lynq-request-uuid": "req-123",
+                    "lynq-internal-token": "s3cret",
+                    "user-id": "00000000-0000-0000-0000-00000000feed",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["skills"], ["Java"])
+
+    def test_refuses_a_caller_without_the_internal_token(self) -> None:
+        fake = _fake_client(generate_return=json.dumps({"skills": ["Java"]}))
+
+        with patch.dict("os.environ", {"LYNQ_INTERNAL_TOKEN": "s3cret"}), patch(
+            "router.skill_enhance.get_llm_client", return_value=fake
+        ):
+            response = anonymous_client().post(
+                self._ENDPOINT, json=_BODY, headers={"lynq-request-uuid": "req-123"}
+            )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["reason"], "Invalid internal token")
+        fake.generate.assert_not_awaited()
+
+    def test_an_access_token_does_not_open_the_internal_route(self) -> None:
+        fake = _fake_client(generate_return=json.dumps({"skills": ["Java"]}))
+
+        with patch.dict("os.environ", {"LYNQ_INTERNAL_TOKEN": "s3cret"}), patch(
+            "router.skill_enhance.get_llm_client", return_value=fake
+        ):
+            response = anonymous_client().post(
+                self._ENDPOINT, json=_BODY, headers=_HEADERS
+            )
+
+        self.assertEqual(response.status_code, 401)
+        fake.generate.assert_not_awaited()
 
 
 if __name__ == "__main__":

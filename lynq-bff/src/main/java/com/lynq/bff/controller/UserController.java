@@ -17,6 +17,7 @@ import com.lynq.bff.client.response.UpskillingSuggestionResponse;
 import com.lynq.bff.client.response.UserApplicationResponse;
 import com.lynq.bff.client.response.UserResumeResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
+import com.lynq.bff.security.LynqUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -36,106 +37,91 @@ public interface UserController {
   @Operation(summary = "Read the authenticated user")
   ResponseEntity<GlobalRestResponse<GetUserResponse>> getUser(
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Create the profile of the authenticated user")
   ResponseEntity<GlobalRestResponse<CreateUserResponse>> createUser(
       CreateUserRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Update the profile of the authenticated user")
   ResponseEntity<GlobalRestResponse<UpdateUserProfileResponse>> updateUserProfile(
       UpdateUserProfileRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Issue a pre-signed url to upload the user's profile image")
   ResponseEntity<GlobalRestResponse<GenerateUploadImageResponse>> generateImageUploadUrl(
       String fileName,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Confirm the user's profile image upload")
   ResponseEntity<Void> confirmImageUpload(
       String fileId,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Issue a pre-signed url to upload a resume document")
   ResponseEntity<GlobalRestResponse<GenerateUploadResumeResponse>> generateResumeUploadUrl(
       String fileName,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Confirm a resume document upload")
   ResponseEntity<Void> confirmResumeUpload(
       String fileId,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "List the resumes of the authenticated user")
   ResponseEntity<GlobalRestResponse<List<UserResumeResponse>>> getResumes(
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "List the languages a resume can be held in")
   ResponseEntity<GlobalRestResponse<List<SupportedLanguageResponse>>> getSupportedResumeLanguages(
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Store a resume for the authenticated user")
   ResponseEntity<GlobalRestResponse<UserResumeResponse>> createResume(
       CreateResumeRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Rename one of the authenticated user's resumes")
   ResponseEntity<GlobalRestResponse<UserResumeResponse>> updateResumeAlias(
       String resumeId,
       UpdateResumeAliasRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Delete one of the authenticated user's resumes")
   ResponseEntity<GlobalRestResponse<DeletedResumeResponse>> deleteResume(
       String resumeId,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "List the job posts the authenticated user applied to")
   ResponseEntity<GlobalRestResponse<PagedResponse<UserApplicationResponse>>> getApplications(
       Integer page,
       Integer size,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Suggest what the authenticated user should learn for a job post")
   ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> suggestUpskilling(
       String jobPostId,
       String language,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Read the public profile of a user")
   @ApiResponses(@ApiResponse(responseCode = "404", description = "No user holds that id."))
   ResponseEntity<GlobalRestResponse<GetUserProfileResponse>> getUserProfile(
       String userId,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String callerId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 }

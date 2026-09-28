@@ -5,15 +5,13 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, patch
 
-from fastapi.testclient import TestClient
-
-from main import app
+from tests.support import anonymous_client, authenticated_client, clear_overrides
 
 _ENDPOINT = "/lynq-ml/dmz/resume-template-creation"
 
 _HEADERS = {
     "lynq-request-uuid": "req-123",
-    "user-id": "user-1",
+    "Authorization": "Bearer access-token",
 }
 
 _RESUME = {
@@ -35,7 +33,10 @@ class ResumeTemplateCreationRouterTests(unittest.TestCase):
     """Covers the happy path plus render/upload/validation failure branches."""
 
     def setUp(self) -> None:
-        self.client = TestClient(app)
+        self.client = authenticated_client()
+
+    def tearDown(self) -> None:
+        clear_overrides()
 
     def test_returns_201_and_uploads_pdf(self) -> None:
         upload = MagicMock(return_value=200)
@@ -128,16 +129,16 @@ class ResumeTemplateCreationRouterTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["reason"], "Invalid Fields Found")
 
-    def test_missing_required_headers_returns_400(self) -> None:
+    def test_missing_authorization_header_returns_401(self) -> None:
         with patch(
             "router.resume_template.render_resume_pdf", return_value=_PDF
         ), patch("router.resume_template.upload_to_presigned_url"):
-            response = self.client.post(
+            response = anonymous_client().post(
                 _ENDPOINT, json=_BODY, headers={"lynq-request-uuid": "req-123"}
             )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["reason"], "Invalid Fields Found")
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["reason"], "Missing Authorization header")
 
 
 if __name__ == "__main__":

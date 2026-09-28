@@ -26,6 +26,7 @@ import com.lynq.bff.client.response.UpskillingSuggestionResponse;
 import com.lynq.bff.client.response.UserApplicationResponse;
 import com.lynq.bff.client.response.UserResumeResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
+import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.UserService;
 import java.util.List;
@@ -37,6 +38,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @ExtendWith(MockitoExtension.class)
 class UserControllerImplTest {
@@ -48,6 +50,10 @@ class UserControllerImplTest {
   private static final String FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
   private static final String FILE_NAME = "avatar.png";
   private static final String JOB_POST_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a61";
+
+  private static final LynqUserPrincipal PRINCIPAL = new LynqUserPrincipal(
+      USER_ID, "janedoe", "jane@lynq.com",
+      List.of(new SimpleGrantedAuthority("R_CANDIDATE")), AUTHORIZATION);
 
   @Mock
   private UserService userService;
@@ -65,7 +71,7 @@ class UserControllerImplTest {
    */
   @Test
   void callsTheServiceAsTheVerifiedCaller() {
-    userController.getUser(REQUEST_UUID, AUTHORIZATION, USER_ID);
+    userController.getUser(REQUEST_UUID, PRINCIPAL);
 
     ArgumentCaptor<Caller> caller = ArgumentCaptor.forClass(Caller.class);
     verify(userService).getUser(caller.capture());
@@ -80,7 +86,7 @@ class UserControllerImplTest {
     when(userService.getUser(any())).thenReturn(user);
 
     ResponseEntity<GlobalRestResponse<GetUserResponse>> response =
-        userController.getUser(REQUEST_UUID, AUTHORIZATION, USER_ID);
+        userController.getUser(REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(user)));
@@ -94,7 +100,7 @@ class UserControllerImplTest {
     when(userService.createUser(eq(request), any())).thenReturn(created);
 
     ResponseEntity<GlobalRestResponse<CreateUserResponse>> response =
-        userController.createUser(request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        userController.createUser(request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
     assertThat(response.getBody().getData(), is(sameInstance(created)));
@@ -107,7 +113,7 @@ class UserControllerImplTest {
     when(userService.updateProfile(eq(request), any())).thenReturn(updated);
 
     ResponseEntity<GlobalRestResponse<UpdateUserProfileResponse>> response =
-        userController.updateUserProfile(request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        userController.updateUserProfile(request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(updated)));
@@ -120,7 +126,7 @@ class UserControllerImplTest {
     when(userService.generateImageUploadUrl(eq(FILE_NAME), any())).thenReturn(upload);
 
     ResponseEntity<GlobalRestResponse<GenerateUploadImageResponse>> response =
-        userController.generateImageUploadUrl(FILE_NAME, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        userController.generateImageUploadUrl(FILE_NAME, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(upload)));
@@ -129,7 +135,7 @@ class UserControllerImplTest {
   @Test
   void answersAConfirmedImageUploadWithNoContentAndNoBody() {
     ResponseEntity<Void> response =
-        userController.confirmImageUpload(FILE_ID, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        userController.confirmImageUpload(FILE_ID, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.NO_CONTENT));
     assertThat(response.getBody(), is(nullValue()));
@@ -143,7 +149,7 @@ class UserControllerImplTest {
     when(userService.generateResumeUploadUrl(eq(FILE_NAME), any())).thenReturn(upload);
 
     ResponseEntity<GlobalRestResponse<GenerateUploadResumeResponse>> response =
-        userController.generateResumeUploadUrl(FILE_NAME, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        userController.generateResumeUploadUrl(FILE_NAME, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(upload)));
@@ -152,7 +158,7 @@ class UserControllerImplTest {
   @Test
   void answersAConfirmedResumeUploadWithNoContent() {
     ResponseEntity<Void> response =
-        userController.confirmResumeUpload(FILE_ID, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        userController.confirmResumeUpload(FILE_ID, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.NO_CONTENT));
     verify(userService).confirmResumeUpload(eq(FILE_ID), any());
@@ -165,7 +171,7 @@ class UserControllerImplTest {
     when(userService.getResumes(any())).thenReturn(resumes);
 
     ResponseEntity<GlobalRestResponse<List<UserResumeResponse>>> response =
-        userController.getResumes(REQUEST_UUID, AUTHORIZATION, USER_ID);
+        userController.getResumes(REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(resumes)));
@@ -178,7 +184,7 @@ class UserControllerImplTest {
     when(userService.getSupportedResumeLanguages(any())).thenReturn(languages);
 
     ResponseEntity<GlobalRestResponse<List<SupportedLanguageResponse>>> response =
-        userController.getSupportedResumeLanguages(REQUEST_UUID, AUTHORIZATION, USER_ID);
+        userController.getSupportedResumeLanguages(REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(languages)));
@@ -191,7 +197,7 @@ class UserControllerImplTest {
     when(userService.createResume(eq(request), any())).thenReturn(created);
 
     ResponseEntity<GlobalRestResponse<UserResumeResponse>> response =
-        userController.createResume(request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        userController.createResume(request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
     assertThat(response.getBody().getData(), is(sameInstance(created)));
@@ -205,7 +211,7 @@ class UserControllerImplTest {
     when(userService.updateResumeAlias(eq(RESUME_ID), eq(request), any())).thenReturn(renamed);
 
     ResponseEntity<GlobalRestResponse<UserResumeResponse>> response = userController
-        .updateResumeAlias(RESUME_ID, request, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        .updateResumeAlias(RESUME_ID, request, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(renamed)));
@@ -217,7 +223,7 @@ class UserControllerImplTest {
     when(userService.deleteResume(eq(RESUME_ID), any())).thenReturn(deleted);
 
     ResponseEntity<GlobalRestResponse<DeletedResumeResponse>> response =
-        userController.deleteResume(RESUME_ID, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        userController.deleteResume(RESUME_ID, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(deleted)));
@@ -230,7 +236,7 @@ class UserControllerImplTest {
     when(userService.getApplications(eq(2), eq(5), any())).thenReturn(page);
 
     ResponseEntity<GlobalRestResponse<PagedResponse<UserApplicationResponse>>> response =
-        userController.getApplications(2, 5, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        userController.getApplications(2, 5, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(page)));
@@ -243,7 +249,7 @@ class UserControllerImplTest {
     when(userService.suggestUpskilling(eq(JOB_POST_ID), eq("es"), any())).thenReturn(suggestion);
 
     ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> response = userController
-        .suggestUpskilling(JOB_POST_ID, "es", REQUEST_UUID, AUTHORIZATION, USER_ID);
+        .suggestUpskilling(JOB_POST_ID, "es", REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(suggestion)));
@@ -261,7 +267,7 @@ class UserControllerImplTest {
     when(userService.getProfile(eq(otherUserId), any())).thenReturn(profile);
 
     ResponseEntity<GlobalRestResponse<GetUserProfileResponse>> response =
-        userController.getUserProfile(otherUserId, REQUEST_UUID, AUTHORIZATION, USER_ID);
+        userController.getUserProfile(otherUserId, REQUEST_UUID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData(), is(sameInstance(profile)));

@@ -91,7 +91,7 @@ public class ResumeTailorService {
         .build();
 
     return relay(
-        () -> lynqAgentClient.startConversation(request, caller.requestUuid(), caller.userId())
+        () -> lynqAgentClient.startConversation(request, caller.requestUuid(), caller.authorization())
             .getData(),
         CONVERSATION_NOT_STARTED);
   }
@@ -114,7 +114,7 @@ public class ResumeTailorService {
 
     return relay(
         () -> lynqAgentClient
-            .takeTurn(conversationId, request, caller.requestUuid(), caller.userId())
+            .takeTurn(conversationId, request, caller.requestUuid(), caller.authorization())
             .getData(),
         TURN_FAILED);
   }
@@ -237,7 +237,7 @@ public class ResumeTailorService {
   private Map<String, Object> readConversation(String conversationId, Caller caller) {
     return relay(
         () -> lynqAgentClient
-            .getConversation(conversationId, caller.requestUuid(), caller.userId())
+            .getConversation(conversationId, caller.requestUuid(), caller.authorization())
             .getData(),
         CONVERSATION_UNREADABLE);
   }
@@ -280,7 +280,7 @@ public class ResumeTailorService {
 
     try {
       Map<String, Object> closed = lynqAgentClient
-          .markApplied(conversationId, request, caller.requestUuid(), caller.userId())
+          .markApplied(conversationId, request, caller.requestUuid(), caller.authorization())
           .getData();
       Object status = closed == null ? null : closed.get(STATUS_FIELD);
       return status == null ? null : status.toString();

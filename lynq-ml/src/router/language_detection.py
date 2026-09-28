@@ -16,6 +16,7 @@ from model.language_detection import (
 )
 from prompt.language_detection import render_language_detection_prompt
 from response import GlobalRestResponse
+from security import CallerPrincipal
 
 log = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ _LOG_CONTEXT = "user_id=%s"
 async def detect_language(
     body: LanguageDetectionRequest,
     lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
-    user_id: Annotated[str, Header(alias="user-id")],
+    principal: CallerPrincipal,
 ) -> GlobalRestResponse[LanguageDetectionResponse]:
     """Detect the main language of the given text.
 
@@ -43,6 +44,7 @@ async def detect_language(
     (mirrors lynq-app-backend). Returns the detected language wrapped in the
     standard ``GlobalRestResponse`` envelope.
     """
+    user_id = principal.id
     log.info("message= Started detect-language, " + _LOG_CONTEXT, user_id)
 
     client = get_llm_client()

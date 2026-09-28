@@ -19,37 +19,37 @@ import org.springframework.web.bind.annotation.RequestParam;
 public interface LynqMlClient {
 
   String REQUEST_UUID_HEADER = "lynq-request-uuid";
-  String USER_ID_HEADER = "user-id";
+  String AUTHORIZATION_HEADER = "Authorization";
 
   @PostMapping("/dmz/resume-template-creation")
   void createResumeTemplate(
       @RequestBody ResumeTemplateCreationRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 
   @PostMapping("/dmz/skill-enhance")
   GlobalRestResponse<SkillEnhanceResponse> enhanceSkills(
       @RequestBody SkillEnhanceRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 
   @PostMapping("/dmz/parse-resume")
   GlobalRestResponse<Object> parseResume(
       @RequestBody ParseResumeRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 
   @PostMapping("/dmz/translate")
   GlobalRestResponse<Object> translateResume(
       @RequestBody TranslateResumeRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 
   @PostMapping("/dmz/detect-language")
   GlobalRestResponse<LanguageDetectionResponse> detectLanguage(
       @RequestBody LanguageDetectionRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 
   /**
    * Derive the transferable capabilities behind a resume's skills.
@@ -65,5 +65,5 @@ public interface LynqMlClient {
       @RequestBody Object resume,
       @RequestParam("language") String language,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(USER_ID_HEADER) String userId);
+      @RequestHeader(AUTHORIZATION_HEADER) String authorization);
 }

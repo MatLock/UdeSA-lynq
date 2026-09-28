@@ -16,16 +16,16 @@ import com.lynq.bff.client.response.UpdateJobResponse;
 import com.lynq.bff.client.response.UpskillingSuggestionResponse;
 import com.lynq.bff.controller.JobController;
 import com.lynq.bff.controller.response.GlobalRestResponse;
-import com.lynq.bff.filter.JwtSignatureFilter;
+import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.JobService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,7 +37,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobControllerImpl implements JobController {
 
   private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
-  private static final String AUTHORIZATION_HEADER = "Authorization";
 
   private final JobService jobService;
 
@@ -50,10 +49,9 @@ public class JobControllerImpl implements JobController {
   public ResponseEntity<GlobalRestResponse<CreateJobResponse>> createJob(
       @RequestBody CreateJobRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     CreateJobResponse created =
-        jobService.createJob(request, new Caller(userId, requestUuid, authorization));
+        jobService.createJob(request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.CREATED)
@@ -66,10 +64,9 @@ public class JobControllerImpl implements JobController {
       @PathVariable String jobId,
       @RequestBody UpdateJobRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     UpdateJobResponse updated =
-        jobService.updateJob(jobId, request, new Caller(userId, requestUuid, authorization));
+        jobService.updateJob(jobId, request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -83,10 +80,9 @@ public class JobControllerImpl implements JobController {
       @RequestParam(defaultValue = "10") Integer size,
       @RequestParam(required = false) String filterValue,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     PagedResponse<GetJobResponse> jobs = jobService.getJobs(
-        page, size, filterValue, new Caller(userId, requestUuid, authorization));
+        page, size, filterValue, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -99,10 +95,9 @@ public class JobControllerImpl implements JobController {
       @RequestParam(defaultValue = "0") Integer page,
       @RequestParam(defaultValue = "10") Integer size,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     PagedResponse<GetJobResponse> jobs =
-        jobService.getMyJobs(page, size, new Caller(userId, requestUuid, authorization));
+        jobService.getMyJobs(page, size, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -114,10 +109,9 @@ public class JobControllerImpl implements JobController {
   public ResponseEntity<GlobalRestResponse<JobDetailsResponse>> getJobDetails(
       @PathVariable String jobId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     JobDetailsResponse job =
-        jobService.getJobDetails(jobId, new Caller(userId, requestUuid, authorization));
+        jobService.getJobDetails(jobId, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -129,10 +123,9 @@ public class JobControllerImpl implements JobController {
   public ResponseEntity<GlobalRestResponse<Long>> increaseSeen(
       @PathVariable String jobId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     Long totalSeen =
-        jobService.increaseSeen(jobId, new Caller(userId, requestUuid, authorization));
+        jobService.increaseSeen(jobId, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -144,10 +137,9 @@ public class JobControllerImpl implements JobController {
   public ResponseEntity<GlobalRestResponse<RefreshJobResponse>> refreshJob(
       @PathVariable String jobId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     RefreshJobResponse refreshed =
-        jobService.refreshJob(jobId, new Caller(userId, requestUuid, authorization));
+        jobService.refreshJob(jobId, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -159,10 +151,9 @@ public class JobControllerImpl implements JobController {
   public ResponseEntity<GlobalRestResponse<CloseJobResponse>> closeJob(
       @PathVariable String jobId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     CloseJobResponse closed =
-        jobService.closeJob(jobId, new Caller(userId, requestUuid, authorization));
+        jobService.closeJob(jobId, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -175,10 +166,9 @@ public class JobControllerImpl implements JobController {
       @PathVariable String jobId,
       @RequestBody ApplyJobRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     ApplyJobResponse applied =
-        jobService.applyToJob(jobId, request, new Caller(userId, requestUuid, authorization));
+        jobService.applyToJob(jobId, request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.CREATED)
@@ -192,10 +182,9 @@ public class JobControllerImpl implements JobController {
       @RequestParam(defaultValue = "0") Integer page,
       @RequestParam(defaultValue = "10") Integer pageSize,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     PagedResponse<JobCandidateResponse> candidates = jobService.getCandidates(
-        jobId, page, pageSize, new Caller(userId, requestUuid, authorization));
+        jobId, page, pageSize, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -208,10 +197,9 @@ public class JobControllerImpl implements JobController {
       @PathVariable String jobId,
       @PathVariable String candidateId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     CandidateExplanationResponse explanation = jobService.explainCandidate(
-        jobId, candidateId, new Caller(userId, requestUuid, authorization));
+        jobId, candidateId, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -224,13 +212,16 @@ public class JobControllerImpl implements JobController {
       @PathVariable String jobId,
       @RequestParam(defaultValue = "en") String language,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     UpskillingSuggestionResponse suggestion = jobService.suggestUpskilling(
-        jobId, language, new Caller(userId, requestUuid, authorization));
+        jobId, language, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, suggestion));
+  }
+
+  private static Caller caller(LynqUserPrincipal principal, String requestUuid) {
+    return new Caller(principal.getId(), requestUuid, principal.getAuthorization());
   }
 }

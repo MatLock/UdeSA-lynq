@@ -8,6 +8,7 @@ import com.lynq.filestorage.controller.response.FileRestResponse;
 import com.lynq.filestorage.controller.response.GlobalRestResponse;
 import com.lynq.filestorage.enums.StoredFileStatus;
 import com.lynq.filestorage.model.StoredFileEntity;
+import com.lynq.filestorage.security.LynqUserPrincipal;
 import com.lynq.filestorage.service.FileService;
 import com.lynq.filestorage.service.PreSignedUploadUrl;
 import java.time.LocalDateTime;
@@ -20,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
@@ -40,6 +42,9 @@ class FileControllerImplTest {
 
   private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
 
+  private static final LynqUserPrincipal PRINCIPAL = new LynqUserPrincipal(
+      USER_ID, "janedoe", "jane@lynq.com", List.of(new SimpleGrantedAuthority("R_CANDIDATE")));
+
   @Mock
   private FileService fileService;
 
@@ -58,7 +63,7 @@ class FileControllerImplTest {
     when(fileService.createUploadUrl(storedFile)).thenReturn(new PreSignedUploadUrl(S3_KEY, UPLOAD_URL));
 
     ResponseEntity<GlobalRestResponse<CreateFileUploadRestResponse>> response =
-        fileController.createUpload(buildRequest(), USER_ID);
+        fileController.createUpload(buildRequest(), PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.CREATED));
     assertThat(response.getBody().isSuccess(), is(true));
@@ -73,7 +78,7 @@ class FileControllerImplTest {
         .thenReturn(buildStoredFile(StoredFileStatus.AVAILABLE));
 
     ResponseEntity<GlobalRestResponse<FileRestResponse>> response =
-        fileController.confirmUpload(FILE_ID, USER_ID);
+        fileController.confirmUpload(FILE_ID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.OK));
     assertThat(response.getBody().getData().getFileId(), is(FILE_ID));
@@ -109,7 +114,7 @@ class FileControllerImplTest {
 
   @Test
   void deleteFileReturnsNoContentAndDelegatesToTheService() {
-    ResponseEntity<Void> response = fileController.deleteFile(FILE_ID, USER_ID);
+    ResponseEntity<Void> response = fileController.deleteFile(FILE_ID, PRINCIPAL);
 
     assertThat(response.getStatusCode(), is(HttpStatus.NO_CONTENT));
     verify(fileService).deleteFile(FILE_ID, USER_ID);

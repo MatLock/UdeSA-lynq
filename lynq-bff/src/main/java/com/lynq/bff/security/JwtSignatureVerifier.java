@@ -15,6 +15,8 @@ import org.springframework.stereotype.Component;
 @Log4j2
 public class JwtSignatureVerifier {
 
+  private static final String USERNAME_CLAIM = "username";
+  private static final String EMAIL_CLAIM = "email";
   private static final String ROLES_CLAIM = "roles";
 
   private final SecretKey signingKey;
@@ -39,7 +41,10 @@ public class JwtSignatureVerifier {
         log.warn("message= Access token verified but carries no subject claim");
         return Optional.empty();
       }
-      return Optional.of(new VerifiedCaller(subject, roles(claims)));
+      return Optional.of(new VerifiedCaller(subject,
+          claims.get(USERNAME_CLAIM, String.class),
+          claims.get(EMAIL_CLAIM, String.class),
+          roles(claims)));
     } catch (Exception e) {
       log.warn("message= Access token signature verification failed, cause={}", e.getMessage());
       return Optional.empty();

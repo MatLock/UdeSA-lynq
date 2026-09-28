@@ -9,9 +9,9 @@ import com.lynq.bff.controller.request.UpdateResumeAliasRestRequest;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
 import com.lynq.bff.controller.response.ResumeTailorApplyRestResponse;
-import com.lynq.bff.filter.JwtSignatureFilter;
 import com.lynq.bff.security.HasRole;
 import com.lynq.bff.security.Role;
+import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.ResumeAliasService;
 import com.lynq.bff.service.ResumeDeletionService;
@@ -22,12 +22,12 @@ import com.lynq.bff.service.ResumePreviewService;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -40,7 +40,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class ResumeControllerImpl implements ResumeController {
 
   private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
-  private static final String AUTHORIZATION_HEADER = "Authorization";
 
   private final ResumePreviewService resumePreviewService;
   private final ResumeImportService resumeImportService;
@@ -68,10 +67,9 @@ public class ResumeControllerImpl implements ResumeController {
   public ResponseEntity<GlobalRestResponse<ResumePreviewRestResponse>> previewResume(
       @RequestBody PreviewResumeRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     ResumePreviewRestResponse preview =
-        resumePreviewService.preview(request, new Caller(userId, requestUuid, authorization));
+        resumePreviewService.preview(request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.CREATED)
@@ -84,10 +82,9 @@ public class ResumeControllerImpl implements ResumeController {
       @PathVariable String fileId,
       @RequestParam(defaultValue = "EN") String language,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     Object resume = resumeImportService.importUploadedDocument(
-        fileId, language, new Caller(userId, requestUuid, authorization));
+        fileId, language, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.CREATED)
@@ -100,10 +97,9 @@ public class ResumeControllerImpl implements ResumeController {
       @PathVariable String resumeId,
       @RequestBody TranslateResumeRestRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     Object translated = resumeTranslationService.translate(resumeId, request.getLanguage(),
-        new Caller(userId, requestUuid, authorization));
+        caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -115,8 +111,8 @@ public class ResumeControllerImpl implements ResumeController {
   public ResponseEntity<Void> discardResumePreview(
       @PathVariable String fileId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
-    resumePreviewService.discard(fileId, new Caller(userId, requestUuid, null));
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
+    resumePreviewService.discard(fileId, caller(principal, requestUuid));
 
     return ResponseEntity.noContent().build();
   }
@@ -127,10 +123,9 @@ public class ResumeControllerImpl implements ResumeController {
       @PathVariable String resumeId,
       @RequestBody UpdateResumeAliasRestRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     Object resume = resumeAliasService.assign(resumeId, request.getAlias(),
-        new Caller(userId, requestUuid, authorization));
+        caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -142,9 +137,8 @@ public class ResumeControllerImpl implements ResumeController {
   public ResponseEntity<Void> deleteResume(
       @PathVariable String resumeId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
-    resumeDeletionService.delete(resumeId, new Caller(userId, requestUuid, authorization));
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
+    resumeDeletionService.delete(resumeId, caller(principal, requestUuid));
 
     return ResponseEntity.noContent().build();
   }
@@ -156,10 +150,9 @@ public class ResumeControllerImpl implements ResumeController {
       @PathVariable String jobId,
       @RequestParam(defaultValue = "EN") String language,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     Object conversation = resumeTailorService.start(resumeId, jobId, language,
-        new Caller(userId, requestUuid, authorization));
+        caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.CREATED)
@@ -172,10 +165,9 @@ public class ResumeControllerImpl implements ResumeController {
       @PathVariable String conversationId,
       @RequestBody TailorTurnRestRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     Object turn = resumeTailorService.turn(conversationId, request.getMessage(),
-        request.getTurnKey(), new Caller(userId, requestUuid, authorization));
+        request.getTurnKey(), caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -187,10 +179,9 @@ public class ResumeControllerImpl implements ResumeController {
   public ResponseEntity<GlobalRestResponse<Map<String, Object>>> getResumeTailoringConversation(
       @PathVariable String conversationId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     Map<String, Object> conversation = resumeTailorService.view(conversationId,
-        new Caller(userId, requestUuid, authorization));
+        caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -203,13 +194,16 @@ public class ResumeControllerImpl implements ResumeController {
       @PathVariable String conversationId,
       @RequestBody TailorApplyRestRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestHeader(AUTHORIZATION_HEADER) String authorization,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     ResumeTailorApplyRestResponse applied = resumeTailorService.apply(conversationId,
-        request, new Caller(userId, requestUuid, authorization));
+        request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.CREATED)
         .body(new GlobalRestResponse<>(true, applied));
+  }
+
+  private static Caller caller(LynqUserPrincipal principal, String requestUuid) {
+    return new Caller(principal.getId(), requestUuid, principal.getAuthorization());
   }
 }

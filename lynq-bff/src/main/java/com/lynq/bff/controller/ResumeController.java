@@ -6,6 +6,7 @@ import com.lynq.bff.controller.request.TailorTurnRestRequest;
 import com.lynq.bff.controller.request.TranslateResumeRestRequest;
 import com.lynq.bff.controller.request.UpdateResumeAliasRestRequest;
 import com.lynq.bff.controller.response.GlobalRestResponse;
+import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
 import com.lynq.bff.controller.response.ResumeTailorApplyRestResponse;
 import java.util.Map;
@@ -61,8 +62,7 @@ public interface ResumeController {
   ResponseEntity<GlobalRestResponse<ResumePreviewRestResponse>> previewResume(
       PreviewResumeRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
       summary = "Import a resume document the candidate uploaded",
@@ -119,8 +119,7 @@ public interface ResumeController {
           example = "es")
       String language,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
       summary = "Translate a stored resume into another language",
@@ -167,8 +166,7 @@ public interface ResumeController {
       String resumeId,
       TranslateResumeRestRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
       summary = "Discard a previewed resume PDF",
@@ -193,7 +191,7 @@ public interface ResumeController {
           example = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41")
       String fileId,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
       summary = "Assign or replace the alias of a stored resume",
@@ -242,8 +240,7 @@ public interface ResumeController {
       String resumeId,
       UpdateResumeAliasRestRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
       summary = "Delete a resume the candidate created",
@@ -266,8 +263,7 @@ public interface ResumeController {
   ResponseEntity<Void> deleteResume(
       @Parameter(description = "Id of the resume to delete.") String resumeId,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
       summary = "Start a CV Tailor conversation for a job posting",
@@ -326,8 +322,7 @@ public interface ResumeController {
           example = "ES")
       String language,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
       summary = "Take a turn in a CV Tailor conversation",
@@ -370,8 +365,7 @@ public interface ResumeController {
       String conversationId,
       TailorTurnRestRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
       summary = "Read a CV Tailor conversation",
@@ -396,8 +390,7 @@ public interface ResumeController {
           example = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42")
       String conversationId,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(
       summary = "Apply with the tailored resume and close the conversation",
@@ -456,7 +449,6 @@ public interface ResumeController {
       String conversationId,
       TailorApplyRestRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String authorization,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
 }

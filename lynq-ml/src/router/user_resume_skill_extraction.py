@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from llm_client import LLMError, get_llm_client
 from response import GlobalRestResponse
+from security import CallerPrincipal
 
 from model.resume_extractor import Resume
 from model.skill_extraction import SkillExtractionResponse
@@ -34,7 +35,7 @@ _LOG_CONTEXT = "user_id=%s"
 async def extract_resume_skills(
     body: Resume,
     lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
-    user_id: Annotated[str, Header(alias="user-id")],
+    principal: CallerPrincipal,
     language: str | None = None,
 ) -> GlobalRestResponse[SkillExtractionResponse]:
     """Consolidate all of a resume's skills into technical/tools/soft buckets.
@@ -50,6 +51,7 @@ async def extract_resume_skills(
     than Kafka or RabbitMQ), always in English so this resume can be matched
     against postings written in another language.
     """
+    user_id = principal.id
     log.info(
         "message= Started resume skill-extraction, " + _LOG_CONTEXT,
         user_id,

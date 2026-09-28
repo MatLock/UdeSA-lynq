@@ -6,6 +6,7 @@ import com.lynq.bff.client.response.CreateFileDownloadResponse;
 import com.lynq.bff.client.response.CreateFileUploadResponse;
 import com.lynq.bff.client.response.FileResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
+import com.lynq.bff.security.LynqUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -29,37 +30,37 @@ public interface FileController {
   ResponseEntity<GlobalRestResponse<CreateFileUploadResponse>> createUpload(
       CreateFileUploadRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Confirm that a registered file finished uploading")
   ResponseEntity<GlobalRestResponse<FileResponse>> confirmUpload(
       String fileId,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Read a file the authenticated user registered")
   @ApiResponses(@ApiResponse(responseCode = "404", description = "No file holds that id."))
   ResponseEntity<GlobalRestResponse<FileResponse>> findOwnedFile(
       String fileId,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Get the pre-signed url to download a file")
   @ApiResponses(@ApiResponse(responseCode = "404", description = "No file holds that id."))
   ResponseEntity<GlobalRestResponse<CreateFileDownloadResponse>> createDownloadUrl(
       String fileId,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Get the pre-signed urls of several files at once")
   ResponseEntity<GlobalRestResponse<Map<String, String>>> createDownloadUrls(
       CreateFileDownloadBatchRequest request,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 
   @Operation(summary = "Delete a file the authenticated user registered")
   ResponseEntity<Void> deleteFile(
       String fileId,
       @Parameter(hidden = true) String requestUuid,
-      @Parameter(hidden = true) String userId);
+      @Parameter(hidden = true) LynqUserPrincipal principal);
 }

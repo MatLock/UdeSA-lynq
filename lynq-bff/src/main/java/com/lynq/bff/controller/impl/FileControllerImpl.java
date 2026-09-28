@@ -7,17 +7,17 @@ import com.lynq.bff.client.response.CreateFileUploadResponse;
 import com.lynq.bff.client.response.FileResponse;
 import com.lynq.bff.controller.FileController;
 import com.lynq.bff.controller.response.GlobalRestResponse;
-import com.lynq.bff.filter.JwtSignatureFilter;
+import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.FileService;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -40,9 +40,9 @@ public class FileControllerImpl implements FileController {
   public ResponseEntity<GlobalRestResponse<CreateFileUploadResponse>> createUpload(
       @RequestBody CreateFileUploadRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     CreateFileUploadResponse upload =
-        fileService.createUpload(request, new Caller(userId, requestUuid, null));
+        fileService.createUpload(request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.CREATED)
@@ -54,8 +54,8 @@ public class FileControllerImpl implements FileController {
   public ResponseEntity<GlobalRestResponse<FileResponse>> confirmUpload(
       @PathVariable String fileId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
-    FileResponse file = fileService.confirmUpload(fileId, new Caller(userId, requestUuid, null));
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
+    FileResponse file = fileService.confirmUpload(fileId, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -67,8 +67,8 @@ public class FileControllerImpl implements FileController {
   public ResponseEntity<GlobalRestResponse<FileResponse>> findOwnedFile(
       @PathVariable String fileId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
-    FileResponse file = fileService.findOwnedFile(fileId, new Caller(userId, requestUuid, null));
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
+    FileResponse file = fileService.findOwnedFile(fileId, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -80,9 +80,9 @@ public class FileControllerImpl implements FileController {
   public ResponseEntity<GlobalRestResponse<CreateFileDownloadResponse>> createDownloadUrl(
       @PathVariable String fileId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     CreateFileDownloadResponse download =
-        fileService.createDownloadUrl(fileId, new Caller(userId, requestUuid, null));
+        fileService.createDownloadUrl(fileId, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -94,9 +94,9 @@ public class FileControllerImpl implements FileController {
   public ResponseEntity<GlobalRestResponse<Map<String, String>>> createDownloadUrls(
       @RequestBody CreateFileDownloadBatchRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
     Map<String, String> downloadUrls =
-        fileService.createDownloadUrls(request, new Caller(userId, requestUuid, null));
+        fileService.createDownloadUrls(request, caller(principal, requestUuid));
 
     return ResponseEntity
         .status(HttpStatus.OK)
@@ -108,9 +108,13 @@ public class FileControllerImpl implements FileController {
   public ResponseEntity<Void> deleteFile(
       @PathVariable String fileId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
-      @RequestAttribute(JwtSignatureFilter.VERIFIED_USER_ID) String userId) {
-    fileService.deleteFile(fileId, new Caller(userId, requestUuid, null));
+      @AuthenticationPrincipal LynqUserPrincipal principal) {
+    fileService.deleteFile(fileId, caller(principal, requestUuid));
 
     return ResponseEntity.noContent().build();
+  }
+
+  private static Caller caller(LynqUserPrincipal principal, String requestUuid) {
+    return new Caller(principal.getId(), requestUuid, principal.getAuthorization());
   }
 }

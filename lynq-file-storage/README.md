@@ -55,10 +55,18 @@ Callers keep only the **file id** it hands back. [`lynq-app-backend`](../lynq-ap
                   ┌───────────────────────────┐
                   │ Caller (lynq-app-backend) │
                   └─────────────┬─────────────┘
-                                │  lynq-request-uuid
+                                │  lynq-request-uuid, Authorization
                                 ▼
                ┌─────────────────────────────────┐
                │    RequestUuidFilter  (/*)      │
+               └────────────────┬────────────────┘
+                                ▼
+               ┌─────────────────────────────────┐
+               │ AuthHeaderExistenceFilter (/*)  │
+               └────────────────┬────────────────┘
+                                ▼
+               ┌─────────────────────────────────┐
+               │  IamAuthenticationFilter  (/*)  │──► lynq-iam /auth/user-info
                └────────────────┬────────────────┘
                                 ▼
                ┌─────────────────────────────────┐
@@ -89,17 +97,19 @@ Callers keep only the **file id** it hands back. [`lynq-app-backend`](../lynq-ap
 - **Exception handling** (`exceptions/`, `controller/handler/`) — domain exceptions mapped to consistent error responses by `ControllerExceptionHandler`.
 - **Migrations** (`resources/changelog/`) — Liquibase changelogs run on startup.
 
-> **Security model.** This service carries no authentication of its own: it only enforces the `lynq-request-uuid` header. It is meant to be reached **inside the cluster** by other Lynq services (it is not exposed through the ingress), and the caller is responsible for authorizing the end user — `lynq-app-backend` validates the bearer token against `lynq-iam` and checks file ownership before delegating. Do not expose it publicly.
+> **Security model.** Every route resolves the caller from the request's `Authorization` header against `lynq-iam`'s `/auth/user-info` and builds a `LynqUserPrincipal` from the answer — the same arrangement `lynq-app-backend` and `lynq-analytics` use. Ownership is then checked against that principal, so a file can only be read, confirmed or deleted with a token belonging to the user who registered it. The service is still meant to be reached **inside the cluster** (it is not exposed through the ingress); what changed is that it no longer takes the caller's word for who they are.
 
 ---
 
 ## Request lifecycle
 
-Every request passes through a single filter before reaching the controller:
+Every request passes through three filters before reaching the controller:
 
-| Order | Filter              | Scope | Purpose                                                                       |
-| :---: | ------------------- | ----- | ----------------------------------------------------------------------------- |
-| 0     | `RequestUuidFilter` | `/*`  | Require the `lynq-request-uuid` header (403 otherwise); echo it back and bind it to the SLF4J MDC for log correlation. |
+| Order | Filter                      | Scope | Purpose                                                                       |
+| :---: | --------------------------- | ----- | ----------------------------------------------------------------------------- |
+| 0     | `RequestUuidFilter`         | `/*`  | Require the `lynq-request-uuid` header (403 otherwise); echo it back and bind it to the SLF4J MDC for log correlation. |
+| 1     | `AuthHeaderExistenceFilter` | `/*`  | Require an `Authorization` header (401 otherwise), before anything is asked of lynq-iam. |
+| 2     | `IamAuthenticationFilter`   | `/*`  | Resolve the token against lynq-iam's `/auth/user-info` and load a `LynqUserPrincipal` into the `SecurityContext`. 401 when lynq-iam refuses the token, 503 when it cannot be reached. |
 
 Swagger assets (`/swagger-ui*`, `/v3/api-docs*`, `/swagger-resources*`, `/webjars*`) are exempt from the header requirement. CORS is open to any origin (`CorsConfig`) so the browser can be handed pre-signed URLs.
 
@@ -205,22 +215,26 @@ the DMZ prefix `/dmz` — this service is reached only through [`lynq-bff`](../l
 validates the access token's signature before proxying.
 **Every** request must include the `lynq-request-uuid` header; requests without it are rejected with `403`.
 
-The three endpoints that **change** a file also require a `user-id` header — set by lynq-bff from
-the verified token, or by lynq-app-backend from the authenticated principal. See
-[Ownership](#ownership) below.
+**Every** request must also carry the caller's `Authorization` header. This service resolves who
+that is against lynq-iam's `/auth/user-info` and builds a `LynqUserPrincipal` from the answer,
+exactly as lynq-app-backend does: a missing header is a `401`, a token lynq-iam refuses is a `401`,
+and lynq-iam being unreachable is a `503`. A caller-supplied `user-id` header names nobody any more
+— only the token does. See [Ownership](#ownership) below.
 
-| Method | Path                          | `user-id` | Description                                                     |
-| ------ | ----------------------------- | :-------: | --------------------------------------------------------------- |
-| POST   | `/dmz/files/upload-url`           | required | Register a file as `PENDING` and record the caller as its owner; returns `{fileId, s3Key, uploadUrl}` (`201`). Body: `{fileName, contentType?}`. |
-| POST   | `/dmz/files/{fileId}/confirm`     | required | Confirm a finished upload; marks the file `AVAILABLE` (`200`). `403` if the file belongs to someone else. |
-| GET    | `/dmz/files/{fileId}/download-url`| —        | Pre-signed GET URL for one file (`200`). Not owner-scoped.      |
-| POST   | `/dmz/files/download-urls`        | —        | Pre-signed GET URLs for a batch, keyed by file id (`200`). Body: `{fileIds: [ … ]}` (1–100). Not owner-scoped. |
-| DELETE | `/dmz/files/{fileId}`             | required | Delete the object and its metadata; idempotent (`204`). `403` if the file belongs to someone else. |
+| Method | Path                          | Owner-scoped | Description                                                     |
+| ------ | ----------------------------- | :----------: | --------------------------------------------------------------- |
+| POST   | `/dmz/files/upload-url`           | yes | Register a file as `PENDING` and record the caller as its owner; returns `{fileId, s3Key, uploadUrl}` (`201`). Body: `{fileName, contentType?}`. |
+| POST   | `/dmz/files/{fileId}/confirm`     | yes | Confirm a finished upload; marks the file `AVAILABLE` (`200`). `403` if the file belongs to someone else. |
+| GET    | `/dmz/files/{fileId}`             | yes | Read a file the caller owns (`200`). `403` if it belongs to someone else. |
+| GET    | `/dmz/files/{fileId}/download-url`| no  | Pre-signed GET URL for one file (`200`).                        |
+| POST   | `/dmz/files/download-urls`        | no  | Pre-signed GET URLs for a batch, keyed by file id (`200`). Body: `{fileIds: [ … ]}` (1–100). |
+| DELETE | `/dmz/files/{fileId}`             | yes | Delete the object and its metadata; idempotent (`204`). `403` if the file belongs to someone else. |
 
 ### Ownership
 
-`stored_files.owner_user_id` records who registered a file, and only that user may **confirm** or
-**delete** it. Anyone else gets a `403`.
+`stored_files.owner_user_id` records who registered a file — the subject of the token the request
+carried, never a value the caller chose — and only that user may **read**, **confirm** or **delete**
+it. Anyone else gets a `403`.
 
 Reads are deliberately **not** owner-scoped. Profile images, company logos and candidate résumés are
 meant to be shown to users other than the one who uploaded them, so an owner-only rule on download
@@ -249,6 +263,9 @@ Errors are wrapped in `ErrorRestResponse` (`{ success:false, data, reason }`). M
 | `BadRequestException`                | 400         |
 | bean-validation failure              | 400 (`{ reason: "Invalid Fields Found", data: { field → message } }`) |
 | missing `lynq-request-uuid` header   | 403         |
+| missing `Authorization` header       | 401         |
+| token lynq-iam refuses               | 401         |
+| lynq-iam unreachable                 | 503         |
 | `ForbiddenException` (the file belongs to another user) | 403 |
 | `NotFoundException`                  | 404         |
 | `IllegalArgumentException`           | 409         |
@@ -266,9 +283,10 @@ Validation rules on the request bodies:
 
 ## Sample requests
 
-> Substitute `$UUID` with any UUID you generate per request (e.g. `uuidgen`), and `$USER_ID` with
-> the id of the user the call is made on behalf of — normally set by lynq-bff from the verified
-> access token. Only the calls that change a file need it.
+> Substitute `$UUID` with any UUID you generate per request (e.g. `uuidgen`), and `$TOKEN` with an
+> access token of the user the call is made on behalf of (`POST /lynq-iam/auth/login/email` returns
+> it as `data.accessToken`). Every call needs it; the owner-scoped ones answer `403` when the token
+> belongs to somebody else.
 
 **Register an upload and get a pre-signed PUT URL**
 
@@ -276,7 +294,7 @@ Validation rules on the request bodies:
 curl -X POST http://localhost:8085/lynq-file-storage/dmz/files/upload-url \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
-  -H "user-id: $USER_ID" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{ "fileName": "avatar.png", "contentType": "image/png" }'
 ```
 
@@ -300,14 +318,15 @@ curl -X PUT "$UPLOAD_URL" --upload-file ./avatar.png
 
 curl -X POST "http://localhost:8085/lynq-file-storage/dmz/files/$FILE_ID/confirm" \
   -H "lynq-request-uuid: $UUID" \
-  -H "user-id: $USER_ID"
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 **Get a download URL for one file**
 
 ```bash
 curl "http://localhost:8085/lynq-file-storage/dmz/files/$FILE_ID/download-url" \
-  -H "lynq-request-uuid: $UUID"
+  -H "lynq-request-uuid: $UUID" \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 **Sign a batch of download URLs**
@@ -316,6 +335,7 @@ curl "http://localhost:8085/lynq-file-storage/dmz/files/$FILE_ID/download-url" \
 curl -X POST http://localhost:8085/lynq-file-storage/dmz/files/download-urls \
   -H "Content-Type: application/json" \
   -H "lynq-request-uuid: $UUID" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{ "fileIds": ["0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41", "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d42"] }'
 ```
 
@@ -335,7 +355,7 @@ Sample response (unknown ids are simply absent):
 ```bash
 curl -X DELETE "http://localhost:8085/lynq-file-storage/dmz/files/$FILE_ID" \
   -H "lynq-request-uuid: $UUID" \
-  -H "user-id: $USER_ID"
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
@@ -412,6 +432,7 @@ Two profiles ship with the project:
 
 | Variable                | Used by                                    | Notes |
 | ----------------------- | ------------------------------------------ | ----- |
+| `LYNQ_IAM_URL`          | Where the caller's token is resolved       | default `http://lynq-iam:8080/lynq-iam` |
 | `DB_URL`                | `spring.datasource.url` (JDBC URL)         | |
 | `DB_USERNAME`           | MySQL user                                 | |
 | `DB_PASSWORD`           | MySQL password                             | |

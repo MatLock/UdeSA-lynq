@@ -37,11 +37,14 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
       - AWS_BUCKET_NAME=${AWS_BUCKET_NAME:-lynq-bucket}
       - AWS_ENDPOINT=${AWS_ENDPOINT:-http://localstack:4566}
+      - LYNQ_IAM_URL=http://lynq-iam:8080/lynq-iam
     depends_on:
       mysql:
         condition: service_healthy
       localstack:
         condition: service_healthy
+      lynq-iam:
+        condition: service_started
 
   lynq-app-backend:
     build: ./lynq-app-backend
@@ -142,8 +145,13 @@ services:
       - BEDROCK_MAX_ATTEMPTS=${BEDROCK_MAX_ATTEMPTS:-3}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - LYNQ_IAM_URL=http://lynq-iam:8080/lynq-iam
+      - LYNQ_IAM_TIMEOUT=${LYNQ_IAM_TIMEOUT:-10}
+      - LYNQ_INTERNAL_TOKEN=${LYNQ_INTERNAL_TOKEN:-local-internal-token-not-a-secret}
       - PORT=8084
     depends_on:
+      lynq-iam:
+        condition: service_started
       ollama:
         condition: service_healthy
       ollama-pull:
@@ -197,7 +205,8 @@ services:
       - AGENT_CONVERSATION_TTL_DAYS=${AGENT_CONVERSATION_TTL_DAYS:-180}
       - LYNQ_ML_URL=http://lynq-ml:8084/lynq-ml
       - ML_TIMEOUT=${ML_TIMEOUT:-300}
-      - LYNQ_AGENT_SYSTEM_USER_ID=${LYNQ_AGENT_SYSTEM_USER_ID:-00000000-0000-0000-0000-0000000a6e17}
+      - LYNQ_IAM_URL=http://lynq-iam:8080/lynq-iam
+      - LYNQ_IAM_TIMEOUT=${LYNQ_IAM_TIMEOUT:-10}
       # Both limits are parameterised so they can be dropped to 2 and exercised
       # without touching code (see the DoD items on the partial answer and on
       # EXHAUSTED). They are copied onto each conversation row at creation.

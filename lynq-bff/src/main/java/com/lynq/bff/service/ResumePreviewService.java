@@ -57,7 +57,7 @@ public class ResumePreviewService {
 
     try {
       render(request, user, upload, caller);
-      lynqFileStorageClient.confirmUpload(upload.getFileId(), caller.requestUuid(), caller.userId());
+      lynqFileStorageClient.confirmUpload(upload.getFileId(), caller.requestUuid(), caller.authorization());
     } catch (RuntimeException e) {
       discardQuietly(upload.getFileId(), caller);
       throw new BadGatewayException(RENDER_FAILED, e);
@@ -76,7 +76,7 @@ public class ResumePreviewService {
 
   public void discard(String fileId, Caller caller) {
     try {
-      lynqFileStorageClient.deleteFile(fileId, caller.requestUuid(), caller.userId());
+      lynqFileStorageClient.deleteFile(fileId, caller.requestUuid(), caller.authorization());
     } catch (RuntimeException e) {
       throw new BadGatewayException(DISCARD_FAILED, e);
     }
@@ -107,7 +107,7 @@ public class ResumePreviewService {
 
     try {
       return lynqFileStorageClient
-          .createUpload(request, caller.requestUuid(), caller.userId())
+          .createUpload(request, caller.requestUuid(), caller.authorization())
           .getData();
     } catch (RuntimeException e) {
       throw new BadGatewayException(REGISTER_FAILED, e);
@@ -124,12 +124,13 @@ public class ResumePreviewService {
         .template(request.getTemplate())
         .build();
 
-    lynqMlClient.createResumeTemplate(renderRequest, caller.requestUuid(), caller.userId());
+    lynqMlClient.createResumeTemplate(renderRequest, caller.requestUuid(), caller.authorization());
   }
 
   private String readUrl(String fileId, Caller caller) {
     try {
-      return lynqFileStorageClient.createDownloadUrl(fileId, caller.requestUuid())
+      return lynqFileStorageClient.createDownloadUrl(fileId, caller.requestUuid(),
+          caller.authorization())
           .getData()
           .getDownloadUrl();
     } catch (RuntimeException e) {
@@ -139,7 +140,7 @@ public class ResumePreviewService {
 
   private void discardQuietly(String fileId, Caller caller) {
     try {
-      lynqFileStorageClient.deleteFile(fileId, caller.requestUuid(), caller.userId());
+      lynqFileStorageClient.deleteFile(fileId, caller.requestUuid(), caller.authorization());
     } catch (RuntimeException e) {
       log.warn("message= Could not roll back a failed resume preview, user_id={}, file_id={}",
           caller.userId(), fileId, e);

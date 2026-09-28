@@ -68,11 +68,17 @@ class ConversationService:
         self._loop_runner = loop_runner
 
     async def create(
-        self, request: CreateConversationRequest, request_uuid: str, user_id: str
+        self,
+        request: CreateConversationRequest,
+        request_uuid: str,
+        user_id: str,
+        authorization: str,
     ) -> CreateConversationResponse:
         job = request.job.model_dump(by_alias=True)
         job["description"] = self._truncate(job.get("description") or "")
-        job["extractedSkills"] = await self._extract_skills(job, request_uuid, user_id)
+        job["extractedSkills"] = await self._extract_skills(
+            job, request_uuid, authorization
+        )
 
         resume_language = verify_resume_language(
             request.base_resume, request.resume_language
@@ -498,11 +504,11 @@ class ConversationService:
             )
 
     async def _extract_skills(
-        self, job: dict, request_uuid: str, user_id: str
+        self, job: dict, request_uuid: str, authorization: str
     ) -> list[str]:
         try:
             return await self._lynq_ml_client.extract_skills(
-                job, request_uuid, user_id
+                job, request_uuid, authorization
             )
         except SkillExtractionFailed as exc:
             log.warning(

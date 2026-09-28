@@ -8,10 +8,10 @@ It does five things.
    key derived from a shared secret, so the same secret is enough to check a token's integrity —
    no call to lynq-iam needed. A request whose signature does not check out never leaves this
    service.
-2. **Forwards the verified caller id.** The `sub` claim of the token it just verified goes
-   downstream as the `user-id` header, replacing anything the client sent. lynq-ml and
-   lynq-file-storage read that header as the caller's identity, so it is the one thing the gateway
-   must not take on trust from the browser.
+2. **Relays the caller's credential, not their id.** The verified token crosses downstream as the
+   `Authorization` header it arrived in, and every service behind the gateway resolves the caller
+   from it for itself, against lynq-iam. The gateway never asserts an identity by user id, so a
+   `user-id` header from the browser names nobody — it is stripped and nothing replaces it.
 3. **Relays a request that one service can answer.** Method, path, query string, remaining headers,
    request body, status code and response body all cross unchanged. Relaying deliberately has no
    request or response model: re-serializing what merely passes through would be a second copy of
@@ -218,13 +218,19 @@ lynq-app-backend is needed to know who is calling.
 
 ### Identity headers
 
-`user-id` is always overwritten with the verified token's subject, and `company-id` is always
-dropped — the gateway has no way to establish one, and the endpoints that need it go through
-lynq-backend. Both are stripped from the incoming request regardless of casing before the trusted
-`user-id` is added, so a client-supplied value can never survive the hop.
+`user-id` and `company-id` are both **dropped** from the incoming request, regardless of casing, and
+nothing replaces them: the gateway names a caller with their token and nothing else. So a
+client-supplied value cannot survive the hop, and cannot be mistaken for one the gateway vouched
+for.
 
-Downstream, `user-id` is what lynq-file-storage records as a file's owner, and what it checks before
-letting anyone confirm or delete that file.
+Downstream, lynq-app-backend, lynq-file-storage, lynq-ml and lynq-agent each call lynq-iam's
+`/auth/user-info` with the relayed `Authorization` header and build their own principal from the
+answer. That is what lynq-file-storage records as a file's owner, and what it checks before letting
+anyone read, confirm or delete that file.
+
+The one caller that carries no user token is **lynq-feeders**, a scheduled scrape: it reaches
+lynq-ml and lynq-app-backend through their `/internal/**` routes, which the shared
+`lynq-internal-token` guards. Nothing under `/internal` is relayed by this gateway.
 
 ---
 
@@ -235,7 +241,7 @@ letting anyone confirm or delete that file.
 | -1    | `CorsFilter`               | all routes                     | Answers browser preflights. Runs first on purpose: a preflight carries neither header below, so the filters after it would reject it and the real request would never be sent. |
 | 0     | `RequestUuidFilter`        | all routes except Swagger      | 403 if `lynq-request-uuid` is missing/blank; echoes it back and binds it to the logging context (MDC). |
 | 1     | `AuthHeaderExistenceFilter`| all routes except Swagger and the anonymous auth routes | 401 if the `Authorization` header is missing.                          |
-| 2     | `JwtSignatureFilter`       | as above, and also not `/auth/refresh` | 401 if the token's signature does not verify, it has expired, or it carries no subject. Publishes the verified subject for the proxy to forward as `user-id`, and loads it — with the token's `roles` claim as authorities — into the `SecurityContext`. |
+| 2     | `JwtSignatureFilter`       | as above, and also not `/auth/refresh` | 401 if the token's signature does not verify, it has expired, or it carries no subject. Builds a `LynqUserPrincipal` from the token's `sub`, `username`, `email` and `roles` claims — carrying the raw `Authorization` header so a controller can relay it — and loads it into the `SecurityContext`. |
 | 3     | `RelayRoleFilter`          | as `JwtSignatureFilter`        | 403 for the relayed routes whose role is structural (`RelayRoleRules`). **Default allow**: a route no rule covers is relayed untouched. |
 
 `PublicPaths` holds those two exceptions, and the difference between them matters:

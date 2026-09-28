@@ -62,7 +62,8 @@ public class ResumeImportService {
   }
 
   private String readUrl(String fileId, Caller caller) {
-    return lynqFileStorageClient.createDownloadUrl(fileId, caller.requestUuid())
+    return lynqFileStorageClient.createDownloadUrl(fileId, caller.requestUuid(),
+          caller.authorization())
         .getData()
         .getDownloadUrl();
   }
@@ -72,7 +73,7 @@ public class ResumeImportService {
         .preSignedUrl(documentUrl)
         .build();
 
-    return lynqMlClient.parseResume(request, caller.requestUuid(), caller.userId()).getData();
+    return lynqMlClient.parseResume(request, caller.requestUuid(), caller.authorization()).getData();
   }
 
   private String language(Object resume, String fallbackLanguage, Caller caller) {
@@ -84,7 +85,7 @@ public class ResumeImportService {
 
     LanguageDetectionRequest request = LanguageDetectionRequest.builder().text(prose).build();
     LanguageDetectionResponse detected = lynqMlClient
-        .detectLanguage(request, caller.requestUuid(), caller.userId())
+        .detectLanguage(request, caller.requestUuid(), caller.authorization())
         .getData();
 
     return detected == null ? fallback : stored(detected.getLanguage());
@@ -119,7 +120,7 @@ public class ResumeImportService {
                                       Caller caller) {
     try {
       SkillExtractionResponse extracted = lynqMlClient
-          .extractResumeSkills(resume, language, caller.requestUuid(), caller.userId())
+          .extractResumeSkills(resume, language, caller.requestUuid(), caller.authorization())
           .getData();
 
       return extracted == null || extracted.getSimilarityTags() == null
@@ -149,7 +150,7 @@ public class ResumeImportService {
 
   private void discardQuietly(String fileId, Caller caller) {
     try {
-      lynqFileStorageClient.deleteFile(fileId, caller.requestUuid(), caller.userId());
+      lynqFileStorageClient.deleteFile(fileId, caller.requestUuid(), caller.authorization());
     } catch (RuntimeException e) {
       log.warn("message= Could not roll back a failed resume import, user_id={}, file_id={}",
           caller.userId(), fileId, e);

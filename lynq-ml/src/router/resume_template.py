@@ -10,6 +10,7 @@ from fastapi.concurrency import run_in_threadpool
 
 from file_uploader.uploader import upload_to_presigned_url
 from response import GlobalRestResponse
+from security import CallerPrincipal
 
 from model.resume_template import ResumeTemplateCreationRequest
 from renderer.resume_template import render_resume_pdf
@@ -36,7 +37,7 @@ _LOG_CONTEXT = "user_id=%s, template=%s"
 async def create_resume_template(
     body: ResumeTemplateCreationRequest,
     lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
-    user_id: Annotated[str, Header(alias="user-id")],
+    principal: CallerPrincipal,
 ) -> GlobalRestResponse:
     """Render the resume into a styled PDF and upload it to the presigned URL.
 
@@ -44,6 +45,7 @@ async def create_resume_template(
     holds AWS credentials: the PDF is streamed to the caller-provided presigned
     PUT URL.
     """
+    user_id = principal.id
     template = body.template
     log.info(
         "message= Started resume-template-creation, " + _LOG_CONTEXT,

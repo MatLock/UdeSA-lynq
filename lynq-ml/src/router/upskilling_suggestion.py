@@ -12,6 +12,7 @@ from fastapi import APIRouter, Header, HTTPException
 
 from llm_client import LLMError, get_llm_client
 from response import GlobalRestResponse
+from security import CallerPrincipal
 from udemy_client import get_course_provider
 
 from model.upskilling_suggestion import (
@@ -42,7 +43,7 @@ _LOG_CONTEXT = "user_id=%s, company_id=%s"
 async def upskilling_suggestion(
     body: UpskillingRequest,
     lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
-    user_id: Annotated[str, Header(alias="user-id")],
+    principal: CallerPrincipal,
     company_id: Annotated[str, Header(alias="company-id")],
     output_language: Annotated[str | None, Header(alias="output-language")] = None,
 ) -> GlobalRestResponse[UpskillingResponse]:
@@ -54,6 +55,7 @@ async def upskilling_suggestion(
     human-readable prose (outcome + reasons) is written in ``output-language``
     (the caller's UI language, e.g. ``es``), defaulting to English.
     """
+    user_id = principal.id
     log.info(
         "message= Started upskilling-suggestion, " + _LOG_CONTEXT,
         user_id,

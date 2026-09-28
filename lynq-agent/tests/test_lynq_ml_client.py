@@ -14,6 +14,8 @@ from client.lynq_ml_client import (
     reset_lynq_ml_client,
 )
 
+_BEARER = "Bearer access-token"
+
 _JOB = {
     "id": "job-1",
     "title": "Senior Backend Engineer",
@@ -27,7 +29,6 @@ def settings_with(**overrides) -> Settings:
     reset_settings()
     settings = Settings()
     settings.lynq_ml_url = "http://lynq-ml:8084/lynq-ml"
-    settings.system_user_id = "system-user"
     for name, value in overrides.items():
         setattr(settings, name, value)
     return settings
@@ -56,7 +57,7 @@ class LynqMlClientTest(unittest.IsolatedAsyncioTestCase):
     async def _extract(self, **overrides) -> list[str]:
         client = LynqMlClient(settings_with(**overrides))
         with patch("httpx.AsyncClient", return_value=self.session):
-            return await client.extract_skills(_JOB, "req-1", "user-1")
+            return await client.extract_skills(_JOB, "req-1", _BEARER)
 
     async def test_it_posts_the_posting_to_skill_enhance(self) -> None:
         self._respond({"success": True, "data": {"skills": ["Kubernetes"]}})
@@ -70,28 +71,22 @@ class LynqMlClientTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body["title"], _JOB["title"])
         self.assertEqual(body["work_type"], "REMOTE")
 
-    async def test_it_travels_as_the_agent_system_user(self) -> None:
+    async def test_it_relays_the_callers_credential_rather_than_their_id(self) -> None:
         self._respond({"success": True, "data": {"skills": []}})
 
         await self._extract()
 
         headers = self.post.await_args.kwargs["headers"]
         self.assertEqual(headers["lynq-request-uuid"], "req-1")
-        self.assertEqual(headers["user-id"], "system-user")
-
-    async def test_without_a_system_user_it_forwards_the_caller(self) -> None:
-        self._respond({"success": True, "data": {"skills": []}})
-
-        await self._extract(system_user_id="")
-
-        self.assertEqual(self.post.await_args.kwargs["headers"]["user-id"], "user-1")
+        self.assertEqual(headers["Authorization"], _BEARER)
+        self.assertNotIn("user-id", headers)
 
     async def test_a_job_without_work_type_defaults_to_remote(self) -> None:
         self._respond({"success": True, "data": {"skills": []}})
         client = LynqMlClient(settings_with())
 
         with patch("httpx.AsyncClient", return_value=self.session):
-            await client.extract_skills({"title": "T", "description": "D"}, "r", "u")
+            await client.extract_skills({"title": "T", "description": "D"}, "r", _BEARER)
 
         self.assertEqual(self.post.await_args.kwargs["json"]["work_type"], "REMOTE")
 

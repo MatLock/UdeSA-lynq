@@ -11,6 +11,7 @@ from fastapi import APIRouter, Header, HTTPException
 
 from llm_client import LLMError, get_llm_client
 from response import GlobalRestResponse
+from security import CallerPrincipal
 
 from model.candidate_explanation import (
     CandidateExplanationRequest,
@@ -58,7 +59,7 @@ _RECOMMENDATION_ALIASES = {
 async def candidate_explanation(
     body: CandidateExplanationRequest,
     lynq_request_uuid: Annotated[str, Header(alias="lynq-request-uuid")],
-    user_id: Annotated[str, Header(alias="user-id")],
+    principal: CallerPrincipal,
     company_id: Annotated[str, Header(alias="company-id")],
 ) -> GlobalRestResponse[CandidateExplanationResponse]:
     """Assess a candidate against a job and explain the hiring decision.
@@ -67,6 +68,7 @@ async def candidate_explanation(
     upskilling-suggestion endpoint and returns a recruiter recommendation with
     the reasons for and against hiring the candidate.
     """
+    user_id = principal.id
     log.info(
         "message= Started candidate-explanation, " + _LOG_CONTEXT,
         user_id,
