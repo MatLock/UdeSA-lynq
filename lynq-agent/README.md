@@ -84,8 +84,9 @@ never drifts from the code; `--png` writes it as an image instead, for the thesi
 conversation step by step — the message, the node the turn is on, what the model proposed
 and what was let in — with the trace spans each step leaves. Open it in a browser; it
 is one file with no build. The turns come from a run against `qwen2.5:7b` on
-2026-09-28, under the earlier design where a set of rules in code (the "guard") stood
-where the judge stands now; the flow is the same, the verdicts were the rules'. `TurnGraphState` is what flows between the nodes: the
+2026-09-28, made under the earlier design where a set of rules in code stood where the
+judge stands now; the page shows the current graph and the rejections with the judge's
+kinds, and says so. `TurnGraphState` is what flows between the nodes: the
 context and the turn state the service built, the model handles, and what each node
 leaves for the next — the intent, the thread, the proposal, the parts, the verdict and how
 many passes have been made.
