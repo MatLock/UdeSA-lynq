@@ -17,6 +17,9 @@ log = logging.getLogger(__name__)
 
 GUARD_SPAN = "guard"
 OK = "OK"
+# A rejection goes back to the model once: the second pass is the correction, and
+# what it still gets wrong stays out. More passes would be the loop again.
+MAX_PASSES = 2
 
 RETRY_NOTE = (
     "The resume's rules rejected these parts of your proposal, and they were not "
@@ -27,35 +30,7 @@ RETRY_NOTE = (
 )
 
 
-def _edits_of(proposal: EditProposal) -> str:
-    return proposal.model_dump_json(exclude={"reply", "warnings"})
-
-
-def _guard_span(state: TurnState, proposal: EditProposal, rejections: list[str]) -> None:
-    state.spans.append(
-        SpanRecord(
-            step=state.next_step(),
-            kind=SpanKind.TOOL,
-            name=GUARD_SPAN,
-            input=_edits_of(proposal),
-            output=OK if not rejections else json.dumps(rejections, ensure_ascii=False),
-        )
-    )
-
-
-async def edit(
-    context: TurnContext,
-    state: TurnState,
-    model,
-    *,
-    provider: str,
-    callbacks: list,
-    retries: int,
-    messages: list,
-) -> tuple[EditProposal, list[str]]:
-    """The editing agent: one structured answer with every change of the turn, run
-    through the guard. A rejection goes back once, so the model can correct itself
-    with the reason in hand; what is still rejected after that stays out."""
+def opening_thread(context: TurnContext, state: TurnState, provider: str, messages: list) -> list:
     system = SystemMessage(
         render(
             EDIT,
@@ -68,20 +43,32 @@ async def edit(
             recommendations=context.recommendations,
         )
     )
-    thread = [system, *messages]
+    return [system, *messages]
 
-    proposal = await ask(model, EditProposal, thread, callbacks=callbacks, retries=retries)
-    rejections = guard.apply(state, proposal)
-    _guard_span(state, proposal, rejections)
-    if not rejections:
-        return proposal, []
 
-    thread = [
+def retry_thread(thread: list, proposal: EditProposal, rejections: list[str]) -> list:
+    return [
         *thread,
         AIMessage(proposal.model_dump_json()),
         HumanMessage(RETRY_NOTE.format(rejections="\n".join(f"- {r}" for r in rejections))),
     ]
-    proposal = await ask(model, EditProposal, thread, callbacks=callbacks, retries=retries)
+
+
+async def propose(model, thread: list, *, callbacks: list, retries: int) -> EditProposal:
+    """The editing agent: one structured answer with every change of the turn."""
+    return await ask(model, EditProposal, thread, callbacks=callbacks, retries=retries)
+
+
+def check(state: TurnState, proposal: EditProposal) -> list[str]:
+    """The guard, with its span: what the proposal asked for and what it got."""
     rejections = guard.apply(state, proposal)
-    _guard_span(state, proposal, rejections)
-    return proposal, rejections
+    state.spans.append(
+        SpanRecord(
+            step=state.next_step(),
+            kind=SpanKind.TOOL,
+            name=GUARD_SPAN,
+            input=proposal.model_dump_json(exclude={"reply", "warnings"}),
+            output=OK if not rejections else json.dumps(rejections, ensure_ascii=False),
+        )
+    )
+    return rejections

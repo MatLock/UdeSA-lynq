@@ -5,17 +5,14 @@ from itertools import dropwhile
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from agent.advisor import advise
 from agent.callbacks import TraceCollector
 from agent.context import Intent, TurnContext, TurnOutcome
-from agent.editor import edit
-from agent.intent import classify
+from agent.graph import RECURSION_LIMIT, TURN_GRAPH, PromptReference
 from agent.state import build_turn_state
 from config import BEDROCK, OLLAMA, get_settings
 from db.models import MessageRole
 from llm.factory import build_model
 from prompt.notice import render as no_change_notice
-from prompt.tailor import ADVISE, EDIT, reference
 
 log = logging.getLogger(__name__)
 
@@ -43,28 +40,36 @@ def turn_messages(context: TurnContext) -> list:
 
 
 async def run_turn(context: TurnContext, model=None, intent_model=None) -> TurnOutcome:
-    """One turn: the intent agent reads the message, then either the advising
-    agent answers or the editing agent proposes and the guard applies."""
+    """One turn through the graph: the intent agent reads the message, then
+    either the advising agent answers or the editing agent proposes and the
+    guard applies, with one correction pass when something is rejected."""
     settings = get_settings()
-    provider = template_provider(settings.llm_provider)
-    intent = await classify(context, provider, intent_model)
     state = build_turn_state(context)
-    family = ADVISE if intent == Intent.ADVISE else EDIT
-    collector = TraceCollector(state, reference(family), context.resume_version_id)
-    call = dict(
-        provider=provider,
-        callbacks=[collector],
-        retries=settings.model_retries,
-        messages=turn_messages(context),
-    )
-    agent_model = model if model is not None else build_model()
+    prompt = PromptReference()
+    collector = TraceCollector(state, prompt, context.resume_version_id)
 
+    result = await TURN_GRAPH.ainvoke(
+        {
+            "context": context,
+            "state": state,
+            "provider": template_provider(settings.llm_provider),
+            "model": model if model is not None else build_model(),
+            "intent_model": intent_model,
+            "callbacks": [collector],
+            "retries": settings.model_retries,
+            "messages": turn_messages(context),
+            "prompt": prompt,
+        },
+        config={"recursion_limit": RECURSION_LIMIT},
+    )
+
+    intent = result["intent"]
     if intent == Intent.ADVISE:
-        advice = await advise(context, state, agent_model, **call)
+        advice = result["advice"]
         reply, warnings = advice.reply, list(advice.warnings)
         recommendations = [r.model_dump() for r in advice.recommendations]
     else:
-        proposal, _ = await edit(context, state, agent_model, **call)
+        proposal = result["proposal"]
         reply, warnings = proposal.reply, list(proposal.warnings)
         recommendations = []
         if not state.changes:

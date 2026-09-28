@@ -45,7 +45,41 @@ means the turn itself failed — it does not cost the candidate a turn.
 ## The turn, inside
 
 A turn is three agents, each with its own prompt and its own single answer, and no
-agent holds a tool. `src/agent/turn.py` runs them.
+agent holds a tool. They are the nodes of a LangGraph `StateGraph` in
+`src/agent/graph.py`, together with the guard; `src/agent/turn.py` builds the state and
+runs it. The graph is fixed and acyclic but for one edge: the guard sends a rejected
+proposal back to the editor once.
+
+```mermaid
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	classify(classify)
+	advise(advise)
+	propose(propose)
+	guard(guard)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> classify;
+	classify -.-> advise;
+	classify -.-> propose;
+	guard -.-> __end__;
+	guard -.-> propose;
+	propose --> guard;
+	advise --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
+```
+
+`python scripts/draw_turn_graph.py` prints that diagram from the compiled graph, so it
+never drifts from the code. `TurnGraphState` is what flows between the nodes: the
+context and the turn state the service built, the model handles, and what each node
+leaves for the next — the intent, the thread, the proposal, the rejections and how many
+passes the guard has made.
 
 **1. The intent agent** (`src/agent/intent.py`, prompt `resources/prompts/intent/`)
 reads the message of the candidate together with the last four messages of the exchange
@@ -121,12 +155,15 @@ parse; it is intermittent, so `src/agent/structured.py` retries the call
 `AGENT_MODEL_RETRIES` times, and `llm/errors.py` decides what is worth retrying by the AWS
 error code, so an `AccessDenied` still fails at once.
 
-Why no tools and no loop: the previous design ran a ReAct loop over edit tools, and the
+Why no tools and no ReAct loop: the previous design ran one over edit tools, and the
 model decided when to stop, which entry an index pointed at after it had reordered the
 section, and whether to look for evidence before adding a skill. Each of those was a way
 for a turn to go wrong that no prompt closed. With the edit surface this small, the whole
 change fits in one schema, the code resolves every reference and checks every part, and
-a turn costs one or two model calls instead of up to twelve.
+a turn costs one or two model calls instead of up to twelve. LangGraph still runs the
+turn, but every edge of its graph is decided by code — the only decision a model takes
+is the intent — and its `recursion_limit` is a backstop the routes never reach, not a
+budget the model spends.
 
 The tokens of each call come from the `usage_metadata` of the `AIMessage`, never
 estimated, and the tariff of the model lives in `src/llm/pricing.py` and is frozen onto
