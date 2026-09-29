@@ -241,6 +241,35 @@ jobs:
           name: jacoco-lynq-bff
           path: lynq-bff/target/site/jacoco/
 
+  build-lynq-analytics:
+    name: "2 · Build & test: lynq-analytics"
+    runs-on: ubuntu-latest
+    needs: set-version
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Setup Java Environment
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: temurin
+          architecture: x64
+          cache: maven
+
+      - name: Build and run tests
+        working-directory: lynq-analytics
+        run: mvn -B clean verify
+
+      - name: Upload JaCoCo report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-lynq-analytics
+          path: lynq-analytics/target/site/jacoco/
+
   build-lynq-ml:
     name: "2 · Build & test: lynq-ml"
     runs-on: ubuntu-latest
@@ -370,7 +399,7 @@ jobs:
   sonar-scan:
     name: "3 · SonarCloud analysis (Quality Gate)"
     runs-on: ubuntu-latest
-    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-ml, build-lynq-feeders, build-lynq-agent]
+    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-analytics, build-lynq-ml, build-lynq-feeders, build-lynq-agent]
     outputs:
       gate: ${{ steps.results.outputs.gate }}
       bugs: ${{ steps.results.outputs.bugs }}
@@ -403,6 +432,7 @@ jobs:
           mvn -B -q -f lynq-app-backend/pom.xml clean test-compile
           mvn -B -q -f lynq-file-storage/pom.xml clean test-compile
           mvn -B -q -f lynq-bff/pom.xml clean test-compile
+          mvn -B -q -f lynq-analytics/pom.xml clean test-compile
 
       # Reuse the coverage reports produced by stage 2 (paths declared in
       # sonar-project.properties). Without them SonarCloud reports 0% coverage
@@ -431,6 +461,12 @@ jobs:
         with:
           name: jacoco-lynq-bff
           path: lynq-bff/target/site/jacoco
+
+      - name: Download lynq-analytics coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: jacoco-lynq-analytics
+          path: lynq-analytics/target/site/jacoco
 
       - name: Download lynq-ml coverage report
         uses: actions/download-artifact@v4
@@ -474,6 +510,7 @@ jobs:
                    lynq-app-backend/target/site/jacoco/jacoco.xml \
                    lynq-file-storage/target/site/jacoco/jacoco.xml \
                    lynq-bff/target/site/jacoco/jacoco.xml \
+                   lynq-analytics/target/site/jacoco/jacoco.xml \
                    lynq-ml/coverage.xml \
                    lynq-feeders/coverage.xml \
                    lynq-agent/coverage.xml; do

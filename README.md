@@ -46,6 +46,10 @@ The job-ingestion service for Lynq, a FastAPI app that keeps the feed stocked wi
 
 CV Tailor: the conversational agent that adapts a candidate's resume to one job posting. A FastAPI app running a ReAct loop over three tools — read what the posting asks for, look for evidence in the base resume, apply an edit — with the conversation, every resume version and the full step-by-step trace persisted in MySQL. What keeps it honest is code rather than prompt wording: contact details never reach the model, jobs and dates cannot be touched, and a skill is only added when the base resume already backs it, so the resume that comes out is one the candidate can defend in an interview.
 
+### lynq-analytics &nbsp; [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-analytics-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-analytics-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/jacoco-analytics.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-analytics-test-workflow.yaml)
+
+The analytics service for Lynq. It will put numbers next to a job post: the time to fill a company can expect for the post it just published, a candidate's standing among the applicants of a post, and the salary medians for a position and for candidates with similar skills. It never reads lynq-app-backend's database: the facts reach it as domain events and are projected into its own schema, `lynq_analytics_db`. Today it is the skeleton — it boots, resolves the caller from lynq-iam on every request and answers with the platform's envelope; the queue, the read model and the endpoints come next.
+
 ### lynq-home
 
 The public landing page for Lynq — a static site served from Cloudflare Workers and deployed with Wrangler.
@@ -63,4 +67,4 @@ The full platform is orchestrated with Docker Compose. From the repository root:
 docker compose up
 ```
 
-This brings up the application modules (`lynq-iam`, `lynq-bff`, `lynq-app-backend`, `lynq-file-storage`, `lynq-app-frontend`, `lynq-ml`, `lynq-feeders`, `lynq-agent`) together with their infrastructure dependencies: MySQL, Redis, LocalStack, and an Ollama model server (pulled on first start). Each module can also be built and run on its own — see the individual module READMEs for details.
+This brings up the application modules (`lynq-iam`, `lynq-bff`, `lynq-app-backend`, `lynq-file-storage`, `lynq-app-frontend`, `lynq-ml`, `lynq-feeders`, `lynq-agent`, `lynq-analytics`) together with their infrastructure dependencies: MySQL, Redis, LocalStack, and an Ollama model server (pulled on first start). Each module can also be built and run on its own — see the individual module READMEs for details.
