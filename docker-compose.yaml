@@ -94,6 +94,23 @@ services:
       lynq-agent:
         condition: service_started
 
+  lynq-analytics:
+    build: ./lynq-analytics
+    ports:
+      - "8091:8080"
+      - "8092:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=production
+      - DB_URL=jdbc:mysql://mysql:3306/lynq_analytics_db
+      - DB_USERNAME=${DB_USERNAME:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-testpassword123}
+      - LYNQ_IAM_URL=http://lynq-iam:8080/lynq-iam
+    depends_on:
+      mysql:
+        condition: service_healthy
+      lynq-iam:
+        condition: service_started
+
   lynq-app-frontend:
     build:
       context: ./lynq-app-frontend
