@@ -138,19 +138,19 @@ class RequirePrincipalTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(get_iam_client(), client)
 
 
-class RequireInternalCallerTests(unittest.IsolatedAsyncioTestCase):
+class RequireInternalCallerTests(unittest.TestCase):
 
-    async def test_accepts_the_configured_internal_token(self) -> None:
+    def test_accepts_the_configured_internal_token(self) -> None:
         with patch.dict("os.environ", {"LYNQ_INTERNAL_TOKEN": "s3cret"}):
-            await require_internal_caller("s3cret")
+            require_internal_caller("s3cret")
 
-    async def test_refuses_a_wrong_missing_or_unconfigured_token(self) -> None:
+    def test_refuses_a_wrong_missing_or_unconfigured_token(self) -> None:
         cases = [("s3cret", "other"), ("s3cret", None), ("", "s3cret")]
         for expected, provided in cases:
             with self.subTest(expected=expected, provided=provided):
                 with patch.dict("os.environ", {"LYNQ_INTERNAL_TOKEN": expected}):
                     with self.assertRaises(HTTPException) as raised:
-                        await require_internal_caller(provided)
+                        require_internal_caller(provided)
 
                 self.assertEqual(raised.exception.status_code, 401)
 

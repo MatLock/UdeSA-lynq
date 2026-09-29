@@ -137,7 +137,7 @@ async def require_principal(
     return await get_iam_client().user_info(authorization, lynq_request_uuid)
 
 
-async def require_internal_caller(
+def require_internal_caller(
     lynq_internal_token: Annotated[
         Optional[str], Header(alias=INTERNAL_TOKEN_HEADER)
     ] = None,
