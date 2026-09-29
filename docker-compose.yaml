@@ -105,8 +105,15 @@ services:
       - DB_USERNAME=${DB_USERNAME:-root}
       - DB_PASSWORD=${DB_PASSWORD:-testpassword123}
       - LYNQ_IAM_URL=http://lynq-iam:8080/lynq-iam
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+      - SPRING_CLOUD_AWS_SQS_ENDPOINT=${AWS_ENDPOINT:-http://localstack:4566}
+      - LYNQ_ANALYTICS_EVENTS_QUEUE=lynq-analytics-events
     depends_on:
       mysql:
+        condition: service_healthy
+      localstack:
         condition: service_healthy
       lynq-iam:
         condition: service_started
@@ -288,14 +295,14 @@ services:
     ports:
       - "4566:4566"
     environment:
-      - SERVICES=s3
+      - SERVICES=s3,sns,sqs
       - AWS_DEFAULT_REGION=${AWS_REGION:-us-east-1}
       - AWS_BUCKET_NAME=${AWS_BUCKET_NAME:-lynq-bucket}
     volumes:
       - ./localstack-init:/etc/localstack/init/ready.d:ro
       - localstack_data:/persisted-data
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health | grep -q '\"s3\": \"\\(running\\|available\\)\"'"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/init/ready | grep -q '\"completed\": true'"]
       interval: 10s
       timeout: 5s
       retries: 5

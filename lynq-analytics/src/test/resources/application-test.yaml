@@ -5,24 +5,27 @@ spring:
     exclude:
       - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   datasource:
-    url: jdbc:h2:mem:lynq_analytics_test;MODE=MySQL;DB_CLOSE_DELAY=-1
-    username: sa
-    password: ''
-    driver-class-name: org.h2.Driver
+    driver-class-name: com.mysql.cj.jdbc.Driver
   jpa:
     open-in-view: false
-    hibernate:
-      ddl-auto: create-drop
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.H2Dialect
+        ddl-auto: none
+        dialect: org.hibernate.dialect.MySQLDialect
         show_sql: false
   liquibase:
-    enabled: false
+    change-log: classpath:changelog/db.changelog-config.xml
+  cloud:
+    aws:
+      sqs:
+        queue-not-found-strategy: fail
 
 lynq:
   iam:
     url: http://localhost:9999/lynq-iam
+  analytics:
+    events:
+      queue: lynq-analytics-events
 
 server:
   port: 0

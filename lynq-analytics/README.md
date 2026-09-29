@@ -4,7 +4,7 @@ Analytics service for the Lynq platform. It will serve the numbers that sit next
 
 It does not read `lynq_backend_db`. Its data will arrive as domain events published by `lynq-app-backend` (SNS topic `lynq-domain-events` → SQS queue `lynq-analytics-events`) and be projected into its own schema, `lynq_analytics_db`.
 
-This is the skeleton: the service boots, authenticates every request against [`lynq-iam`](../lynq-iam) and answers with the platform's response envelope. Queue, read model and endpoints come next.
+Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. The read model and the endpoints come next.
 
 ---
 
@@ -17,11 +17,12 @@ This is the skeleton: the service boots, authenticates every request against [`l
 | Web server        | Jetty (Tomcat excluded)                                                      |
 | Persistence       | MySQL 9 (`lynq_analytics_db`), Hibernate / Spring Data JPA, Liquibase migrations |
 | Inter-service     | Spring Cloud OpenFeign — client for `lynq-iam`                               |
+| Messaging         | Spring Cloud AWS 4 SQS (`@SqsListener`), AWS SDK v2                          |
 | Docs              | springdoc-openapi (Swagger UI)                                              |
 | Logging           | Log4j2 + SLF4J MDC for per-request correlation IDs; `@AuditLog` aspect       |
 | Metrics           | Micrometer + Prometheus registry                                            |
 | Build             | Maven (Spring Boot plugin), Dockerfile on `eclipse-temurin:21-jre-alpine`   |
-| Tests             | JUnit Jupiter, Testcontainers (MockServer for `lynq-iam`), H2, JaCoCo        |
+| Tests             | JUnit Jupiter, Testcontainers (MySQL, LocalStack, MockServer for `lynq-iam`), Awaitility, JaCoCo |
 
 ---
 
@@ -45,15 +46,49 @@ Every response uses the platform envelope: `GlobalRestResponse` (`success`, `dat
 
 ---
 
+## Domain events
+
+`lynq-app-backend` publishes to the SNS topic `lynq-domain-events`; the SQS queue `lynq-analytics-events` is subscribed to it with **raw message delivery**, so each message body is the event envelope exactly as published:
+
+```json
+{
+  "eventId": "5c8f3a3e-0b7e-5d61-9c1a-2f4b8e6d7a10",
+  "eventType": "ApplicationSubmitted",
+  "aggregateType": "APPLICATION",
+  "aggregateId": "33333333-3333-3333-3333-333333333333",
+  "occurredOn": "2026-09-29T14:03:27.125Z",
+  "payload": { "jobId": "77777777-7777-7777-7777-777777777777", "lynqScore": 72.5 }
+}
+```
+
+| Field           | Rule                                                                       |
+| --------------- | -------------------------------------------------------------------------- |
+| `eventId`       | UUID, required. Deterministic on the producer side, so a replay repeats it |
+| `eventType`     | required, up to 64 characters                                              |
+| `aggregateType` | required, up to 32 characters (`JOB_POST`, `APPLICATION`, `CANDIDATE`)     |
+| `aggregateId`   | required, up to 36 characters                                              |
+| `occurredOn`    | ISO-8601 instant, required: when the fact happened, not when it was sent   |
+| `payload`       | JSON object, required; stored as received                                  |
+
+`DomainEventListener` hands each message to `DomainEventService`, which stores it in `domain_events` (`received_on` stamped on arrival). An event of any type is stored, so a projection added later can be rebuilt from the table.
+
+- **Idempotency** — `event_id` is `UNIQUE` in `domain_events`; there is no separate `processed_events` table. An event already stored is acknowledged and skipped. Two consumers racing on the same event both reach the insert; the loser hits the constraint, sees the row and acknowledges too.
+- **Failures** — a message that is not JSON, or an envelope missing a field, is not acknowledged. SQS redelivers it and, after 5 receives, moves it to `lynq-analytics-events-dlq` (kept 14 days).
+- **Missing queue** — `queue-not-found-strategy: fail`: the service does not start if the queue is missing, instead of creating one without its dead-letter queue.
+
+Locally, `localstack-init/02-init-domain-events.sh` creates the topic, the queue, the DLQ and the subscription.
+
+---
+
 ## Running locally
 
 **Prerequisites**
 
 - JDK 21
 - Maven 3.9+
-- A reachable MySQL 9 with the `lynq_analytics_db` database, and a running `lynq-iam`
+- A reachable MySQL 9 with the `lynq_analytics_db` database, a running `lynq-iam`, and LocalStack with the domain events queue (`docker compose up localstack`)
 
-The default `application.yaml` targets `localhost:3306` (MySQL, `root` / `federico`) and `lynq-iam` at `http://localhost:8080/lynq-iam`.
+The default `application.yaml` targets `localhost:3306` (MySQL, `root` / `federico`), `lynq-iam` at `http://localhost:8080/lynq-iam` and SQS at `http://localhost:4566`.
 
 ```bash
 mvn clean package
@@ -67,7 +102,7 @@ Service URLs (default profile):
 - Swagger UI: `http://localhost:8091/lynq-analytics/swagger-ui.html`
 - Actuator / Prometheus: `http://localhost:8092/actuator`
 
-**Tests** (Testcontainers spins up a MockServer for `lynq-iam`; Docker must be running):
+**Tests** (Testcontainers spins up MySQL, LocalStack with SNS and SQS, and a MockServer for `lynq-iam`; Docker must be running):
 
 ```bash
 mvn test
@@ -86,6 +121,9 @@ mvn test
 | `DB_USERNAME`  | MySQL user                         | |
 | `DB_PASSWORD`  | MySQL password                     | |
 | `LYNQ_IAM_URL` | `lynq.iam.url` (Feign client)      | default `http://lynq-iam:8080/lynq-iam` |
+| `LYNQ_ANALYTICS_EVENTS_QUEUE` | `lynq.analytics.events.queue` | default `lynq-analytics-events` |
+| `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | AWS SDK default chains | unset in EKS when the pod role provides them |
+| `SPRING_CLOUD_AWS_SQS_ENDPOINT` | SQS endpoint override | only against LocalStack, e.g. `http://localstack:4566` |
 
 ---
 
@@ -112,9 +150,13 @@ lynq-analytics/
     │   │   ├── client/          # LynqIamClient (Feign) and its response
     │   │   ├── config/          # AppConfig, FilterConfig, OpenApiConfig, SecurityConfig
     │   │   ├── controller/      # ControllerExceptionHandler, response envelope
-    │   │   ├── exceptions/      # BadRequest, Forbidden, NotFound
+    │   │   ├── exceptions/      # BadRequest, Forbidden, NotFound, InvalidDomainEvent
     │   │   ├── filter/          # RequestUuid, AuthHeaderExistence, IamAuthentication, PublicPaths
-    │   │   └── security/        # LynqUserPrincipal, Role, @HasRole
+    │   │   ├── listener/        # DomainEventListener (SQS) and the envelope it receives
+    │   │   ├── model/           # JPA entities
+    │   │   ├── repository/      # Spring Data repositories
+    │   │   ├── security/        # LynqUserPrincipal, Role, @HasRole
+    │   │   └── service/         # DomainEventService
     │   └── resources/
     │       ├── application.yaml
     │       ├── application-production.yaml
