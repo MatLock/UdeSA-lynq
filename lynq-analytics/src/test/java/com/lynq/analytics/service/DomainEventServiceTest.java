@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.JsonNode;
@@ -15,6 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.JsonNodeFactory;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -22,6 +24,7 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -43,11 +46,18 @@ class DomainEventServiceTest {
   @Mock
   private DomainEventRepository domainEventRepository;
 
+  @Mock
+  private DomainEventProjector jobPostProjector;
+
+  @Mock
+  private DomainEventProjector candidateProjector;
+
   private DomainEventService domainEventService;
 
   @BeforeEach
   void setUp() {
-    domainEventService = new DomainEventService(domainEventRepository);
+    domainEventService = new DomainEventService(domainEventRepository,
+        List.of(jobPostProjector, candidateProjector));
   }
 
   @Test
@@ -71,6 +81,35 @@ class DomainEventServiceTest {
   }
 
   @Test
+  void projectsANewEventWithTheProjectorsThatSupportItsType() {
+    DomainEventMessage message = message(EVENT_TYPE, AGGREGATE_TYPE, AGGREGATE_ID, OCCURRED_ON,
+        PAYLOAD);
+    when(domainEventRepository.existsByEventId(EVENT_ID.toString())).thenReturn(false);
+    when(jobPostProjector.supports(EVENT_TYPE)).thenReturn(true);
+    when(candidateProjector.supports(EVENT_TYPE)).thenReturn(false);
+
+    domainEventService.record(message);
+
+    InOrder inOrder = inOrder(domainEventRepository, jobPostProjector);
+    inOrder.verify(domainEventRepository).saveAndFlush(any());
+    inOrder.verify(jobPostProjector).project(message);
+    verify(candidateProjector, never()).project(any());
+  }
+
+  @Test
+  void recordsAnEventThatNoProjectorSupports() {
+    when(domainEventRepository.existsByEventId(EVENT_ID.toString())).thenReturn(false);
+
+    boolean recorded = domainEventService.record(message(EVENT_TYPE, AGGREGATE_TYPE, AGGREGATE_ID,
+        OCCURRED_ON, PAYLOAD));
+
+    assertThat(recorded, is(true));
+    verify(domainEventRepository).saveAndFlush(any());
+    verify(jobPostProjector, never()).project(any());
+    verify(candidateProjector, never()).project(any());
+  }
+
+  @Test
   void skipsAnEventThatIsAlreadyRecorded() {
     when(domainEventRepository.existsByEventId(EVENT_ID.toString())).thenReturn(true);
 
@@ -79,6 +118,7 @@ class DomainEventServiceTest {
 
     assertThat(recorded, is(false));
     verify(domainEventRepository, never()).saveAndFlush(any());
+    verifyNoInteractions(jobPostProjector, candidateProjector);
   }
 
   @Test
@@ -153,7 +193,7 @@ class DomainEventServiceTest {
         () -> domainEventService.record(message));
 
     assertThat(exception.getMessage(), is(reason));
-    verifyNoInteractions(domainEventRepository);
+    verifyNoInteractions(domainEventRepository, jobPostProjector, candidateProjector);
   }
 
   private DomainEventMessage message(String eventType, String aggregateType, String aggregateId,

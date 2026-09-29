@@ -4,7 +4,7 @@ Analytics service for the Lynq platform. It will serve the numbers that sit next
 
 It does not read `lynq_backend_db`. Its data will arrive as domain events published by `lynq-app-backend` (SNS topic `lynq-domain-events` → SQS queue `lynq-analytics-events`) and be projected into its own schema, `lynq_analytics_db`.
 
-Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. The read model and the endpoints come next.
+Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. Job post events are also projected into a read model of job posts. The candidate read model and the endpoints come next.
 
 ---
 
@@ -78,6 +78,32 @@ Every response uses the platform envelope: `GlobalRestResponse` (`success`, `dat
 
 Locally, `localstack-init/02-init-domain-events.sh` creates the topic, the queue, the DLQ and the subscription.
 
+### Projections
+
+Once an event is stored, `DomainEventService` hands it to every `DomainEventProjector` that supports its type, **in the same transaction**. If a projection fails, the stored event is rolled back with it and SQS redelivers the message. Event types no projector supports yet are stored and nothing else.
+
+### Job post read model
+
+`JobPostProjector` keeps three tables up to date from the four job post events:
+
+| Table             | Key               | Holds                                                                                          |
+| ----------------- | ----------------- | ---------------------------------------------------------------------------------------------- |
+| `job_posts`       | `id` (the job id) | title, category, work type, source, company, author, salary range and currency, status, `published_on`, `closed_on`, `close_reason`, `reopened_on`, `synthetic` |
+| `job_post_skills` | `job_id`, `skill` | the skills the post asks for                                                                   |
+| `job_post_tags`   | `job_id`, `tag`   | its similarity tags, indexed by `tag`                                                          |
+
+| Event              | Payload                                                                                                             | Projection                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `JobPostPublished` | `jobId`, `title`, `workType`, `source`, `publishedOn` required; `category`, `companyId`, `createdByUserId`, `salaryRangeDown`, `salaryRangeTop`, `salaryCurrency`, `skills`, `similarityTags`, `synthetic` | creates the post `OPEN`, or refreshes it                                    |
+| `JobPostUpdated`   | `jobId`, `title`, `workType` required; `salaryRangeDown`, `salaryRangeTop`, `salaryCurrency`, `skills`, `similarityTags` | overwrites those fields and replaces the skills and tags: a missing value clears it, as the backend's update does |
+| `JobPostClosed`    | `jobId`, `closedOn` required; `closeReason`                                                                         | `CLOSE` with its date and reason                                            |
+| `JobPostReopened`  | `jobId`, `reopenedOn` required                                                                                      | `OPEN`, stamps `reopened_on`, clears the close; `published_on` is kept      |
+
+- **Order** — SQS standard does not guarantee order, so each post keeps two watermarks: `details_occurred_on` (published and updated) and `status_occurred_on` (published, closed and reopened). An event older than the watermark it would move is discarded; it stays in `domain_events`. Two watermarks rather than one keep an update that arrives first from swallowing a close that happened before it.
+- **Before the publish** — an update, close or reopen for a post not published yet fails with `UnknownJobPostException`. SQS redelivers it, by then the publish has usually arrived, and after 5 receives it goes to the DLQ.
+- **Validation** — the payload's `jobId` must match the envelope's `aggregateId`. A missing required field or an unreadable payload fails with `InvalidDomainEventException` and ends in the DLQ. Unknown fields are ignored, so the backend can add fields first.
+- **Skills and tags** — trimmed, blanks dropped, duplicates removed ignoring case, since MySQL's collation compares them that way.
+
 ---
 
 ## Running locally
@@ -150,13 +176,14 @@ lynq-analytics/
     │   │   ├── client/          # LynqIamClient (Feign) and its response
     │   │   ├── config/          # AppConfig, FilterConfig, OpenApiConfig, SecurityConfig
     │   │   ├── controller/      # ControllerExceptionHandler, response envelope
-    │   │   ├── exceptions/      # BadRequest, Forbidden, NotFound, InvalidDomainEvent
+    │   │   ├── enums/           # JobStatus
+    │   │   ├── exceptions/      # BadRequest, Forbidden, NotFound, InvalidDomainEvent, UnknownJobPost
     │   │   ├── filter/          # RequestUuid, AuthHeaderExistence, IamAuthentication, PublicPaths
-    │   │   ├── listener/        # DomainEventListener (SQS) and the envelope it receives
+    │   │   ├── listener/        # DomainEventListener (SQS), the envelope and the event payloads
     │   │   ├── model/           # JPA entities
     │   │   ├── repository/      # Spring Data repositories
     │   │   ├── security/        # LynqUserPrincipal, Role, @HasRole
-    │   │   └── service/         # DomainEventService
+    │   │   └── service/         # DomainEventService, DomainEventProjector, JobPostProjector
     │   └── resources/
     │       ├── application.yaml
     │       ├── application-production.yaml
