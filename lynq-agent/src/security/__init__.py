@@ -132,7 +132,7 @@ async def require_principal(
 CallerPrincipal = Annotated[Principal, Depends(require_principal)]
 
 
-async def require_candidate(principal: CallerPrincipal) -> Principal:
+def require_candidate(principal: CallerPrincipal) -> Principal:
     if not principal.has_role(CANDIDATE_ROLE):
         raise HTTPException(status_code=403, detail=NOT_A_CANDIDATE_ERROR)
     return principal
