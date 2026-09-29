@@ -27,11 +27,24 @@ spring:
         show_sql: false
   liquibase:
     change-log: classpath:changelog/db.changelog-config.xml
+  cloud:
+    aws:
+      region:
+        static: ${AWS_REGION:us-east-1}
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID:test}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:test}
+      sqs:
+        endpoint: ${AWS_ENDPOINT:http://localhost:4566}
+        queue-not-found-strategy: fail
 
 
 lynq:
   iam:
     url: http://localhost:8080/lynq-iam
+  analytics:
+    events:
+      queue: ${LYNQ_ANALYTICS_EVENTS_QUEUE:lynq-analytics-events}
 
 
 server:
