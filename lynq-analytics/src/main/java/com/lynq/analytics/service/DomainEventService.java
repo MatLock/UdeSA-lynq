@@ -5,6 +5,7 @@ import com.lynq.analytics.listener.message.DomainEventMessage;
 import com.lynq.analytics.model.DomainEventEntity;
 import com.lynq.analytics.repository.DomainEventRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
@@ -19,9 +20,12 @@ public class DomainEventService {
   private static final int MAX_AGGREGATE_ID_LENGTH = 36;
 
   private final DomainEventRepository domainEventRepository;
+  private final List<DomainEventProjector> projectors;
 
-  public DomainEventService(DomainEventRepository domainEventRepository) {
+  public DomainEventService(DomainEventRepository domainEventRepository,
+      List<DomainEventProjector> projectors) {
     this.domainEventRepository = domainEventRepository;
+    this.projectors = projectors;
   }
 
   @Transactional
@@ -44,6 +48,9 @@ public class DomainEventService {
         .build());
     log.info("message= Recorded domain event '{}' of type '{}' for {} '{}'",
         eventId, message.eventType(), message.aggregateType(), message.aggregateId());
+    projectors.stream()
+        .filter(projector -> projector.supports(message.eventType()))
+        .forEach(projector -> projector.project(message));
     return true;
   }
 
