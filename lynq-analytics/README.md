@@ -18,11 +18,12 @@ Today the service boots, authenticates every request against [`lynq-iam`](../lyn
 | Persistence       | MySQL 9 (`lynq_analytics_db`), Hibernate / Spring Data JPA, Liquibase migrations |
 | Inter-service     | Spring Cloud OpenFeign — client for `lynq-iam`                               |
 | Messaging         | Spring Cloud AWS 4 SQS (`@SqsListener`), AWS SDK v2                          |
+| Cache             | Spring Cache over Redis (Spring Data Redis, Lettuce)                         |
 | Docs              | springdoc-openapi (Swagger UI)                                              |
 | Logging           | Log4j2 + SLF4J MDC for per-request correlation IDs; `@AuditLog` aspect       |
 | Metrics           | Micrometer + Prometheus registry                                            |
 | Build             | Maven (Spring Boot plugin), Dockerfile on `eclipse-temurin:21-jre-alpine`   |
-| Tests             | JUnit Jupiter, Testcontainers (MySQL, LocalStack, MockServer for `lynq-iam`), Awaitility, JaCoCo |
+| Tests             | JUnit Jupiter, Testcontainers (MySQL, LocalStack, Redis, MockServer for `lynq-iam`), Awaitility, JaCoCo |
 
 ---
 
@@ -183,15 +184,38 @@ Matches are ordered by score and then by skills in common. `Distribution.of(valu
 
 ---
 
+## Cache
+
+The analytics are computed on request over the read model, and Redis keeps each answer for an hour (`CacheConfig`, a `RedisCacheManager` behind `@EnableCaching`). There is one cache per endpoint, declared in `AnalyticsCaches`; a cache not declared there does not exist, so a misspelt name fails instead of creating a cache without its TTL.
+
+| Cache          | Endpoint                                  | Key                |
+| -------------- | ----------------------------------------- | ------------------ |
+| `time-to-fill` | `GET /dmz/analytics/job/{jobId}/time-to-fill` | `jobId`        |
+| `salary`       | `GET /dmz/analytics/job/{jobId}/salary`   | `jobId`            |
+| `standing`     | `GET /dmz/analytics/job/{jobId}/standing` | `jobId:userId`     |
+
+The standing is keyed by the candidate too: it holds the caller's own rank and score, and one candidate must never be served another's. The other two answers are the same for every caller of a job post.
+
+- **Keys** — `lynq-analytics::<cache>::<key>` in Redis, e.g. `lynq-analytics::standing::7777…:1111…`.
+- **TTL** — `lynq.analytics.cache.ttl`, default `PT1H`, the same for every cache. Nothing is evicted when an event arrives: an answer can be up to an hour behind the read model.
+- **Values** — JSON with the type of the value recorded, so a response record comes back as itself; only types under `com.lynq.analytics`, `java.lang`, `java.util` and `java.time` are read back. Nulls are not cached, and neither is an exception, so a `403` or `404` is never stored.
+- **Redis down** — a cache error is logged and the call goes on uncached (`LoggingCacheErrorHandler`). Command and connect timeouts are 500 ms, so an outage costs half a second per request, not the driver's default minute.
+- **Writes** — immediate: a request waits for Redis to confirm the entry. Spring Data Redis 4 writes in the background by default with Lettuce, which lets an eviction overtake the write it follows and hides write failures from the error handler; waiting costs under a millisecond next to computing a median.
+- **Metrics** — hits, misses, puts and evictions per cache, as `cache.gets{cache,result}`, `cache.puts` and `cache.evictions` on `/actuator/prometheus`. They are what tells whether the hour is right.
+
+The endpoints come with the analytics (F7–F9); each will declare `@Cacheable(cacheNames = AnalyticsCaches.…, key = …)` with the key above.
+
+---
+
 ## Running locally
 
 **Prerequisites**
 
 - JDK 21
 - Maven 3.9+
-- A reachable MySQL 9 with the `lynq_analytics_db` database, a running `lynq-iam`, and LocalStack with the domain events queue (`docker compose up localstack`)
+- A reachable MySQL 9 with the `lynq_analytics_db` database, a running `lynq-iam`, Redis, and LocalStack with the domain events queue (`docker compose up localstack redis`)
 
-The default `application.yaml` targets `localhost:3306` (MySQL, `root` / `federico`), `lynq-iam` at `http://localhost:8080/lynq-iam` and SQS at `http://localhost:4566`.
+The default `application.yaml` targets `localhost:3306` (MySQL, `root` / `federico`), `lynq-iam` at `http://localhost:8080/lynq-iam`, SQS at `http://localhost:4566` and Redis at `localhost:6379` (`root` / `password`, the compose defaults).
 
 ```bash
 mvn clean package
@@ -205,7 +229,7 @@ Service URLs (default profile):
 - Swagger UI: `http://localhost:8091/lynq-analytics/swagger-ui.html`
 - Actuator / Prometheus: `http://localhost:8092/actuator`
 
-**Tests** (Testcontainers spins up MySQL, LocalStack with SNS and SQS, and a MockServer for `lynq-iam`; Docker must be running):
+**Tests** (Testcontainers spins up MySQL, LocalStack with SNS and SQS, Redis, and a MockServer for `lynq-iam`; Docker must be running):
 
 ```bash
 mvn test
@@ -227,6 +251,8 @@ mvn test
 | `LYNQ_ANALYTICS_EVENTS_QUEUE` | `lynq.analytics.events.queue` | default `lynq-analytics-events` |
 | `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | AWS SDK default chains | unset in EKS when the pod role provides them |
 | `SPRING_CLOUD_AWS_SQS_ENDPOINT` | SQS endpoint override | only against LocalStack, e.g. `http://localstack:4566` |
+| `REDIS_ADDRESS`, `REDIS_PORT` | `spring.data.redis.host` / `port` | |
+| `REDIS_USERNAME`, `REDIS_PASSWORD` | Redis ACL user | |
 | `LYNQ_ANALYTICS_SIMILARITY_INCLUDE_SYNTHETIC` | `lynq.analytics.similarity.include-synthetic` | default `true` |
 | `LYNQ_ANALYTICS_TAG_FREQUENCY_CRON` | `lynq.analytics.tag-frequency.cron` | default `0 0 8 * * *` (UTC) |
 
@@ -252,8 +278,9 @@ lynq-analytics/
     │   ├── java/com/lynq/analytics/
     │   │   ├── LynqAnalyticsApplication.java
     │   │   ├── aspect/          # @AuditLog + LogAspect
+    │   │   ├── cache/           # AnalyticsCaches: one cache per endpoint
     │   │   ├── client/          # LynqIamClient (Feign) and its response
-    │   │   ├── config/          # AppConfig, FilterConfig, OpenApiConfig, SecurityConfig, SimilarityConfig and its properties
+    │   │   ├── config/          # AppConfig, FilterConfig, OpenApiConfig, SecurityConfig, SimilarityConfig, CacheConfig and their properties
     │   │   ├── controller/      # ControllerExceptionHandler, response envelope
     │   │   ├── enums/           # JobStatus
     │   │   ├── exceptions/      # BadRequest, Forbidden, NotFound, InvalidDomainEvent, UnknownJobPost

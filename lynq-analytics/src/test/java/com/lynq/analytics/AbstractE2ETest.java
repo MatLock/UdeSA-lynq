@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MockServerContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.containers.localstack.LocalStackContainer;
@@ -37,6 +38,10 @@ public abstract class AbstractE2ETest {
   private static final DockerImageName LOCALSTACK_IMAGE =
       DockerImageName.parse("localstack/localstack:3.8.1");
 
+  private static final DockerImageName REDIS_IMAGE = DockerImageName.parse("redis:7.2-alpine");
+
+  private static final int REDIS_PORT = 6379;
+
   private static final String DATABASE_NAME = "lynq_analytics_db";
 
   protected static final String DOMAIN_EVENTS_TOPIC = "lynq-domain-events";
@@ -56,6 +61,11 @@ public abstract class AbstractE2ETest {
       .withServices(LocalStackContainer.Service.SQS, LocalStackContainer.Service.SNS)
       .withReuse(true);
 
+  @SuppressWarnings("resource")
+  protected static final GenericContainer<?> REDIS = new GenericContainer<>(REDIS_IMAGE)
+      .withExposedPorts(REDIS_PORT)
+      .withReuse(true);
+
   protected static MockServerClient lynqIamMock;
   protected static SqsClient sqsTestClient;
   protected static SnsClient snsTestClient;
@@ -68,6 +78,8 @@ public abstract class AbstractE2ETest {
     lynqIamMock = new MockServerClient(LYNQ_IAM.getHost(), LYNQ_IAM.getServerPort());
 
     MYSQL.start();
+
+    REDIS.start();
 
     LOCALSTACK.start();
     StaticCredentialsProvider credentials = StaticCredentialsProvider.create(
@@ -130,5 +142,9 @@ public abstract class AbstractE2ETest {
     registry.add("spring.cloud.aws.credentials.access-key", LOCALSTACK::getAccessKey);
     registry.add("spring.cloud.aws.credentials.secret-key", LOCALSTACK::getSecretKey);
     registry.add("spring.cloud.aws.sqs.endpoint", () -> LOCALSTACK.getEndpoint().toString());
+    registry.add("spring.data.redis.host", REDIS::getHost);
+    registry.add("spring.data.redis.port", () -> REDIS.getMappedPort(REDIS_PORT));
+    registry.add("spring.data.redis.username", () -> "");
+    registry.add("spring.data.redis.password", () -> "");
   }
 }
