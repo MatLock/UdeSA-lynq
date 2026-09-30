@@ -26,6 +26,8 @@ lynq:
   analytics:
     events:
       queue: lynq-analytics-events
+    tag-frequency:
+      cron: "-"
 
 server:
   port: 0
