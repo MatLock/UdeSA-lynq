@@ -2,6 +2,7 @@ package com.lynq.analytics;
 
 import com.lynq.analytics.enums.JobStatus;
 import com.lynq.analytics.model.JobPostEntity;
+import com.lynq.analytics.repository.ApplicationRepository;
 import com.lynq.analytics.repository.DomainEventRepository;
 import com.lynq.analytics.repository.JobPostRepository;
 import org.hibernate.Hibernate;
@@ -68,12 +69,16 @@ class JobPostsApplicationTests extends AbstractE2ETest {
   private JobPostRepository jobPostRepository;
 
   @Autowired
+  private ApplicationRepository applicationRepository;
+
+  @Autowired
   private TransactionTemplate transactionTemplate;
 
   @BeforeEach
   void setUp() {
     sqsTestClient.purgeQueue(PurgeQueueRequest.builder().queueUrl(eventsQueueUrl).build());
     sqsTestClient.purgeQueue(PurgeQueueRequest.builder().queueUrl(eventsDlqUrl).build());
+    applicationRepository.deleteAll();
     jobPostRepository.deleteAll();
     domainEventRepository.deleteAll();
   }

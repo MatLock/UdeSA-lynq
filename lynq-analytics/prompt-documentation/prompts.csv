@@ -20,3 +20,8 @@ date,prompt
 "29-09-2026","unit tests for JobPostProjector and for the projector dispatch in DomainEventService"
 "29-09-2026","e2e for the job post read model on MySQL and LocalStack: a post through publish, update, close and reopen, a stale update discarded but still recorded, a close arriving after a newer update, an update arriving before its publish, and an update for a post never published ending in the DLQ"
 "29-09-2026","document the projections and the job post read model in the lynq-analytics README"
+"30-09-2026","F5: add the candidate read model to lynq-analytics. Liquibase changesets for candidates, candidate_skills and candidate_tags, keyed by candidate_id + skill and candidate_id + tag with tags indexed, and applications with the lynqScore of the event, unique by job and candidate and a foreign key to job_posts"
+"30-09-2026","add a CandidateProjector for CandidateSkillsUpdated and CandidateExpectedSalaryUpdated: skills updated replaces skills and tags, salary updated sets the expected salary and its currency or clears both, and each keeps its own watermark so a late salary is not dropped by newer skills"
+"30-09-2026","add an ApplicationProjector for ApplicationSubmitted: store the score the backend computed, reject a score outside 0 to 100, and fail with UnknownJobPostException when the job post has not been published yet so SQS redelivers it"
+"30-09-2026","move the payload validation and normalisation JobPostProjector keeps private into a helper the three projectors share, keeping its error messages"
+"30-09-2026","unit tests for CandidateProjector and ApplicationProjector, e2e on MySQL and LocalStack for candidates and applications, and document the candidate read model in the lynq-analytics README"

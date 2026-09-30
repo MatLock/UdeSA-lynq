@@ -4,7 +4,7 @@ Analytics service for the Lynq platform. It will serve the numbers that sit next
 
 It does not read `lynq_backend_db`. Its data will arrive as domain events published by `lynq-app-backend` (SNS topic `lynq-domain-events` → SQS queue `lynq-analytics-events`) and be projected into its own schema, `lynq_analytics_db`.
 
-Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. Job post events are also projected into a read model of job posts. The candidate read model and the endpoints come next.
+Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. Job post, candidate and application events are also projected into a read model. The similarity queries and the endpoints come next.
 
 ---
 
@@ -57,7 +57,13 @@ Every response uses the platform envelope: `GlobalRestResponse` (`success`, `dat
   "aggregateType": "APPLICATION",
   "aggregateId": "33333333-3333-3333-3333-333333333333",
   "occurredOn": "2026-09-29T14:03:27.125Z",
-  "payload": { "jobId": "77777777-7777-7777-7777-777777777777", "lynqScore": 72.5 }
+  "payload": {
+    "applicationId": "33333333-3333-3333-3333-333333333333",
+    "jobId": "77777777-7777-7777-7777-777777777777",
+    "userId": "11111111-1111-1111-1111-111111111111",
+    "appliedOn": "2026-09-29",
+    "lynqScore": 72
+  }
 }
 ```
 
@@ -103,6 +109,29 @@ Once an event is stored, `DomainEventService` hands it to every `DomainEventProj
 - **Before the publish** — an update, close or reopen for a post not published yet fails with `UnknownJobPostException`. SQS redelivers it, by then the publish has usually arrived, and after 5 receives it goes to the DLQ.
 - **Validation** — the payload's `jobId` must match the envelope's `aggregateId`. A missing required field or an unreadable payload fails with `InvalidDomainEventException` and ends in the DLQ. Unknown fields are ignored, so the backend can add fields first.
 - **Skills and tags** — trimmed, blanks dropped, duplicates removed ignoring case, since MySQL's collation compares them that way.
+
+### Candidate read model
+
+`CandidateProjector` and `ApplicationProjector` keep four more tables up to date:
+
+| Table              | Key                     | Holds                                                                               |
+| ------------------ | ----------------------- | ----------------------------------------------------------------------------------- |
+| `candidates`       | `id` (the user id)      | expected salary and its currency, `synthetic`                                       |
+| `candidate_skills` | `candidate_id`, `skill` | the candidate's skills                                                              |
+| `candidate_tags`   | `candidate_id`, `tag`   | their similarity tags, indexed by `tag`                                             |
+| `applications`     | `id` (the application id) | job post, candidate, `applied_on`, the `lynq_score` the backend computed when the candidate applied, `synthetic`; unique by job post and candidate, indexed by candidate |
+
+| Event                            | Aggregate     | Payload                                                                                    | Projection                                                                                  |
+| -------------------------------- | ------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `CandidateSkillsUpdated`         | `CANDIDATE`   | `userId` required; `skills`, `similarityTags`, `synthetic`                                 | creates the candidate if needed and replaces its skills and tags; the salary is kept        |
+| `CandidateExpectedSalaryUpdated` | `CANDIDATE`   | `userId` required; `expectedSalary`, `currency` (required with a salary), `synthetic`      | creates the candidate if needed and sets its salary; no `expectedSalary` clears both; skills and tags are kept |
+| `ApplicationSubmitted`           | `APPLICATION` | `applicationId`, `jobId`, `userId`, `appliedOn`, `lynqScore` required; `synthetic`          | creates the application, or refreshes it                                                    |
+
+- **Order** — each candidate keeps two watermarks, `skills_occurred_on` and `salary_occurred_on`, for the same reason a job post does: a salary change that arrives late must not be dropped because the skills moved since. An application keeps `occurred_on`. An event older than the watermark it would move is discarded and stays in `domain_events`.
+- **Candidates without skills** — a candidate appears with whichever event arrives first. Applications do not create or require one: the standing only needs the application's score, and a candidate who applied without ever updating their skills has no row.
+- **Before the publish** — an application for a job post not published yet fails with `UnknownJobPostException`, redelivered by SQS like an early job post update and sent to the DLQ after 5 receives. `applications.job_id` is a foreign key to `job_posts`.
+- **Score** — `lynqScore` is the integer from 0 to 100 that `lynq-app-backend` computes; analytics does not recompute it. A score outside that range is an invalid event and ends in the DLQ, as does an `expectedSalary` that is not positive.
+- **Validation** — the payload's `userId` or `applicationId` must match the envelope's `aggregateId`. Skills and tags are normalised as for job posts.
 
 ---
 
@@ -183,7 +212,7 @@ lynq-analytics/
     │   │   ├── model/           # JPA entities
     │   │   ├── repository/      # Spring Data repositories
     │   │   ├── security/        # LynqUserPrincipal, Role, @HasRole
-    │   │   └── service/         # DomainEventService, DomainEventProjector, JobPostProjector
+    │   │   └── service/         # DomainEventService, DomainEventProjector and the job post, candidate and application projectors
     │   └── resources/
     │       ├── application.yaml
     │       ├── application-production.yaml

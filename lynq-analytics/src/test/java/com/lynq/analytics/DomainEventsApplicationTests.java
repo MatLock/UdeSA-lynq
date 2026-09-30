@@ -32,16 +32,14 @@ class DomainEventsApplicationTests extends AbstractE2ETest {
 
   private static final String EVENT_ID = "5c8f3a3e-0b7e-5d61-9c1a-2f4b8e6d7a10";
   private static final String DUPLICATED_EVENT_ID = "0e4c1d52-6a9b-5f3e-8d27-b1c6a4f9e823";
-  private static final String EVENT_TYPE = "ApplicationSubmitted";
-  private static final String AGGREGATE_TYPE = "APPLICATION";
-  private static final String AGGREGATE_ID = "33333333-3333-3333-3333-333333333333";
+  private static final String EVENT_TYPE = "JobPostViewed";
+  private static final String AGGREGATE_TYPE = "JOB_POST";
+  private static final String AGGREGATE_ID = "77777777-7777-7777-7777-777777777777";
   private static final String OCCURRED_ON = "2026-09-29T14:03:27.125Z";
   private static final String PAYLOAD = """
-      {"applicationId": "33333333-3333-3333-3333-333333333333",
-       "jobId": "77777777-7777-7777-7777-777777777777",
+      {"jobId": "77777777-7777-7777-7777-777777777777",
        "userId": "11111111-1111-1111-1111-111111111111",
-       "appliedOn": "2026-09-29",
-       "lynqScore": 72.5,
+       "viewedOn": "2026-09-29",
        "synthetic": false}""";
 
   private static final String NOT_JSON = "this is not a domain event";
