@@ -38,6 +38,14 @@ lynq:
   analytics:
     events:
       queue: ${LYNQ_ANALYTICS_EVENTS_QUEUE:lynq-analytics-events}
+    similarity:
+      include-synthetic: ${LYNQ_ANALYTICS_SIMILARITY_INCLUDE_SYNTHETIC:true}
+      threshold-tags: 2
+      fallback-threshold-tags: 1
+      min-sample: 5
+    tag-frequency:
+      cron: ${LYNQ_ANALYTICS_TAG_FREQUENCY_CRON:0 0 8 * * *}
+      zone: Etc/UTC
 
 
 server:

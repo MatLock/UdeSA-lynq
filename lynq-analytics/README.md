@@ -4,7 +4,7 @@ Analytics service for the Lynq platform. It will serve the numbers that sit next
 
 It does not read `lynq_backend_db`. Its data will arrive as domain events published by `lynq-app-backend` (SNS topic `lynq-domain-events` → SQS queue `lynq-analytics-events`) and be projected into its own schema, `lynq_analytics_db`.
 
-Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. Job post, candidate and application events are also projected into a read model. The similarity queries and the endpoints come next.
+Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. Job post, candidate and application events are also projected into a read model, over which the service resolves similar job posts and similar candidates. The endpoints come next.
 
 ---
 
@@ -135,6 +135,54 @@ Once an event is stored, `DomainEventService` hands it to every `DomainEventProj
 
 ---
 
+## Similarity
+
+The analytics compare a job post with **similar job posts** (time to fill, salary of the position) and with **similar candidates** (their expected salary). Similarity is set overlap on similarity tags, each tag weighted by how rare it is among job posts. There is no trained model and no embeddings: the semantic step already happens when `lynq-ml` turns skills into generalised tags.
+
+### Tag weights
+
+`tag_frequency` holds, for every tag, `df` (how many job posts carry it) and its `weight`:
+
+```
+weight = ln((N + 1) / (df + 1))        N = job posts
+```
+
+A tag in every job post weighs `0`; a tag seen once weighs `ln((N + 1) / 2)`. Candidate tags do not change the weights: rarity is what the market asks for. Tags are stored lower-cased and compared ignoring case. A tag missing from the table, from a post published after the last run, weighs as much as the rarest known one; with an empty table every tag weighs `1` and the metrics reduce to counting tags.
+
+`TagFrequencyScheduler` recomputes the whole table daily at 08:00 UTC (05:00 in Buenos Aires, after the feeders' 06:00 UTC run), and on startup if the table is empty. Every tag seen is upserted and the ones no job post has anymore are removed.
+
+The **median weight** the thresholds use is taken over occurrences — every row of `job_post_tags` with the weight of its tag — not over distinct tags. Most distinct tags appear in one or two posts, so a median over them sits near the maximum weight and no threshold would admit anything; per occurrence it is the weight of a typical tag in a typical post.
+
+### Metrics
+
+Both live behind `TagSimilarity` (`score`, `threshold`), with `m` the median weight and `k` the number of median tags asked for:
+
+| Comparison                     | Class                       | Score                                        | Threshold                          |
+| ------------------------------ | --------------------------- | -------------------------------------------- | ---------------------------------- |
+| job post against job post      | `WeightedJaccardSimilarity` | `Σ w(mine ∩ other) / Σ w(mine ∪ other)`      | `min(1, k · m / Σ w(mine))`        |
+| candidate against the job post | `WeightedOverlapSimilarity` | `Σ w(job ∩ candidate)`                       | `k · m`                            |
+
+Jaccard keeps a broad post that contains mine from counting as the same position. The candidate score does not divide by the union, so extra tags do not count against a candidate, and a single rare tag can admit on its own.
+
+`SimilarityService.findSimilarJobPosts(jobId, eligible)` and `findSimilarCandidates(jobId, eligible)`:
+
+1. load the posts or candidates that share at least one tag with the job post (the post itself excluded) and keep the `eligible` ones — closed posts, posts with a salary in a currency, candidates with an expected salary: whatever the analytic needs;
+2. score them and drop the ones that score `0`, so a shared tag that weighs nothing admits nobody;
+3. admit those at or above the threshold for `k = 2`; if fewer than 5 pass, admit those at or above `k = 1` and flag the result as `fallback`.
+
+Matches are ordered by score and then by skills in common. `Distribution.of(values)` gives the `n`, median, p25 and p75 of a sample, interpolating linearly between values.
+
+| Property                                          | Default         | |
+| ------------------------------------------------- | --------------- | - |
+| `lynq.analytics.similarity.include-synthetic`     | `true`          | synthetic rows count for the weights and the samples; env `LYNQ_ANALYTICS_SIMILARITY_INCLUDE_SYNTHETIC` |
+| `lynq.analytics.similarity.threshold-tags`        | `2`             | `k` of the threshold |
+| `lynq.analytics.similarity.fallback-threshold-tags` | `1`           | `k` when the sample is short |
+| `lynq.analytics.similarity.min-sample`            | `5`             | below it, fall back |
+| `lynq.analytics.tag-frequency.cron`               | `0 0 8 * * *`   | env `LYNQ_ANALYTICS_TAG_FREQUENCY_CRON`; `-` disables it |
+| `lynq.analytics.tag-frequency.zone`               | `Etc/UTC`       | |
+
+---
+
 ## Running locally
 
 **Prerequisites**
@@ -179,6 +227,8 @@ mvn test
 | `LYNQ_ANALYTICS_EVENTS_QUEUE` | `lynq.analytics.events.queue` | default `lynq-analytics-events` |
 | `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | AWS SDK default chains | unset in EKS when the pod role provides them |
 | `SPRING_CLOUD_AWS_SQS_ENDPOINT` | SQS endpoint override | only against LocalStack, e.g. `http://localstack:4566` |
+| `LYNQ_ANALYTICS_SIMILARITY_INCLUDE_SYNTHETIC` | `lynq.analytics.similarity.include-synthetic` | default `true` |
+| `LYNQ_ANALYTICS_TAG_FREQUENCY_CRON` | `lynq.analytics.tag-frequency.cron` | default `0 0 8 * * *` (UTC) |
 
 ---
 
@@ -203,7 +253,7 @@ lynq-analytics/
     │   │   ├── LynqAnalyticsApplication.java
     │   │   ├── aspect/          # @AuditLog + LogAspect
     │   │   ├── client/          # LynqIamClient (Feign) and its response
-    │   │   ├── config/          # AppConfig, FilterConfig, OpenApiConfig, SecurityConfig
+    │   │   ├── config/          # AppConfig, FilterConfig, OpenApiConfig, SecurityConfig, SimilarityConfig and its properties
     │   │   ├── controller/      # ControllerExceptionHandler, response envelope
     │   │   ├── enums/           # JobStatus
     │   │   ├── exceptions/      # BadRequest, Forbidden, NotFound, InvalidDomainEvent, UnknownJobPost
@@ -212,7 +262,9 @@ lynq-analytics/
     │   │   ├── model/           # JPA entities
     │   │   ├── repository/      # Spring Data repositories
     │   │   ├── security/        # LynqUserPrincipal, Role, @HasRole
-    │   │   └── service/         # DomainEventService, DomainEventProjector and the job post, candidate and application projectors
+    │   │   ├── similarity/      # TagSimilarity, its two metrics, TagWeights and the match results
+    │   │   ├── stats/           # Distribution: n, median, p25, p75
+    │   │   └── service/         # DomainEventService and the projectors; TagFrequencyService and its scheduler; SimilarityService
     │   └── resources/
     │       ├── application.yaml
     │       ├── application-production.yaml
