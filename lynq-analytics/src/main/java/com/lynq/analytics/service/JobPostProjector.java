@@ -1,7 +1,12 @@
 package com.lynq.analytics.service;
 
+import static com.lynq.analytics.service.ProjectionSupport.isNotBefore;
+import static com.lynq.analytics.service.ProjectionSupport.replace;
+import static com.lynq.analytics.service.ProjectionSupport.requireAggregateId;
+import static com.lynq.analytics.service.ProjectionSupport.requirePresent;
+import static com.lynq.analytics.service.ProjectionSupport.requireText;
+
 import com.lynq.analytics.enums.JobStatus;
-import com.lynq.analytics.exceptions.InvalidDomainEventException;
 import com.lynq.analytics.exceptions.UnknownJobPostException;
 import com.lynq.analytics.listener.message.DomainEventMessage;
 import com.lynq.analytics.listener.message.JobPostClosedPayload;
@@ -11,14 +16,9 @@ import com.lynq.analytics.listener.message.JobPostUpdatedPayload;
 import com.lynq.analytics.model.JobPostEntity;
 import com.lynq.analytics.repository.JobPostRepository;
 import java.time.Instant;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
 import java.util.Set;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.stereotype.Service;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
@@ -178,55 +178,11 @@ public class JobPostProjector implements DomainEventProjector {
         message.aggregateId(), message.occurredOn(), part, storedOn);
   }
 
-  private static boolean isNotBefore(Instant occurredOn, Instant storedOn) {
-    return storedOn == null || !occurredOn.isBefore(storedOn);
-  }
-
-  private static void replace(Set<String> current, List<String> values) {
-    current.clear();
-    if (values == null) {
-      return;
-    }
-    Set<String> seen = new HashSet<>();
-    values.stream()
-        .filter(Objects::nonNull)
-        .map(String::trim)
-        .filter(value -> !value.isEmpty())
-        .filter(value -> seen.add(value.toLowerCase(Locale.ROOT)))
-        .forEach(current::add);
-  }
-
   private <T> T read(DomainEventMessage message, Class<T> type) {
-    try {
-      return objectMapper.treeToValue(message.payload(), type);
-    } catch (JacksonException e) {
-      throw invalid(message, "has a payload that cannot be read: " + e.getOriginalMessage());
-    }
+    return ProjectionSupport.read(objectMapper, message, type);
   }
 
   private void requireJobId(DomainEventMessage message, String jobId) {
-    requireText(message, jobId, "jobId");
-    if (!jobId.equals(message.aggregateId())) {
-      throw invalid(message, "has jobId '" + jobId + "' but aggregateId '"
-          + message.aggregateId() + "'");
-    }
-  }
-
-  private void requireText(DomainEventMessage message, String value, String field) {
-    if (value == null || value.isBlank()) {
-      throw invalid(message, "has no " + field);
-    }
-  }
-
-  private void requirePresent(DomainEventMessage message, Object value, String field) {
-    if (value == null) {
-      throw invalid(message, "has no " + field);
-    }
-  }
-
-  private InvalidDomainEventException invalid(DomainEventMessage message, String problem) {
-    return new InvalidDomainEventException(
-        "Domain event '" + message.eventId() + "' of type '" + message.eventType() + "' "
-            + problem);
+    requireAggregateId(message, jobId, "jobId");
   }
 }
