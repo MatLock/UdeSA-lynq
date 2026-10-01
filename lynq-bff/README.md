@@ -28,7 +28,7 @@ It does five things.
    BFF rather than a proxy: see [Flows the gateway owns](#flows-the-gateway-owns). Downstream
    services stay unaware of each other, and none of them orchestrates another.
 
-Everything behind it — lynq-app-backend, lynq-ml, lynq-file-storage — exposes its API under a
+Everything behind it — lynq-app-backend, lynq-ml, lynq-file-storage, lynq-analytics — exposes its API under a
 `/dmz` prefix and is reached only through here. That is why none of them checks the token's
 signature for itself.
 
@@ -42,13 +42,14 @@ against `/auth/user-info` on every request.
 ## Routing
 
 Routing is **by resource, not by service**. The path a caller writes is the path the owning service
-sees below its prefix — `/dmz` for the three DMZ services, `/auth` for lynq-iam; which service that
+sees below its prefix — `/dmz` for the DMZ services, `/auth` for lynq-iam; which service that
 is never appears in the URL.
 
 | Gateway path                                              | Owner              |
 | --------------------------------------------------------- | ------------------ |
 | `/lynq-bff/user/**`, `/lynq-bff/company/**`, `/lynq-bff/job/**` | lynq-app-backend   |
 | `/lynq-bff/files/**`                                      | lynq-file-storage  |
+| `/lynq-bff/analytics/job/{jobId}/time-to-fill`, `/lynq-bff/analytics/job/{jobId}/standing`, `/lynq-bff/analytics/job/{jobId}/salary` | lynq-analytics |
 | `/lynq-bff/skill-enhance`, `/lynq-bff/translate`, `/lynq-bff/detect-language` | lynq-ml |
 | `/lynq-bff/auth/register`, `/lynq-bff/auth/login/username`, `/lynq-bff/auth/login/email`, `/lynq-bff/auth/refresh`, `/lynq-bff/auth/update-password`, `/lynq-bff/auth/check-username`, `/lynq-bff/auth/check-email` | lynq-iam |
 
@@ -64,6 +65,9 @@ POST /lynq-bff/skill-enhance
 POST /lynq-bff/files/upload-url
   -> POST /lynq-file-storage/dmz/files/upload-url
 
+GET  /lynq-bff/analytics/job/{jobId}/standing
+  -> GET  /lynq-analytics/dmz/analytics/job/{jobId}/standing
+
 POST /lynq-bff/auth/login/email
   -> POST /lynq-iam/auth/login/email
 ```
@@ -71,11 +75,11 @@ POST /lynq-bff/auth/login/email
 Nothing is rewritten: the gateway only picks who to talk to. That keeps the topology out of the URL,
 so a resource can move between services without every caller having to change.
 
-The mappings are an **allowlist**. A downstream endpoint not named in `DmzProxyControllerImpl` — or,
-for the auth routes, in `IamAuthProxyControllerImpl` — is unreachable from the browser and answers
-`404`, so a new endpoint is closed by default: the right way round for a gateway. The price is that
-a genuinely new top-level resource has to be added here too. The auth mappings are stricter still:
-exact paths, one exact verb each, so `GET /auth/login/email` is a `405` rather than a relay.
+The mappings are an **allowlist**. A downstream endpoint not mapped by one of the gateway's
+controllers is unreachable from the browser and answers `404`, so a new endpoint is closed by
+default: the right way round for a gateway. The price is that a genuinely new top-level resource
+has to be added here too. The auth mappings are stricter still: exact paths, one exact verb each,
+so `GET /auth/login/email` is a `405` rather than a relay.
 
 ### What is not routed
 

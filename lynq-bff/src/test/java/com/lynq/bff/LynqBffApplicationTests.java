@@ -52,6 +52,15 @@ class LynqBffApplicationTests extends AbstractE2ETest {
       {"success": true, "data": {"fileId": "file-1", "uploadUrl": "https://s3.local/put"}}""";
   private static final String COMPANY_ONLY_REFUSAL_BODY = """
       {"success": false, "reason": "Only users of type COMPANY can perform this action"}""";
+  private static final String CANDIDATE_ONLY_REFUSAL_BODY = """
+      {"success": false, "reason": "Only users of type CANDIDATE can perform this action"}""";
+  private static final String TIME_TO_FILL_BODY = """
+      {"success": true, "data": {"n": 12, "median": 21.0, "p25": 14.0, "p75": 25.0, \
+"insufficientData": false, "expiredByPolicy": 3}}""";
+  private static final String SALARY_BODY = """
+      {"success": true, "data": {"positionSalary": {"n": 8, "median": 1500000.0, \
+"currency": "ARS", "insufficientData": false}, "peersExpectedSalary": {"n": 2, \
+"currency": "ARS", "insufficientData": true}}}""";
 
   private static final String RESUME_ID = "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a60";
   private static final String RESUME_ALIAS_PATH = "/dmz/user/resume/" + RESUME_ID + "/alias";
@@ -95,6 +104,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     lynqBackendMock.reset();
     lynqMlMock.reset();
     lynqFileStorageMock.reset();
+    lynqAnalyticsMock.reset();
     accessToken = validAccessToken();
   }
 
@@ -520,6 +530,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
     lynqMlMock.verify(request(), VerificationTimes.exactly(0));
     lynqFileStorageMock.verify(request(), VerificationTimes.exactly(0));
+    lynqAnalyticsMock.verify(request(), VerificationTimes.exactly(0));
   }
 
   @Test
@@ -740,6 +751,71 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
     assertThat(response.statusCode(), is(200));
     assertThat(dataField(response, "jobId"), is(JOB_ID));
+  }
+
+  @Test
+  void relaysTheTimeToFillToLynqAnalyticsWithTheCallersHeaders() throws Exception {
+    useRoles("R_COMPANY");
+    String path = "/dmz/analytics/job/" + JOB_ID + "/time-to-fill";
+    lynqAnalyticsMock.when(request().withMethod("GET").withPath(path))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(TIME_TO_FILL_BODY));
+
+    HttpResponse<String> response =
+        send("GET", CONTEXT_PATH + "/analytics/job/" + JOB_ID + "/time-to-fill", null);
+
+    assertThat(response.statusCode(), is(200));
+    assertThat(payloadOf(response).path("data").path("median").asDouble(), is(21.0));
+    assertThat(payloadOf(response).path("data").path("expiredByPolicy").asInt(), is(3));
+    lynqAnalyticsMock.verify(request()
+        .withMethod("GET")
+        .withPath(path)
+        .withHeader(AUTHORIZATION_HEADER, "Bearer " + accessToken)
+        .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID), VerificationTimes.once());
+  }
+
+  @Test
+  void relaysTheSalaryInsightsWithBothBlocks() throws Exception {
+    lynqAnalyticsMock.when(request().withMethod("GET")
+            .withPath("/dmz/analytics/job/" + JOB_ID + "/salary"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(SALARY_BODY));
+
+    HttpResponse<String> response =
+        send("GET", CONTEXT_PATH + "/analytics/job/" + JOB_ID + "/salary", null);
+
+    assertThat(response.statusCode(), is(200));
+    JsonNode data = payloadOf(response).path("data");
+    assertThat(data.path("positionSalary").path("currency").asText(), is("ARS"));
+    assertThat(data.path("peersExpectedSalary").path("insufficientData").asBoolean(), is(true));
+  }
+
+  @Test
+  void passesLynqAnalyticsRefusalOfTheStandingBack() throws Exception {
+    useRoles("R_COMPANY");
+    lynqAnalyticsMock.when(request().withMethod("GET")
+            .withPath("/dmz/analytics/job/" + JOB_ID + "/standing"))
+        .respond(response().withStatusCode(403)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(CANDIDATE_ONLY_REFUSAL_BODY));
+
+    HttpResponse<String> response =
+        send("GET", CONTEXT_PATH + "/analytics/job/" + JOB_ID + "/standing", null);
+
+    assertThat(response.statusCode(), is(403));
+    assertThat(payloadOf(response).path("reason").asText(),
+        is("Only users of type CANDIDATE can perform this action"));
+  }
+
+  @Test
+  void answers404ForAnAnalyticsRouteTheGatewayDoesNotName() throws Exception {
+    HttpResponse<String> response =
+        send("GET", CONTEXT_PATH + "/analytics/candidate/me/benchmark", null);
+
+    assertThat(response.statusCode(), is(404));
+    lynqAnalyticsMock.verify(request(), VerificationTimes.exactly(0));
   }
 
   private static JsonNode payloadOf(HttpResponse<String> response) throws Exception {
