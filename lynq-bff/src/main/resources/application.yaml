@@ -42,6 +42,8 @@ lynq:
     url: ${LYNQ_FILE_STORAGE_URL:http://localhost:8085/lynq-file-storage}
   agent:
     url: ${LYNQ_AGENT_URL:http://localhost:8090/lynq-agent}
+  analytics:
+    url: ${LYNQ_ANALYTICS_URL:http://localhost:8091/lynq-analytics}
 
 server:
   port: 8087

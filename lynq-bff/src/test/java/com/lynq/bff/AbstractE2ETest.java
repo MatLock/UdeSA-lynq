@@ -43,10 +43,14 @@ public abstract class AbstractE2ETest {
   protected static final MockServerContainer LYNQ_FILE_STORAGE =
       new MockServerContainer(MOCKSERVER_IMAGE).withReuse(true);
 
+  protected static final MockServerContainer LYNQ_ANALYTICS =
+      new MockServerContainer(MOCKSERVER_IMAGE).withReuse(true);
+
   protected static MockServerClient lynqIamMock;
   protected static MockServerClient lynqBackendMock;
   protected static MockServerClient lynqMlMock;
   protected static MockServerClient lynqFileStorageMock;
+  protected static MockServerClient lynqAnalyticsMock;
 
   static {
     LYNQ_IAM.start();
@@ -61,6 +65,10 @@ public abstract class AbstractE2ETest {
     LYNQ_FILE_STORAGE.start();
     lynqFileStorageMock =
         new MockServerClient(LYNQ_FILE_STORAGE.getHost(), LYNQ_FILE_STORAGE.getServerPort());
+
+    LYNQ_ANALYTICS.start();
+    lynqAnalyticsMock =
+        new MockServerClient(LYNQ_ANALYTICS.getHost(), LYNQ_ANALYTICS.getServerPort());
   }
 
   @DynamicPropertySource
@@ -69,6 +77,7 @@ public abstract class AbstractE2ETest {
     registry.add("lynq.backend.url", LYNQ_BACKEND::getEndpoint);
     registry.add("lynq.ml.url", LYNQ_ML::getEndpoint);
     registry.add("lynq.file-storage.url", LYNQ_FILE_STORAGE::getEndpoint);
+    registry.add("lynq.analytics.url", LYNQ_ANALYTICS::getEndpoint);
   }
 
   protected static String validAccessToken() {
