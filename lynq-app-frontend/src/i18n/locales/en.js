@@ -1,3 +1,49 @@
+const numbers = {
+  jobAffinity: {
+    name: 'Your affinity with this posting',
+    value: (score) => `${score} out of 100`,
+  },
+  standing: {
+    name: 'Your position among the applicants',
+    value: (rank, total) => `rank ${rank} of ${total}`,
+  },
+  peerPercentile: {
+    name: 'Your position among profiles like yours',
+    value: (percentile, peers) => `percentile ${percentile} among ${peers} peers`,
+  },
+  marketFit: {
+    name: 'Your market fit',
+    set: (jobs) => `across ${jobs} relevant open postings`,
+  },
+  marketReach: {
+    name: 'Your reach',
+    value: (percent, threshold) => `above ${threshold} in ${percent}% of postings`,
+    set: (jobs) => `across ${jobs} relevant open postings`,
+  },
+  jobMedian: {
+    name: 'Median for this posting',
+    set: (applicants) => `across ${applicants} applicants`,
+  },
+  timeToFill: {
+    name: 'How long a posting like yours takes to fill',
+    value: (days) => `${days} days on the market`,
+    set: (jobs) => `across ${jobs} similar postings already closed`,
+    censored: (jobs, days) => `${jobs} postings were still open at day ${days}`,
+    globalMedian: 'overall median, not of similar postings',
+  },
+  positionSalary: {
+    name: 'Salary of similar postings',
+    set: (jobs, currency) => `across ${jobs} similar postings with a salary in ${currency}`,
+  },
+  peersExpectedSalary: {
+    name: 'Expected salary of similar candidates',
+    set: (candidates, currency) =>
+      `across ${candidates} similar candidates with an expected salary in ${currency}`,
+  },
+  distribution: { median: 'median', p25: 'p25', p75: 'p75' },
+  asOfToday: 'as of today',
+}
+
 const en = {
   login: {
     title: 'Welcome to LYNQ',
@@ -412,7 +458,7 @@ const en = {
       candidate: [
         {
           key: 'standing',
-          title: 'Your position among the applicants',
+          title: numbers.standing.name,
           where: 'CandidateStandingCard · JobDetailPage',
           level: 'query',
           whatIsMissing: 'Apply to a posting so there is a position to measure.',
@@ -420,7 +466,7 @@ const en = {
         },
         {
           key: 'benchmark',
-          title: 'Your position among profiles like yours',
+          title: numbers.peerPercentile.name,
           where: 'PeerBenchmarkCard · AnalyticsPage',
           level: 'snapshot',
           whatIsMissing: 'Written by the 05:00 job, comparing you against candidates who share your similarity tags.',
@@ -438,7 +484,7 @@ const en = {
       company: [
         {
           key: 'timeToFill',
-          title: 'How long a posting like yours takes to fill',
+          title: numbers.timeToFill.name,
           where: 'TimeToFillCard · MyJobPostsPage',
           level: 'ingest',
           whatIsMissing: 'It needs similar postings that already closed. External postings close when the feeder verifies they are gone.',
@@ -464,10 +510,10 @@ const en = {
         title: 'What each number is waiting for',
         chart: 'Analytic', source: 'Reads from', level: 'Level', blockedBy: 'Blocked by',
         rows: [
-          { chart: 'Position among applicants', source: 'applications', level: '2', levelKey: 'query', blockedBy: 'nothing: it works with today data' },
-          { chart: 'Time to fill', source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'verified closing of external postings' },
+          { chart: numbers.standing.name, source: 'applications', level: '2', levelKey: 'query', blockedBy: 'nothing: it works with today data' },
+          { chart: numbers.timeToFill.name, source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'verified closing of external postings' },
           { chart: 'Salary against the market', source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'posting currency and candidate expected salary' },
-          { chart: 'Peer percentile', source: 'candidate_daily_benchmark', level: '3', levelKey: 'snapshot', blockedBy: 'the 05:00 job' },
+          { chart: numbers.peerPercentile.name, source: 'candidate_daily_benchmark', level: '3', levelKey: 'snapshot', blockedBy: 'the 05:00 job' },
         ],
       },
     },
@@ -960,14 +1006,7 @@ const en = {
     chartCard: { sample: (n) => `N = ${n}` },
     emptyState: { sample: (n) => `N = ${n}` },
     levels: { ingest: 'level 1', query: 'level 2', snapshot: 'level 3' },
-    numbers: {
-      jobAffinity: 'Your affinity with this posting',
-      standing: 'Your position among the applicants',
-      peerPercentile: 'Your position among profiles like yours',
-      marketFit: 'Your market fit',
-      jobMedian: 'Median for this posting',
-      asOfToday: 'as of today',
-    },
+    numbers,
   },
 }
 
