@@ -44,6 +44,26 @@ Spring Security is configured **stateless** and `permitAll` (`SecurityConfig`); 
 
 Every response uses the platform envelope: `GlobalRestResponse` (`success`, `data`) on success and `ErrorRestResponse` (adds `reason`) on failure, mapped from exceptions in `ControllerExceptionHandler`.
 
+### Roles per endpoint
+
+The role check lives here, not in lynq-bff: the gateway relays the route and passes this service's
+`403` back. Each endpoint carries its `@HasRole` from the PR that adds it; a route without one is
+open to any authenticated caller. The role is only the first gate — whether a company owns the job
+post, or a candidate applied to it, is checked against the read model by the endpoint itself.
+
+| Endpoint                                      | `@HasRole`  | Also checked                       | Item |
+| --------------------------------------------- | ----------- | ---------------------------------- | ---- |
+| `GET /dmz/analytics/job/{jobId}/time-to-fill` | `COMPANY`   | the caller owns the job post       | F8   |
+| `GET /dmz/analytics/company/me/jobs`          | `COMPANY`   | —                                  | K8   |
+| `GET /dmz/analytics/job/{jobId}/standing`     | `CANDIDATE` | the caller applied to the job post | F7   |
+| `GET /dmz/analytics/candidate/me/benchmark`   | `CANDIDATE` | —                                  | K5   |
+| `GET /dmz/analytics/job/{jobId}/salary`       | none        | —                                  | F9   |
+| `GET /dmz/analytics/market`                   | none        | —                                  | K8   |
+
+`HasRoleAuthorizationTest` pins the mechanism on a test-only controller: each role reaches its
+route, the other role and a caller without roles get `403` with the role named in `reason`, and an
+unannotated route lets any of them through.
+
 ---
 
 ## Domain events
