@@ -32,5 +32,4 @@ date,prompt
 "01-10-2026","keep the role rules of the analytics endpoints in lynq-analytics instead of a RelayRoleRules table in lynq-bff: the gateway relays the route and passes the 403 of the service that owns the data back"
 "01-10-2026","create a HasRoleAuthorizationTest over a test-only controller that proves @HasRole(COMPANY) and @HasRole(CANDIDATE) let their own role through and answer 403 to the other role, with a reason naming the role that is missing"
 "01-10-2026","add to the HasRoleAuthorizationTest that a caller without any role is refused both role-scoped routes, and that a route without @HasRole stays open to any authenticated caller whatever role it holds"
-"01-10-2026","document in the lynq-analytics README the role each endpoint carries: time-to-fill and company/me/jobs COMPANY, standing and candidate/me/benchmark CANDIDATE, salary and market any authenticated caller"
 "01-10-2026","state in the same README section that the role is only the first gate: whether the company owns the job post, or the candidate applied to it, is checked against the read model by the endpoint itself"
