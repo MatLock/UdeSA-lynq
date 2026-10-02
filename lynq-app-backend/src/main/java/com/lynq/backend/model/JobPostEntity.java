@@ -1,5 +1,6 @@
 package com.lynq.backend.model;
 
+import com.lynq.backend.enums.CloseReason;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.WorkType;
@@ -52,6 +53,12 @@ public class JobPostEntity {
   @Column(name = "salary_range_top")
   private Integer salaryRangeTop;
 
+  @Column(name = "salary_currency", length = 3)
+  private String salaryCurrency;
+
+  @Column(name = "category", length = 64)
+  private String category;
+
   @Column(name = "job_url", length = 2048)
   private String jobUrl;
 
@@ -60,6 +67,16 @@ public class JobPostEntity {
 
   @Column(name = "closed_on")
   private LocalDate closedOn;
+
+  @Column(name = "last_seen_on")
+  private LocalDate lastSeenOn;
+
+  @Column(name = "last_checked_on")
+  private LocalDate lastCheckedOn;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "close_reason", length = 32)
+  private CloseReason closeReason;
 
   @Column(name = "total_seen", nullable = false)
   @Builder.Default
