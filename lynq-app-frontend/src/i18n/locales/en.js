@@ -217,6 +217,11 @@ const en = {
     applying: 'Applying…',
     applied: 'You have applied to this job.',
     alreadyApplied: 'You have already applied to this job.',
+    standing: {
+      pending: 'We are recording your application: your position shows up in a few seconds.',
+      late: 'Your position is not ready yet. Open the posting again in a while.',
+      medianWithheld: (min) => `shown from ${min} applicants`,
+    },
     applyError: 'Could not apply. Please try again.',
     applyExternal: 'Apply on {source}',
     applyingExternal: 'Preparing…',
@@ -462,7 +467,7 @@ const en = {
           where: 'CandidateStandingCard · JobDetailPage',
           level: 'query',
           whatIsMissing: 'Apply to a posting so there is a position to measure.',
-          thresholdReason: 'Below 5 applicants it is not shown: with fewer, every bar of the histogram identifies someone.',
+          thresholdReason: 'Below 5 applicants the rank is shown but not the median: with so few, the median gives the others\' scores away.',
         },
         {
           key: 'benchmark',
