@@ -42,6 +42,8 @@ lynq:
     url: ${LYNQ_FILE_STORAGE_URL:http://lynq-file-storage:8080/lynq-file-storage}
   agent:
     url: ${LYNQ_AGENT_URL:http://lynq-agent:8090/lynq-agent}
+  analytics:
+    url: ${LYNQ_ANALYTICS_URL:http://lynq-analytics:8080/lynq-analytics}
 
 server:
   port: 8080

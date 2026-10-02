@@ -1,3 +1,49 @@
+const numbers = {
+  jobAffinity: {
+    name: 'Tu afinidad con este aviso',
+    value: (score) => `${score} de 100`,
+  },
+  standing: {
+    name: 'Tu posición entre los postulantes',
+    value: (rank, total) => `puesto ${rank} de ${total}`,
+  },
+  peerPercentile: {
+    name: 'Tu posición entre perfiles parecidos al tuyo',
+    value: (percentile, peers) => `percentil ${percentile} de ${peers} pares`,
+  },
+  marketFit: {
+    name: 'Tu fit de mercado',
+    set: (jobs) => `sobre ${jobs} avisos abiertos relevantes`,
+  },
+  marketReach: {
+    name: 'Tu alcance',
+    value: (percent, threshold) => `supera ${threshold} en el ${percent} % de los avisos`,
+    set: (jobs) => `sobre ${jobs} avisos abiertos relevantes`,
+  },
+  jobMedian: {
+    name: 'Mediana del aviso',
+    set: (applicants) => `entre ${applicants} postulantes`,
+  },
+  timeToFill: {
+    name: 'Cuánto tarda en cubrirse un aviso como el tuyo',
+    value: (days) => `${days} días en el mercado`,
+    set: (jobs) => `sobre ${jobs} avisos parecidos ya cerrados`,
+    censored: (jobs, days) => `${jobs} avisos seguían abiertos a los ${days} días`,
+    globalMedian: 'mediana global, no de avisos parecidos',
+  },
+  positionSalary: {
+    name: 'Salario de avisos parecidos',
+    set: (jobs, currency) => `sobre ${jobs} avisos parecidos con salario en ${currency}`,
+  },
+  peersExpectedSalary: {
+    name: 'Salario esperado de candidatos parecidos',
+    set: (candidates, currency) =>
+      `sobre ${candidates} candidatos parecidos con salario esperado en ${currency}`,
+  },
+  distribution: { median: 'mediana', p25: 'p25', p75: 'p75' },
+  asOfToday: 'al día de hoy',
+}
+
 const es = {
   login: {
     title: 'Bienvenido a LYNQ',
@@ -412,7 +458,7 @@ const es = {
       candidate: [
         {
           key: 'standing',
-          title: 'Tu posición entre los postulantes',
+          title: numbers.standing.name,
           where: 'CandidateStandingCard · JobDetailPage',
           level: 'query',
           whatIsMissing: 'Postulate a un aviso para tener una posición que medir.',
@@ -420,7 +466,7 @@ const es = {
         },
         {
           key: 'benchmark',
-          title: 'Tu posición entre perfiles parecidos al tuyo',
+          title: numbers.peerPercentile.name,
           where: 'PeerBenchmarkCard · AnalyticsPage',
           level: 'snapshot',
           whatIsMissing: 'Lo escribe el job de las 05:00 comparándote con candidatos que comparten tus similarity tags.',
@@ -438,7 +484,7 @@ const es = {
       company: [
         {
           key: 'timeToFill',
-          title: 'Cuánto tarda en cubrirse un aviso como el tuyo',
+          title: numbers.timeToFill.name,
           where: 'TimeToFillCard · MyJobPostsPage',
           level: 'ingest',
           whatIsMissing: 'Hacen falta avisos parecidos ya cerrados. Los avisos externos se cierran cuando el feeder verifica que dejaron de estar publicados.',
@@ -464,10 +510,10 @@ const es = {
         title: 'Qué falta para que cada número exista',
         chart: 'Analítica', source: 'Lee de', level: 'Nivel', blockedBy: 'Bloqueada por',
         rows: [
-          { chart: 'Posición entre postulantes', source: 'applications', level: '2', levelKey: 'query', blockedBy: 'nada: sale con los datos de hoy' },
-          { chart: 'Time to fill', source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'cierre verificado de avisos externos' },
+          { chart: numbers.standing.name, source: 'applications', level: '2', levelKey: 'query', blockedBy: 'nada: sale con los datos de hoy' },
+          { chart: numbers.timeToFill.name, source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'cierre verificado de avisos externos' },
           { chart: 'Salario contra el mercado', source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'moneda del aviso y salario esperado del candidato' },
-          { chart: 'Percentil entre pares', source: 'candidate_daily_benchmark', level: '3', levelKey: 'snapshot', blockedBy: 'el job de las 05:00' },
+          { chart: numbers.peerPercentile.name, source: 'candidate_daily_benchmark', level: '3', levelKey: 'snapshot', blockedBy: 'el job de las 05:00' },
         ],
       },
     },
@@ -960,14 +1006,7 @@ const es = {
     chartCard: { sample: (n) => `N = ${n}` },
     emptyState: { sample: (n) => `N = ${n}` },
     levels: { ingest: 'nivel 1', query: 'nivel 2', snapshot: 'nivel 3' },
-    numbers: {
-      jobAffinity: 'Tu afinidad con este aviso',
-      standing: 'Tu posición entre los postulantes',
-      peerPercentile: 'Tu posición entre perfiles parecidos al tuyo',
-      marketFit: 'Tu fit de mercado',
-      jobMedian: 'Mediana del aviso',
-      asOfToday: 'al día de hoy',
-    },
+    numbers,
   },
 }
 
