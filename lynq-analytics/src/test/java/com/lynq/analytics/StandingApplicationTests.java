@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.closeTo;
@@ -162,7 +163,7 @@ class StandingApplicationTests extends AbstractE2ETest {
 
   private static ApplicationEntity application(String candidateId, int score) {
     return ApplicationEntity.builder()
-        .id("app-" + candidateId)
+        .id(UUID.randomUUID().toString())
         .jobId(JOB_ID)
         .candidateId(candidateId)
         .appliedOn(LocalDate.parse("2026-09-22"))
