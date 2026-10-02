@@ -51,6 +51,8 @@ lynq:
       threshold-tags: 2
       fallback-threshold-tags: 1
       min-sample: 5
+    standing:
+      min-applicants: 5
     cache:
       ttl: PT1H
     tag-frequency:

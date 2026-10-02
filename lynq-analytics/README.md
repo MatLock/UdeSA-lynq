@@ -4,7 +4,7 @@ Analytics service for the Lynq platform. It will serve the numbers that sit next
 
 It does not read `lynq_backend_db`. Its data will arrive as domain events published by `lynq-app-backend` (SNS topic `lynq-domain-events` → SQS queue `lynq-analytics-events`) and be projected into its own schema, `lynq_analytics_db`.
 
-Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. Job post, candidate and application events are also projected into a read model, over which the service resolves similar job posts and similar candidates. The endpoints come next.
+Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. Job post, candidate and application events are also projected into a read model, over which the service resolves similar job posts and similar candidates. The first analytic is served: a candidate's **standing** among the applicants of a job post. Time to fill and salary come next.
 
 ---
 
@@ -199,8 +199,43 @@ Matches are ordered by score and then by skills in common. `Distribution.of(valu
 | `lynq.analytics.similarity.threshold-tags`        | `2`             | `k` of the threshold |
 | `lynq.analytics.similarity.fallback-threshold-tags` | `1`           | `k` when the sample is short |
 | `lynq.analytics.similarity.min-sample`            | `5`             | below it, fall back |
+| `lynq.analytics.standing.min-applicants`          | `5`             | below it, the standing has no `medianScore` |
 | `lynq.analytics.tag-frequency.cron`               | `0 0 8 * * *`   | env `LYNQ_ANALYTICS_TAG_FREQUENCY_CRON`; `-` disables it |
 | `lynq.analytics.tag-frequency.zone`               | `Etc/UTC`       | |
+
+---
+
+## Standing
+
+`GET /dmz/analytics/job/{jobId}/standing` — where the caller stands among the applicants of a job post. Only `CANDIDATE` users, and only for a job post they applied to.
+
+```json
+{
+  "success": true,
+  "data": {
+    "rank": 2,
+    "totalApplicants": 6,
+    "percentile": 66.66666666666667,
+    "score": 72,
+    "medianScore": 66.0
+  }
+}
+```
+
+| Field             | Meaning                                                                                       |
+| ----------------- | --------------------------------------------------------------------------------------------- |
+| `rank`            | one plus the applicants who scored higher, so ties share a rank and the next one skips it (90, 72, 72, 60 ranks 1, 2, 2, 4) |
+| `totalApplicants` | applications to the job post, the caller's included                                           |
+| `percentile`      | `100 · (below + tied / 2) / totalApplicants`, the caller counted among the tied              |
+| `score`           | the `lynqScore` of the caller's application, as the backend computed it when they applied    |
+| `medianScore`     | median of every applicant's score; `null` below `lynq.analytics.standing.min-applicants` (5) |
+
+`StandingService` reads two things from the read model: the caller's application, and the scores of every application to the job post. No other applicant is identified, and below five applicants the median is withheld: with two applicants, the median and the caller's own score give the other one's score away. The rank and the percentile only say how many scored higher, so they are always answered.
+
+- **Refusals** — a `COMPANY` caller gets `403` from `@HasRole`. A candidate without an application to the job post gets `403`, and `404` if analytics holds no job post with that id.
+- **Freshness** — an application reaches the read model through `ApplicationSubmitted`, so a candidate who has just applied can get `403` for the seconds the event takes to arrive. After that, the answer is cached for an hour per job post and candidate: new applicants do not move a cached rank until it expires.
+- **Synthetic rows** — every application counts, synthetic or not; `include-synthetic` only applies to the similarity samples.
+- **Naming** — the frontend shows it as "your position among the applicants", with its rank and N side by side; `percentile` is in the contract but the app keeps that word for the peer benchmark.
 
 ---
 
@@ -223,7 +258,7 @@ The standing is keyed by the candidate too: it holds the caller's own rank and s
 - **Writes** — immediate: a request waits for Redis to confirm the entry. Spring Data Redis 4 writes in the background by default with Lettuce, which lets an eviction overtake the write it follows and hides write failures from the error handler; waiting costs under a millisecond next to computing a median.
 - **Metrics** — hits, misses, puts and evictions per cache, as `cache.gets{cache,result}`, `cache.puts` and `cache.evictions` on `/actuator/prometheus`. They are what tells whether the hour is right.
 
-The endpoints come with the analytics (F7–F9); each will declare `@Cacheable(cacheNames = AnalyticsCaches.…, key = …)` with the key above.
+Each endpoint's service method declares `@Cacheable(cacheNames = AnalyticsCaches.…, key = …)` with the key above; the standing does (`StandingService`), time to fill and salary will with F8 and F9.
 
 ---
 
@@ -301,7 +336,7 @@ lynq-analytics/
     │   │   ├── cache/           # AnalyticsCaches: one cache per endpoint
     │   │   ├── client/          # LynqIamClient (Feign) and its response
     │   │   ├── config/          # AppConfig, FilterConfig, OpenApiConfig, SecurityConfig, SimilarityConfig, CacheConfig and their properties
-    │   │   ├── controller/      # ControllerExceptionHandler, response envelope
+    │   │   ├── controller/      # AnalyticsController and its impl, ControllerExceptionHandler, response envelope
     │   │   ├── enums/           # JobStatus
     │   │   ├── exceptions/      # BadRequest, Forbidden, NotFound, InvalidDomainEvent, UnknownJobPost
     │   │   ├── filter/          # RequestUuid, AuthHeaderExistence, IamAuthentication, PublicPaths
@@ -310,8 +345,8 @@ lynq-analytics/
     │   │   ├── repository/      # Spring Data repositories
     │   │   ├── security/        # LynqUserPrincipal, Role, @HasRole
     │   │   ├── similarity/      # TagSimilarity, its two metrics, TagWeights and the match results
-    │   │   ├── stats/           # Distribution: n, median, p25, p75
-    │   │   └── service/         # DomainEventService and the projectors; TagFrequencyService and its scheduler; SimilarityService
+    │   │   ├── stats/           # Distribution: n, median, p25, p75; Standing: rank, percentile, median score
+    │   │   └── service/         # DomainEventService and the projectors; TagFrequencyService and its scheduler; SimilarityService; StandingService
     │   └── resources/
     │       ├── application.yaml
     │       ├── application-production.yaml
