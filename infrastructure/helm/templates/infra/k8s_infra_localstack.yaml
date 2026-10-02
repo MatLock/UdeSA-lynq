@@ -32,6 +32,15 @@ data:
     }'
 
     echo "LocalStack S3 ready: bucket '${BUCKET}' created with CORS enabled."
+  02-init-domain-events.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    TOPIC="${DOMAIN_EVENTS_TOPIC:-lynq-domain-events}"
+
+    awslocal sns create-topic --name "${TOPIC}"
+
+    echo "LocalStack SNS ready: topic '${TOPIC}' created."
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -55,7 +64,7 @@ spec:
           image: gresau/localstack-persist:4.5
           env:
             - name: SERVICES
-              value: s3
+              value: s3,sns
             - name: AWS_DEFAULT_REGION
               value: {{ .Values.lynq_app_backend.config.AWS_REGION | quote }}
             - name: AWS_BUCKET_NAME
