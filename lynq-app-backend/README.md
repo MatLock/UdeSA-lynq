@@ -20,6 +20,7 @@ Authentication is **not** handled here. Every protected request is validated aga
   - [Search the job feed](#2-search-the-job-feed)
   - [Candidate evaluations via lynq-ml](#3-candidate-evaluations-via-lynq-ml)
   - [Image upload](#4-image-upload-pre-signed-urls)
+  - [Domain events](#5-domain-events)
 - [Data model](#data-model)
 - [API reference](#api-reference)
 - [Sample requests](#sample-requests)
@@ -302,6 +303,27 @@ sequenceDiagram
 For the résumé the confirm step is not called by the browser: `lynq-bff`'s resume-import flow calls
 it as the first step of reading the uploaded document into a résumé (see that service's README).
 
+
+### 5. Domain events
+
+Every change analytics needs is published to the SNS topic `lynq-domain-events`, which [`lynq-analytics`](../lynq-analytics) consumes through its own SQS queue. The message body is the envelope `{eventId, eventType, aggregateType, aggregateId, occurredOn, payload}`; dates are ISO-8601, `occurredOn` is an instant in UTC.
+
+| Event                            | Aggregate     | Emitted by                                                  | Payload |
+| -------------------------------- | ------------- | ----------------------------------------------------------- | ------- |
+| `JobPostPublished`               | `JOB_POST`    | `createJob`, and the feeder ingest once per open post        | `jobId`, `title`, `category`, `workType`, `source`, `companyId`, `createdByUserId`, `salaryRangeDown`, `salaryRangeTop`, `salaryCurrency`, `skills`, `similarityTags`, `publishedOn` |
+| `JobPostUpdated`                 | `JOB_POST`    | `updateJob`                                                 | `jobId`, `title`, `workType`, `salaryRangeDown`, `salaryRangeTop`, `salaryCurrency`, `skills`, `similarityTags` |
+| `JobPostClosed`                  | `JOB_POST`    | `closeJob`, and `updateJob` when it closes the post          | `jobId`, `closedOn`, `closeReason` |
+| `JobPostReopened`                | `JOB_POST`    | `refreshJob`, and `updateJob` when it reopens the post       | `jobId`, `reopenedOn` |
+| `ApplicationSubmitted`           | `APPLICATION` | `applyToJob`                                                | `applicationId`, `jobId`, `userId`, `appliedOn`, `lynqScore` computed when the candidate applied |
+| `CandidateSkillsUpdated`         | `CANDIDATE`   | `createResume`                                              | `userId`, every `skills` and `similarityTags` the candidate has |
+| `CandidateExpectedSalaryUpdated` | `CANDIDATE`   | the replay; the profile update emits it once it takes a salary | `userId`, `expectedSalary`, `currency` |
+
+Skills and tags travel sorted, so the same state always serializes the same way.
+
+- **At most once** — the services hand each event to `DomainEventPublisher` inside their transaction, and `DomainEventRelay` sends it with `@TransactionalEventListener(AFTER_COMMIT)`: a rolled-back change publishes nothing. `SnsDomainEventSender` retries a failed publish (`lynq.events.publish-attempts`, 3, with a linear `retry-backoff` of 200 ms) and then logs the event as lost at `ERROR`; it never fails the request that already committed. There is no outbox: what is lost is recovered by the replay.
+- **Deterministic ids** — `eventId` is a UUIDv5 of the event type, the aggregate id and the fact the event states. A fact the database keeps is identified by its content: a publish by the whole payload, a close by the opening and closing dates, a reopening by its date, an application by its id, a candidate's skills by the full set. A change the database does not keep, an update or a salary change, is identified by its instant, so two updates are always two events. The consumer is idempotent by `eventId`, so publishing the same fact twice stores it once.
+- **Replay** — `POST /internal/events/replay`, behind the internal token, walks `job_posts`, `users` and `user_application_job` in pages of 200 and publishes what they hold now, in batches of ten: every post published on the start of its `created_on`, and closed at the end of its `closed_on` if it is; every candidate's skills on the day of their latest resume and their salary if they have one; every application on its `applied_on` with the score its candidate has today. Running it twice repeats every id. A fact that has not changed since its live event repeats that event's id too; one that has carries an older `occurredOn` than what the consumer holds, so it does not overwrite it. A closed post without `closed_on` is skipped and counted. The response gives `published`, `failed`, `skippedJobPosts` and `publishedByEventType`.
+
 ---
 
 ## Data model
@@ -310,9 +332,9 @@ Liquibase provisions the `lynq_backend_db` schema on startup (`resources/changel
 
 | Table                  | Purpose                                                                                  |
 | ---------------------- | ---------------------------------------------------------------------------------------- |
-| `users`                | Profile of a Lynq user. **`id` equals the `lynq-iam` user id** (no local credentials). `type` ∈ {`CANDIDATE`, `COMPANY`}. `lynq_file_storage_id` points at the profile image held by `lynq-file-storage`. |
+| `users`                | Profile of a Lynq user. **`id` equals the `lynq-iam` user id** (no local credentials). `type` ∈ {`CANDIDATE`, `COMPANY`}. `lynq_file_storage_id` points at the profile image held by `lynq-file-storage`. `expected_salary` and `expected_salary_currency` are optional and self-declared. |
 | `companies`            | Company profile, unique `name`, `owner_user_id` → `users`. `lynq_file_storage_id` points at the logo held by `lynq-file-storage`. |
-| `job_posts`            | Job postings. `job_status` ∈ {`OPEN`, `CLOSE`}, `job_post_source` ∈ {`LYNQ`, `LINKEDIN`, `COMPUTRABAJO`, `BUMERAN`}, `work_type` ∈ {`REMOTE`, `IN_OFFICE`}. FKs to `users` (poster) and `companies` — both nullable for scraped jobs. |
+| `job_posts`            | Job postings. `job_status` ∈ {`OPEN`, `CLOSE`}, `job_post_source` ∈ {`LYNQ`, `LINKEDIN`, `COMPUTRABAJO`, `BUMERAN`}, `work_type` ∈ {`REMOTE`, `IN_OFFICE`}. FKs to `users` (poster) and `companies` — both nullable for scraped jobs. `salary_currency` (backfilled `ARS` where there is a salary) and `category` come from the post; `last_seen_on`, `last_checked_on` and `close_reason` ∈ {`OWNER`, `VERIFIED_CLOSED`, `VERIFIED_GONE`, `EXPIRED_BY_POLICY`} track whether an external post is still alive. |
 | `job_post_skills`      | Skills required by a job (`job_id`, `skill`), unique per pair.                           |
 | `user_skills`          | Skills a user has (`user_id`, `skill`), unique per pair — drives the LyNQ score. Written when a resume is created. |
 | `job_post_similarity_tags` | Generalized capabilities of a job (`job_id`, `similarity_tag`), unique per pair. Derived by lynq-ml, never displayed — they only widen the LyNQ score. |
@@ -531,7 +553,11 @@ Two profiles ship with the project:
 | `DB_PASSWORD`           | MySQL password                             | |
 | `LYNQ_IAM_URL`          | `lynq.iam.url` (Feign client)              | default `http://lynq-iam:8080/lynq-iam` |
 | `LYNQ_ML_URL`           | `lynq.ml.url` (Feign client)               | default `http://localhost:8084/lynq-ml` |
-| `LYNQ_FILE_STORAGE_URL` | `lynq.file-storage.url` (Feign client)     | default `http://lynq-file-storage:8080/lynq-file-storage`. No `AWS_*` variables here — the bucket belongs to `lynq-file-storage` |
+| `LYNQ_FILE_STORAGE_URL` | `lynq.file-storage.url` (Feign client)     | default `http://lynq-file-storage:8080/lynq-file-storage`. The bucket belongs to `lynq-file-storage`; the `AWS_*` variables below are for SNS only |
+| `LYNQ_DOMAIN_EVENTS_TOPIC_ARN` | `lynq.events.topic-arn`             | required in production; ARN of `lynq-domain-events` |
+| `AWS_REGION`            | `lynq.aws.region` (SNS client)             | default `us-east-1` |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | `lynq.aws.*` (SNS client) | publish-only key; when blank the SDK's default credential chain is used |
+| `AWS_ENDPOINT`          | `lynq.aws.endpoint` (SNS client)           | blank for AWS; `http://localstack:4566` against LocalStack |
 
 ---
 

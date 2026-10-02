@@ -19,6 +19,8 @@ import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.WorkType;
+import com.lynq.backend.event.DomainEventPublisher;
+import com.lynq.backend.event.DomainEvents;
 import com.lynq.backend.exceptions.AlreadyAppliedToJobException;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.ForbiddenException;
@@ -43,6 +45,7 @@ import com.lynq.backend.repository.projection.JobCandidateProjection;
 import com.lynq.backend.repository.projection.JobWithDetailsProjection;
 import com.lynq.backend.security.LynqUserPrincipal;
 import com.lynq.backend.security.Role;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Arrays;
@@ -92,12 +95,14 @@ public class JobService {
   private final JobPostSimilarityTagRepository jobPostSimilarityTagRepository;
   private final FileStorageService fileStorageService;
   private final LynqMLClient lynqMLClient;
+  private final DomainEventPublisher domainEventPublisher;
 
   public JobService(JobPostRepository jobPostRepository, CompanyRepository companyRepository,
       UserRepository userRepository, UserApplicationJobRepository userApplicationJobRepository,
       UserResumeRepository userResumeRepository,
       JobPostSkillRepository jobPostSkillRepository, JobPostSimilarityTagRepository jobPostSimilarityTagRepository,
-      FileStorageService fileStorageService, LynqMLClient lynqMLClient) {
+      FileStorageService fileStorageService, LynqMLClient lynqMLClient,
+      DomainEventPublisher domainEventPublisher) {
     this.jobPostRepository = jobPostRepository;
     this.companyRepository = companyRepository;
     this.userRepository = userRepository;
@@ -107,6 +112,7 @@ public class JobService {
     this.jobPostSimilarityTagRepository = jobPostSimilarityTagRepository;
     this.fileStorageService = fileStorageService;
     this.lynqMLClient = lynqMLClient;
+    this.domainEventPublisher = domainEventPublisher;
   }
 
   @AuditLog
@@ -135,7 +141,9 @@ public class JobService {
     addSkills(job, skills);
     addSimilarityTags(job, similarityTags);
 
-    return jobPostRepository.save(job);
+    JobPostEntity saved = jobPostRepository.save(job);
+    domainEventPublisher.publish(DomainEvents.jobPostPublished(job, Instant.now()));
+    return saved;
   }
 
   @AuditLog
@@ -162,7 +170,10 @@ public class JobService {
     job.setCreatedOn(LocalDate.now(ZoneOffset.UTC));
     job.setClosedOn(null);
 
-    return jobPostRepository.save(job);
+    JobPostEntity saved = jobPostRepository.save(job);
+    domainEventPublisher.publish(
+        DomainEvents.jobPostReopened(job, job.getCreatedOn(), Instant.now()));
+    return saved;
   }
 
   @AuditLog
@@ -178,7 +189,9 @@ public class JobService {
     job.setJobStatus(JobStatus.CLOSE);
     job.setClosedOn(LocalDate.now(ZoneOffset.UTC));
 
-    return jobPostRepository.save(job);
+    JobPostEntity saved = jobPostRepository.save(job);
+    domainEventPublisher.publish(DomainEvents.jobPostClosed(job, Instant.now()));
+    return saved;
   }
 
   @AuditLog
@@ -194,12 +207,15 @@ public class JobService {
     job.setWorkType(workType);
     job.setSalaryRangeDown(salaryRangeDown);
     job.setSalaryRangeTop(salaryRangeTop);
+    JobStatus previousStatus = job.getJobStatus();
     updateStatus(job, status);
 
     updateSkills(job, skills);
     updateSimilarityTags(job, similarityTags);
 
-    return jobPostRepository.save(job);
+    JobPostEntity saved = jobPostRepository.save(job);
+    publishUpdate(job, previousStatus);
+    return saved;
   }
 
   @AuditLog
@@ -229,7 +245,28 @@ public class JobService {
     application.setUser(user);
     application.setAppliedOn(LocalDate.now(ZoneOffset.UTC));
 
-    return userApplicationJobRepository.save(application);
+    UserApplicationJobEntity saved = userApplicationJobRepository.save(application);
+    domainEventPublisher.publish(DomainEvents.applicationSubmitted(application,
+        scoreOf(job, user), Instant.now()));
+    return saved;
+  }
+
+  static Integer scoreOf(JobPostEntity job, UserEntity candidate) {
+    return LyNQScoreCalculator.score(
+        job.getSkills().stream().map(JobPostSkillEntity::getSkill).toList(),
+        job.getSimilarityTags().stream().map(JobPostSimilarityTagEntity::getSimilarityTag).toList(),
+        skillNamesOf(candidate), similarityTagNamesOf(candidate));
+  }
+
+  private void publishUpdate(JobPostEntity job, JobStatus previousStatus) {
+    Instant occurredOn = Instant.now();
+    domainEventPublisher.publish(DomainEvents.jobPostUpdated(job, occurredOn));
+    if (job.getJobStatus() == previousStatus) {
+      return;
+    }
+    domainEventPublisher.publish(job.getJobStatus() == JobStatus.CLOSE
+        ? DomainEvents.jobPostClosed(job, occurredOn)
+        : DomainEvents.jobPostReopened(job, LocalDate.now(ZoneOffset.UTC), occurredOn));
   }
 
   /**

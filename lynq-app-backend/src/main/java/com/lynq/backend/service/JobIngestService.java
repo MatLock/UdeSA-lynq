@@ -5,6 +5,8 @@ import com.fasterxml.uuid.impl.NameBasedGenerator;
 import com.lynq.backend.controller.request.IngestJobPostRequest;
 import com.lynq.backend.controller.response.IngestJobPostsRestResponse;
 import com.lynq.backend.enums.JobStatus;
+import com.lynq.backend.event.DomainEventPublisher;
+import com.lynq.backend.event.DomainEvents;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSimilarityTagEntity;
@@ -44,14 +46,17 @@ public class JobIngestService {
   private final CompanyRepository companyRepository;
   private final JobPostSkillRepository jobPostSkillRepository;
   private final JobPostSimilarityTagRepository jobPostSimilarityTagRepository;
+  private final DomainEventPublisher domainEventPublisher;
 
   public JobIngestService(JobPostRepository jobPostRepository, CompanyRepository companyRepository,
       JobPostSkillRepository jobPostSkillRepository,
-      JobPostSimilarityTagRepository jobPostSimilarityTagRepository) {
+      JobPostSimilarityTagRepository jobPostSimilarityTagRepository,
+      DomainEventPublisher domainEventPublisher) {
     this.jobPostRepository = jobPostRepository;
     this.companyRepository = companyRepository;
     this.jobPostSkillRepository = jobPostSkillRepository;
     this.jobPostSimilarityTagRepository = jobPostSimilarityTagRepository;
+    this.domainEventPublisher = domainEventPublisher;
   }
 
   @Transactional
@@ -61,6 +66,7 @@ public class JobIngestService {
     int skills = 0;
     int similarityTags = 0;
     int skipped = 0;
+    Instant ingestedOn = Instant.now();
 
     for (IngestJobPostRequest request : jobPosts) {
       String title = truncate(request.getTitle(), MAX_TITLE_LENGTH);
@@ -76,8 +82,11 @@ public class JobIngestService {
 
       JobPostEntity job = upsertJob(request, title, company.entity());
       jobs++;
-      skills += replaceSkills(job, request.getSkills());
-      similarityTags += replaceSimilarityTags(job, request.getSimilarityTags());
+      Set<String> jobSkills = normalize(request.getSkills());
+      Set<String> jobSimilarityTags = normalize(request.getSimilarityTags());
+      skills += replaceSkills(job, jobSkills);
+      similarityTags += replaceSimilarityTags(job, jobSimilarityTags);
+      publishIngested(job, jobSkills, jobSimilarityTags, ingestedOn);
     }
 
     return IngestJobPostsRestResponse.builder()
@@ -142,11 +151,20 @@ public class JobIngestService {
     return jobPostRepository.save(job);
   }
 
-  private int replaceSkills(JobPostEntity job, List<String> requested) {
+  private void publishIngested(JobPostEntity job, Set<String> skills, Set<String> similarityTags,
+      Instant ingestedOn) {
+    if (job.getJobStatus() != JobStatus.OPEN) {
+      return;
+    }
+    domainEventPublisher.publish(
+        DomainEvents.jobPostPublished(job, skills, similarityTags, ingestedOn));
+  }
+
+  private int replaceSkills(JobPostEntity job, Set<String> skills) {
     jobPostSkillRepository.deleteAll(jobPostSkillRepository.findByJobPost(job));
 
     List<JobPostSkillEntity> entities = new ArrayList<>();
-    for (String skill : normalize(requested)) {
+    for (String skill : skills) {
       entities.add(JobPostSkillEntity.builder()
           .id(deterministicId("skill" + KEY_SEPARATOR + job.getId() + KEY_SEPARATOR
               + skill.toLowerCase(Locale.ROOT)))
@@ -158,11 +176,11 @@ public class JobIngestService {
     return entities.size();
   }
 
-  private int replaceSimilarityTags(JobPostEntity job, List<String> requested) {
+  private int replaceSimilarityTags(JobPostEntity job, Set<String> similarityTags) {
     jobPostSimilarityTagRepository.deleteAll(jobPostSimilarityTagRepository.findByJobPost(job));
 
     List<JobPostSimilarityTagEntity> entities = new ArrayList<>();
-    for (String tag : normalize(requested)) {
+    for (String tag : similarityTags) {
       entities.add(JobPostSimilarityTagEntity.builder()
           .id(deterministicId("tag" + KEY_SEPARATOR + job.getId() + KEY_SEPARATOR
               + tag.toLowerCase(Locale.ROOT)))

@@ -14,6 +14,8 @@ import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.controller.response.UserApplicationResponse;
 import com.lynq.backend.controller.response.UserProfileCompanyRestResponse;
 import com.lynq.backend.controller.response.UserProfileJobRestResponse;
+import com.lynq.backend.event.DomainEventPublisher;
+import com.lynq.backend.event.DomainEvents;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.model.CompanyEntity;
@@ -29,6 +31,7 @@ import com.lynq.backend.repository.UserRepository;
 import com.lynq.backend.repository.SupportedLanguageRepository;
 import com.lynq.backend.repository.UserResumeRepository;
 import com.lynq.backend.repository.projection.UserApplicationProjection;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Arrays;
@@ -64,12 +67,14 @@ public class UserService {
   private final SupportedLanguageRepository supportedLanguageRepository;
   private final FileStorageService fileStorageService;
   private final ObjectMapper objectMapper;
+  private final DomainEventPublisher domainEventPublisher;
 
   public UserService(UserRepository userRepository, UserResumeRepository userResumeRepository,
       CompanyRepository companyRepository, JobPostRepository jobPostRepository,
       UserApplicationJobRepository userApplicationJobRepository,
       SupportedLanguageRepository supportedLanguageRepository,
-      FileStorageService fileStorageService, ObjectMapper objectMapper){
+      FileStorageService fileStorageService, ObjectMapper objectMapper,
+      DomainEventPublisher domainEventPublisher){
     this.userRepository = userRepository;
     this.userResumeRepository = userResumeRepository;
     this.companyRepository = companyRepository;
@@ -78,6 +83,7 @@ public class UserService {
     this.supportedLanguageRepository = supportedLanguageRepository;
     this.fileStorageService = fileStorageService;
     this.objectMapper = objectMapper;
+    this.domainEventPublisher = domainEventPublisher;
   }
 
   @AuditLog
@@ -271,6 +277,7 @@ public class UserService {
     userResumeRepository.save(resume);
     syncCandidateSkills(user, request);
     userRepository.save(user);
+    domainEventPublisher.publish(DomainEvents.candidateSkillsUpdated(user, Instant.now()));
 
     return toResponse(resume, fileStorageService.obtainDownloadUrl(request.getFileId()));
   }

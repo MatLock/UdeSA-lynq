@@ -5,6 +5,9 @@ import com.lynq.backend.controller.response.IngestJobPostsRestResponse;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.WorkType;
+import com.lynq.backend.event.DomainEvent;
+import com.lynq.backend.event.DomainEventPublisher;
+import com.lynq.backend.event.payload.JobPostPublishedPayload;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSimilarityTagEntity;
@@ -34,6 +37,7 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -66,12 +70,15 @@ class JobIngestServiceTest {
   @Mock
   private JobPostSimilarityTagRepository jobPostSimilarityTagRepository;
 
+  @Mock
+  private DomainEventPublisher domainEventPublisher;
+
   private JobIngestService service;
 
   @BeforeEach
   void setUp() {
     service = new JobIngestService(jobPostRepository, companyRepository, jobPostSkillRepository,
-        jobPostSimilarityTagRepository);
+        jobPostSimilarityTagRepository, domainEventPublisher);
   }
 
   private IngestJobPostRequest.IngestJobPostRequestBuilder request() {
@@ -184,6 +191,62 @@ class JobIngestServiceTest {
 
     assertThat(existing.getTitle(), is(TITLE));
     assertThat(existing.getTotalSeen(), is(42L));
+  }
+
+  @Test
+  void ingestPublishesOneJobPostPublishedPerIngestedJobPost() {
+    savesWhatItIsGiven();
+
+    service.ingest(List.of(
+        request().skills(List.of("Python", " python ", "Django")).build(),
+        request().externalId("1118437288").build(),
+        request().title(" ").externalId("1118437289").build()));
+
+    ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+    verify(domainEventPublisher, times(2)).publish(captor.capture());
+    DomainEvent first = captor.getAllValues().getFirst();
+    assertThat(first.eventType(), is("JobPostPublished"));
+    assertThat(first.aggregateId(), is(EXPECTED_JOB_ID));
+    JobPostPublishedPayload payload = (JobPostPublishedPayload) first.payload();
+    assertThat(payload.jobId(), is(EXPECTED_JOB_ID));
+    assertThat(payload.title(), is(TITLE));
+    assertThat(payload.source(), is("BUMERAN"));
+    assertThat(payload.workType(), is("REMOTE"));
+    assertThat(payload.companyId(), is(EXPECTED_COMPANY_ID));
+    assertThat(payload.createdByUserId(), is(nullValue()));
+    assertThat(payload.skills(), contains("Django", "Python"));
+    assertThat(payload.similarityTags(), contains("Backend Development"));
+    assertThat(payload.publishedOn(), is(POSTED_ON));
+    assertThat(captor.getAllValues().get(1).occurredOn(), is(first.occurredOn()));
+  }
+
+  @Test
+  void ingestingTheSameJobPostAgainRepeatsItsEventId() {
+    savesWhatItIsGiven();
+
+    service.ingest(List.of(request().build()));
+    service.ingest(List.of(request().build()));
+
+    ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+    verify(domainEventPublisher, times(2)).publish(captor.capture());
+    assertThat(captor.getAllValues().get(1).eventId(),
+        is(captor.getAllValues().getFirst().eventId()));
+  }
+
+  @Test
+  void aClosedJobPostIsIngestedWithoutPublishingIt() {
+    JobPostEntity closed = JobPostEntity.builder()
+        .id(EXPECTED_JOB_ID)
+        .totalSeen(0L)
+        .jobStatus(JobStatus.CLOSE)
+        .build();
+    when(jobPostRepository.findById(EXPECTED_JOB_ID)).thenReturn(Optional.of(closed));
+    savesWhatItIsGiven();
+
+    IngestJobPostsRestResponse response = service.ingest(List.of(request().build()));
+
+    assertThat(response.getJobs(), is(1));
+    verify(domainEventPublisher, never()).publish(any());
   }
 
   @Test

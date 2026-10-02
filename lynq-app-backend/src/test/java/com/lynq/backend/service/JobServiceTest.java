@@ -13,6 +13,13 @@ import com.lynq.backend.controller.response.PagedRestResponse;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.WorkType;
+import com.lynq.backend.event.DomainEvent;
+import com.lynq.backend.event.DomainEventPublisher;
+import com.lynq.backend.event.payload.ApplicationSubmittedPayload;
+import com.lynq.backend.event.payload.JobPostClosedPayload;
+import com.lynq.backend.event.payload.JobPostPublishedPayload;
+import com.lynq.backend.event.payload.JobPostReopenedPayload;
+import com.lynq.backend.event.payload.JobPostUpdatedPayload;
 import com.lynq.backend.exceptions.AlreadyAppliedToJobException;
 import com.lynq.backend.controller.request.ApplyJobRequest;
 import com.lynq.backend.exceptions.BadRequestException;
@@ -53,6 +60,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -76,6 +84,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -221,13 +231,16 @@ class JobServiceTest {
   @Mock
   private Authentication authentication;
 
+  @Mock
+  private DomainEventPublisher domainEventPublisher;
+
   private JobService jobService;
 
   @BeforeEach
   void setUp() {
     jobService = new JobService(jobPostRepository, companyRepository, userRepository,
         userApplicationJobRepository, userResumeRepository, jobPostSkillRepository,
-        jobPostSimilarityTagRepository, fileStorageService, lynqMLClient);
+        jobPostSimilarityTagRepository, fileStorageService, lynqMLClient, domainEventPublisher);
     lenient().when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
     SecurityContextHolder.setContext(securityContext);
   }
@@ -1607,6 +1620,200 @@ class JobServiceTest {
     when(jobPostRepository.findJobDetailsById(JOB_ID)).thenReturn(Optional.of(projection));
     when(userApplicationJobRepository.countByJobId(JOB_ID)).thenReturn(TOTAL_CANDIDATES_APPLIED);
     when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
+  }
+
+  @Test
+  void createJobPublishesTheJobPostOnceItIsSaved() {
+    UserEntity user = companyUser();
+    stubAuthenticatedCompanyUserWithCompany(user);
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    JobPostEntity job = jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
+        SALARY_RANGE_TOP, JOB_POST_TYPE, SKILLS, TAGS);
+
+    InOrder order = inOrder(jobPostRepository, domainEventPublisher);
+    order.verify(jobPostRepository).save(any(JobPostEntity.class));
+    DomainEvent event = publishedEvents().getFirst();
+    order.verify(domainEventPublisher).publish(event);
+    assertThat(event.eventType(), is("JobPostPublished"));
+    assertThat(event.aggregateType(), is("JOB_POST"));
+    assertThat(event.aggregateId(), is(job.getId()));
+    JobPostPublishedPayload payload = (JobPostPublishedPayload) event.payload();
+    assertThat(payload.jobId(), is(job.getId()));
+    assertThat(payload.title(), is(TITLE));
+    assertThat(payload.workType(), is(WORK_TYPE.name()));
+    assertThat(payload.source(), is(JOB_POST_TYPE.name()));
+    assertThat(payload.companyId(), is(COMPANY_ID));
+    assertThat(payload.createdByUserId(), is(USER_ID));
+    assertThat(payload.salaryRangeDown(), is(SALARY_RANGE_DOWN));
+    assertThat(payload.salaryRangeTop(), is(SALARY_RANGE_TOP));
+    assertThat(payload.skills(), contains(SKILL_JAVA, SKILL_POSTGRES, SKILL_SPRING));
+    assertThat(payload.similarityTags(), contains("Backend Development"));
+    assertThat(payload.publishedOn(), is(LocalDate.now(ZoneOffset.UTC)));
+  }
+
+  @Test
+  void closeJobPublishesTheCloseWithItsDate() {
+    UserEntity owner = candidateUser(null);
+    JobPostEntity job = JobPostEntity.builder()
+        .id(JOB_ID)
+        .jobStatus(JobStatus.OPEN)
+        .createdByUser(owner)
+        .createdOn(CREATED_ON)
+        .build();
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    jobService.closeJob(JOB_ID);
+
+    DomainEvent event = publishedEvents().getFirst();
+    assertThat(event.eventType(), is("JobPostClosed"));
+    assertThat(event.aggregateId(), is(JOB_ID));
+    JobPostClosedPayload payload = (JobPostClosedPayload) event.payload();
+    assertThat(payload.jobId(), is(JOB_ID));
+    assertThat(payload.closedOn(), is(LocalDate.now(ZoneOffset.UTC)));
+  }
+
+  @Test
+  void closeJobThatIsRefusedPublishesNothing() {
+    UserEntity owner = candidateUser(null);
+    JobPostEntity job = JobPostEntity.builder()
+        .id(JOB_ID)
+        .jobStatus(JobStatus.CLOSE)
+        .createdByUser(owner)
+        .build();
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+
+    assertThrows(BadRequestException.class, () -> jobService.closeJob(JOB_ID));
+
+    verify(domainEventPublisher, never()).publish(any());
+  }
+
+  @Test
+  void refreshJobPublishesTheReopeningWithTheNewOpeningDate() {
+    UserEntity owner = candidateUser(null);
+    JobPostEntity job = JobPostEntity.builder()
+        .id(JOB_ID)
+        .jobStatus(JobStatus.CLOSE)
+        .createdByUser(owner)
+        .createdOn(LocalDate.of(2026, Month.JANUARY, 1))
+        .closedOn(LocalDate.of(2026, Month.MAY, 1))
+        .build();
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    jobService.refreshJob(JOB_ID);
+
+    DomainEvent event = publishedEvents().getFirst();
+    assertThat(event.eventType(), is("JobPostReopened"));
+    JobPostReopenedPayload payload = (JobPostReopenedPayload) event.payload();
+    assertThat(payload.jobId(), is(JOB_ID));
+    assertThat(payload.reopenedOn(), is(LocalDate.now(ZoneOffset.UTC)));
+  }
+
+  @Test
+  void updateJobPublishesOnlyTheUpdateWhenTheStatusIsKept() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE,
+        JobStatus.OPEN, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS, TAGS);
+
+    List<DomainEvent> events = publishedEvents();
+    assertThat(events, hasSize(1));
+    assertThat(events.getFirst().eventType(), is("JobPostUpdated"));
+    JobPostUpdatedPayload payload = (JobPostUpdatedPayload) events.getFirst().payload();
+    assertThat(payload.jobId(), is(JOB_ID));
+    assertThat(payload.title(), is(UPDATED_TITLE));
+    assertThat(payload.workType(), is(UPDATED_WORK_TYPE.name()));
+    assertThat(payload.salaryRangeDown(), is(UPDATED_SALARY_RANGE_DOWN));
+    assertThat(payload.salaryRangeTop(), is(UPDATED_SALARY_RANGE_TOP));
+    assertThat(payload.skills(), contains(SKILL_JAVA, SKILL_POSTGRES, SKILL_SPRING));
+    assertThat(payload.similarityTags(), contains("Backend Development"));
+  }
+
+  @Test
+  void updateJobThatClosesTheJobPublishesTheUpdateAndThenTheClose() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE,
+        JobStatus.CLOSE, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS, TAGS);
+
+    List<DomainEvent> events = publishedEvents();
+    assertThat(events.stream().map(DomainEvent::eventType).toList(),
+        contains("JobPostUpdated", "JobPostClosed"));
+    assertThat(((JobPostClosedPayload) events.get(1).payload()).closedOn(),
+        is(LocalDate.now(ZoneOffset.UTC)));
+    assertThat(events.get(1).occurredOn(), is(events.get(0).occurredOn()));
+  }
+
+  @Test
+  void updateJobThatReopensTheJobPublishesTheUpdateAndThenTheReopening() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
+    job.setJobStatus(JobStatus.CLOSE);
+    job.setClosedOn(LocalDate.of(2026, Month.MAY, 1));
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE,
+        JobStatus.OPEN, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS, TAGS);
+
+    List<DomainEvent> events = publishedEvents();
+    assertThat(events.stream().map(DomainEvent::eventType).toList(),
+        contains("JobPostUpdated", "JobPostReopened"));
+    assertThat(((JobPostReopenedPayload) events.get(1).payload()).reopenedOn(),
+        is(LocalDate.now(ZoneOffset.UTC)));
+  }
+
+  @Test
+  void applyToJobPublishesTheApplicationWithTheScoreOfThatMoment() {
+    UserEntity user = candidateUser(List.of(SKILL_JAVA), List.of("Backend Development"));
+    JobPostEntity job = ownedJob(companyUser(), List.of(SKILL_JAVA, SKILL_SPRING));
+    stubAuthenticatedUser(user);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(userResumeRepository.findByIdAndUserId(RESUME_ID, USER_ID))
+        .thenReturn(Optional.of(UserResumeEntity.builder().id(RESUME_ID).build()));
+    when(userApplicationJobRepository.save(any(UserApplicationJobEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    UserApplicationJobEntity application = jobService.applyToJob(JOB_ID, applyWith(RESUME_ID));
+
+    DomainEvent event = publishedEvents().getFirst();
+    assertThat(event.eventType(), is("ApplicationSubmitted"));
+    assertThat(event.aggregateType(), is("APPLICATION"));
+    assertThat(event.aggregateId(), is(application.getId()));
+    ApplicationSubmittedPayload payload = (ApplicationSubmittedPayload) event.payload();
+    assertThat(payload.applicationId(), is(application.getId()));
+    assertThat(payload.jobId(), is(JOB_ID));
+    assertThat(payload.userId(), is(USER_ID));
+    assertThat(payload.appliedOn(), is(LocalDate.now(ZoneOffset.UTC)));
+    assertThat(payload.lynqScore(), is(LyNQScoreCalculator.score(
+        List.of(SKILL_JAVA, SKILL_SPRING), List.of(), List.of(SKILL_JAVA),
+        List.of("Backend Development"))));
+  }
+
+  private List<DomainEvent> publishedEvents() {
+    ArgumentCaptor<DomainEvent> events = ArgumentCaptor.forClass(DomainEvent.class);
+    verify(domainEventPublisher, atLeastOnce()).publish(events.capture());
+    return events.getAllValues();
   }
 
   private UserEntity companyUser() {
