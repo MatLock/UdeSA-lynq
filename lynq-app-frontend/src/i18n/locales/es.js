@@ -217,6 +217,11 @@ const es = {
     applying: 'Postulando…',
     applied: 'Te postulaste a este empleo.',
     alreadyApplied: 'Ya te postulaste a este empleo.',
+    standing: {
+      pending: 'Estamos registrando tu postulación: tu posición aparece en unos segundos.',
+      late: 'Tu posición todavía no está lista. Volvé a abrir el aviso en un rato.',
+      medianWithheld: (min) => `se muestra desde ${min} postulantes`,
+    },
     applyError: 'No se pudo postular. Intentá de nuevo.',
     applyExternal: 'Postularme en {source}',
     applyingExternal: 'Preparando…',
@@ -462,7 +467,7 @@ const es = {
           where: 'CandidateStandingCard · JobDetailPage',
           level: 'query',
           whatIsMissing: 'Postulate a un aviso para tener una posición que medir.',
-          thresholdReason: 'Debajo de 5 postulantes no se muestra: con menos, cada punto del histograma identifica a alguien.',
+          thresholdReason: 'Debajo de 5 postulantes se muestra el puesto pero no la mediana: con tan pocos, la mediana deja ver el puntaje de los demás.',
         },
         {
           key: 'benchmark',

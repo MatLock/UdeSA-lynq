@@ -10,6 +10,7 @@ import TailorResumeModal from '../../components/TailorResumeModal/TailorResumeMo
 import CompanyIcon from '../../components/CompanyIcon/CompanyIcon.jsx'
 import UserIcon from '../../components/UserIcon/UserIcon.jsx'
 import Spinner from '../../components/Spinner/Spinner.jsx'
+import CandidateStandingCard from '../../components/CandidateStandingCard/CandidateStandingCard.jsx'
 import formatRelativeDate from '../../utils/formatRelativeDate'
 import downloadFile from '../../utils/downloadFile'
 import resumeLabel from '../../utils/resumeLabel'
@@ -143,6 +144,7 @@ const JobHeroSide = ({
   tailorDisabled,
   onApply,
   onTailor,
+  standingCard,
   t,
 }) => {
   if (isOwner) {
@@ -206,6 +208,7 @@ const JobHeroSide = ({
             }}
           />
         )}
+        {standingCard}
         {/* Apply action, vertically centered on the hero's right edge. */}
         <div className="job-detail-hero-actions">
           <div className="job-detail-apply-row">
@@ -763,6 +766,11 @@ const JobDetailPage = () => {
               tailorDisabled={tailorDisabled}
               onApply={handleApply}
               onTailor={handleTailor}
+              standingCard={
+                hasApplied && (
+                  <CandidateStandingCard authFetch={authFetch} jobId={jobId} />
+                )
+              }
               t={t}
             />
           }

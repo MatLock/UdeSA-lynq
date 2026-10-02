@@ -23,7 +23,7 @@ import static org.mockserver.model.HttpResponse.response;
 class AnalyticsApplicationTests extends AbstractE2ETest {
 
   private static final String CONTEXT_PATH = "/lynq-analytics";
-  private static final String ANALYTICS_PATH = "/dmz/analytics/job/77777777-7777-7777-7777-777777777777/standing";
+  private static final String ANALYTICS_PATH = "/dmz/analytics/job/00000000-0000-0000-0000-000000000000/standing";
   private static final String API_DOCS_PATH = "/v3/api-docs";
   private static final String USERINFO_PATH = "/auth/user-info";
 
