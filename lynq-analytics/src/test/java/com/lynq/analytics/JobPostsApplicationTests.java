@@ -45,7 +45,7 @@ class JobPostsApplicationTests extends AbstractE2ETest {
        "createdByUserId": "11111111-1111-1111-1111-111111111111",
        "salaryRangeDown": 1500000, "salaryRangeTop": 2200000, "salaryCurrency": "ARS",
        "skills": ["Java", "Spring"], "similarityTags": ["backend", "jvm"],
-       "publishedOn": "2026-09-20", "synthetic": false}""".formatted(JOB_ID);
+       "publishedOn": "2026-09-20"}""".formatted(JOB_ID);
 
   private static final String UPDATED = """
       {"jobId": "%s", "title": "Senior Backend Developer", "workType": "REMOTE",

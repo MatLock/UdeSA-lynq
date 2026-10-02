@@ -37,9 +37,6 @@ public class ApplicationEntity {
   @Column(name = "lynq_score", nullable = false)
   private Integer lynqScore;
 
-  @Column(name = "synthetic", nullable = false)
-  private boolean synthetic;
-
   @Column(name = "occurred_on", nullable = false)
   private Instant occurredOn;
 

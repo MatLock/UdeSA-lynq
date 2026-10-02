@@ -63,7 +63,6 @@ public class CandidateProjector implements DomainEventProjector {
 
     replace(candidate.getSkills(), payload.skills());
     replace(candidate.getTags(), payload.similarityTags());
-    candidate.setSynthetic(Boolean.TRUE.equals(payload.synthetic()));
     candidate.setSkillsOccurredOn(message.occurredOn());
     save(message, candidate);
   }
@@ -88,7 +87,6 @@ public class CandidateProjector implements DomainEventProjector {
     candidate.setExpectedSalary(payload.expectedSalary());
     candidate.setExpectedSalaryCurrency(
         payload.expectedSalary() == null ? null : payload.currency());
-    candidate.setSynthetic(Boolean.TRUE.equals(payload.synthetic()));
     candidate.setSalaryOccurredOn(message.occurredOn());
     save(message, candidate);
   }

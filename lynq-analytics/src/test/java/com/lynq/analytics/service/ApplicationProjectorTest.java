@@ -44,7 +44,7 @@ class ApplicationProjectorTest {
 
   private static final String SUBMITTED = """
       {"applicationId": "%s", "jobId": "%s", "userId": "%s", "appliedOn": "2026-09-22",
-       "lynqScore": 72, "synthetic": true, "notYetKnown": "ignored"}"""
+       "lynqScore": 72, "notYetKnown": "ignored"}"""
       .formatted(APPLICATION_ID, JOB_ID, USER_ID);
 
   @Mock
@@ -79,20 +79,7 @@ class ApplicationProjectorTest {
     assertThat(application.getCandidateId(), is(USER_ID));
     assertThat(application.getAppliedOn(), is(LocalDate.parse("2026-09-22")));
     assertThat(application.getLynqScore(), is(72));
-    assertThat(application.isSynthetic(), is(true));
     assertThat(application.getOccurredOn(), is(T2));
-  }
-
-  @Test
-  void submittedWithoutSyntheticIsNotSynthetic() {
-    when(jobPostRepository.existsById(JOB_ID)).thenReturn(true);
-    when(applicationRepository.findById(APPLICATION_ID)).thenReturn(Optional.empty());
-
-    applicationProjector.project(message(APPLICATION_SUBMITTED, T2, """
-        {"applicationId": "%s", "jobId": "%s", "userId": "%s", "appliedOn": "2026-09-22",
-         "lynqScore": 0}""".formatted(APPLICATION_ID, JOB_ID, USER_ID)));
-
-    assertThat(saved().isSynthetic(), is(false));
   }
 
   @Test

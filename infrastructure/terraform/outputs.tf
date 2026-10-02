@@ -53,6 +53,16 @@ output "file_storage_s3_access_key_id" {
   value       = aws_iam_access_key.backend_s3.id
 }
 
+output "domain_events_topic_arn" {
+  description = "ARN of the SNS topic lynq-app-backend publishes its domain events to."
+  value       = aws_sns_topic.domain_events.arn
+}
+
+output "backend_sns_access_key_id" {
+  description = "Access key id of the publish-only IAM user consumed by lynq-app-backend (the secret lives only in state / the k8s Secret)."
+  value       = aws_iam_access_key.backend_sns.id
+}
+
 output "ml_bedrock_access_key_id" {
   description = "Access key id of the Bedrock-only IAM user consumed by lynq-ml (the secret lives only in state / the k8s Secret)."
   value       = aws_iam_access_key.ml_bedrock.id

@@ -15,10 +15,8 @@ public interface TagFrequencyRepository extends JpaRepository<TagFrequencyEntity
   @Query(value = """
       SELECT LOWER(t.tag) AS tag, COUNT(*) AS df
       FROM job_post_tags t
-      JOIN job_posts j ON j.id = t.job_id
-      WHERE :includeSynthetic OR j.synthetic = FALSE
       GROUP BY LOWER(t.tag)""", nativeQuery = true)
-  List<TagCount> countJobPostTags(@Param("includeSynthetic") boolean includeSynthetic);
+  List<TagCount> countJobPostTags();
 
   @Modifying
   @Query("delete from TagFrequencyEntity f where f.computedOn < :computedOn")

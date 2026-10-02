@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS lynq_analytics_db.job_posts (
     closed_on           DATE,
     close_reason        VARCHAR(32),
     reopened_on         DATE,
-    synthetic           BOOLEAN      NOT NULL DEFAULT FALSE,
     details_occurred_on DATETIME(6)  NOT NULL,
     status_occurred_on  DATETIME(6)  NOT NULL,
     CONSTRAINT pk_job_posts PRIMARY KEY (id)

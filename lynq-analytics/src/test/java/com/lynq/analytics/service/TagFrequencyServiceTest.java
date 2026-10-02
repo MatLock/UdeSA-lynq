@@ -1,6 +1,5 @@
 package com.lynq.analytics.service;
 
-import com.lynq.analytics.config.SimilarityProperties;
 import com.lynq.analytics.model.TagFrequencyEntity;
 import com.lynq.analytics.repository.JobPostRepository;
 import com.lynq.analytics.repository.TagFrequencyRepository;
@@ -35,8 +34,7 @@ class TagFrequencyServiceTest {
 
   @BeforeEach
   void setUp() {
-    tagFrequencyService = new TagFrequencyService(tagFrequencyRepository, jobPostRepository,
-        new SimilarityProperties(true, 2, 1, 5));
+    tagFrequencyService = new TagFrequencyService(tagFrequencyRepository, jobPostRepository);
   }
 
   @Test
@@ -56,8 +54,8 @@ class TagFrequencyServiceTest {
 
   @Test
   void recomputesEveryTagAndRemovesTheOnesNotSeenInThisRun() {
-    when(jobPostRepository.countForTagFrequency(true)).thenReturn(13L);
-    when(tagFrequencyRepository.countJobPostTags(true)).thenReturn(List.of(
+    when(jobPostRepository.count()).thenReturn(13L);
+    when(tagFrequencyRepository.countJobPostTags()).thenReturn(List.of(
         count("teamwork", 13), count("kubernetes", 1)));
 
     int recomputed = tagFrequencyService.recompute();
@@ -76,17 +74,6 @@ class TagFrequencyServiceTest {
     verify(tagFrequencyRepository).deleteComputedBefore(removedBefore.capture());
     assertThat(removedBefore.getValue(), is(kubernetes.getComputedOn()));
     assertThat(removedBefore.getValue().getNano() % 1000, is(0));
-  }
-
-  @Test
-  void excludesSyntheticJobPostsWhenConfiguredTo() {
-    tagFrequencyService = new TagFrequencyService(tagFrequencyRepository, jobPostRepository,
-        new SimilarityProperties(false, 2, 1, 5));
-
-    tagFrequencyService.recompute();
-
-    verify(jobPostRepository).countForTagFrequency(false);
-    verify(tagFrequencyRepository).countJobPostTags(false);
   }
 
   @Test

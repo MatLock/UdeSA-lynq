@@ -33,8 +33,7 @@ class CandidatesApplicationTests extends AbstractE2ETest {
   private static final String SALARY_CLEARED_EVENT_ID = "b1b2c3d4-0005-5000-8000-000000000005";
 
   private static final String SKILLS = """
-      {"userId": "%s", "skills": ["Java", "Spring"], "similarityTags": ["backend", "jvm"],
-       "synthetic": false}""".formatted(USER_ID);
+      {"userId": "%s", "skills": ["Java", "Spring"], "similarityTags": ["backend", "jvm"]}""".formatted(USER_ID);
 
   private static final String NEWER_SKILLS = """
       {"userId": "%s", "skills": ["Java", "Kotlin"], "similarityTags": ["backend"]}"""

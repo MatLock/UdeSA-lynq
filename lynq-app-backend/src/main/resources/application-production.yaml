@@ -37,6 +37,15 @@ lynq:
     url: ${LYNQ_FILE_STORAGE_URL:http://lynq-file-storage:8080/lynq-file-storage}
   internal:
     token: ${LYNQ_INTERNAL_TOKEN:}
+  aws:
+    region: ${AWS_REGION:us-east-1}
+    access-key-id: ${AWS_ACCESS_KEY_ID:}
+    secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
+    endpoint: ${AWS_ENDPOINT:}
+  events:
+    topic-arn: ${LYNQ_DOMAIN_EVENTS_TOPIC_ARN}
+    publish-attempts: 3
+    retry-backoff: 200ms
 
 
 server:

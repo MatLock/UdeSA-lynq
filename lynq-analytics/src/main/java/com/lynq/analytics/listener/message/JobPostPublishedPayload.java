@@ -16,6 +16,5 @@ public record JobPostPublishedPayload(
     String salaryCurrency,
     List<String> skills,
     List<String> similarityTags,
-    LocalDate publishedOn,
-    Boolean synthetic) {
+    LocalDate publishedOn) {
 }

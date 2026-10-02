@@ -5,6 +5,5 @@ import java.util.List;
 public record CandidateSkillsUpdatedPayload(
     String userId,
     List<String> skills,
-    List<String> similarityTags,
-    Boolean synthetic) {
+    List<String> similarityTags) {
 }

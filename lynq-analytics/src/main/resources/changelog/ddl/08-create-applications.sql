@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS lynq_analytics_db.applications (
     candidate_id  VARCHAR(36)  NOT NULL,
     applied_on    DATE         NOT NULL,
     lynq_score    INT          NOT NULL,
-    synthetic     BOOLEAN      NOT NULL DEFAULT FALSE,
     occurred_on   DATETIME(6)  NOT NULL,
     CONSTRAINT pk_applications PRIMARY KEY (id),
     CONSTRAINT fk_applications_job_post FOREIGN KEY (job_id) REFERENCES lynq_analytics_db.job_posts (id),

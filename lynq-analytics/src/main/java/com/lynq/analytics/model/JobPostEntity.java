@@ -76,9 +76,6 @@ public class JobPostEntity {
   @Column(name = "reopened_on")
   private LocalDate reopenedOn;
 
-  @Column(name = "synthetic", nullable = false)
-  private boolean synthetic;
-
   @Column(name = "details_occurred_on", nullable = false)
   private Instant detailsOccurredOn;
 

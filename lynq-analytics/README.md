@@ -115,13 +115,13 @@ Once an event is stored, `DomainEventService` hands it to every `DomainEventProj
 
 | Table             | Key               | Holds                                                                                          |
 | ----------------- | ----------------- | ---------------------------------------------------------------------------------------------- |
-| `job_posts`       | `id` (the job id) | title, category, work type, source, company, author, salary range and currency, status, `published_on`, `closed_on`, `close_reason`, `reopened_on`, `synthetic` |
+| `job_posts`       | `id` (the job id) | title, category, work type, source, company, author, salary range and currency, status, `published_on`, `closed_on`, `close_reason`, `reopened_on` |
 | `job_post_skills` | `job_id`, `skill` | the skills the post asks for                                                                   |
 | `job_post_tags`   | `job_id`, `tag`   | its similarity tags, indexed by `tag`                                                          |
 
 | Event              | Payload                                                                                                             | Projection                                                                  |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `JobPostPublished` | `jobId`, `title`, `workType`, `source`, `publishedOn` required; `category`, `companyId`, `createdByUserId`, `salaryRangeDown`, `salaryRangeTop`, `salaryCurrency`, `skills`, `similarityTags`, `synthetic` | creates the post `OPEN`, or refreshes it                                    |
+| `JobPostPublished` | `jobId`, `title`, `workType`, `source`, `publishedOn` required; `category`, `companyId`, `createdByUserId`, `salaryRangeDown`, `salaryRangeTop`, `salaryCurrency`, `skills`, `similarityTags` | creates the post `OPEN`, or refreshes it                                    |
 | `JobPostUpdated`   | `jobId`, `title`, `workType` required; `salaryRangeDown`, `salaryRangeTop`, `salaryCurrency`, `skills`, `similarityTags` | overwrites those fields and replaces the skills and tags: a missing value clears it, as the backend's update does |
 | `JobPostClosed`    | `jobId`, `closedOn` required; `closeReason`                                                                         | `CLOSE` with its date and reason                                            |
 | `JobPostReopened`  | `jobId`, `reopenedOn` required                                                                                      | `OPEN`, stamps `reopened_on`, clears the close; `published_on` is kept      |
@@ -137,16 +137,16 @@ Once an event is stored, `DomainEventService` hands it to every `DomainEventProj
 
 | Table              | Key                     | Holds                                                                               |
 | ------------------ | ----------------------- | ----------------------------------------------------------------------------------- |
-| `candidates`       | `id` (the user id)      | expected salary and its currency, `synthetic`                                       |
+| `candidates`       | `id` (the user id)      | expected salary and its currency                                                    |
 | `candidate_skills` | `candidate_id`, `skill` | the candidate's skills                                                              |
 | `candidate_tags`   | `candidate_id`, `tag`   | their similarity tags, indexed by `tag`                                             |
-| `applications`     | `id` (the application id) | job post, candidate, `applied_on`, the `lynq_score` the backend computed when the candidate applied, `synthetic`; unique by job post and candidate, indexed by candidate |
+| `applications`     | `id` (the application id) | job post, candidate, `applied_on`, the `lynq_score` the backend computed when the candidate applied; unique by job post and candidate, indexed by candidate |
 
 | Event                            | Aggregate     | Payload                                                                                    | Projection                                                                                  |
 | -------------------------------- | ------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| `CandidateSkillsUpdated`         | `CANDIDATE`   | `userId` required; `skills`, `similarityTags`, `synthetic`                                 | creates the candidate if needed and replaces its skills and tags; the salary is kept        |
-| `CandidateExpectedSalaryUpdated` | `CANDIDATE`   | `userId` required; `expectedSalary`, `currency` (required with a salary), `synthetic`      | creates the candidate if needed and sets its salary; no `expectedSalary` clears both; skills and tags are kept |
-| `ApplicationSubmitted`           | `APPLICATION` | `applicationId`, `jobId`, `userId`, `appliedOn`, `lynqScore` required; `synthetic`          | creates the application, or refreshes it                                                    |
+| `CandidateSkillsUpdated`         | `CANDIDATE`   | `userId` required; `skills`, `similarityTags`                                              | creates the candidate if needed and replaces its skills and tags; the salary is kept        |
+| `CandidateExpectedSalaryUpdated` | `CANDIDATE`   | `userId` required; `expectedSalary`, `currency` (required with a salary)                   | creates the candidate if needed and sets its salary; no `expectedSalary` clears both; skills and tags are kept |
+| `ApplicationSubmitted`           | `APPLICATION` | `applicationId`, `jobId`, `userId`, `appliedOn`, `lynqScore` required                       | creates the application, or refreshes it                                                    |
 
 - **Order** — each candidate keeps two watermarks, `skills_occurred_on` and `salary_occurred_on`, for the same reason a job post does: a salary change that arrives late must not be dropped because the skills moved since. An application keeps `occurred_on`. An event older than the watermark it would move is discarded and stays in `domain_events`.
 - **Candidates without skills** — a candidate appears with whichever event arrives first. Applications do not create or require one: the standing only needs the application's score, and a candidate who applied without ever updating their skills has no row.
@@ -195,7 +195,6 @@ Matches are ordered by score and then by skills in common. `Distribution.of(valu
 
 | Property                                          | Default         | |
 | ------------------------------------------------- | --------------- | - |
-| `lynq.analytics.similarity.include-synthetic`     | `true`          | synthetic rows count for the weights and the samples; env `LYNQ_ANALYTICS_SIMILARITY_INCLUDE_SYNTHETIC` |
 | `lynq.analytics.similarity.threshold-tags`        | `2`             | `k` of the threshold |
 | `lynq.analytics.similarity.fallback-threshold-tags` | `1`           | `k` when the sample is short |
 | `lynq.analytics.similarity.min-sample`            | `5`             | below it, fall back |
@@ -234,7 +233,6 @@ Matches are ordered by score and then by skills in common. `Distribution.of(valu
 
 - **Refusals** — a `COMPANY` caller gets `403` from `@HasRole`. A candidate without an application to the job post gets `403`, and `404` if analytics holds no job post with that id.
 - **Freshness** — an application reaches the read model through `ApplicationSubmitted`, so a candidate who has just applied can get `403` for the seconds the event takes to arrive. After that, the answer is cached for an hour per job post and candidate: new applicants do not move a cached rank until it expires.
-- **Synthetic rows** — every application counts, synthetic or not; `include-synthetic` only applies to the similarity samples.
 - **Naming** — the frontend shows it as "your position among the applicants", with its rank and N side by side; `percentile` is in the contract but the app keeps that word for the peer benchmark.
 
 ---
@@ -308,7 +306,6 @@ mvn test
 | `SPRING_CLOUD_AWS_SQS_ENDPOINT` | SQS endpoint override | only against LocalStack, e.g. `http://localstack:4566` |
 | `REDIS_ADDRESS`, `REDIS_PORT` | `spring.data.redis.host` / `port` | |
 | `REDIS_USERNAME`, `REDIS_PASSWORD` | Redis ACL user | |
-| `LYNQ_ANALYTICS_SIMILARITY_INCLUDE_SYNTHETIC` | `lynq.analytics.similarity.include-synthetic` | default `true` |
 | `LYNQ_ANALYTICS_TAG_FREQUENCY_CRON` | `lynq.analytics.tag-frequency.cron` | default `0 0 8 * * *` (UTC) |
 
 ---

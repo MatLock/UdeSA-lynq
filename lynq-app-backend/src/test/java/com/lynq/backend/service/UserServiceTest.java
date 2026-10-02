@@ -6,6 +6,9 @@ import com.lynq.backend.controller.request.UpdateUserProfileRequest;
 import com.lynq.backend.controller.response.GetUserResumeRestResponse;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.Language;
+import com.lynq.backend.event.DomainEvent;
+import com.lynq.backend.event.DomainEventPublisher;
+import com.lynq.backend.event.payload.CandidateSkillsUpdatedPayload;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.NotFoundException;
 import com.lynq.backend.controller.response.GetSupportedLanguageRestResponse;
@@ -31,6 +34,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -56,6 +60,7 @@ import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -139,6 +144,9 @@ class UserServiceTest {
   @Mock
   private FileStorageService fileStorageService;
 
+  @Mock
+  private DomainEventPublisher domainEventPublisher;
+
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   private UserService userService;
@@ -147,7 +155,7 @@ class UserServiceTest {
   void setUp() {
     userService = new UserService(userRepository, userResumeRepository, companyRepository,
         jobPostRepository, userApplicationJobRepository, supportedLanguageRepository,
-        fileStorageService, objectMapper);
+        fileStorageService, objectMapper, domainEventPublisher);
   }
 
   @Test
@@ -447,6 +455,44 @@ class UserServiceTest {
     assertThat(candidate.getSimilarityTags().stream().map(UserSimilarityTagEntity::getSimilarityTag).toList(),
         contains("Backend Development", "Asynchronous Messaging"));
     verify(userRepository).save(candidate);
+  }
+
+  @Test
+  void createResumePublishesEveryCandidateSkillAndTagOnceTheyAreSaved() {
+    UserEntity candidate = candidate();
+    candidate.getSkills().add(UserSkillsEntity.builder()
+        .skill("Kotlin")
+        .user(candidate)
+        .build());
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate));
+    when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of());
+    when(fileStorageService.obtainDownloadUrl(RESUME_FILE_ID)).thenReturn(RESUME_PDF_URL);
+
+    userService.createResume(USER_ID, requestWithSkills());
+
+    InOrder order = inOrder(userRepository, domainEventPublisher);
+    order.verify(userRepository).save(candidate);
+    ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+    order.verify(domainEventPublisher).publish(captor.capture());
+    DomainEvent event = captor.getValue();
+    assertThat(event.eventType(), is("CandidateSkillsUpdated"));
+    assertThat(event.aggregateType(), is("CANDIDATE"));
+    assertThat(event.aggregateId(), is(USER_ID));
+    CandidateSkillsUpdatedPayload payload = (CandidateSkillsUpdatedPayload) event.payload();
+    assertThat(payload.userId(), is(USER_ID));
+    assertThat(payload.skills(), contains("Docker", "Java", "Kotlin", "RabbitMQ"));
+    assertThat(payload.similarityTags(),
+        contains("Asynchronous Messaging", "Backend Development"));
+  }
+
+  @Test
+  void createResumeThatIsRefusedPublishesNothing() {
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+
+    assertThrows(NotFoundException.class,
+        () -> userService.createResume(USER_ID, requestWithSkills()));
+
+    verify(domainEventPublisher, never()).publish(any());
   }
 
   @Test

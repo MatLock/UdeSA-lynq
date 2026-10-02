@@ -39,4 +39,3 @@ date,prompt
 "02-10-2026","compute the standing from the applications read model: rank as one plus the applicants who scored higher so ties share it, totalApplicants, percentile, the caller's score and the median score"
 "02-10-2026","answer 403 to a candidate who did not apply to the job post and 404 when analytics does not hold the job post"
 "02-10-2026","do not return the median score below five applicants, with the five in a property"
-"02-10-2026","cache the standing in the standing cache keyed by job and candidate"

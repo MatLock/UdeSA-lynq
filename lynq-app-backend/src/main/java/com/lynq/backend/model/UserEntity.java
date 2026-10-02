@@ -50,6 +50,12 @@ public class UserEntity {
   @Column(name = "birth_date")
   private LocalDate birthDate;
 
+  @Column(name = "expected_salary")
+  private Integer expectedSalary;
+
+  @Column(name = "expected_salary_currency", length = 3)
+  private String expectedSalaryCurrency;
+
   @Column(name = "created_on", nullable = false)
   private LocalDate createdOn;
 

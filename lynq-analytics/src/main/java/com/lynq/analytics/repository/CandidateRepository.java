@@ -15,8 +15,6 @@ public interface CandidateRepository extends JpaRepository<CandidateEntity, Stri
   @EntityGraph(attributePaths = {"tags", "skills"})
   @Query("""
       select distinct c from CandidateEntity c
-      where (:includeSynthetic = true or c.synthetic = false)
-        and c.id in (select s.id from CandidateEntity s join s.tags t where t in :tags)""")
-  List<CandidateEntity> findSharingTags(@Param("tags") Collection<String> tags,
-      @Param("includeSynthetic") boolean includeSynthetic);
+      where c.id in (select s.id from CandidateEntity s join s.tags t where t in :tags)""")
+  List<CandidateEntity> findSharingTags(@Param("tags") Collection<String> tags);
 }

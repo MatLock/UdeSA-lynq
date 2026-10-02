@@ -59,10 +59,17 @@ services:
       - LYNQ_IAM_URL=http://lynq-iam:8080/lynq-iam
       - LYNQ_FILE_STORAGE_URL=http://lynq-file-storage:8080/lynq-file-storage
       - LYNQ_INTERNAL_TOKEN=${LYNQ_INTERNAL_TOKEN:-local-internal-token-not-a-secret}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+      - AWS_ENDPOINT=${AWS_ENDPOINT:-http://localstack:4566}
+      - LYNQ_DOMAIN_EVENTS_TOPIC_ARN=arn:aws:sns:${AWS_REGION:-us-east-1}:000000000000:lynq-domain-events
     depends_on:
       mysql:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      localstack:
         condition: service_healthy
       lynq-iam:
         condition: service_started

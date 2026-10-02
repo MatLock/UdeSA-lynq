@@ -29,7 +29,6 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -58,7 +57,7 @@ class SimilarityServiceTest {
 
   @BeforeEach
   void setUp() {
-    similarityService = service(true);
+    similarityService = service();
   }
 
   @Test
@@ -159,18 +158,6 @@ class SimilarityServiceTest {
   }
 
   @Test
-  void passesTheSyntheticSettingToTheQuery() {
-    similarityService = service(false);
-    givenReference(REFERENCE_TAGS, Set.of());
-    when(jobPostRepository.findSharingTags(any(), eq(JOB_ID), eq(false))).thenReturn(List.of());
-    when(tagFrequencyService.weights()).thenReturn(WEIGHTS);
-
-    similarityService.findSimilarJobPosts(JOB_ID, job -> true);
-
-    verify(jobPostRepository).findSharingTags(Set.of("backend", "sql", "cloud"), JOB_ID, false);
-  }
-
-  @Test
   void admitsCandidatesByTheWeightTheyShareWithTheJobPost() {
     givenReference(REFERENCE_TAGS, Set.of());
     List<CandidateEntity> candidates = new ArrayList<>();
@@ -178,7 +165,7 @@ class SimilarityServiceTest {
       candidates.add(candidate("two-tags-" + i, Set.of("backend", "sql", "design", "mobile")));
     }
     candidates.add(candidate("one-tag", Set.of("cloud")));
-    when(candidateRepository.findSharingTags(Set.of("backend", "sql", "cloud"), true))
+    when(candidateRepository.findSharingTags(Set.of("backend", "sql", "cloud")))
         .thenReturn(candidates);
     when(tagFrequencyService.weights()).thenReturn(WEIGHTS);
 
@@ -194,7 +181,7 @@ class SimilarityServiceTest {
   @Test
   void fallsBackForCandidatesWhenFewerThanFivePass() {
     givenReference(REFERENCE_TAGS, Set.of());
-    when(candidateRepository.findSharingTags(any(), anyBoolean())).thenReturn(List.of(
+    when(candidateRepository.findSharingTags(any())).thenReturn(List.of(
         candidate("two-tags", Set.of("backend", "sql")),
         candidate("one-tag", Set.of("cloud")),
         candidate("teamwork-only", Set.of("teamwork"))));
@@ -214,7 +201,7 @@ class SimilarityServiceTest {
     givenReference(REFERENCE_TAGS, Set.of());
     CandidateEntity withSalary = candidate("with-salary", Set.of("backend", "sql"));
     withSalary.setExpectedSalary(2000000);
-    when(candidateRepository.findSharingTags(any(), anyBoolean())).thenReturn(List.of(
+    when(candidateRepository.findSharingTags(any())).thenReturn(List.of(
         withSalary, candidate("without-salary", Set.of("backend", "sql"))));
     when(tagFrequencyService.weights()).thenReturn(WEIGHTS);
 
@@ -224,9 +211,9 @@ class SimilarityServiceTest {
     assertThat(matches.items(), contains(withSalary));
   }
 
-  private SimilarityService service(boolean includeSynthetic) {
+  private SimilarityService service() {
     return new SimilarityService(jobPostRepository, candidateRepository, tagFrequencyService,
-        new SimilarityProperties(includeSynthetic, 2, 1, 5));
+        new SimilarityProperties(2, 1, 5));
   }
 
   private void givenReference(Set<String> tags, Set<String> skills) {
@@ -236,7 +223,7 @@ class SimilarityServiceTest {
   }
 
   private void givenJobPostsSharingTags(List<JobPostEntity> others) {
-    when(jobPostRepository.findSharingTags(any(), eq(JOB_ID), eq(true))).thenReturn(others);
+    when(jobPostRepository.findSharingTags(any(), eq(JOB_ID))).thenReturn(others);
     when(tagFrequencyService.weights()).thenReturn(WEIGHTS);
   }
 

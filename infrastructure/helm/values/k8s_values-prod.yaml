@@ -19,6 +19,8 @@ k8s_namespace: prod
 #     DB_USERNAME, DB_PASSWORD
 #     LYNQ_INTERNAL_TOKEN       -> shared secret guarding the /internal/** routes;
 #                                  must match the one in lynq-feeders-secret
+#     AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   -> sns:Publish on lynq-domain-events only
+#                                                   (omit if using IRSA)
 #     (no bucket credentials: files are delegated to lynq-file-storage)
 #
 #   lynq-feeders-secret         (Opaque)
@@ -231,6 +233,9 @@ lynq_app_backend:
     LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
     # Files are delegated to lynq-file-storage; this service holds no bucket config.
     LYNQ_FILE_STORAGE_URL: http://lynq-file-storage-service:8080/lynq-file-storage
+    AWS_REGION: us-east-1
+    AWS_ENDPOINT: ""
+    LYNQ_DOMAIN_EVENTS_TOPIC_ARN: "REPLACE_DOMAIN_EVENTS_TOPIC_ARN"
 
 # Owns every stored file: the bucket credentials, the pre-signed URLs and the
 # file metadata all live here.

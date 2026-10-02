@@ -242,6 +242,11 @@ lynq_app_backend:
     LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
     # Files are delegated to lynq-file-storage; this service holds no bucket config.
     LYNQ_FILE_STORAGE_URL: http://lynq-file-storage-service:8080/lynq-file-storage
+    AWS_REGION: us-east-1
+    AWS_ENDPOINT: http://localstack:4566
+    AWS_ACCESS_KEY_ID: test
+    AWS_SECRET_ACCESS_KEY: test
+    LYNQ_DOMAIN_EVENTS_TOPIC_ARN: arn:aws:sns:us-east-1:000000000000:lynq-domain-events
 
 # Owns every stored file: the bucket credentials, the pre-signed URLs and the
 # file metadata all live here.
