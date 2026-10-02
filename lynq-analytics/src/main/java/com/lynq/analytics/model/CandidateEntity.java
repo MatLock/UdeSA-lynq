@@ -35,9 +35,6 @@ public class CandidateEntity {
   @Column(name = "expected_salary_currency", length = 3)
   private String expectedSalaryCurrency;
 
-  @Column(name = "synthetic", nullable = false)
-  private boolean synthetic;
-
   @Column(name = "skills_occurred_on")
   private Instant skillsOccurredOn;
 

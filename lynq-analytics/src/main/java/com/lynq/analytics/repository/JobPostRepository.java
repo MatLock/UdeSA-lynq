@@ -12,15 +12,11 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface JobPostRepository extends JpaRepository<JobPostEntity, String> {
 
-  @Query("select count(j) from JobPostEntity j where :includeSynthetic = true or j.synthetic = false")
-  long countForTagFrequency(@Param("includeSynthetic") boolean includeSynthetic);
-
   @EntityGraph(attributePaths = {"tags", "skills"})
   @Query("""
       select distinct j from JobPostEntity j
       where j.id <> :jobId
-        and (:includeSynthetic = true or j.synthetic = false)
         and j.id in (select s.id from JobPostEntity s join s.tags t where t in :tags)""")
   List<JobPostEntity> findSharingTags(@Param("tags") Collection<String> tags,
-      @Param("jobId") String jobId, @Param("includeSynthetic") boolean includeSynthetic);
+      @Param("jobId") String jobId);
 }

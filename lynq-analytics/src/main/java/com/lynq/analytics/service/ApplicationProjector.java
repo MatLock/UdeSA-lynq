@@ -80,7 +80,6 @@ public class ApplicationProjector implements DomainEventProjector {
     application.setCandidateId(payload.userId());
     application.setAppliedOn(payload.appliedOn());
     application.setLynqScore(payload.lynqScore());
-    application.setSynthetic(Boolean.TRUE.equals(payload.synthetic()));
     application.setOccurredOn(message.occurredOn());
     applicationRepository.save(application);
     log.info("message= Projected {} '{}' onto application '{}' of candidate '{}' for job post '{}'",

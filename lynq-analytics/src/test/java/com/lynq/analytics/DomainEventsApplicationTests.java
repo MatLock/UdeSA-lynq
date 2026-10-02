@@ -39,8 +39,7 @@ class DomainEventsApplicationTests extends AbstractE2ETest {
   private static final String PAYLOAD = """
       {"jobId": "77777777-7777-7777-7777-777777777777",
        "userId": "11111111-1111-1111-1111-111111111111",
-       "viewedOn": "2026-09-29",
-       "synthetic": false}""";
+       "viewedOn": "2026-09-29"}""";
 
   private static final String NOT_JSON = "this is not a domain event";
   private static final String WITHOUT_EVENT_TYPE = """

@@ -8,7 +8,6 @@ import com.lynq.analytics.repository.ApplicationRepository;
 import com.lynq.analytics.repository.CandidateRepository;
 import com.lynq.analytics.repository.JobPostRepository;
 import com.lynq.analytics.repository.TagFrequencyRepository;
-import com.lynq.analytics.repository.TagFrequencyRepository.TagCount;
 import com.lynq.analytics.service.SimilarityService;
 import com.lynq.analytics.service.TagFrequencyService;
 import com.lynq.analytics.similarity.SimilarMatches;
@@ -63,7 +62,7 @@ class SimilarityApplicationTests extends AbstractE2ETest {
     jobPostRepository.deleteAll();
     candidateRepository.deleteAll();
     tagFrequencyRepository.deleteAll();
-    JOB_POSTS.forEach((id, tags) -> jobPostRepository.save(jobPost(id, tags, false)));
+    JOB_POSTS.forEach((id, tags) -> jobPostRepository.save(jobPost(id, tags)));
     tagFrequencyService.recompute();
   }
 
@@ -108,8 +107,8 @@ class SimilarityApplicationTests extends AbstractE2ETest {
 
   @Test
   void aTagInEveryJobPostAloneAdmitsNoCandidateAndARareOneAloneDoes() {
-    candidateRepository.save(candidate("C_TEAM", Set.of("teamwork"), false));
-    candidateRepository.save(candidate("C_KUBE", Set.of("kubernetes"), false));
+    candidateRepository.save(candidate("C_TEAM", Set.of("teamwork")));
+    candidateRepository.save(candidate("C_KUBE", Set.of("kubernetes")));
 
     SimilarMatches<CandidateEntity> matches = similarityService.findSimilarCandidates("RARE",
         candidate -> true);
@@ -120,9 +119,9 @@ class SimilarityApplicationTests extends AbstractE2ETest {
 
   @Test
   void fallsBackToOneMedianTagForCandidatesWhenFewerThanFivePass() {
-    candidateRepository.save(candidate("C_BS", Set.of("backend", "sql"), false));
-    candidateRepository.save(candidate("C_CLOUD", Set.of("Cloud"), false));
-    candidateRepository.save(candidate("C_TEAM", Set.of("teamwork"), false));
+    candidateRepository.save(candidate("C_BS", Set.of("backend", "sql")));
+    candidateRepository.save(candidate("C_CLOUD", Set.of("Cloud")));
+    candidateRepository.save(candidate("C_TEAM", Set.of("teamwork")));
 
     SimilarMatches<CandidateEntity> matches = similarityService.findSimilarCandidates("REF",
         candidate -> true);
@@ -134,9 +133,9 @@ class SimilarityApplicationTests extends AbstractE2ETest {
   @Test
   void keepsTheThresholdOfTwoMedianTagsForCandidatesWhenFivePass() {
     for (int i = 0; i < 5; i++) {
-      candidateRepository.save(candidate("C_ALL_" + i, Set.of("backend", "sql", "cloud"), false));
+      candidateRepository.save(candidate("C_ALL_" + i, Set.of("backend", "sql", "cloud")));
     }
-    candidateRepository.save(candidate("C_CLOUD", Set.of("cloud"), false));
+    candidateRepository.save(candidate("C_CLOUD", Set.of("cloud")));
 
     SimilarMatches<CandidateEntity> matches = similarityService.findSimilarCandidates("REF",
         candidate -> true);
@@ -147,26 +146,12 @@ class SimilarityApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void leavesSyntheticRowsOutWhenAskedTo() {
-    JobPostEntity synthetic = jobPostRepository.findById("N5").orElseThrow();
-    synthetic.setSynthetic(true);
-    jobPostRepository.save(synthetic);
-    candidateRepository.save(candidate("C_REAL", Set.of("backend"), false));
-    candidateRepository.save(candidate("C_SEED", Set.of("backend"), true));
-    Set<String> tags = Set.of("backend", "sql", "cloud", "teamwork");
+  void leavesTheReferenceOutOfTheJobPostsSharingItsTags() {
+    List<String> sharing = jobIds(jobPostRepository.findSharingTags(
+        Set.of("backend", "sql", "cloud", "teamwork"), "REF"));
 
-    List<String> withSynthetic = jobIds(jobPostRepository.findSharingTags(tags, "REF", true));
-    List<String> withoutSynthetic = jobIds(jobPostRepository.findSharingTags(tags, "REF", false));
-
-    assertThat(withSynthetic, hasItem("N5"));
-    assertThat(withoutSynthetic, not(hasItem("N5")));
-    assertThat(withoutSynthetic, not(hasItem("REF")));
-    assertThat(candidateRepository.findSharingTags(tags, false).stream()
-        .map(CandidateEntity::getId).toList(), contains("C_REAL"));
-    assertThat(jobPostRepository.countForTagFrequency(false), is(12L));
-    assertThat(tagFrequencyRepository.countJobPostTags(false).stream()
-        .filter(count -> count.getTag().equals("backend"))
-        .map(TagCount::getDf).toList(), contains(7L));
+    assertThat(sharing, hasItem("N5"));
+    assertThat(sharing, not(hasItem("REF")));
   }
 
   private void assertFrequency(String tag, int df, double weight) {
@@ -207,7 +192,7 @@ class SimilarityApplicationTests extends AbstractE2ETest {
     return jobPosts;
   }
 
-  private static JobPostEntity jobPost(String id, Set<String> tags, boolean synthetic) {
+  private static JobPostEntity jobPost(String id, Set<String> tags) {
     return JobPostEntity.builder()
         .id(id)
         .title(id)
@@ -215,17 +200,15 @@ class SimilarityApplicationTests extends AbstractE2ETest {
         .source("LYNQ")
         .status(JobStatus.OPEN)
         .publishedOn(LocalDate.parse("2026-09-20"))
-        .synthetic(synthetic)
         .tags(new HashSet<>(tags))
         .detailsOccurredOn(OCCURRED_ON)
         .statusOccurredOn(OCCURRED_ON)
         .build();
   }
 
-  private static CandidateEntity candidate(String id, Set<String> tags, boolean synthetic) {
+  private static CandidateEntity candidate(String id, Set<String> tags) {
     return CandidateEntity.builder()
         .id(id)
-        .synthetic(synthetic)
         .tags(new HashSet<>(tags))
         .skillsOccurredOn(OCCURRED_ON)
         .build();

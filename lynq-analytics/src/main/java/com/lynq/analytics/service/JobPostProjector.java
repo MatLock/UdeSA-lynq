@@ -81,7 +81,6 @@ public class JobPostProjector implements DomainEventProjector {
       job.setSalaryRangeTop(payload.salaryRangeTop());
       job.setSalaryCurrency(payload.salaryCurrency());
       job.setPublishedOn(payload.publishedOn());
-      job.setSynthetic(Boolean.TRUE.equals(payload.synthetic()));
       replace(job.getSkills(), payload.skills());
       replace(job.getTags(), payload.similarityTags());
       job.setDetailsOccurredOn(message.occurredOn());

@@ -7,6 +7,5 @@ public record ApplicationSubmittedPayload(
     String jobId,
     String userId,
     LocalDate appliedOn,
-    Integer lynqScore,
-    Boolean synthetic) {
+    Integer lynqScore) {
 }

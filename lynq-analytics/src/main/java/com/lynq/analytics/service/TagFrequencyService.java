@@ -1,6 +1,5 @@
 package com.lynq.analytics.service;
 
-import com.lynq.analytics.config.SimilarityProperties;
 import com.lynq.analytics.model.TagFrequencyEntity;
 import com.lynq.analytics.repository.JobPostRepository;
 import com.lynq.analytics.repository.TagFrequencyRepository;
@@ -18,21 +17,18 @@ public class TagFrequencyService {
 
   private final TagFrequencyRepository tagFrequencyRepository;
   private final JobPostRepository jobPostRepository;
-  private final SimilarityProperties properties;
 
   public TagFrequencyService(TagFrequencyRepository tagFrequencyRepository,
-      JobPostRepository jobPostRepository, SimilarityProperties properties) {
+      JobPostRepository jobPostRepository) {
     this.tagFrequencyRepository = tagFrequencyRepository;
     this.jobPostRepository = jobPostRepository;
-    this.properties = properties;
   }
 
   @Transactional
   public int recompute() {
     Instant computedOn = Instant.now().truncatedTo(ChronoUnit.MICROS);
-    long jobPosts = jobPostRepository.countForTagFrequency(properties.includeSynthetic());
-    List<TagFrequencyEntity> frequencies = tagFrequencyRepository
-        .countJobPostTags(properties.includeSynthetic()).stream()
+    long jobPosts = jobPostRepository.count();
+    List<TagFrequencyEntity> frequencies = tagFrequencyRepository.countJobPostTags().stream()
         .map(count -> TagFrequencyEntity.builder()
             .tag(count.getTag())
             .df((int) count.getDf())

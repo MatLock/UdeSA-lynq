@@ -46,7 +46,7 @@ class CandidateProjectorTest {
 
   private static final String SKILLS_UPDATED = """
       {"userId": "%s", "skills": ["Java", " Spring ", "java", ""],
-       "similarityTags": ["backend", "jvm", "Backend"], "synthetic": true,
+       "similarityTags": ["backend", "jvm", "Backend"],
        "notYetKnown": "ignored"}""".formatted(USER_ID);
 
   private static final String SALARY_UPDATED = """
@@ -79,7 +79,6 @@ class CandidateProjectorTest {
     assertThat(candidate.getId(), is(USER_ID));
     assertThat(candidate.getSkills(), containsInAnyOrder("Java", "Spring"));
     assertThat(candidate.getTags(), containsInAnyOrder("backend", "jvm"));
-    assertThat(candidate.isSynthetic(), is(true));
     assertThat(candidate.getSkillsOccurredOn(), is(T1));
     assertThat(candidate.getSalaryOccurredOn(), is(nullValue()));
     assertThat(candidate.getExpectedSalary(), is(nullValue()));
@@ -96,7 +95,6 @@ class CandidateProjectorTest {
     assertThat(saved(), is(sameInstance(candidate)));
     assertThat(candidate.getSkills(), containsInAnyOrder("Kotlin"));
     assertThat(candidate.getTags(), is(empty()));
-    assertThat(candidate.isSynthetic(), is(false));
     assertThat(candidate.getSkillsOccurredOn(), is(T2));
     assertThat(candidate.getExpectedSalary(), is(1500000));
     assertThat(candidate.getSalaryOccurredOn(), is(T1));
@@ -133,7 +131,6 @@ class CandidateProjectorTest {
     assertThat(candidate.getId(), is(USER_ID));
     assertThat(candidate.getExpectedSalary(), is(2000000));
     assertThat(candidate.getExpectedSalaryCurrency(), is("ARS"));
-    assertThat(candidate.isSynthetic(), is(false));
     assertThat(candidate.getSalaryOccurredOn(), is(T1));
     assertThat(candidate.getSkillsOccurredOn(), is(nullValue()));
     assertThat(candidate.getSkills(), is(empty()));

@@ -56,7 +56,7 @@ class JobPostProjectorTest {
        "workType": "REMOTE", "source": "LYNQ", "companyId": "%s", "createdByUserId": "%s",
        "salaryRangeDown": 1500000, "salaryRangeTop": 2200000, "salaryCurrency": "ARS",
        "skills": ["Java", " Spring ", "java", ""], "similarityTags": ["backend", "jvm"],
-       "publishedOn": "2026-09-20", "synthetic": true, "notYetKnown": "ignored"}"""
+       "publishedOn": "2026-09-20", "notYetKnown": "ignored"}"""
       .formatted(JOB_ID, COMPANY_ID, USER_ID);
 
   private static final String UPDATED = """
@@ -107,7 +107,6 @@ class JobPostProjectorTest {
     assertThat(job.getSalaryRangeTop(), is(2200000));
     assertThat(job.getSalaryCurrency(), is("ARS"));
     assertThat(job.getPublishedOn(), is(LocalDate.parse("2026-09-20")));
-    assertThat(job.isSynthetic(), is(true));
     assertThat(job.getStatus(), is(JobStatus.OPEN));
     assertThat(job.getClosedOn(), is(nullValue()));
     assertThat(job.getSkills(), containsInAnyOrder("Java", "Spring"));
@@ -117,7 +116,7 @@ class JobPostProjectorTest {
   }
 
   @Test
-  void publishedWithoutSyntheticIsNotSynthetic() {
+  void publishedWithoutSkillsOrTagsHasNone() {
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.empty());
 
     jobPostProjector.project(message(JOB_POST_PUBLISHED, T1, """
@@ -125,7 +124,6 @@ class JobPostProjectorTest {
          "publishedOn": "2026-09-20"}""".formatted(JOB_ID)));
 
     JobPostEntity job = saved();
-    assertThat(job.isSynthetic(), is(false));
     assertThat(job.getSkills(), is(empty()));
     assertThat(job.getTags(), is(empty()));
   }

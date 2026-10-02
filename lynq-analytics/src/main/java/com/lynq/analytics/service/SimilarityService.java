@@ -54,8 +54,7 @@ public class SimilarityService {
     if (referenceTags.isEmpty()) {
       return SimilarMatches.none();
     }
-    List<JobPostEntity> others = jobPostRepository.findSharingTags(referenceTags, jobId,
-        properties.includeSynthetic());
+    List<JobPostEntity> others = jobPostRepository.findSharingTags(referenceTags, jobId);
     return match(reference, referenceTags, others, JobPostEntity::getTags,
         JobPostEntity::getSkills, eligible, jobPostSimilarity);
   }
@@ -68,8 +67,7 @@ public class SimilarityService {
     if (referenceTags.isEmpty()) {
       return SimilarMatches.none();
     }
-    List<CandidateEntity> others = candidateRepository.findSharingTags(referenceTags,
-        properties.includeSynthetic());
+    List<CandidateEntity> others = candidateRepository.findSharingTags(referenceTags);
     return match(reference, referenceTags, others, CandidateEntity::getTags,
         CandidateEntity::getSkills, eligible, candidateSimilarity);
   }

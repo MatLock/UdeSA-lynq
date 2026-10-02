@@ -39,7 +39,7 @@ class ApplicationsApplicationTests extends AbstractE2ETest {
 
   private static final String SUBMITTED = """
       {"applicationId": "%s", "jobId": "%s", "userId": "%s", "appliedOn": "2026-09-22",
-       "lynqScore": 72, "synthetic": false}""".formatted(APPLICATION_ID, JOB_ID, USER_ID);
+       "lynqScore": 72}""".formatted(APPLICATION_ID, JOB_ID, USER_ID);
 
   private static final String INVALID_SCORE = """
       {"applicationId": "%s", "jobId": "%s", "userId": "%s", "appliedOn": "2026-09-22",
@@ -74,7 +74,6 @@ class ApplicationsApplicationTests extends AbstractE2ETest {
     assertThat(application.getCandidateId(), is(USER_ID));
     assertThat(application.getAppliedOn(), is(LocalDate.parse("2026-09-22")));
     assertThat(application.getLynqScore(), is(72));
-    assertThat(application.isSynthetic(), is(false));
   }
 
   @Test
