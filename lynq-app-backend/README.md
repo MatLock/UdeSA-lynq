@@ -226,6 +226,16 @@ always did.
 
 Nothing is stored: the score is computed per request, on every job that is read.
 
+**Scoring in batches.** `lynq-analytics` needs the score of candidates against job posts they never
+applied to, and must not keep a copy of the calculator. `POST /internal/score/batch`, behind the
+internal token, is the same calculator as a pure function: the request describes each job post and
+each candidate once — `id`, `skills`, `similarityTags` — and lists the `pairs` (`jobId`,
+`candidateId`) to score, up to 5000 profiles of each kind and 5000 pairs. The ids are opaque, so a
+caller can describe a candidate that does not exist, for instance a real one with a skill added.
+Nothing is read from or written to the database. The response lists `{jobId, candidateId, score}` in
+the order of the pairs; a pair naming an id the request does not describe, or an id described
+twice, is a `400`.
+
 **Where the candidate's skills come from.** The resume is the only place a candidate's skills are
 ever written down, so creating one (`POST /user/resume`) projects them onto the user:
 `skills.technical` and `skills.tools` become `user_skills`, and the similarity tags lynq-llm
