@@ -172,7 +172,7 @@ const update_job = async (
  * candidate who solved the same problem with a different technology — and travel
  * with the job post.
  *
- * lynq-ml is a Python service, so it speaks snake_case in both directions — the
+ * lynq-llm is a Python service, so it speaks snake_case in both directions — the
  * request goes out as work_type and the answer comes back as similarity_tags —
  * while the app-backend that stores them is Java and expects camelCase. The
  * conversion happens here. (The BFF relays this call verbatim, so nothing
@@ -378,7 +378,7 @@ const get_job_candidates = async (authFetch, jobId, { page = 0, pageSize = 10 } 
  * (JobController.explainCandidate) through `authFetch`. Owner-only: the backend
  * resolves the caller from the bearer token, requires them to own both the
  * company and the job post (403 otherwise), reads the job and candidate from the
- * database and forwards the pair to the lynq-ml service. `candidateId` is the
+ * database and forwards the pair to the lynq-llm service. `candidateId` is the
  * applicant's user id (JobCandidateResponse.userId), which the backend looks up
  * in the users table. Replies 404 when the job post or candidate does not exist.
  *

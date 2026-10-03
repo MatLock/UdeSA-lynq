@@ -16,7 +16,7 @@
  *      lists them. Then logs out.
  *   5. The candidate logs back in, finds the open job and applies to it.
  *   6. The candidate creates a resume by uploading a PDF (./files) — parsed by
- *      the ML service — then assigns an alias to it and overrides that alias,
+ *      the LLM service — then assigns an alias to it and overrides that alias,
  *      proving both writes stick.
  *   7. The candidate creates a second resume through the translation flow:
  *      runs the translation, picks a template, generates the live preview
@@ -155,7 +155,7 @@ const RECRUITER = {
 
 const RESUME = {
   file: RESUME_PDF,
-  // The language lynq-ml should detect in the document, and the language the
+  // The language lynq-llm should detect in the document, and the language the
   // switcher must then show for it.
   language: 'EN',
   // Assigned first, then overridden — assigning and renaming are the same
@@ -219,7 +219,7 @@ const JOB = {
   minSalary: '1200000',
   maxSalary: '1800000',
   // Skills are not typed in: they come from the "Generar habilidades" button,
-  // which asks the backend's ML endpoint for them. The exact list depends on
+  // which asks the backend's LLM endpoint for them. The exact list depends on
   // the model, so the test only requires that at least this many come back.
   minSkills: 1,
 }
@@ -558,7 +558,7 @@ const login = async (driver, username, password) => {
 // ---------------------------------------------------------------------------
 
 // Fills the skills in with the "Generar habilidades" button of SkillsField,
-// which posts the title, description and work type to the backend's ML endpoint
+// which posts the title, description and work type to the backend's LLM endpoint
 // (POST /ml/skill-enhance) and turns the answer into chips.
 //
 // The title, description and work type must already be filled in: the button
@@ -987,7 +987,7 @@ const languagesInSwitcher = async (driver) => {
 
 // Creates the candidate's first resume through the upload path of the wizard:
 // with no resume on file, /my-resume opens straight into the method step, where
-// "Subí un PDF o Word" registers the file, PUTs it to storage and has the ML
+// "Subí un PDF o Word" registers the file, PUTs it to storage and has the LLM
 // service read it into a structured resume. The import runs an LLM server-side,
 // hence the extra-long wait for the viewer to appear.
 const createResumeByUpload = async (driver, resume) => {
@@ -1083,7 +1083,7 @@ const createResumeFromForm = async (driver, resume) => {
   detail(`template chosen: ${resume.template}`)
 
   // Advancing renders the document server-side (the gateway signs the URLs and
-  // lynq-ml draws the PDF), so the preview step can take a while to arrive.
+  // lynq-llm draws the PDF), so the preview step can take a while to arrive.
   await click(driver, By.css('.resume-footer-next'))
   await waitForResumeStepNamed(driver, 'resume-preview-step', EXTRA_LONG_TIMEOUT)
   await waitVisible(driver, By.css('.resume-preview-page canvas'), EXTRA_LONG_TIMEOUT)

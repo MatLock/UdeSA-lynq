@@ -19,8 +19,8 @@ conversation API, which is reachable only from `lynq-bff`.
 | `GET` | `/lynq-agent/dmz/conversation/{id}` | The thread, the current resume and the list of versions |
 | `PATCH` | `/lynq-agent/dmz/conversation/{id}/applied` | Closes the conversation once `lynq-bff` applied with one of its resumes |
 
-Creating a conversation calls lynq-ml's `POST /dmz/skill-enhance` once and freezes the
-answer into `job_snapshot.extractedSkills`; if lynq-ml is unavailable the skills the
+Creating a conversation calls lynq-llm's `POST /dmz/skill-enhance` once and freezes the
+answer into `job_snapshot.extractedSkills`; if lynq-llm is unavailable the skills the
 posting already declares are used instead, and the conversation still opens.
 
 The greeting it answers with costs nothing: it is a Jinja template per language,
@@ -288,7 +288,7 @@ resolved from the token against lynq-iam's `/auth/user-info`, the same way lynq-
 resolves it, and that resolved user is the one a conversation belongs to — a `user-id`
 header names nobody. A missing `Authorization` is a 401, a token lynq-iam refuses is a 401,
 and lynq-iam being unreachable is a 503. Creating a conversation relays the same credential
-to lynq-ml, which resolves it for itself.
+to lynq-llm, which resolves it for itself.
 
 The roles that token carries are read too: tailoring a resume is a candidate's operation, so
 the four conversation routes sit behind `CandidatePrincipal` and answer 403 to anyone else.
@@ -385,8 +385,8 @@ guarantees are checked there.
 | `AGENT_MODEL_RETRIES` | `2` | Times a model call is retried when Bedrock rejects what the model emitted |
 | `AGENT_TURN_TIMEOUT` | `600` | Seconds before a `RUNNING` turn is treated as a dead process. Operational, never copied onto the row |
 | `AGENT_JOB_DESCRIPTION_MAX_CHARS` | `6000` | The posting is truncated to this before it is frozen into the snapshot |
-| `LYNQ_ML_URL` | `http://localhost:8084/lynq-ml` | Where the skill extraction of the posting is asked for |
-| `ML_TIMEOUT` | `300` | Seconds allowed for the lynq-ml call |
+| `LYNQ_LLM_URL` | `http://localhost:8084/lynq-llm` | Where the skill extraction of the posting is asked for |
+| `LYNQ_LLM_TIMEOUT` | `300` | Seconds allowed for the lynq-llm call |
 | `LYNQ_IAM_URL` | `http://localhost:8080/lynq-iam` | Where the caller's token is resolved |
 | `LYNQ_IAM_TIMEOUT` | `10` | Seconds allowed for that lookup |
 | `LLM_PROVIDER` | `ollama` | `ollama` for local development, `bedrock` in the cloud |

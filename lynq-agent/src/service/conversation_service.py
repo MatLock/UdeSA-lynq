@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from agent.context import SpanRecord, TurnContext, TurnOutcome, apply_pricing, utc_now
 from agent.turn import run_turn
 from agent.language import verify_resume_language
-from client.lynq_ml_client import SkillExtractionFailed
+from client.lynq_llm_client import SkillExtractionFailed
 from config import Settings
 from db import repository
 from logging_context import log_safe
@@ -58,12 +58,12 @@ class ConversationService:
     def __init__(
         self,
         session_factory: async_sessionmaker[AsyncSession],
-        lynq_ml_client,
+        lynq_llm_client,
         settings: Settings,
         loop_runner=run_turn,
     ) -> None:
         self._session_factory = session_factory
-        self._lynq_ml_client = lynq_ml_client
+        self._lynq_llm_client = lynq_llm_client
         self._settings = settings
         self._loop_runner = loop_runner
 
@@ -507,7 +507,7 @@ class ConversationService:
         self, job: dict, request_uuid: str, authorization: str
     ) -> list[str]:
         try:
-            return await self._lynq_ml_client.extract_skills(
+            return await self._lynq_llm_client.extract_skills(
                 job, request_uuid, authorization
             )
         except SkillExtractionFailed as exc:

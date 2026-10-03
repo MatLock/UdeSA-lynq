@@ -14,7 +14,7 @@ import static org.mockito.Mockito.when;
 
 import com.lynq.bff.client.LynqBackendClient;
 import com.lynq.bff.client.LynqFileStorageClient;
-import com.lynq.bff.client.LynqMlClient;
+import com.lynq.bff.client.LynqLlmClient;
 import com.lynq.bff.client.request.CreateResumeRequest;
 import com.lynq.bff.client.request.LanguageDetectionRequest;
 import com.lynq.bff.client.request.ParseResumeRequest;
@@ -72,14 +72,14 @@ class ResumeImportServiceTest {
   private LynqFileStorageClient lynqFileStorageClient;
 
   @Mock
-  private LynqMlClient lynqMlClient;
+  private LynqLlmClient lynqLlmClient;
 
   private ResumeImportService resumeImportService;
 
   @BeforeEach
   void setUp() {
     resumeImportService =
-        new ResumeImportService(lynqBackendClient, lynqFileStorageClient, lynqMlClient);
+        new ResumeImportService(lynqBackendClient, lynqFileStorageClient, lynqLlmClient);
   }
 
   @Test
@@ -103,18 +103,18 @@ class ResumeImportServiceTest {
 
     resumeImportService.importUploadedDocument(FILE_ID, UI_LANGUAGE, CALLER);
 
-    InOrder order = inOrder(lynqBackendClient, lynqFileStorageClient, lynqMlClient);
+    InOrder order = inOrder(lynqBackendClient, lynqFileStorageClient, lynqLlmClient);
     order.verify(lynqBackendClient).confirmResumeUpload(FILE_ID, REQUEST_UUID, AUTHORIZATION);
     order.verify(lynqFileStorageClient).createDownloadUrl(FILE_ID, REQUEST_UUID, AUTHORIZATION);
-    order.verify(lynqMlClient).parseResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
-    order.verify(lynqMlClient).detectLanguage(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
-    order.verify(lynqMlClient)
+    order.verify(lynqLlmClient).parseResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    order.verify(lynqLlmClient).detectLanguage(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    order.verify(lynqLlmClient)
         .extractResumeSkills(any(), eq(UI_LANGUAGE), eq(REQUEST_UUID), eq(AUTHORIZATION));
     order.verify(lynqBackendClient).createResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
   }
 
   @Test
-  void importSendsLynqMlTheSignedReadUrlOfTheUploadedDocument() {
+  void importSendsLynqLlmTheSignedReadUrlOfTheUploadedDocument() {
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("EN");
@@ -123,7 +123,7 @@ class ResumeImportServiceTest {
     resumeImportService.importUploadedDocument(FILE_ID, UI_LANGUAGE, CALLER);
 
     ArgumentCaptor<ParseResumeRequest> captor = ArgumentCaptor.forClass(ParseResumeRequest.class);
-    verify(lynqMlClient).parseResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    verify(lynqLlmClient).parseResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     assertThat(captor.getValue().getPreSignedUrl(), is(DOCUMENT_URL));
   }
 
@@ -138,7 +138,7 @@ class ResumeImportServiceTest {
 
     ArgumentCaptor<LanguageDetectionRequest> captor =
         ArgumentCaptor.forClass(LanguageDetectionRequest.class);
-    verify(lynqMlClient).detectLanguage(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    verify(lynqLlmClient).detectLanguage(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     String text = captor.getValue().getText();
     assertThat(text.contains(SUMMARY), is(true));
     assertThat(text.contains(ROLE_DESCRIPTION), is(true));
@@ -168,7 +168,7 @@ class ResumeImportServiceTest {
   @Test
   void importFallsBackToTheCallersLanguageWhenTheResumeHasNoProseToClassify() {
     givenReadUrl();
-    when(lynqMlClient.parseResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
+    when(lynqLlmClient.parseResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, Map.of(
             "personal_info", Map.of("full_name", FULL_NAME),
             "skills", Map.of("technical", List.of("Java")))));
@@ -176,7 +176,7 @@ class ResumeImportServiceTest {
 
     resumeImportService.importUploadedDocument(FILE_ID, UI_LANGUAGE, CALLER);
 
-    verify(lynqMlClient, never()).detectLanguage(any(), any(), any());
+    verify(lynqLlmClient, never()).detectLanguage(any(), any(), any());
     ArgumentCaptor<CreateResumeRequest> captor = ArgumentCaptor.forClass(CreateResumeRequest.class);
     verify(lynqBackendClient).createResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     assertThat(captor.getValue().getLanguage(), is(Language.ES));
@@ -199,7 +199,7 @@ class ResumeImportServiceTest {
   @Test
   void importDeletesTheDocumentWhenItCannotBeParsed() {
     givenReadUrl();
-    when(lynqMlClient.parseResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
+    when(lynqLlmClient.parseResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenThrow(new IllegalStateException("the LLM returned nonsense"));
 
     BadGatewayException exception = assertThrows(BadGatewayException.class,
@@ -234,13 +234,13 @@ class ResumeImportServiceTest {
 
     assertThat(exception.getMessage(), is(CONFIRM_FAILED));
     verify(lynqFileStorageClient, never()).deleteFile(any(), any(), any());
-    verify(lynqMlClient, never()).parseResume(any(), any(), any());
+    verify(lynqLlmClient, never()).parseResume(any(), any(), any());
   }
 
   @Test
   void importReportsTheFailureEvenWhenTheRollbackAlsoFails() {
     givenReadUrl();
-    when(lynqMlClient.parseResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
+    when(lynqLlmClient.parseResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenThrow(new IllegalStateException("the LLM returned nonsense"));
     doThrow(new IllegalStateException("delete exploded"))
         .when(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, AUTHORIZATION);
@@ -252,7 +252,7 @@ class ResumeImportServiceTest {
   }
 
   @Test
-  void importStoresTheSimilarityTagsLynqMlDerivesFromTheParsedResume() {
+  void importStoresTheSimilarityTagsLynqLlmDerivesFromTheParsedResume() {
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("EN");
@@ -277,17 +277,17 @@ class ResumeImportServiceTest {
     resumeImportService.importUploadedDocument(FILE_ID, UI_LANGUAGE, CALLER);
 
     ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-    verify(lynqMlClient)
+    verify(lynqLlmClient)
         .extractResumeSkills(captor.capture(), eq(UI_LANGUAGE), eq(REQUEST_UUID), eq(AUTHORIZATION));
     assertThat(captor.getValue(), is(sameInstance(PARSED_RESUME)));
   }
 
   @Test
-  void importStoresTheResumeWithoutTagsWhenLynqMlCannotDeriveThem() {
+  void importStoresTheResumeWithoutTagsWhenLynqLlmCannotDeriveThem() {
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("EN");
-    when(lynqMlClient.extractResumeSkills(any(), eq(UI_LANGUAGE), eq(REQUEST_UUID), eq(AUTHORIZATION)))
+    when(lynqLlmClient.extractResumeSkills(any(), eq(UI_LANGUAGE), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenThrow(new IllegalStateException("the LLM timed out"));
     givenStoredResume();
 
@@ -301,7 +301,7 @@ class ResumeImportServiceTest {
   }
 
   @Test
-  void importStoresTheResumeWithoutTagsWhenLynqMlOmitsThem() {
+  void importStoresTheResumeWithoutTagsWhenLynqLlmOmitsThem() {
     givenReadUrl();
     givenParsedResume();
     givenDetectedLanguage("EN");
@@ -324,18 +324,18 @@ class ResumeImportServiceTest {
   }
 
   private void givenParsedResume() {
-    when(lynqMlClient.parseResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
+    when(lynqLlmClient.parseResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, PARSED_RESUME));
   }
 
   private void givenDetectedLanguage(String language) {
-    when(lynqMlClient.detectLanguage(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
+    when(lynqLlmClient.detectLanguage(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true,
             LanguageDetectionResponse.builder().language(language).build()));
   }
 
   private void givenExtractedTags(List<String> similarityTags) {
-    when(lynqMlClient.extractResumeSkills(any(), eq(UI_LANGUAGE), eq(REQUEST_UUID), eq(AUTHORIZATION)))
+    when(lynqLlmClient.extractResumeSkills(any(), eq(UI_LANGUAGE), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true,
             SkillExtractionResponse.builder().similarityTags(similarityTags).build()));
   }

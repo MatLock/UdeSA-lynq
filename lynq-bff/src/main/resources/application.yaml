@@ -5,19 +5,19 @@ spring:
     openfeign:
       client:
         config:
-          # lynq-ml runs LLM generations; translating a whole resume is its
+          # lynq-llm runs LLM generations; translating a whole resume is its
           # longest one and can far exceed OpenFeign's 60s default read
-          # timeout (especially on a local Ollama model). Kept above lynq-ml's
+          # timeout (especially on a local Ollama model). Kept above lynq-llm's
           # own LLM_TIMEOUT so the model, not this gateway, decides the cutoff.
-          lynqMl:
+          lynqLlm:
             connectTimeout: 10000
             readTimeout: 310000
-          # The relayed lynq-ml endpoints are generations too — skill-enhance
+          # The relayed lynq-llm endpoints are generations too — skill-enhance
           # takes a minute on a local model — and Feign resolves this config by
           # client name, so the typed client's timeout above does not cover the
           # relay client. Without this, the gateway cuts the request at 60s and
-          # answers 502 while lynq-ml is still producing a good answer.
-          lynqMlDmz:
+          # answers 502 while lynq-llm is still producing a good answer.
+          lynqLlmDmz:
             connectTimeout: 10000
             readTimeout: 310000
           # A CV Tailor turn is an LLM loop of several steps, so it is longer
@@ -36,8 +36,8 @@ lynq:
     url: ${LYNQ_IAM_URL:http://localhost:8080/lynq-iam}
   backend:
     url: ${LYNQ_BACKEND_URL:http://localhost:8082/lynq-backend-app}
-  ml:
-    url: ${LYNQ_ML_URL:http://localhost:8084/lynq-ml}
+  llm:
+    url: ${LYNQ_LLM_URL:http://localhost:8084/lynq-llm}
   file-storage:
     url: ${LYNQ_FILE_STORAGE_URL:http://localhost:8085/lynq-file-storage}
   agent:

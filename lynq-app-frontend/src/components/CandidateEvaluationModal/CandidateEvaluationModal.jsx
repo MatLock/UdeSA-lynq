@@ -4,7 +4,7 @@ import strings from '../../i18n'
 import useModalDialog from '../../hooks/useModalDialog'
 import './CandidateEvaluationModal.css'
 
-// Normalize the free-text lynq-ml recommendation to a stable slug so the badge
+// Normalize the free-text lynq-llm recommendation to a stable slug so the badge
 // can be colored and (when it matches a known verdict) translated.
 const recommendationSlug = (recommendation) =>
   (recommendation ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_')

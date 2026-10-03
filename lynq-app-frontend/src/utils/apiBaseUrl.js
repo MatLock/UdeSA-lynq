@@ -1,6 +1,6 @@
 // The single origin the browser talks to: lynq-bff.
 //
-// Every call leaves through the gateway — the app-backend resources, the ML
+// Every call leaves through the gateway — the app-backend resources, the LLM
 // features, the files, and the lynq-iam auth endpoints it relays. lynq-iam has
 // no public route of its own, so there is one base URL here rather than one per
 // service, and `LYNQ_BFF_BASE_URL` is the only one Vite has to bake in.

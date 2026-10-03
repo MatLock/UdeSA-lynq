@@ -7,7 +7,7 @@ import httpx
 import requests
 
 from backend_client import BackendClient
-from ml_client import MlClient
+from llm_client import LlmClient
 from router.ingest import build_service
 from scraper import BumeranScraper, ComputrabajoScraper, get_scrapers
 from scraper.computrabajo import ComputrabajoScraper as RawComputrabajoScraper
@@ -107,24 +107,24 @@ class BumeranSessionTest(unittest.TestCase):
 
 class ReachabilityTest(unittest.IsolatedAsyncioTestCase):
 
-    async def test_ml_is_reachable_when_health_answers(self):
+    async def test_llm_is_reachable_when_health_answers(self):
         response = MagicMock()
         response.status_code = 200
-        with patch("ml_client.client.httpx.AsyncClient", return_value=_patched_get(response)):
-            client = MlClient("http://ml/lynq-ml", "system", "internal-token", 1.0)
+        with patch("llm_client.client.httpx.AsyncClient", return_value=_patched_get(response)):
+            client = LlmClient("http://llm/lynq-llm", "system", "internal-token", 1.0)
             self.assertTrue(await client.is_reachable())
 
-    async def test_ml_is_unreachable_on_a_transport_error(self):
+    async def test_llm_is_unreachable_on_a_transport_error(self):
         context = _patched_get(side_effect=httpx.ConnectError("refused"))
-        with patch("ml_client.client.httpx.AsyncClient", return_value=context):
-            client = MlClient("http://ml/lynq-ml", "system", "internal-token", 1.0)
+        with patch("llm_client.client.httpx.AsyncClient", return_value=context):
+            client = LlmClient("http://llm/lynq-llm", "system", "internal-token", 1.0)
             self.assertFalse(await client.is_reachable())
 
-    async def test_ml_is_unreachable_when_health_returns_a_server_error(self):
+    async def test_llm_is_unreachable_when_health_returns_a_server_error(self):
         response = MagicMock()
         response.status_code = 503
-        with patch("ml_client.client.httpx.AsyncClient", return_value=_patched_get(response)):
-            client = MlClient("http://ml/lynq-ml", "system", "internal-token", 1.0)
+        with patch("llm_client.client.httpx.AsyncClient", return_value=_patched_get(response)):
+            client = LlmClient("http://llm/lynq-llm", "system", "internal-token", 1.0)
             self.assertFalse(await client.is_reachable())
 
     async def test_backend_is_reachable_when_the_server_answers_at_all(self):
@@ -145,7 +145,7 @@ class BuildServiceTest(unittest.TestCase):
 
     def test_wires_the_clients_from_the_environment(self):
         env = {
-            "LYNQ_ML_URL": "http://ml:8084/lynq-ml",
+            "LYNQ_LLM_URL": "http://llm:8084/lynq-llm",
             "LYNQ_BACKEND_URL": "http://backend:8080/lynq-backend-app",
             "LYNQ_INTERNAL_TOKEN": "configured",
             "FEEDER_SOURCES": "bumeran",
@@ -153,7 +153,7 @@ class BuildServiceTest(unittest.TestCase):
         with patch.dict("os.environ", env, clear=True):
             service = build_service()
 
-        self.assertEqual(service.ml_client.base_url, "http://ml:8084/lynq-ml")
+        self.assertEqual(service.llm_client.base_url, "http://llm:8084/lynq-llm")
         self.assertEqual(service.backend_client.base_url, "http://backend:8080/lynq-backend-app")
         self.assertEqual(service.backend_client.internal_token, "configured")
         self.assertEqual(len(service.scrapers_for(service.plan_for(None))), 1)

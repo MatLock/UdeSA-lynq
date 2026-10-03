@@ -63,8 +63,8 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   private static final String CREATE_COMPANY_PATH = "/dmz/company";
   private static final String CREATE_JOB_PATH = "/dmz/job";
   private static final String RESUME_PATH = "/dmz/user/resume";
-  private static final String ML_UPSKILLING_PATH = "/dmz/upskilling_suggestion";
-  private static final String ML_CANDIDATE_EXPLANATION_PATH = "/dmz/candidate-explanation";
+  private static final String LLM_UPSKILLING_PATH = "/dmz/upskilling_suggestion";
+  private static final String LLM_CANDIDATE_EXPLANATION_PATH = "/dmz/candidate-explanation";
   private static final String USERINFO_PATH = "/auth/user-info";
 
   private static final String AUTHORIZATION_HEADER = "Authorization";
@@ -216,7 +216,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   @BeforeEach
   void setUp() {
     lynqIamMock.reset();
-    lynqMlMock.reset();
+    lynqLlmMock.reset();
     lynqFileStorageMock.reset();
     stubFileStorageDownloadUrls();
     userApplicationJobRepository.deleteAll();
@@ -878,9 +878,9 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     List<Map<String, Object>> suggestions = (List<Map<String, Object>>) data.get("suggestions");
     assertThat(suggestions.get(0).get("query"), is(UPSKILLING_QUERY));
 
-    lynqMlMock.verify(request()
+    lynqLlmMock.verify(request()
         .withMethod("POST")
-        .withPath(ML_UPSKILLING_PATH)
+        .withPath(LLM_UPSKILLING_PATH)
         .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID)
         .withHeader(AUTHORIZATION_HEADER, BEARER_TOKEN)
         .withHeader(COMPANY_ID_HEADER, COMPANY_ID)
@@ -898,9 +898,9 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     HttpResponse<String> response = getUpskillingSuggestion(JOB_ID, "es");
 
     assertThat(response.statusCode(), is(200));
-    lynqMlMock.verify(request()
+    lynqLlmMock.verify(request()
         .withMethod("POST")
-        .withPath(ML_UPSKILLING_PATH)
+        .withPath(LLM_UPSKILLING_PATH)
         .withHeader(OUTPUT_LANGUAGE_HEADER, "es"));
   }
 
@@ -915,7 +915,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     HttpResponse<String> response = getUpskillingSuggestion(JOB_ID);
 
     assertThat(response.statusCode(), is(401));
-    lynqMlMock.verify(request().withPath(ML_UPSKILLING_PATH), VerificationTimes.exactly(0));
+    lynqLlmMock.verify(request().withPath(LLM_UPSKILLING_PATH), VerificationTimes.exactly(0));
   }
 
   @Test
@@ -929,7 +929,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
     assertThat(response.statusCode(), is(403));
     assertThat(parse(response.body()).get("success"), is(false));
-    lynqMlMock.verify(request().withPath(ML_UPSKILLING_PATH), VerificationTimes.exactly(0));
+    lynqLlmMock.verify(request().withPath(LLM_UPSKILLING_PATH), VerificationTimes.exactly(0));
   }
 
   @Test
@@ -942,7 +942,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
     assertThat(response.statusCode(), is(404));
     assertThat(parse(response.body()).get("success"), is(false));
-    lynqMlMock.verify(request().withPath(ML_UPSKILLING_PATH), VerificationTimes.exactly(0));
+    lynqLlmMock.verify(request().withPath(LLM_UPSKILLING_PATH), VerificationTimes.exactly(0));
   }
 
   @Test
@@ -971,9 +971,9 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     assertThat(strengths, contains(CANDIDATE_STRENGTH));
     assertThat(concerns, contains(CANDIDATE_CONCERN));
 
-    lynqMlMock.verify(request()
+    lynqLlmMock.verify(request()
         .withMethod("POST")
-        .withPath(ML_CANDIDATE_EXPLANATION_PATH)
+        .withPath(LLM_CANDIDATE_EXPLANATION_PATH)
         .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID)
         .withHeader(AUTHORIZATION_HEADER, BEARER_TOKEN)
         .withHeader(COMPANY_ID_HEADER, COMPANY_ID)
@@ -992,7 +992,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
     HttpResponse<String> response = getCandidateExplanation(JOB_ID, CANDIDATE_A_ID);
 
     assertThat(response.statusCode(), is(401));
-    lynqMlMock.verify(request().withPath(ML_CANDIDATE_EXPLANATION_PATH), VerificationTimes.exactly(0));
+    lynqLlmMock.verify(request().withPath(LLM_CANDIDATE_EXPLANATION_PATH), VerificationTimes.exactly(0));
   }
 
   @Test
@@ -1008,7 +1008,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
     assertThat(response.statusCode(), is(403));
     assertThat(parse(response.body()).get("success"), is(false));
-    lynqMlMock.verify(request().withPath(ML_CANDIDATE_EXPLANATION_PATH), VerificationTimes.exactly(0));
+    lynqLlmMock.verify(request().withPath(LLM_CANDIDATE_EXPLANATION_PATH), VerificationTimes.exactly(0));
   }
 
   @Test
@@ -1022,7 +1022,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
 
     assertThat(response.statusCode(), is(404));
     assertThat(parse(response.body()).get("success"), is(false));
-    lynqMlMock.verify(request().withPath(ML_CANDIDATE_EXPLANATION_PATH), VerificationTimes.exactly(0));
+    lynqLlmMock.verify(request().withPath(LLM_CANDIDATE_EXPLANATION_PATH), VerificationTimes.exactly(0));
   }
 
   @Test
@@ -1983,7 +1983,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   private void stubMlUpskillingSuggestion() {
-    lynqMlMock.when(request().withMethod("POST").withPath(ML_UPSKILLING_PATH))
+    lynqLlmMock.when(request().withMethod("POST").withPath(LLM_UPSKILLING_PATH))
         .respond(response()
             .withStatusCode(200)
             .withContentType(MediaType.APPLICATION_JSON)
@@ -2005,7 +2005,7 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   private void stubMlCandidateExplanation() {
-    lynqMlMock.when(request().withMethod("POST").withPath(ML_CANDIDATE_EXPLANATION_PATH))
+    lynqLlmMock.when(request().withMethod("POST").withPath(LLM_CANDIDATE_EXPLANATION_PATH))
         .respond(response()
             .withStatusCode(200)
             .withContentType(MediaType.APPLICATION_JSON)

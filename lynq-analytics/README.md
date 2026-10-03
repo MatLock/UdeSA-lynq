@@ -158,7 +158,7 @@ Once an event is stored, `DomainEventService` hands it to every `DomainEventProj
 
 ## Similarity
 
-The analytics compare a job post with **similar job posts** (time to fill, salary of the position) and with **similar candidates** (their expected salary). Similarity is set overlap on similarity tags, each tag weighted by how rare it is among job posts. There is no trained model and no embeddings: the semantic step already happens when `lynq-ml` turns skills into generalised tags.
+The analytics compare a job post with **similar job posts** (time to fill, salary of the position) and with **similar candidates** (their expected salary). Similarity is set overlap on similarity tags, each tag weighted by how rare it is among job posts. There is no trained model and no embeddings: the semantic step already happens when `lynq-llm` turns skills into generalised tags.
 
 ### Tag weights
 

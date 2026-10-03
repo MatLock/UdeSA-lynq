@@ -4,7 +4,7 @@
 [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/jacoco-app-backend.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-app-backend-test-workflow.yaml)
 [![Version](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/version.svg)](https://github.com/MatLock/UdeSA-lynq/releases)
 
-Core application service for the Lynq platform. It owns the product domain — **user profiles**, **companies**, and **job posts** — and exposes the **job feed** that mixes Lynq-native postings with externally scraped ones, ranked per candidate with a **LyNQ match score**. It also brokers **profile/company image uploads** through the [`lynq-file-storage`](../lynq-file-storage) service and calls `lynq-ml` for the two **candidate evaluations** whose payload it assembles from its own database.
+Core application service for the Lynq platform. It owns the product domain — **user profiles**, **companies**, and **job posts** — and exposes the **job feed** that mixes Lynq-native postings with externally scraped ones, ranked per candidate with a **LyNQ match score**. It also brokers **profile/company image uploads** through the [`lynq-file-storage`](../lynq-file-storage) service and calls `lynq-llm` for the two **candidate evaluations** whose payload it assembles from its own database.
 
 Authentication is **not** handled here. Every protected request is validated against the [`lynq-iam`](../lynq-iam) identity provider, and the resolved user identity is loaded into the security context for the duration of the request.
 
@@ -18,7 +18,7 @@ Authentication is **not** handled here. Every protected request is validated aga
 - [Core flows](#core-flows)
   - [Create a job post](#1-create-a-job-post)
   - [Search the job feed](#2-search-the-job-feed)
-  - [Candidate evaluations via lynq-ml](#3-candidate-evaluations-via-lynq-ml)
+  - [Candidate evaluations via lynq-llm](#3-candidate-evaluations-via-lynq-llm)
   - [Image upload](#4-image-upload-pre-signed-urls)
   - [Domain events](#5-domain-events)
 - [Data model](#data-model)
@@ -40,7 +40,7 @@ Authentication is **not** handled here. Every protected request is validated aga
 | Framework         | Spring Boot 4.0.6 (Web, Data JPA, Actuator, AOP, Security, Validation)       |
 | Web server        | Jetty (Tomcat excluded)                                                      |
 | Persistence       | MySQL 9, Hibernate / Spring Data JPA, Liquibase migrations                   |
-| Inter-service     | Spring Cloud OpenFeign — clients for `lynq-iam`, `lynq-ml` and `lynq-file-storage` |
+| Inter-service     | Spring Cloud OpenFeign — clients for `lynq-iam`, `lynq-llm` and `lynq-file-storage` |
 | Object storage    | None here — delegated to `lynq-file-storage`, which owns the bucket and signs the URLs |
 | IDs               | `java-uuid-generator` (time-ordered UUIDv7) for domain entities             |
 | Validation        | Hibernate Validator, Bean Validation (Jakarta)                              |
@@ -48,7 +48,7 @@ Authentication is **not** handled here. Every protected request is validated aga
 | Logging           | Log4j2 + SLF4J MDC for per-request correlation IDs; `@AuditLog` aspect       |
 | Metrics           | Micrometer + Prometheus registry                                            |
 | Build             | Maven (Spring Boot plugin), Dockerfile on `eclipse-temurin:21-jre-alpine`   |
-| Tests             | JUnit Jupiter, Testcontainers (MockServer for `lynq-iam` / `lynq-ml` / `lynq-file-storage`), H2, JaCoCo |
+| Tests             | JUnit Jupiter, Testcontainers (MockServer for `lynq-iam` / `lynq-llm` / `lynq-file-storage`), H2, JaCoCo |
 
 ---
 
@@ -74,7 +74,7 @@ Authentication is **not** handled here. Every protected request is validated aga
         │ /dmz/user    │ /dmz/company │ /dmz/job       │
         └──────┬───────┴──────┬───────┴───────┬────────┘
                ▼              ▼               ▼
-        ┌────────────┐ ┌────────────┐ ┌────────────┐──► lynq-ml
+        ┌────────────┐ ┌────────────┐ ┌────────────┐──► lynq-llm
         │UserService │ │CompanyServ.│ │ JobService │    (candidate-explanation,
         └─────┬──────┘ └─────┬──────┘ └─────┬──────┘     upskilling_suggestion)
               │              │              │
@@ -93,8 +93,8 @@ Authentication is **not** handled here. Every protected request is validated aga
 **Layers**
 
 - **Controller** (`controller/`) — thin HTTP layer. Each interface (e.g. `JobController`) carries OpenAPI annotations; the `*Impl` maps HTTP verbs to service calls and wraps responses in `GlobalRestResponse<T>`. The authenticated user is injected via `@AuthenticationPrincipal LynqUserPrincipal`.
-- **Service** (`service/`) — business logic. `UserService`, `CompanyService`, and `JobService` own their aggregates; `FileStorageService` is the only door to `lynq-file-storage`, which owns every stored file (this service keeps just the file ids); `JobService` also calls `lynq-ml` for the candidate evaluations.
-- **Client** (`client/`) — Feign clients for the three downstream services (`LynqIamClient`, `LynqMLClient`, `LynqFileStorageClient`) plus their request/response DTOs.
+- **Service** (`service/`) — business logic. `UserService`, `CompanyService`, and `JobService` own their aggregates; `FileStorageService` is the only door to `lynq-file-storage`, which owns every stored file (this service keeps just the file ids); `JobService` also calls `lynq-llm` for the candidate evaluations.
+- **Client** (`client/`) — Feign clients for the three downstream services (`LynqIamClient`, `LynqLlmClient`, `LynqFileStorageClient`) plus their request/response DTOs.
 - **Filters** (`filter/`) — cross-cutting request handling registered via `FilterConfig` with explicit ordering. `PublicPaths` is the single whitelist consulted by the auth filters (only Swagger assets are public).
 - **Security** (`security/`) — `LynqUserPrincipal` is the identity `lynq-iam` resolves from the access token, stored as the Spring Security principal. The token's signature is verified upstream by `lynq-bff`, not here.
 - **Aspect** (`aspect/`) — the `@AuditLog` annotation + `LogAspect` produce structured entry/exit logs around annotated methods, masking sensitive fields.
@@ -137,7 +137,7 @@ caller may reach, `AUTHORIZED_BY_OWNERSHIP` for what the service authorizes by w
 ("only the owner of the job post can close it"). A listed route that no longer exists fails the build
 too, so the list cannot rot into a wishlist.
 
-> The `lynq-request-uuid` header is forwarded on every downstream call to `lynq-iam` and `lynq-ml`, so a single logical request can be traced across all services by its UUID.
+> The `lynq-request-uuid` header is forwarded on every downstream call to `lynq-iam` and `lynq-llm`, so a single logical request can be traced across all services by its UUID.
 
 ---
 
@@ -208,7 +208,7 @@ How much of what a job asks for the authenticated candidate has, as a percentage
 `COMPANY` users; `0` when the candidate has nothing recorded or the job asks for nothing.
 
 A job is described **twice**: by its literal skills (`Kafka`) and by the *similarity tags*
-lynq-ml derives from them (`Asynchronous Messaging`). The candidate is described the same way. The
+lynq-llm derives from them (`Asynchronous Messaging`). The candidate is described the same way. The
 score is computed against both descriptions and **the better one wins**:
 
 ```
@@ -228,15 +228,15 @@ Nothing is stored: the score is computed per request, on every job that is read.
 
 **Where the candidate's skills come from.** The resume is the only place a candidate's skills are
 ever written down, so creating one (`POST /user/resume`) projects them onto the user:
-`skills.technical` and `skills.tools` become `user_skills`, and the similarity tags lynq-ml
+`skills.technical` and `skills.tools` become `user_skills`, and the similarity tags lynq-llm
 extracted become `user_similarity_tags`. Soft skills are left out — a job requirement is not
 "Leadership". New entries are **added** to what the candidate already has rather than replacing it:
 the same person may hold one resume per language or per role, and the skills of the one they are
 not looking at right now are no less true.
 
-### 3. Candidate evaluations via lynq-ml
+### 3. Candidate evaluations via lynq-llm
 
-`JobService` calls `lynq-ml` for two evaluations: `candidate-explanation` (a hiring verdict for one
+`JobService` calls `lynq-llm` for two evaluations: `candidate-explanation` (a hiring verdict for one
 applicant) and `upskilling_suggestion` (what a candidate would need to learn for a job). Both build
 their payload from this service's own database — the job post, the application and the candidate —
 after checking that the caller may see them, which is exactly why they cannot be called from the
@@ -254,14 +254,14 @@ sequenceDiagram
     participant Ctrl as JobControllerImpl
     participant Svc as JobService
     participant DB as MySQL
-    participant ML as lynq-ml
+    participant LLM as lynq-llm
 
     C->>Ctrl: GET /dmz/job/{jobId}/candidate/{candidateId}/candidate-explanation
     Ctrl->>Svc: explainCandidate(...)
     Svc->>DB: load application → job post + candidate
     Svc->>Svc: caller must own the job post
-    Svc->>ML: POST /dmz/candidate-explanation<br/>headers: lynq-request-uuid, Authorization, company-id
-    ML-->>Svc: { outcome, strengths, concerns }
+    Svc->>LLM: POST /dmz/candidate-explanation<br/>headers: lynq-request-uuid, Authorization, company-id
+    LLM-->>Svc: { outcome, strengths, concerns }
     Svc-->>Ctrl: CandidateExplanationResponse
     Ctrl-->>C: 200 OK
 ```
@@ -337,7 +337,7 @@ Liquibase provisions the `lynq_backend_db` schema on startup (`resources/changel
 | `job_posts`            | Job postings. `job_status` ∈ {`OPEN`, `CLOSE`}, `job_post_source` ∈ {`LYNQ`, `LINKEDIN`, `COMPUTRABAJO`, `BUMERAN`}, `work_type` ∈ {`REMOTE`, `IN_OFFICE`}. FKs to `users` (poster) and `companies` — both nullable for scraped jobs. `salary_currency` (backfilled `ARS` where there is a salary) and `category` come from the post; `last_seen_on`, `last_checked_on` and `close_reason` ∈ {`OWNER`, `VERIFIED_CLOSED`, `VERIFIED_GONE`, `EXPIRED_BY_POLICY`} track whether an external post is still alive. |
 | `job_post_skills`      | Skills required by a job (`job_id`, `skill`), unique per pair.                           |
 | `user_skills`          | Skills a user has (`user_id`, `skill`), unique per pair — drives the LyNQ score. Written when a resume is created. |
-| `job_post_similarity_tags` | Generalized capabilities of a job (`job_id`, `similarity_tag`), unique per pair. Derived by lynq-ml, never displayed — they only widen the LyNQ score. |
+| `job_post_similarity_tags` | Generalized capabilities of a job (`job_id`, `similarity_tag`), unique per pair. Derived by lynq-llm, never displayed — they only widen the LyNQ score. |
 | `user_similarity_tags` | The same for a candidate (`user_id`, `similarity_tag`). A post asking for Kafka and a candidate who used RabbitMQ meet here, on `Asynchronous Messaging`. |
 | `user_resumes`         | Uploaded/generated résumés (`resume` JSON, `language`, `lynq_file_storage_id` → the PDF held by `lynq-file-storage`). |
 | `user_application_job` | A user's application to a job (unique per `job_post_id` + `user_id`).                    |
@@ -491,7 +491,7 @@ curl "http://localhost:8082/lynq-backend-app/dmz/job?page=0&size=20&filterValue=
 - Maven 3.9+ (or the bundled `./mvnw`)
 - A reachable MySQL 9 (`lynq_backend_db`), a running `lynq-iam`, and — for uploads — a running `lynq-file-storage`
 
-The default `application.yaml` targets `localhost:3306` (MySQL, `root` / `federico`), `lynq-iam` at `http://localhost:8080/lynq-iam`, `lynq-ml` at `http://localhost:8084/lynq-ml`, and `lynq-file-storage` at `http://localhost:8085/lynq-file-storage`. Override anything that differs.
+The default `application.yaml` targets `localhost:3306` (MySQL, `root` / `federico`), `lynq-iam` at `http://localhost:8080/lynq-iam`, `lynq-llm` at `http://localhost:8084/lynq-llm`, and `lynq-file-storage` at `http://localhost:8085/lynq-file-storage`. Override anything that differs.
 
 **Steps**
 
@@ -516,7 +516,7 @@ Service URLs (default profile):
 - Swagger UI: `http://localhost:8082/lynq-backend-app/swagger-ui.html`
 - Actuator / Prometheus: `http://localhost:8083/actuator`
 
-**Tests** (Testcontainers spins up a MockServer per downstream service — `lynq-iam`, `lynq-ml` and `lynq-file-storage`; Docker must be running):
+**Tests** (Testcontainers spins up a MockServer per downstream service — `lynq-iam`, `lynq-llm` and `lynq-file-storage`; Docker must be running):
 
 ```bash
 ./mvnw test
@@ -526,7 +526,7 @@ Service URLs (default profile):
 
 ## Running with Docker
 
-The repo-root `docker-compose.yaml` provisions the whole platform — MySQL, LocalStack, `lynq-iam`, `lynq-ml` (+ Ollama), `lynq-file-storage`, this backend, and the frontend. Run compose from the repository root (one level up):
+The repo-root `docker-compose.yaml` provisions the whole platform — MySQL, LocalStack, `lynq-iam`, `lynq-llm` (+ Ollama), `lynq-file-storage`, this backend, and the frontend. Run compose from the repository root (one level up):
 
 ```bash
 # Build the jar first (the image just COPYs it in)
@@ -553,7 +553,7 @@ Two profiles ship with the project:
 | `DB_USERNAME`           | MySQL user                                 | |
 | `DB_PASSWORD`           | MySQL password                             | |
 | `LYNQ_IAM_URL`          | `lynq.iam.url` (Feign client)              | default `http://lynq-iam:8080/lynq-iam` |
-| `LYNQ_ML_URL`           | `lynq.ml.url` (Feign client)               | default `http://localhost:8084/lynq-ml` |
+| `LYNQ_LLM_URL`          | `lynq.llm.url` (Feign client)              | default `http://localhost:8084/lynq-llm` |
 | `LYNQ_FILE_STORAGE_URL` | `lynq.file-storage.url` (Feign client)     | default `http://lynq-file-storage:8080/lynq-file-storage`. The bucket belongs to `lynq-file-storage`; the `AWS_*` variables below are for SNS only |
 | `LYNQ_DOMAIN_EVENTS_TOPIC_ARN` | `lynq.events.topic-arn`             | required in production; ARN of `lynq-domain-events` |
 | `AWS_REGION`            | `lynq.aws.region` (SNS client)             | default `us-east-1` |
@@ -564,7 +564,7 @@ Two profiles ship with the project:
 
 ## Observability
 
-- **Logs** — Log4j2 (`log4j2-spring.xml`). Every entry carries the `requestId` MDC key set by `RequestUuidFilter`, so logs for one request correlate across `lynq-app-backend`, `lynq-iam`, and `lynq-ml` by the same UUID.
+- **Logs** — Log4j2 (`log4j2-spring.xml`). Every entry carries the `requestId` MDC key set by `RequestUuidFilter`, so logs for one request correlate across `lynq-app-backend`, `lynq-iam`, and `lynq-llm` by the same UUID.
 - **Audit logs** — methods annotated with `@AuditLog` are wrapped by `LogAspect`, which logs entry/exit + (sanitized) arguments. Fields named `password`, `newPassword`, `refreshToken`, and `accessToken` are masked, recursively, in both parameters and serialized bodies.
 - **Health** — `/actuator/health` with `liveness`/`readiness` probes, on the management port (`8083` default / `8081` prod).
 - **Metrics** — `/actuator/prometheus` exports Micrometer metrics in Prometheus format.
@@ -579,7 +579,7 @@ src/
 │   ├── java/com/lynq/backend/
 │   │   ├── LynqAppBackendApplication.java
 │   │   ├── aspect/        # @AuditLog + LogAspect (sensitive-field masking)
-│   │   ├── client/        # Feign clients for lynq-iam, lynq-ml & lynq-file-storage + DTOs
+│   │   ├── client/        # Feign clients for lynq-iam, lynq-llm & lynq-file-storage + DTOs
 │   │   ├── config/        # App (Jackson), Security, Filter, OpenAPI beans
 │   │   ├── controller/    # Controller interfaces + impls, request/response DTOs, error handler
 │   │   ├── enums/         # WorkType, JobStatus, JobPostSource, Language

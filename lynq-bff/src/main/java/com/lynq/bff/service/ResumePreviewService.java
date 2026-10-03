@@ -2,7 +2,7 @@ package com.lynq.bff.service;
 
 import com.lynq.bff.client.LynqBackendClient;
 import com.lynq.bff.client.LynqFileStorageClient;
-import com.lynq.bff.client.LynqMlClient;
+import com.lynq.bff.client.LynqLlmClient;
 import com.lynq.bff.client.request.CreateFileUploadRequest;
 import com.lynq.bff.client.request.ResumeTemplateCreationRequest;
 import com.lynq.bff.client.response.CreateFileUploadResponse;
@@ -31,14 +31,14 @@ public class ResumePreviewService {
 
   private final LynqBackendClient lynqBackendClient;
   private final LynqFileStorageClient lynqFileStorageClient;
-  private final LynqMlClient lynqMlClient;
+  private final LynqLlmClient lynqLlmClient;
 
   public ResumePreviewService(LynqBackendClient lynqBackendClient,
                               LynqFileStorageClient lynqFileStorageClient,
-                              LynqMlClient lynqMlClient) {
+                              LynqLlmClient lynqLlmClient) {
     this.lynqBackendClient = lynqBackendClient;
     this.lynqFileStorageClient = lynqFileStorageClient;
-    this.lynqMlClient = lynqMlClient;
+    this.lynqLlmClient = lynqLlmClient;
   }
 
   public ResumePreviewRestResponse preview(PreviewResumeRequest request, Caller caller) {
@@ -124,7 +124,7 @@ public class ResumePreviewService {
         .template(request.getTemplate())
         .build();
 
-    lynqMlClient.createResumeTemplate(renderRequest, caller.requestUuid(), caller.authorization());
+    lynqLlmClient.createResumeTemplate(renderRequest, caller.requestUuid(), caller.authorization());
   }
 
   private String readUrl(String fileId, Caller caller) {

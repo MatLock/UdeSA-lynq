@@ -46,7 +46,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
   // Messaging" for a candidate who used RabbitMQ). They are never shown — the
   // resume does not display them — but they ship with it so the LyNQ score can
   // match this candidate against a job asking for an equivalent technology.
-  // lynq-ml is Python, hence the snake_case field on the way in.
+  // lynq-llm is Python, hence the snake_case field on the way in.
   const [similarityTags, setSimilarityTags] = useState(() => data.similarityTags ?? [])
   const [errors, setErrors] = useState({})
   const [generating, setGenerating] = useState(false)
@@ -91,7 +91,7 @@ const ResumeEmploymentStep = ({ active, stepNumber, totalSteps }) => {
     pruneEntries(data.education ?? []).length > 0 ||
     Boolean(data.personal?.summary?.trim())
 
-  // Ask lynq-ml (through the backend) which skills the resume implies, then merge
+  // Ask lynq-llm (through the backend) which skills the resume implies, then merge
   // them into the three buckets. Merging rather than replacing keeps whatever the
   // candidate typed themselves; cleanList drops duplicates case-insensitively.
   const handleGenerateSkills = async () => {

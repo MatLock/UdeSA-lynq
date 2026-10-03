@@ -1,7 +1,7 @@
 {{- if and .Values.localInfra .Values.ollamaInCluster }}
 # Optional in-cluster Ollama (only when ollamaInCluster=true). By default local
 # uses the Ollama already running on the host machine, so this is not rendered.
-# In prod lynq-ml points at an external OLLAMA_BASE_URL.
+# In prod lynq-llm points at an external OLLAMA_BASE_URL.
 # The container starts `ollama serve`, waits until it is responsive, pulls the
 # configured model, then keeps serving. The model is persisted on a PVC so it is
 # not re-downloaded on every restart.
@@ -48,8 +48,8 @@ spec:
               pid=$!
               echo "waiting for ollama to become responsive..."
               until /bin/ollama list >/dev/null 2>&1; do sleep 1; done
-              echo "pulling model {{ .Values.lynq_ml.config.OLLAMA_MODEL }}..."
-              /bin/ollama pull {{ .Values.lynq_ml.config.OLLAMA_MODEL }} || true
+              echo "pulling model {{ .Values.lynq_llm.config.OLLAMA_MODEL }}..."
+              /bin/ollama pull {{ .Values.lynq_llm.config.OLLAMA_MODEL }} || true
               wait $pid
           ports:
             - name: http

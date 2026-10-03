@@ -22,22 +22,22 @@ public abstract class AbstractE2ETest {
   protected static final MockServerContainer LYNQ_IAM = new MockServerContainer(MOCKSERVER_IMAGE)
       .withReuse(true);
 
-  protected static final MockServerContainer LYNQ_ML = new MockServerContainer(MOCKSERVER_IMAGE)
+  protected static final MockServerContainer LYNQ_LLM = new MockServerContainer(MOCKSERVER_IMAGE)
       .withReuse(true);
 
   protected static final MockServerContainer LYNQ_FILE_STORAGE =
       new MockServerContainer(MOCKSERVER_IMAGE).withReuse(true);
 
   protected static MockServerClient lynqIamMock;
-  protected static MockServerClient lynqMlMock;
+  protected static MockServerClient lynqLlmMock;
   protected static MockServerClient lynqFileStorageMock;
 
   static {
     LYNQ_IAM.start();
     lynqIamMock = new MockServerClient(LYNQ_IAM.getHost(), LYNQ_IAM.getServerPort());
 
-    LYNQ_ML.start();
-    lynqMlMock = new MockServerClient(LYNQ_ML.getHost(), LYNQ_ML.getServerPort());
+    LYNQ_LLM.start();
+    lynqLlmMock = new MockServerClient(LYNQ_LLM.getHost(), LYNQ_LLM.getServerPort());
 
     LYNQ_FILE_STORAGE.start();
     lynqFileStorageMock =
@@ -47,7 +47,7 @@ public abstract class AbstractE2ETest {
   @DynamicPropertySource
   static void registerDynamicProperties(DynamicPropertyRegistry registry) {
     registry.add("lynq.iam.url", LYNQ_IAM::getEndpoint);
-    registry.add("lynq.ml.url", LYNQ_ML::getEndpoint);
+    registry.add("lynq.llm.url", LYNQ_LLM::getEndpoint);
     registry.add("lynq.file-storage.url", LYNQ_FILE_STORAGE::getEndpoint);
   }
 }

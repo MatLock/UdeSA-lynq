@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lynq-llm-config
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-llm
+data:
+{{- range $key, $value := .Values.lynq_llm.config }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}

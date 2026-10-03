@@ -116,7 +116,7 @@ const TranslateTemplateModal = ({ source, language, resume, onCompleted, onCance
     setTemplate(picked)
   }
 
-  // freshAuthFetch, not authFetch: rendering goes through lynq-ml and can take
+  // freshAuthFetch, not authFetch: rendering goes through lynq-llm and can take
   // a while, so the flow leaves with a token that has its whole lifetime ahead.
   const renderPreview = async () => {
     if (busy) return

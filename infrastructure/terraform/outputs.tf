@@ -63,9 +63,9 @@ output "backend_sns_access_key_id" {
   value       = aws_iam_access_key.backend_sns.id
 }
 
-output "ml_bedrock_access_key_id" {
-  description = "Access key id of the Bedrock-only IAM user consumed by lynq-ml (the secret lives only in state / the k8s Secret)."
-  value       = aws_iam_access_key.ml_bedrock.id
+output "llm_bedrock_access_key_id" {
+  description = "Access key id of the Bedrock-only IAM user consumed by lynq-llm (the secret lives only in state / the k8s Secret)."
+  value       = aws_iam_access_key.llm_bedrock.id
 }
 
 output "eks_cluster_name" {

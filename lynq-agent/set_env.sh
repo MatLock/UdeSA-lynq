@@ -24,11 +24,11 @@ export AGENT_MODEL_RETRIES="${AGENT_MODEL_RETRIES:-2}"
 export AGENT_TURN_TIMEOUT="${AGENT_TURN_TIMEOUT:-600}"
 export AGENT_JOB_DESCRIPTION_MAX_CHARS="${AGENT_JOB_DESCRIPTION_MAX_CHARS:-6000}"
 
-export LYNQ_ML_URL="${LYNQ_ML_URL:-http://localhost:8084/lynq-ml}"
-export ML_TIMEOUT="${ML_TIMEOUT:-300}"
+export LYNQ_LLM_URL="${LYNQ_LLM_URL:-http://localhost:8084/lynq-llm}"
+export LYNQ_LLM_TIMEOUT="${LYNQ_LLM_TIMEOUT:-300}"
 
 # Every /dmz route resolves who is calling against lynq-iam from the request's
-# Authorization header, and that same credential is relayed to lynq-ml.
+# Authorization header, and that same credential is relayed to lynq-llm.
 export LYNQ_IAM_URL="${LYNQ_IAM_URL:-http://localhost:8080/lynq-iam}"
 export LYNQ_IAM_TIMEOUT="${LYNQ_IAM_TIMEOUT:-10}"
 

@@ -1,7 +1,7 @@
 package com.lynq.bff.service;
 
 import com.lynq.bff.client.LynqBackendClient;
-import com.lynq.bff.client.LynqMlClient;
+import com.lynq.bff.client.LynqLlmClient;
 import com.lynq.bff.client.request.TranslateResumeRequest;
 import com.lynq.bff.client.response.SupportedLanguageResponse;
 import com.lynq.bff.client.response.UserResumeResponse;
@@ -34,12 +34,12 @@ public class ResumeTranslationService {
   private static final String TRANSLATE_FAILED = "The resume could not be translated";
 
   private final LynqBackendClient lynqBackendClient;
-  private final LynqMlClient lynqMlClient;
+  private final LynqLlmClient lynqLlmClient;
 
   public ResumeTranslationService(LynqBackendClient lynqBackendClient,
-                                  LynqMlClient lynqMlClient) {
+                                  LynqLlmClient lynqLlmClient) {
     this.lynqBackendClient = lynqBackendClient;
-    this.lynqMlClient = lynqMlClient;
+    this.lynqLlmClient = lynqLlmClient;
   }
 
   public Object translate(String resumeId, String targetLanguage, Caller caller) {
@@ -118,7 +118,7 @@ public class ResumeTranslationService {
         .build();
 
     try {
-      return lynqMlClient
+      return lynqLlmClient
           .translateResume(request, caller.requestUuid(), caller.authorization())
           .getData();
     } catch (RuntimeException e) {

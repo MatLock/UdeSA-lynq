@@ -35,7 +35,7 @@ cloudflare_zone_id = "REPLACE_CF_ZONE_ID"
 s3_bucket_name  = "REPLACE_BUCKET_NAME"
 ollama_base_url = "REPLACE_OLLAMA_BASE_URL"
 
-# lynq-ml runs on Bedrock in prod (LLM_PROVIDER=bedrock in k8s_values-prod.yaml).
+# lynq-llm runs on Bedrock in prod (LLM_PROVIDER=bedrock in k8s_values-prod.yaml).
 # The model must be enabled in this region's Bedrock console.
 bedrock_model_id = "amazon.nova-lite-v1:0"
 bedrock_region   = "us-east-1"

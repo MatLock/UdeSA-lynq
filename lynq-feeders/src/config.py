@@ -30,8 +30,8 @@ def _csv(name: str, default: str) -> list[str]:
 class Settings:
 
     def __init__(self) -> None:
-        self.ml_url: str = os.getenv(
-            "LYNQ_ML_URL", "http://localhost:8084/lynq-ml"
+        self.llm_url: str = os.getenv(
+            "LYNQ_LLM_URL", "http://localhost:8084/lynq-llm"
         ).rstrip("/")
         self.backend_url: str = os.getenv(
             "LYNQ_BACKEND_URL", "http://localhost:8082/lynq-backend-app"
@@ -49,8 +49,8 @@ class Settings:
         self.sources: list[str] = _csv("FEEDER_SOURCES", DEFAULT_SOURCES)
 
         self.http_timeout: float = _float("HTTP_TIMEOUT", 30.0)
-        self.ml_timeout: float = _float("ML_TIMEOUT", 300.0)
-        self.ml_concurrency: int = _int("ML_CONCURRENCY", 2)
+        self.llm_timeout: float = _float("LYNQ_LLM_TIMEOUT", 300.0)
+        self.llm_concurrency: int = _int("LYNQ_LLM_CONCURRENCY", 2)
         self.scrape_timeout: float = _float("SCRAPE_TIMEOUT", 25.0)
 
 

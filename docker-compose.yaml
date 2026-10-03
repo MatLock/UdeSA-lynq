@@ -86,7 +86,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - LYNQ_IAM_URL=http://lynq-iam:8080/lynq-iam
       - LYNQ_BACKEND_URL=http://lynq-app-backend:8080/lynq-backend-app
-      - LYNQ_ML_URL=http://lynq-ml:8084/lynq-ml
+      - LYNQ_LLM_URL=http://lynq-llm:8084/lynq-llm
       - LYNQ_FILE_STORAGE_URL=http://lynq-file-storage:8080/lynq-file-storage
       - LYNQ_AGENT_URL=http://lynq-agent:8090/lynq-agent
       - LYNQ_ANALYTICS_URL=http://lynq-analytics:8080/lynq-analytics
@@ -97,7 +97,7 @@ services:
         condition: service_started
       lynq-file-storage:
         condition: service_started
-      lynq-ml:
+      lynq-llm:
         condition: service_started
       lynq-agent:
         condition: service_started
@@ -169,8 +169,8 @@ services:
     entrypoint: ["/bin/sh", "-c", "ollama pull \"$${OLLAMA_MODEL}\""]
     restart: "no"
 
-  lynq-ml:
-    build: ./lynq-ml
+  lynq-llm:
+    build: ./lynq-llm
     ports:
       - "8084:8084"
     environment:
@@ -197,7 +197,7 @@ services:
       ollama-pull:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8084/lynq-ml/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8084/lynq-llm/health')"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -209,19 +209,19 @@ services:
       - "8089:8089"
     environment:
       - PORT=8089
-      - LYNQ_ML_URL=http://lynq-ml:8084/lynq-ml
+      - LYNQ_LLM_URL=http://lynq-llm:8084/lynq-llm
       - LYNQ_BACKEND_URL=http://lynq-app-backend:8080/lynq-backend-app
       - LYNQ_INTERNAL_TOKEN=${LYNQ_INTERNAL_TOKEN:-local-internal-token-not-a-secret}
       - LYNQ_FEEDERS_SYSTEM_USER_ID=${LYNQ_FEEDERS_SYSTEM_USER_ID:-00000000-0000-0000-0000-00000000feed}
       - FEEDER_CATEGORIES=${FEEDER_CATEGORIES:-ADMINISTRACION,TECNOLOGIA,CONTABILIDAD,RECURSOS_HUMANOS}
       - FEEDER_SOURCES=${FEEDER_SOURCES:-bumeran,computrabajo}
       - FEEDER_JOBS_PER_CATEGORY=${FEEDER_JOBS_PER_CATEGORY:-10}
-      - ML_CONCURRENCY=${ML_CONCURRENCY:-2}
-      - ML_TIMEOUT=${ML_TIMEOUT:-300}
+      - LYNQ_LLM_CONCURRENCY=${LYNQ_LLM_CONCURRENCY:-2}
+      - LYNQ_LLM_TIMEOUT=${LYNQ_LLM_TIMEOUT:-300}
     depends_on:
       lynq-app-backend:
         condition: service_started
-      lynq-ml:
+      lynq-llm:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8089/lynq-feeders/health')"]
@@ -243,8 +243,8 @@ services:
       - AGENT_ABANDON_AFTER_DAYS=${AGENT_ABANDON_AFTER_DAYS:-7}
       - AGENT_TRACE_TTL_DAYS=${AGENT_TRACE_TTL_DAYS:-30}
       - AGENT_CONVERSATION_TTL_DAYS=${AGENT_CONVERSATION_TTL_DAYS:-180}
-      - LYNQ_ML_URL=http://lynq-ml:8084/lynq-ml
-      - ML_TIMEOUT=${ML_TIMEOUT:-300}
+      - LYNQ_LLM_URL=http://lynq-llm:8084/lynq-llm
+      - LYNQ_LLM_TIMEOUT=${LYNQ_LLM_TIMEOUT:-300}
       - LYNQ_IAM_URL=http://lynq-iam:8080/lynq-iam
       - LYNQ_IAM_TIMEOUT=${LYNQ_IAM_TIMEOUT:-10}
       # Both limits are parameterised so they can be dropped to 2 and exercised
@@ -282,7 +282,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-      lynq-ml:
+      lynq-llm:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/lynq-agent/health')"]

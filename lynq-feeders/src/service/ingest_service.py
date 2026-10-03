@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from backend_client import BackendClient, BackendError, IngestStats
 from config import Settings
-from ml_client import MlClient, MlError
+from llm_client import LlmClient, LlmError
 from model import IngestOverrides, RunPlan
 from scraper import Listing, Scraper, get_scrapers
 
@@ -78,12 +78,12 @@ class IngestService:
     def __init__(
         self,
         settings: Settings,
-        ml_client: MlClient,
+        llm_client: LlmClient,
         backend_client: BackendClient,
         scrapers: Optional[list[Scraper]] = None,
     ) -> None:
         self.settings = settings
-        self.ml_client = ml_client
+        self.llm_client = llm_client
         self.backend_client = backend_client
         self._scrapers = scrapers
 
@@ -180,10 +180,10 @@ class IngestService:
 
         work_type = REMOTE if listing.remote else IN_OFFICE
         try:
-            result = await self.ml_client.skill_enhance(
+            result = await self.llm_client.skill_enhance(
                 request_uuid, listing.title, listing.description, work_type
             )
-        except MlError as exc:
+        except LlmError as exc:
             return f"skill-enhance failed: {exc}"
 
         listing.skills = result.skills
@@ -196,7 +196,7 @@ class IngestService:
     async def _enrich_all(
         self, request_uuid: str, listings: list[Listing]
     ) -> list[EnrichmentFailure]:
-        semaphore = asyncio.Semaphore(max(1, self.settings.ml_concurrency))
+        semaphore = asyncio.Semaphore(max(1, self.settings.llm_concurrency))
 
         async def guarded(listing: Listing) -> Optional[str]:
             async with semaphore:

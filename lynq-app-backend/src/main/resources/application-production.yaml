@@ -31,8 +31,8 @@ spring:
 lynq:
   iam:
     url: ${LYNQ_IAM_URL:http://lynq-iam:8080/lynq-iam}
-  ml:
-    url: ${LYNQ_ML_URL:http://localhost:8084/lynq-ml}
+  llm:
+    url: ${LYNQ_LLM_URL:http://localhost:8084/lynq-llm}
   file-storage:
     url: ${LYNQ_FILE_STORAGE_URL:http://lynq-file-storage:8080/lynq-file-storage}
   internal:

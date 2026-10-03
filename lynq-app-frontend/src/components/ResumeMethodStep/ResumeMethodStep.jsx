@@ -13,7 +13,7 @@ import resumeService from '../../services/resumeService'
 import strings, { activeLocale } from '../../i18n'
 import './ResumeMethodStep.css'
 
-// Documents lynq-ml can read (see file_reader/resume_reader.py), and the size cap
+// Documents lynq-llm can read (see file_reader/resume_reader.py), and the size cap
 // we apply before spending a pre-signed URL on a file that is too large.
 const ACCEPTED_EXTENSIONS = ['.pdf', '.doc', '.docx']
 const MAX_FILE_BYTES = 10 * 1024 * 1024

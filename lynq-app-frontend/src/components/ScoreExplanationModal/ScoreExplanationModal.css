@@ -131,7 +131,7 @@
   color: var(--text-h);
 }
 
-/* One skill gap (the ml query) and its course links. */
+/* One skill gap (the llm query) and its course links. */
 .score-modal-suggestion {
   display: flex;
   flex-direction: column;

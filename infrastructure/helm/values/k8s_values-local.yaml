@@ -13,7 +13,7 @@ createNamespace: true
 # (RDS, ElastiCache, S3) and the apps point at them via config.
 localInfra: true
 
-# By default lynq-ml uses the Ollama running on your host machine (see
+# By default lynq-llm uses the Ollama running on your host machine (see
 # OLLAMA_BASE_URL below) instead of a heavy in-cluster Ollama. Set this to true
 # to deploy Ollama inside the cluster (pulls the model on first start).
 ollamaInCluster: false
@@ -83,9 +83,9 @@ lynq_app_frontend:
     limits:
       memory: 64Mi
 
-lynq_ml:
+lynq_llm:
   replicas: 1
-  image: matlock0o/lynq:lynq-ml-3.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-llm-3.0.2-SNAPSHOT
   resources:
     requests:
       cpu: 100m
@@ -132,8 +132,8 @@ lynq_agent:
     PORT: "8090"
     HOST: "0.0.0.0"
     DB_MIGRATE_ON_STARTUP: "true"
-    LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
-    ML_TIMEOUT: "300"
+    LYNQ_LLM_URL: http://lynq-llm-service:8084/lynq-llm
+    LYNQ_LLM_TIMEOUT: "300"
     LYNQ_IAM_URL: http://lynq-iam-service:8080/lynq-iam
     LYNQ_IAM_TIMEOUT: "10"
     # Both limits are copied onto each conversation row at creation, so changing
@@ -160,7 +160,7 @@ lynq_agent:
     AGENT_TRACE_TTL_DAYS: "30"
     AGENT_CONVERSATION_TTL_DAYS: "180"
     LLM_PROVIDER: ollama
-    # Same host Ollama lynq-ml uses; see the note in its config above.
+    # Same host Ollama lynq-llm uses; see the note in its config above.
     OLLAMA_BASE_URL: http://host.minikube.internal:11434
     OLLAMA_MODEL: qwen2.5:7b
     # Only read when LLM_PROVIDER=bedrock. The loop is meant for Nova Pro
@@ -184,14 +184,14 @@ lynq_feeders:
   config:
     PORT: "8089"
     HOST: "0.0.0.0"
-    LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
+    LYNQ_LLM_URL: http://lynq-llm-service:8084/lynq-llm
     LYNQ_BACKEND_URL: http://lynq-app-backend-service:8080/lynq-backend-app
     LYNQ_FEEDERS_SYSTEM_USER_ID: 00000000-0000-0000-0000-00000000feed
     FEEDER_CATEGORIES: ADMINISTRACION,TECNOLOGIA,CONTABILIDAD,RECURSOS_HUMANOS
     FEEDER_SOURCES: bumeran,computrabajo
     FEEDER_JOBS_PER_CATEGORY: "10"
-    ML_CONCURRENCY: "2"
-    ML_TIMEOUT: "300"
+    LYNQ_LLM_CONCURRENCY: "2"
+    LYNQ_LLM_TIMEOUT: "300"
     HTTP_TIMEOUT: "30"
     SCRAPE_TIMEOUT: "25"
   cron:
@@ -222,7 +222,7 @@ lynq_bff:
     SPRING_PROFILES_ACTIVE: production
     LYNQ_IAM_URL: http://lynq-iam-service:8080/lynq-iam
     LYNQ_BACKEND_URL: http://lynq-app-backend-service:8080/lynq-backend-app
-    LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
+    LYNQ_LLM_URL: http://lynq-llm-service:8084/lynq-llm
     LYNQ_FILE_STORAGE_URL: http://lynq-file-storage-service:8080/lynq-file-storage
     LYNQ_AGENT_URL: http://lynq-agent-service:8090/lynq-agent
 
@@ -239,7 +239,7 @@ lynq_app_backend:
     SPRING_PROFILES_ACTIVE: production
     DB_URL: jdbc:mysql://mysql:3306/lynq_backend_db
     LYNQ_IAM_URL: http://lynq-iam-service:8080/lynq-iam
-    LYNQ_ML_URL: http://lynq-ml-service:8084/lynq-ml
+    LYNQ_LLM_URL: http://lynq-llm-service:8084/lynq-llm
     # Files are delegated to lynq-file-storage; this service holds no bucket config.
     LYNQ_FILE_STORAGE_URL: http://lynq-file-storage-service:8080/lynq-file-storage
     AWS_REGION: us-east-1

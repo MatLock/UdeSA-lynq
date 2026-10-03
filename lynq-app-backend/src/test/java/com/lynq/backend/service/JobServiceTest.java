@@ -221,7 +221,7 @@ class JobServiceTest {
   private FileStorageService fileStorageService;
 
   @Mock
-  private com.lynq.backend.client.LynqMLClient lynqMLClient;
+  private com.lynq.backend.client.LynqLlmClient lynqLlmClient;
 
   @Mock
   private SecurityContext securityContext;
@@ -241,7 +241,7 @@ class JobServiceTest {
   void setUp() {
     jobService = new JobService(jobPostRepository, companyRepository, userRepository,
         userApplicationJobRepository, userResumeRepository, jobPostSkillRepository,
-        jobPostSimilarityTagRepository, fileStorageService, lynqMLClient, domainEventPublisher);
+        jobPostSimilarityTagRepository, fileStorageService, lynqLlmClient, domainEventPublisher);
     lenient().when(fileStorageService.obtainDownloadUrls(anyList())).thenReturn(Map.of());
     SecurityContextHolder.setContext(securityContext);
   }
@@ -1467,14 +1467,14 @@ class JobServiceTest {
         .thenReturn(Optional.of(application(job, candidate)));
     when(companyRepository.findByOwner(owner))
         .thenReturn(Optional.of(CompanyEntity.builder().id(COMPANY_ID).owner(owner).build()));
-    when(lynqMLClient.candidateExplanation(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(COMPANY_ID)))
+    when(lynqLlmClient.candidateExplanation(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(COMPANY_ID)))
         .thenReturn(new GlobalRestResponse<>(true, explanationResponse()));
     ArgumentCaptor<CandidateEvaluationRequest> requestCaptor =
         ArgumentCaptor.forClass(CandidateEvaluationRequest.class);
 
     jobService.explainCandidate(JOB_ID, CANDIDATE_ID, REQUEST_UUID);
 
-    verify(lynqMLClient).candidateExplanation(requestCaptor.capture(), eq(REQUEST_UUID),
+    verify(lynqLlmClient).candidateExplanation(requestCaptor.capture(), eq(REQUEST_UUID),
         eq(BEARER_TOKEN), eq(COMPANY_ID));
     CandidateEvaluationRequest forwarded = requestCaptor.getValue();
     assertThat(forwarded.getJob().getSkills(), contains(SKILL_JAVA, SKILL_SPRING, SKILL_POSTGRES));
@@ -1494,14 +1494,14 @@ class JobServiceTest {
         .thenReturn(Optional.of(application(job, candidate)));
     when(companyRepository.findByOwner(owner))
         .thenReturn(Optional.of(CompanyEntity.builder().id(COMPANY_ID).owner(owner).build()));
-    CandidateExplanationResponse mlResponse = explanationResponse();
-    when(lynqMLClient.candidateExplanation(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(COMPANY_ID)))
-        .thenReturn(new GlobalRestResponse<>(true, mlResponse));
+    CandidateExplanationResponse llmResponse = explanationResponse();
+    when(lynqLlmClient.candidateExplanation(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(COMPANY_ID)))
+        .thenReturn(new GlobalRestResponse<>(true, llmResponse));
 
     CandidateExplanationResponse result =
         jobService.explainCandidate(JOB_ID, CANDIDATE_ID, REQUEST_UUID);
 
-    assertThat(result, is(sameInstance(mlResponse)));
+    assertThat(result, is(sameInstance(llmResponse)));
     assertThat(result.getRecommendation(), is(CANDIDATE_RECOMMENDATION));
     assertThat(result.getExplanation(), is(CANDIDATE_EXPLANATION_TEXT));
   }
@@ -1515,7 +1515,7 @@ class JobServiceTest {
     NotFoundException exception = assertThrows(NotFoundException.class,
         () -> jobService.explainCandidate(JOB_ID, CANDIDATE_ID, REQUEST_UUID));
     assertThat(exception.getMessage(), is(CANDIDATE_APPLICATION_NOT_FOUND));
-    verify(lynqMLClient, never()).candidateExplanation(any(), any(), any(), any());
+    verify(lynqLlmClient, never()).candidateExplanation(any(), any(), any(), any());
   }
 
   @Test
@@ -1531,7 +1531,7 @@ class JobServiceTest {
     ForbiddenException exception = assertThrows(ForbiddenException.class,
         () -> jobService.explainCandidate(JOB_ID, CANDIDATE_ID, REQUEST_UUID));
     assertThat(exception.getMessage(), is(ONLY_JOB_OWNER_CAN_EXPLAIN_CANDIDATES));
-    verify(lynqMLClient, never()).candidateExplanation(any(), any(), any(), any());
+    verify(lynqLlmClient, never()).candidateExplanation(any(), any(), any(), any());
   }
 
   @Test
@@ -1547,7 +1547,7 @@ class JobServiceTest {
     BadRequestException exception = assertThrows(BadRequestException.class,
         () -> jobService.explainCandidate(JOB_ID, CANDIDATE_ID, REQUEST_UUID));
     assertThat(exception.getMessage(), is(USER_NOT_LINKED_TO_COMPANY));
-    verify(lynqMLClient, never()).candidateExplanation(any(), any(), any(), any());
+    verify(lynqLlmClient, never()).candidateExplanation(any(), any(), any(), any());
   }
 
   @Test
@@ -1555,7 +1555,7 @@ class JobServiceTest {
     stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA, SKILL_SPRING)));
     JobPostEntity job = jobWithCompany(List.of(SKILL_JAVA, SKILL_SPRING, SKILL_POSTGRES));
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
-    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(COMPANY_ID),
+    when(lynqLlmClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(COMPANY_ID),
         eq(OUTPUT_LANGUAGE)))
         .thenReturn(new GlobalRestResponse<>(true, upskillingResponse()));
     ArgumentCaptor<CandidateEvaluationRequest> requestCaptor =
@@ -1563,7 +1563,7 @@ class JobServiceTest {
 
     jobService.suggestUpskilling(JOB_ID, REQUEST_UUID, OUTPUT_LANGUAGE);
 
-    verify(lynqMLClient).upskillingSuggestion(requestCaptor.capture(), eq(REQUEST_UUID),
+    verify(lynqLlmClient).upskillingSuggestion(requestCaptor.capture(), eq(REQUEST_UUID),
         eq(BEARER_TOKEN), eq(COMPANY_ID), eq(OUTPUT_LANGUAGE));
     CandidateEvaluationRequest forwarded = requestCaptor.getValue();
     assertThat(forwarded.getJob().getSkills(), contains(SKILL_JAVA, SKILL_SPRING, SKILL_POSTGRES));
@@ -1578,15 +1578,15 @@ class JobServiceTest {
     stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA)));
     when(jobPostRepository.findById(JOB_ID))
         .thenReturn(Optional.of(jobWithCompany(List.of(SKILL_JAVA, SKILL_SPRING))));
-    UpskillingSuggestionResponse mlResponse = upskillingResponse();
-    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(COMPANY_ID),
+    UpskillingSuggestionResponse llmResponse = upskillingResponse();
+    when(lynqLlmClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(COMPANY_ID),
         eq(OUTPUT_LANGUAGE)))
-        .thenReturn(new GlobalRestResponse<>(true, mlResponse));
+        .thenReturn(new GlobalRestResponse<>(true, llmResponse));
 
     UpskillingSuggestionResponse result =
         jobService.suggestUpskilling(JOB_ID, REQUEST_UUID, OUTPUT_LANGUAGE);
 
-    assertThat(result, is(sameInstance(mlResponse)));
+    assertThat(result, is(sameInstance(llmResponse)));
   }
 
   @Test
@@ -1594,13 +1594,13 @@ class JobServiceTest {
     stubAuthenticatedUser(authenticatedCandidate(List.of(SKILL_JAVA)));
     JobPostEntity job = ownedJob(companyUser(), List.of(SKILL_JAVA));
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
-    when(lynqMLClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(""),
+    when(lynqLlmClient.upskillingSuggestion(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(""),
         eq(OUTPUT_LANGUAGE)))
         .thenReturn(new GlobalRestResponse<>(true, upskillingResponse()));
 
     jobService.suggestUpskilling(JOB_ID, REQUEST_UUID, OUTPUT_LANGUAGE);
 
-    verify(lynqMLClient).upskillingSuggestion(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(""),
+    verify(lynqLlmClient).upskillingSuggestion(any(), eq(REQUEST_UUID), eq(BEARER_TOKEN), eq(""),
         eq(OUTPUT_LANGUAGE));
   }
 
@@ -1612,7 +1612,7 @@ class JobServiceTest {
     NotFoundException exception = assertThrows(NotFoundException.class,
         () -> jobService.suggestUpskilling(JOB_ID, REQUEST_UUID, OUTPUT_LANGUAGE));
     assertThat(exception.getMessage(), is(JOB_POST_NOT_FOUND));
-    verify(lynqMLClient, never()).upskillingSuggestion(any(), any(), any(), any(), any());
+    verify(lynqLlmClient, never()).upskillingSuggestion(any(), any(), any(), any(), any());
   }
 
   private UserEntity authenticatedCandidate(List<String> skillNames) {

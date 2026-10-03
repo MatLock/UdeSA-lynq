@@ -44,7 +44,7 @@ const initialsOf = (fullName) => {
     .join('')
 }
 
-// Read-only rendering of a resume JSON (the shape lynq-ml extracts and the
+// Read-only rendering of a resume JSON (the shape lynq-llm extracts and the
 // backend stores). Every field is optional, so each block is rendered only when
 // it holds content; the caller passes the already-filtered `sections` list so the
 // document and the section nav can never disagree about what exists.

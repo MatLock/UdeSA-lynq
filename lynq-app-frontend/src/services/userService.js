@@ -209,7 +209,7 @@ const get_user_applications = async (authFetch, { page = 0, size = 10 } = {}) =>
  *
  * Calls GET /user/upskilling-suggestion/{jobPostId}
  * (UserController.suggestUpskilling) through `authFetch`. The backend asks
- * lynq-ml to explain the candidate's LYNQ score against that job and, when the
+ * lynq-llm to explain the candidate's LYNQ score against that job and, when the
  * candidate isn't a perfect match, to suggest courses that close each skill gap.
  * The correlation-id header the endpoint requires is added by authFetch, so we
  * only pass the job id. Candidate-resolved from the bearer token.
@@ -218,7 +218,7 @@ const get_user_applications = async (authFetch, { page = 0, size = 10 } = {}) =>
  *   secured fetcher (useApi's authFetch).
  * @param {string} jobPostId - The applied-to job's id (application.jobId).
  * @param {string} [language] - The caller's UI language code (e.g. `es`),
- *   forwarded so lynq-ml writes the explanation and reasons in it. Defaults to
+ *   forwarded so lynq-llm writes the explanation and reasons in it. Defaults to
  *   English at the backend when omitted.
  * @returns {Promise<{
  *   outcome: string,

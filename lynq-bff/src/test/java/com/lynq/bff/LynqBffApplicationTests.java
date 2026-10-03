@@ -102,7 +102,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   void setUp() {
     lynqIamMock.reset();
     lynqBackendMock.reset();
-    lynqMlMock.reset();
+    lynqLlmMock.reset();
     lynqFileStorageMock.reset();
     lynqAnalyticsMock.reset();
     accessToken = validAccessToken();
@@ -229,13 +229,13 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void routesToLynqMlOnTheMlPrefix() throws Exception {
-    String mlBody = """
+  void routesToLynqLlmOnTheMlPrefix() throws Exception {
+    String llmBody = """
         {"success": true, "data": {"language": "en"}}""";
-    lynqMlMock.when(request().withMethod("POST").withPath("/dmz/detect-language"))
+    lynqLlmMock.when(request().withMethod("POST").withPath("/dmz/detect-language"))
         .respond(response().withStatusCode(200)
             .withContentType(MediaType.APPLICATION_JSON)
-            .withBody(mlBody));
+            .withBody(llmBody));
 
     HttpResponse<String> response = send("POST", CONTEXT_PATH + "/detect-language", "{}");
 
@@ -245,19 +245,19 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void relaysSkillEnhanceStraightToLynqMlWithoutGoingThroughLynqBackend() throws Exception {
-    String mlBody = """
+  void relaysSkillEnhanceStraightToLynqLlmWithoutGoingThroughLynqBackend() throws Exception {
+    String llmBody = """
         {"success": true, "data": {"skills": ["Java", "Spring"]}}""";
-    lynqMlMock.when(request().withMethod("POST").withPath("/dmz/skill-enhance"))
+    lynqLlmMock.when(request().withMethod("POST").withPath("/dmz/skill-enhance"))
         .respond(response().withStatusCode(200)
             .withContentType(MediaType.APPLICATION_JSON)
-            .withBody(mlBody));
+            .withBody(llmBody));
 
     HttpResponse<String> response = send("POST", CONTEXT_PATH + "/skill-enhance", "{}");
 
     assertThat(response.statusCode(), is(200));
     assertThat(payloadOf(response).path("data").path("skills").get(0).asText(), is("Java"));
-    lynqMlMock.verify(request()
+    lynqLlmMock.verify(request()
         .withPath("/dmz/skill-enhance")
         .withHeader(AUTHORIZATION_HEADER, "Bearer " + accessToken), VerificationTimes.once());
     lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
@@ -265,19 +265,19 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
   @Test
   void relaysResumeSkillExtractionKeepingTheMultiSegmentPathAndLanguageParam() throws Exception {
-    String mlBody = """
+    String llmBody = """
         {"success": true, "data": {"skills": ["Java"], "tools": [], "soft": []}}""";
-    lynqMlMock.when(request().withMethod("POST").withPath("/dmz/resume/skill-extraction"))
+    lynqLlmMock.when(request().withMethod("POST").withPath("/dmz/resume/skill-extraction"))
         .respond(response().withStatusCode(200)
             .withContentType(MediaType.APPLICATION_JSON)
-            .withBody(mlBody));
+            .withBody(llmBody));
 
     HttpResponse<String> response =
         send("POST", CONTEXT_PATH + "/resume/skill-extraction?language=es", "{}");
 
     assertThat(response.statusCode(), is(200));
     assertThat(payloadOf(response).path("data").path("skills").get(0).asText(), is("Java"));
-    lynqMlMock.verify(request()
+    lynqLlmMock.verify(request()
         .withPath("/dmz/resume/skill-extraction")
         .withQueryStringParameter(Parameter.param("language", "es"))
         .withHeader(AUTHORIZATION_HEADER, "Bearer " + accessToken), VerificationTimes.once());
@@ -285,25 +285,25 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void refusesTheLynqMlEvaluationsThatLynqBackendOwns() throws Exception {
+  void refusesTheLynqLlmEvaluationsThatLynqBackendOwns() throws Exception {
     for (String endpoint : new String[] {"upskilling_suggestion", "candidate-explanation"}) {
       HttpResponse<String> response = send("POST", CONTEXT_PATH + "/" + endpoint, "{}");
 
       assertThat(response.statusCode(), is(403));
       assertThat(response.body(), containsString("built from lynq-backend's data"));
     }
-    lynqMlMock.verify(request(), VerificationTimes.exactly(0));
+    lynqLlmMock.verify(request(), VerificationTimes.exactly(0));
   }
 
   @Test
-  void refusesTheLynqMlEndpointsThatFetchACallerSuppliedUrl() throws Exception {
+  void refusesTheLynqLlmEndpointsThatFetchACallerSuppliedUrl() throws Exception {
     for (String endpoint : new String[] {"parse-resume", "resume-template-creation"}) {
       HttpResponse<String> response = send("POST", CONTEXT_PATH + "/" + endpoint, "{}");
 
       assertThat(response.statusCode(), is(403));
       assertThat(response.body(), containsString("caller-supplied URL"));
     }
-    lynqMlMock.verify(request(), VerificationTimes.exactly(0));
+    lynqLlmMock.verify(request(), VerificationTimes.exactly(0));
   }
 
   @Test
@@ -528,7 +528,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
     assertThat(response.statusCode(), is(404));
     lynqBackendMock.verify(request(), VerificationTimes.exactly(0));
-    lynqMlMock.verify(request(), VerificationTimes.exactly(0));
+    lynqLlmMock.verify(request(), VerificationTimes.exactly(0));
     lynqFileStorageMock.verify(request(), VerificationTimes.exactly(0));
     lynqAnalyticsMock.verify(request(), VerificationTimes.exactly(0));
   }

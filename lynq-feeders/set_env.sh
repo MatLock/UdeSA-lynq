@@ -13,7 +13,7 @@
 export HOST="${HOST:-0.0.0.0}"
 export PORT="${PORT:-8089}"
 
-export LYNQ_ML_URL="${LYNQ_ML_URL:-http://localhost:8084/lynq-ml}"
+export LYNQ_LLM_URL="${LYNQ_LLM_URL:-http://localhost:8084/lynq-llm}"
 export LYNQ_BACKEND_URL="${LYNQ_BACKEND_URL:-http://localhost:8082/lynq-backend-app}"
 
 export LYNQ_FEEDERS_SYSTEM_USER_ID="${LYNQ_FEEDERS_SYSTEM_USER_ID:-00000000-0000-0000-0000-00000000feed}"
@@ -32,8 +32,8 @@ export FEEDER_SOURCES="${FEEDER_SOURCES:-bumeran,computrabajo}"
 export HTTP_TIMEOUT="${HTTP_TIMEOUT:-30}"
 export SCRAPE_TIMEOUT="${SCRAPE_TIMEOUT:-25}"
 # Sized for the LLM leg, not a normal HTTP call: a whole run is ~80 postings
-# and each one is a generation on lynq-ml.
-export ML_TIMEOUT="${ML_TIMEOUT:-300}"
-export ML_CONCURRENCY="${ML_CONCURRENCY:-2}"
+# and each one is a generation on lynq-llm.
+export LYNQ_LLM_TIMEOUT="${LYNQ_LLM_TIMEOUT:-300}"
+export LYNQ_LLM_CONCURRENCY="${LYNQ_LLM_CONCURRENCY:-2}"
 
 echo "lynq-feeders env set: PORT=$PORT, sources=$FEEDER_SOURCES"

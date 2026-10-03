@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from backend_client import IngestStats
 from config import Settings
 from main import app
-from ml_client import SkillEnhanceResult
+from llm_client import SkillEnhanceResult
 from model import IngestOverrides, RunPlan
 from router.ingest import run_guard
 from scraper.base import Listing
@@ -44,10 +44,10 @@ def _scraper(source="bumeran", listings=None):
     return scraper
 
 
-def _ml():
-    ml = MagicMock()
-    ml.skill_enhance = AsyncMock(return_value=SkillEnhanceResult(["Python"], ["Backend"]))
-    return ml
+def _llm():
+    llm = MagicMock()
+    llm.skill_enhance = AsyncMock(return_value=SkillEnhanceResult(["Python"], ["Backend"]))
+    return llm
 
 
 def _backend():
@@ -59,7 +59,7 @@ def _backend():
 class PlanTest(unittest.TestCase):
 
     def setUp(self):
-        self.service = IngestService(_settings(), _ml(), _backend(), scrapers=[_scraper()])
+        self.service = IngestService(_settings(), _llm(), _backend(), scrapers=[_scraper()])
 
     def test_no_overrides_uses_the_configured_defaults(self):
         plan = self.service.plan_for(None)
@@ -91,7 +91,7 @@ class PlanTest(unittest.TestCase):
 class ValidateTest(unittest.TestCase):
 
     def setUp(self):
-        self.service = IngestService(_settings(), _ml(), _backend())
+        self.service = IngestService(_settings(), _llm(), _backend())
 
     def test_returns_the_plan_that_would_run(self):
         plan = self.service.validate(IngestOverrides(categories=["TECNOLOGIA"]))
@@ -108,7 +108,7 @@ class ScopedRunTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_override_reaches_the_scraper(self):
         scraper = _scraper(listings=[_listing()])
-        service = IngestService(_settings(), _ml(), _backend(), scrapers=[scraper])
+        service = IngestService(_settings(), _llm(), _backend(), scrapers=[scraper])
 
         await service.run(
             REQUEST_UUID, IngestOverrides(categories=["TECNOLOGIA"], jobs_per_category=3)
@@ -119,7 +119,7 @@ class ScopedRunTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_report_states_what_actually_ran(self):
         service = IngestService(
-            _settings(), _ml(), _backend(), scrapers=[_scraper(listings=[_listing()])]
+            _settings(), _llm(), _backend(), scrapers=[_scraper(listings=[_listing()])]
         )
 
         report = await service.run(REQUEST_UUID, IngestOverrides(categories=["CONTABILIDAD"]))
@@ -129,7 +129,7 @@ class ScopedRunTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_default_run_still_covers_every_category(self):
         scraper = _scraper(listings=[_listing()])
-        service = IngestService(_settings(), _ml(), _backend(), scrapers=[scraper])
+        service = IngestService(_settings(), _llm(), _backend(), scrapers=[scraper])
 
         report = await service.run(REQUEST_UUID)
 
