@@ -26,6 +26,7 @@ def _listing(**overrides) -> Listing:
         remote=True,
         salary_min=1500000.0,
         salary_max=2000000.0,
+        currency="ARS",
         apply_url="https://ar.computrabajo.com/oferta",
         posted_at=1789207200000,
         skills=["Python"],
@@ -79,6 +80,15 @@ class ToIngestPayloadTest(unittest.TestCase):
         payload = to_ingest_payload(_listing(salary_min=1500000.75, salary_max=None))
         self.assertEqual(payload["salaryRangeDown"], 1500000)
         self.assertIsNone(payload["salaryRangeTop"])
+
+    def test_salary_currency_and_category_are_sent(self):
+        payload = to_ingest_payload(_listing())
+        self.assertEqual(payload["salaryCurrency"], "ARS")
+        self.assertEqual(payload["category"], "TECNOLOGIA")
+
+    def test_a_listing_without_salary_sends_no_currency(self):
+        payload = to_ingest_payload(_listing(salary_min=None, salary_max=None, currency=None))
+        self.assertIsNone(payload["salaryCurrency"])
 
     def test_bumeran_source_is_uppercased(self):
         self.assertEqual(to_ingest_payload(_listing(source="bumeran"))["jobPostSource"], "BUMERAN")

@@ -75,6 +75,12 @@ class ToListingTest(unittest.TestCase):
         listing = _to_listing({**_AVISO, "modalidadTrabajo": "Presencial"}, "TECNOLOGIA")
         self.assertFalse(listing.remote)
 
+    def test_the_listing_carries_no_salary_because_the_search_does_not_expose_one(self):
+        listing = _to_listing({**_AVISO, "salarioObligatorio": True}, "TECNOLOGIA")
+        self.assertIsNone(listing.salary_min)
+        self.assertIsNone(listing.salary_max)
+        self.assertIsNone(listing.currency)
+
     def test_listing_without_a_title_is_dropped(self):
         self.assertIsNone(_to_listing({**_AVISO, "titulo": None}, "TECNOLOGIA"))
 
