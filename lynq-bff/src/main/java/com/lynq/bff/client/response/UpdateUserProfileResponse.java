@@ -25,4 +25,6 @@ public class UpdateUserProfileResponse {
   private String linkedinUrl;
   private LocalDate birthDate;
   private LocalDate createdOn;
+  private Integer expectedSalary;
+  private String expectedSalaryCurrency;
 }

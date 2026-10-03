@@ -23,6 +23,7 @@ public class CreateJobRequest {
   private WorkType workType;
   private Integer salaryRangeDown;
   private Integer salaryRangeTop;
+  private String salaryCurrency;
   private JobPostSource jobPostSource;
   private List<String> skills;
   private List<String> similarityTags;

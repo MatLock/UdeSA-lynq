@@ -24,6 +24,7 @@ public class UpdateJobRequest {
   private JobStatus status;
   private Integer salaryRangeDown;
   private Integer salaryRangeTop;
+  private String salaryCurrency;
   private List<String> skills;
   private List<String> similarityTags;
 }
