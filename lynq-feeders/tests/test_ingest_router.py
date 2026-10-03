@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -8,7 +9,7 @@ from fastapi.testclient import TestClient
 from backend_client import BackendError, IngestStats
 from main import app
 from model import RunPlan
-from router.ingest import run_guard
+from router.ingest import run_guard, run_ingest
 from service import EnrichmentError, IngestReport, SourceReport
 
 INGEST = "/lynq-feeders/ingest"
@@ -114,6 +115,23 @@ class IngestRouterTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertFalse(response.json()["success"])
+
+
+class RunIngestTest(unittest.IsolatedAsyncioTestCase):
+
+    async def test_holds_the_feeder_run_lock_while_it_runs(self):
+        lock = asyncio.Lock()
+        held = []
+        service = _service(_report())
+        service.run = AsyncMock(side_effect=lambda *args: held.append(lock.locked()) or _report())
+        run_guard.start()
+        with patch("router.run_control.feeder_runs", lock):
+            await run_ingest(service, HEADERS["lynq-request-uuid"], None)
+
+        self.assertEqual(held, [True])
+        self.assertFalse(lock.locked())
+        self.assertTrue(run_guard.start())
+        run_guard.finish()
 
 
 if __name__ == "__main__":

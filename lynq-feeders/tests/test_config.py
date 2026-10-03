@@ -16,6 +16,20 @@ class SettingsTest(unittest.TestCase):
         self.assertEqual(settings.jobs_per_category, 10)
         self.assertEqual(settings.system_user_id, DEFAULT_SYSTEM_USER_ID)
 
+    def test_verify_limits_default_to_forty_checks_and_three_failures(self):
+        settings = self._settings({})
+
+        self.assertEqual(settings.verify_max_checks, 40)
+        self.assertEqual(settings.verify_max_consecutive_failures, 3)
+
+    def test_verify_limits_come_from_the_environment(self):
+        settings = self._settings(
+            {"VERIFY_MAX_CHECKS": "10", "VERIFY_MAX_CONSECUTIVE_FAILURES": "5"}
+        )
+
+        self.assertEqual(settings.verify_max_checks, 10)
+        self.assertEqual(settings.verify_max_consecutive_failures, 5)
+
     def test_the_internal_token_falls_back_to_the_local_stack_secret(self):
         self.assertEqual(self._settings({}).internal_token, DEFAULT_INTERNAL_TOKEN)
 

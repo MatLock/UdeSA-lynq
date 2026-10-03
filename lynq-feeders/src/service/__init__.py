@@ -7,6 +7,7 @@ from service.ingest_service import (
     IngestService,
     SourceReport,
 )
+from service.verify_service import SourceVerifyReport, VerifyReport, VerifyService
 
 __all__ = [
     "IngestService",
@@ -14,4 +15,7 @@ __all__ = [
     "SourceReport",
     "EnrichmentError",
     "EnrichmentFailure",
+    "VerifyService",
+    "VerifyReport",
+    "SourceVerifyReport",
 ]

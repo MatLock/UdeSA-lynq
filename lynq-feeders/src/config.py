@@ -53,6 +53,9 @@ class Settings:
         self.llm_concurrency: int = _int("LYNQ_LLM_CONCURRENCY", 2)
         self.scrape_timeout: float = _float("SCRAPE_TIMEOUT", 25.0)
 
+        self.verify_max_checks: int = _int("VERIFY_MAX_CHECKS", 40)
+        self.verify_max_consecutive_failures: int = _int("VERIFY_MAX_CONSECUTIVE_FAILURES", 3)
+
 
 def get_settings() -> Settings:
     return Settings()

@@ -1,6 +1,6 @@
 # lynq-feeders
 
-Job-listing feeder service for the Lynq platform. A FastAPI app that scrapes the Argentine job portals, asks `lynq-llm` to extract skills and similarity tags from each posting, and hands the batch to `lynq-app-backend` for persistence. A daily Kubernetes CronJob calls it; the same endpoint can be invoked on demand from inside the cluster, optionally scoped to a subset of portals and categories.
+Job-listing feeder service for the Lynq platform. A FastAPI app that scrapes the Argentine job portals, asks `lynq-llm` to extract skills and similarity tags from each posting, and hands the batch to `lynq-app-backend` for persistence. It also goes back to the postings it ingested weeks ago and checks whether they are still up, so that a posting that left its portal gets closed in Lynq. A daily Kubernetes CronJob calls both; the same endpoints can be invoked on demand from inside the cluster, optionally scoped to a subset of portals and categories.
 
 It replaces a set of standalone scripts that wrote scraped JSON to disk and then inserted it straight into MySQL. Those are gone: this service is the only thing that feeds external listings into the platform, and it does so through `lynq-app-backend` rather than by touching the database.
 
@@ -11,6 +11,7 @@ It replaces a set of standalone scripts that wrote scraped JSON to disk and then
 - [Technologies](#technologies)
 - [Architecture](#architecture)
 - [Categories](#categories)
+- [Liveness verification](#liveness-verification)
 - [API reference](#api-reference)
 - [Running locally](#running-locally)
 - [Running with Docker](#running-with-docker)
@@ -104,6 +105,9 @@ once `lynq-llm` is healthy.
 
 A scraper that fails for one category does not abort the others — that failure is logged per source and the run carries on.
 
+Every posting the backend receives is stamped `last_seen_on = today`, and a posting it
+had closed is reopened when it shows up again.
+
 ---
 
 ## Categories
@@ -123,12 +127,84 @@ A category that is not in the table falls back to a keyword derived from its nam
 
 ---
 
+## Liveness verification
+
+The portals never tell Lynq that a posting ended: the ingest only sees the newest
+postings, so one that left its portal would stay open forever. The verify run is what
+closes them, and it is where the time to fill of external postings comes from — a
+posting's days on the market end on the day the check found it gone.
+
+### Run sequence
+
+1. Ask `lynq-app-backend` for the postings due a check: open, external, with a job URL,
+   not seen for 20 days and not checked today, at most 10 per category, the never-checked
+   first. The list interleaves the categories.
+2. Check at most `VERIFY_MAX_CHECKS` (40) of them, one after the other with a 1–2.5 s pause,
+   with the checker of their source.
+3. Report every outcome in one batch to `POST /internal/job-posts/liveness`.
+4. Call `POST /internal/job-posts/expire`, which closes as `EXPIRED_BY_POLICY` every external
+   posting not seen for 25 days, checked or not. Analytics keeps those out of the median:
+   the posting was still up when the policy closed it.
+
+If the report in step 3 fails, step 4 does not run: the postings found alive today would
+otherwise be expired.
+
+### What each outcome means
+
+| Outcome | When | Backend |
+| --- | --- | --- |
+| `ALIVE` | the posting answers and is still taking applications | renews `last_seen_on` and `last_checked_on` |
+| `CLOSED` | the portal shows the posting as finished | closes it today as `VERIFIED_CLOSED` |
+| `GONE` | `404`/`410`, or a redirect away from the posting to a listing or the home page | closes it today as `VERIFIED_GONE` |
+| `UNKNOWN` | timeout, network error, `429`, `5xx`, or a page the checker does not recognise | stamps `last_checked_on` only |
+
+`UNKNOWN` is deliberately where anything unrecognised lands: a wrong `ALIVE` would keep a
+dead posting open forever, while an `UNKNOWN` lets the 25-day policy close it as censored.
+So if a portal changes its markup, the symptom is the `unknown` count growing against
+`checked` in the run's last log line — watch that ratio.
+
+### The markers, per portal
+
+They were found by checking the postings already stored, on 2026-10-03, and the captures
+live in `tests/fixtures/liveness/`.
+
+- **Computrabajo** takes a finished posting down instead of marking it: the posting URL
+  answers `301` to the search listing (`/trabajo-de-…` or `/empleos-en-…`). Of 24 stored
+  postings, 4 redirected and 20 still showed the "Postularme" button. No "finished" page
+  was ever seen, so the checker has no `CLOSED`: a posting is `ALIVE` only when the page is
+  a posting (the `description-offer` block) **and** has the apply button
+  (`data-href-offer-apply`). A redirect to another posting is followed, at most twice.
+- **Bumeran** serves the same single-page-app shell for every posting URL, live or not, so
+  the HTML says nothing. The checker asks the portal's own posting API,
+  `GET /api/candidates/fichaAvisoNormalizada/{id}` (the id is the number at the end of the
+  posting URL), on the same warmed-up session as the scraper. `aviso.estado` is `activo`
+  while it is live; `offline` and `vencido` are finished — those two are what Bumeran's own
+  front end treats as a finished posting, and 5 of 18 stored postings were `offline`. An
+  unknown id answers `404`. Any other `estado` is `UNKNOWN`.
+
+### Blocked sources
+
+A source that answers `403` or `429`, or Bumeran's Cloudflare challenge, is cut for the
+rest of the run: its remaining postings are reported `UNKNOWN` without being requested.
+So is a source that fails `VERIFY_MAX_CONSECUTIVE_FAILURES` (3) times in a row on the
+network; a definite answer resets that count. Being cut costs nothing but a day: the
+postings go to the back of the queue and come up again.
+
+### One run at a time, after the ingest
+
+A second verify call while one is running is refused with `409`. A verify run also waits
+for an ingest run in progress before it starts — the CronJob fires both one after the
+other, and the expiry must not close a posting the ingest is about to see again.
+
+---
+
 ## API reference
 
 | Method | Path                    | Purpose                                      |
 | ------ | ----------------------- | -------------------------------------------- |
 | `GET`  | `/lynq-feeders/health`  | Liveness/readiness probe.                    |
 | `POST` | `/lynq-feeders/ingest`  | Accept one feed run and start it in the background. Scoped by an optional body. |
+| `POST` | `/lynq-feeders/verify`  | Accept one verify run and start it in the background, after any ingest in progress. Scoped by an optional body. |
 
 Every route except the probe requires the `lynq-request-uuid` header; a request without it is rejected with `403`.
 
@@ -199,6 +275,38 @@ message= Feeder ingest run aborted, skill extraction failed
 message= Feeder ingest run aborted, the job post ingest failed
 ```
 
+### `POST /lynq-feeders/verify`
+
+Accepts one verify run and answers **`202` with an empty body**; the run starts in the
+background once any ingest run in progress has finished. Without a body it checks every
+configured source. An optional body narrows it:
+
+```bash
+curl -X POST http://localhost:8089/lynq-feeders/verify \
+  -H "lynq-request-uuid: $(uuidgen)" \
+  -H "Content-Type: application/json" \
+  -d '{"sources": ["computrabajo"]}'
+```
+
+Postings of a source left out of the run are neither checked nor reported: they stay
+first in tomorrow's queue.
+
+| Status | Meaning |
+| ------ | ------- |
+| `202` | Accepted. No body. |
+| `400` | Unknown source. Nothing was started. |
+| `403` | No `lynq-request-uuid` header. |
+| `409` | A verify run is already in progress. Nothing was started. |
+
+It ends on one line with the totals, after one line per source:
+
+```
+message= Verified source, source=bumeran, requested=18, alive=13, closed=5, gone=0, unknown=0, blocked_reason=None
+message= Finished feeder verify run, candidates=52, checked=40, alive=31, closed=5, gone=3, unknown=1, skipped_by_backend=0, expired=6, blocked_sources=[]
+```
+
+A failed one logs `Feeder verify run aborted, a lynq-app-backend call failed`.
+
 ### `GET /lynq-feeders/health`
 
 Reports whether `lynq-llm` and `lynq-app-backend` are reachable, but **always answers `200`**. Unlike `lynq-llm`, a down dependency is surfaced rather than fatal: the cron fires once a day, and taking the pod out of rotation because the LLM is briefly unreachable would leave nothing to fire against.
@@ -257,7 +365,9 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 | `LYNQ_LLM_CONCURRENCY`         | `2`                                                | Concurrent skill-enhance calls.                                |
 | `LYNQ_LLM_TIMEOUT`             | `300`                                              | Skill-enhance timeout, in seconds.                             |
 | `HTTP_TIMEOUT`                 | `30`                                               | Timeout for the backend ingest call, in seconds.               |
-| `SCRAPE_TIMEOUT`               | `25`                                               | Per-request scraping timeout, in seconds.                      |
+| `SCRAPE_TIMEOUT`               | `25`                                               | Per-request scraping and liveness-check timeout, in seconds.   |
+| `VERIFY_MAX_CHECKS`            | `40`                                               | Postings checked per verify run.                               |
+| `VERIFY_MAX_CONSECUTIVE_FAILURES` | `3`                                             | Network failures in a row that cut a source for the run.       |
 | `HOST` / `PORT`                | `0.0.0.0` / `8089`                                 | Bind address.                                                  |
 
 `LYNQ_INTERNAL_TOKEN` defaults to the same throwaway value `lynq-app-backend` falls back to outside its `production` profile, so the local stack ingests with no setup. That value is deliberately worthless: `application-production.yaml` leaves the token empty, and an empty expected token rejects every `/internal/**` call, so a deploy that forgets the real secret still fails loudly on the first ingest. Never commit a real value — it belongs in the cluster Secret, or in `~/.config/mendel/credentials` locally.
@@ -269,7 +379,7 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 The service has no scheduler of its own — it is a plain HTTP service that does nothing until something calls it. Two separate workloads make up the daily run:
 
 - a **Deployment** serving the endpoint around the clock, and
-- a **CronJob** (`infrastructure/helm/templates/cronjobs/`) whose only job is to `POST` to that endpoint at `0 6 * * *` UTC from a throwaway `curl` pod. It waits for the `202` and exits; the run outlives it inside the Deployment's pod, and a second run landing on top of a live one is refused there with a `409`.
+- a **CronJob** (`infrastructure/helm/templates/cronjobs/`) whose only job is to `POST` to `/ingest` and then to `/verify` at `0 6 * * *` UTC from a throwaway `curl` pod, under one `lynq-request-uuid`. It waits for the two `202`s and exits; the runs outlive it inside the Deployment's pod — the verify one waiting for the ingest — and a second run landing on top of a live one is refused there with a `409`.
 
 Because the schedule lives entirely in Kubernetes, the same endpoint is available on demand at any time.
 
@@ -329,15 +439,17 @@ lynq-feeders/
 ├── src/
 │   ├── main.py                 app wiring, routers, uvicorn entrypoint
 │   ├── config.py               environment-backed settings
-│   ├── backend_client/         lynq-app-backend internal ingest client
+│   ├── backend_client/         lynq-app-backend internal ingest and verification client
 │   ├── llm_client/             lynq-llm skill-enhance client
 │   ├── middleware/             lynq-request-uuid enforcement
-│   ├── model/                  ingest request overrides and run plan
+│   ├── model/                  ingest and verify request overrides and run plans
 │   ├── response/               GlobalRestResponse envelopes
-│   ├── router/                 health + ingest routes
-│   ├── scraper/                base model, category mapping, one module per portal
-│   └── service/                run orchestration
+│   ├── router/                 health, ingest and verify routes; the shared run lock
+│   ├── scraper/                base model, category mapping, one module per portal with
+│   │                           its scraper and its liveness checker
+│   └── service/                ingest and verify run orchestration
 └── tests/
+    └── fixtures/liveness/      captured postings the checkers are tested against
 ```
 
 ## Scraping policy

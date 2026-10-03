@@ -4,6 +4,7 @@ from exception_handlers import register_exception_handlers
 from middleware.request_uuid import require_request_uuid
 from router.health import router as health_router
 from router.ingest import router as ingest_router
+from router.verify import router as verify_router
 
 import logging.config
 import os
@@ -43,6 +44,7 @@ app.include_router(health)
 
 internal = APIRouter(prefix="/lynq-feeders")
 internal.include_router(ingest_router)
+internal.include_router(verify_router)
 app.include_router(internal)
 
 
