@@ -55,8 +55,10 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   private static final String CANDIDATE_ONLY_REFUSAL_BODY = """
       {"success": false, "reason": "Only users of type CANDIDATE can perform this action"}""";
   private static final String TIME_TO_FILL_BODY = """
-      {"success": true, "data": {"n": 12, "median": 21.0, "p25": 14.0, "p75": 25.0, \
-"insufficientData": false, "expiredByPolicy": 3}}""";
+      {"success": true, "data": {"n": 2, "median": null, "p25": null, "p75": null, \
+"insufficientData": true, "externalJobPosts": 1, "expiredByPolicy": 3, \
+"expiredAfterDays": 25, "daysOpen": 9, "overall": {"n": 40, "median": 21.0, "p25": 14.0, \
+"p75": 30.0, "insufficientData": false}}}""";
   private static final String BENCHMARK_BODY = """
       {"success": true, "data": {"snapshotOn": "2026-10-03", "marketFit": 61, "jobsScored": 40, \
 "aboveThresholdPct": 55, "reachThreshold": 60, "peerPercentile": 72, "peerGroupSize": 38, \
@@ -779,8 +781,14 @@ class LynqBffApplicationTests extends AbstractE2ETest {
         send("GET", CONTEXT_PATH + "/analytics/job/" + JOB_ID + "/time-to-fill", null);
 
     assertThat(response.statusCode(), is(200));
-    assertThat(payloadOf(response).path("data").path("median").asDouble(), is(21.0));
+    assertThat(payloadOf(response).path("data").path("insufficientData").asBoolean(), is(true));
+    assertThat(payloadOf(response).path("data").path("externalJobPosts").asInt(), is(1));
     assertThat(payloadOf(response).path("data").path("expiredByPolicy").asInt(), is(3));
+    assertThat(payloadOf(response).path("data").path("expiredAfterDays").asInt(), is(25));
+    assertThat(payloadOf(response).path("data").path("daysOpen").asLong(), is(9L));
+    assertThat(payloadOf(response).path("data").path("overall").path("median").asDouble(),
+        is(21.0));
+    assertThat(payloadOf(response).path("data").path("overall").path("n").asInt(), is(40));
     lynqAnalyticsMock.verify(request()
         .withMethod("GET")
         .withPath(path)

@@ -40,3 +40,4 @@ date,prompt
 "03-10-2026","pass salaryCurrency through the job requests and responses, and expectedSalary with its currency through the user profile"
 "03-10-2026","the downstream service is now called lynq-llm and lives at /lynq-llm: rename LynqMlClient to LynqLlmClient, MlController/MlControllerImpl/MlService to Llm*, the lynqMl/lynqMlDmz Feign configs to lynqLlm/lynqLlmDmz and lynq.ml.url / LYNQ_ML_URL to lynq.llm.url / LYNQ_LLM_URL, keeping every relayed route the same"
 "03-10-2026","relay GET /analytics/candidate/me/benchmark, GET /analytics/market with its optional currency and GET /analytics/company/me/jobs to lynq-analytics with the caller's Authorization and lynq-request-uuid, passing lynq-analytics' role refusals back"
+"03-10-2026","relay the whole time to fill on GET /analytics/job/{jobId}/time-to-fill: add externalJobPosts, expiredAfterDays, daysOpen and the overall fallback block to its typed response so they reach the frontend"

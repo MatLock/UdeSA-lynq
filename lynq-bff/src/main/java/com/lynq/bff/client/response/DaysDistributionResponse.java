@@ -13,16 +13,11 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class JobTimeToFillResponse {
+public class DaysDistributionResponse {
 
   private Integer n;
   private Double median;
   private Double p25;
   private Double p75;
   private boolean insufficientData;
-  private Integer externalJobPosts;
-  private Integer expiredByPolicy;
-  private Integer expiredAfterDays;
-  private Long daysOpen;
-  private DaysDistributionResponse overall;
 }
