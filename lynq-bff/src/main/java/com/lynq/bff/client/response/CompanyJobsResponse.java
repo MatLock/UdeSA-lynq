@@ -1,7 +1,7 @@
 package com.lynq.bff.client.response;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import java.time.LocalDate;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -14,13 +14,7 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class CompanyJobResponse {
+public class CompanyJobsResponse {
 
-  private String jobId;
-  private String title;
-  private String status;
-  private LocalDate publishedOn;
-  private Integer applications;
-  private Double medianScore;
-  private boolean insufficientData;
+  private List<CompanyJobResponse> jobs;
 }

@@ -49,7 +49,7 @@ is never appears in the URL.
 | --------------------------------------------------------- | ------------------ |
 | `/lynq-bff/user/**`, `/lynq-bff/company/**`, `/lynq-bff/job/**` | lynq-app-backend   |
 | `/lynq-bff/files/**`                                      | lynq-file-storage  |
-| `/lynq-bff/analytics/job/{jobId}/time-to-fill`, `/lynq-bff/analytics/job/{jobId}/standing`, `/lynq-bff/analytics/job/{jobId}/salary` | lynq-analytics |
+| `/lynq-bff/analytics/job/{jobId}/time-to-fill`, `/lynq-bff/analytics/job/{jobId}/standing`, `/lynq-bff/analytics/job/{jobId}/salary`, `/lynq-bff/analytics/candidate/me/benchmark`, `/lynq-bff/analytics/market`, `/lynq-bff/analytics/company/me/jobs` | lynq-analytics |
 | `/lynq-bff/skill-enhance`, `/lynq-bff/translate`, `/lynq-bff/detect-language` | lynq-llm |
 | `/lynq-bff/auth/register`, `/lynq-bff/auth/login/username`, `/lynq-bff/auth/login/email`, `/lynq-bff/auth/refresh`, `/lynq-bff/auth/update-password`, `/lynq-bff/auth/check-username`, `/lynq-bff/auth/check-email` | lynq-iam |
 

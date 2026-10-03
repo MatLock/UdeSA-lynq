@@ -57,6 +57,19 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   private static final String TIME_TO_FILL_BODY = """
       {"success": true, "data": {"n": 12, "median": 21.0, "p25": 14.0, "p75": 25.0, \
 "insufficientData": false, "expiredByPolicy": 3}}""";
+  private static final String BENCHMARK_BODY = """
+      {"success": true, "data": {"snapshotOn": "2026-10-03", "marketFit": 61, "jobsScored": 40, \
+"aboveThresholdPct": 55, "reachThreshold": 60, "peerPercentile": 72, "peerGroupSize": 38, \
+"skillUnlocks": [{"skill": "Kafka", "jobsUnlocked": 4}], "series": []}}""";
+  private static final String MARKET_BODY = """
+      {"success": true, "data": {"snapshotOn": "2026-10-03", "openJobPosts": 30, \
+"skillDemand": [{"skill": "Java", "openJobPosts": 14, "weeklyChange": 4}], \
+"salary": {"currency": "USD", "rows": []}, \
+"publishedPerWeek": [{"weekStart": "2026-09-21", "jobPosts": 4}]}}""";
+  private static final String COMPANY_JOBS_BODY = """
+      {"success": true, "data": {"jobs": [{"jobId": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a70", \
+"title": "Backend", "status": "OPEN", "publishedOn": "2026-09-20", "applications": 6, \
+"medianScore": 66.0, "insufficientData": false}]}}""";
   private static final String SALARY_BODY = """
       {"success": true, "data": {"positionSalary": {"n": 8, "median": 1500000.0, \
 "currency": "ARS", "insufficientData": false}, "peersExpectedSalary": {"n": 2, \
@@ -810,9 +823,68 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void answers404ForAnAnalyticsRouteTheGatewayDoesNotName() throws Exception {
+  void relaysTheBenchmarkOfTheCallerWithTheCallersHeaders() throws Exception {
+    String path = "/dmz/analytics/candidate/me/benchmark";
+    lynqAnalyticsMock.when(request().withMethod("GET").withPath(path))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(BENCHMARK_BODY));
+
     HttpResponse<String> response =
         send("GET", CONTEXT_PATH + "/analytics/candidate/me/benchmark", null);
+
+    assertThat(response.statusCode(), is(200));
+    JsonNode data = payloadOf(response).path("data");
+    assertThat(data.path("snapshotOn").asText(), is("2026-10-03"));
+    assertThat(data.path("peerPercentile").asInt(), is(72));
+    assertThat(data.path("skillUnlocks").path(0).path("skill").asText(), is("Kafka"));
+    lynqAnalyticsMock.verify(request()
+        .withMethod("GET")
+        .withPath(path)
+        .withHeader(AUTHORIZATION_HEADER, "Bearer " + accessToken)
+        .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID), VerificationTimes.once());
+  }
+
+  @Test
+  void relaysTheMarketWithTheRequestedCurrency() throws Exception {
+    lynqAnalyticsMock.when(request().withMethod("GET").withPath("/dmz/analytics/market")
+            .withQueryStringParameter("currency", "USD"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(MARKET_BODY));
+
+    HttpResponse<String> response =
+        send("GET", CONTEXT_PATH + "/analytics/market?currency=USD", null);
+
+    assertThat(response.statusCode(), is(200));
+    JsonNode data = payloadOf(response).path("data");
+    assertThat(data.path("salary").path("currency").asText(), is("USD"));
+    assertThat(data.path("skillDemand").path(0).path("weeklyChange").asInt(), is(4));
+    assertThat(data.path("publishedPerWeek").path(0).path("weekStart").asText(),
+        is("2026-09-21"));
+  }
+
+  @Test
+  void relaysTheJobPostsOfTheCallingCompany() throws Exception {
+    useRoles("R_COMPANY");
+    lynqAnalyticsMock.when(request().withMethod("GET").withPath("/dmz/analytics/company/me/jobs"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(COMPANY_JOBS_BODY));
+
+    HttpResponse<String> response =
+        send("GET", CONTEXT_PATH + "/analytics/company/me/jobs", null);
+
+    assertThat(response.statusCode(), is(200));
+    JsonNode job = payloadOf(response).path("data").path("jobs").path(0);
+    assertThat(job.path("applications").asInt(), is(6));
+    assertThat(job.path("medianScore").asDouble(), is(66.0));
+  }
+
+  @Test
+  void answers404ForAnAnalyticsRouteTheGatewayDoesNotName() throws Exception {
+    HttpResponse<String> response =
+        send("GET", CONTEXT_PATH + "/analytics/candidate/" + SPOOFED_USER_ID + "/benchmark", null);
 
     assertThat(response.statusCode(), is(404));
     lynqAnalyticsMock.verify(request(), VerificationTimes.exactly(0));

@@ -8,9 +8,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.lynq.bff.client.response.CandidateBenchmarkResponse;
+import com.lynq.bff.client.response.CompanyJobsResponse;
 import com.lynq.bff.client.response.JobSalaryResponse;
 import com.lynq.bff.client.response.JobStandingResponse;
 import com.lynq.bff.client.response.JobTimeToFillResponse;
+import com.lynq.bff.client.response.MarketResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.AnalyticsService;
@@ -93,6 +96,53 @@ class AnalyticsControllerImplTest {
     verify(analyticsService).getStanding(eq(JOB_ID), caller.capture());
     assertThat(caller.getValue().userId(), is(USER_ID));
     assertThat(caller.getValue().requestUuid(), is(REQUEST_UUID));
+    assertThat(caller.getValue().authorization(), is(AUTHORIZATION));
+  }
+
+  @Test
+  void answersTheBenchmarkOfTheCallerWithOk() {
+    CandidateBenchmarkResponse benchmark = CandidateBenchmarkResponse.builder().marketFit(61)
+        .build();
+    when(analyticsService.getCandidateBenchmark(any())).thenReturn(benchmark);
+
+    ResponseEntity<GlobalRestResponse<CandidateBenchmarkResponse>> response =
+        analyticsController.getCandidateBenchmark(REQUEST_UUID, PRINCIPAL);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+    assertThat(response.getBody().getData(), is(sameInstance(benchmark)));
+  }
+
+  @Test
+  void answersTheMarketInTheRequestedCurrencyWithOk() {
+    MarketResponse market = MarketResponse.builder().openJobPosts(30).build();
+    when(analyticsService.getMarket(eq("USD"), any())).thenReturn(market);
+
+    ResponseEntity<GlobalRestResponse<MarketResponse>> response =
+        analyticsController.getMarket("USD", REQUEST_UUID, PRINCIPAL);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+    assertThat(response.getBody().getData(), is(sameInstance(market)));
+  }
+
+  @Test
+  void answersTheCompanyJobPostsWithOk() {
+    CompanyJobsResponse jobs = CompanyJobsResponse.builder().build();
+    when(analyticsService.getCompanyJobs(any())).thenReturn(jobs);
+
+    ResponseEntity<GlobalRestResponse<CompanyJobsResponse>> response =
+        analyticsController.getCompanyJobs(REQUEST_UUID, PRINCIPAL);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.OK));
+    assertThat(response.getBody().getData(), is(sameInstance(jobs)));
+  }
+
+  @Test
+  void readsTheBenchmarkAsTheVerifiedCaller() {
+    analyticsController.getCandidateBenchmark(REQUEST_UUID, PRINCIPAL);
+
+    ArgumentCaptor<Caller> caller = ArgumentCaptor.forClass(Caller.class);
+    verify(analyticsService).getCandidateBenchmark(caller.capture());
+    assertThat(caller.getValue().userId(), is(USER_ID));
     assertThat(caller.getValue().authorization(), is(AUTHORIZATION));
   }
 }

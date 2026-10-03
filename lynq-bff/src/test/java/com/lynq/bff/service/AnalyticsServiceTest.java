@@ -7,9 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 import com.lynq.bff.client.LynqAnalyticsClient;
+import com.lynq.bff.client.response.CandidateBenchmarkResponse;
+import com.lynq.bff.client.response.CompanyJobsResponse;
 import com.lynq.bff.client.response.JobSalaryResponse;
 import com.lynq.bff.client.response.JobStandingResponse;
 import com.lynq.bff.client.response.JobTimeToFillResponse;
+import com.lynq.bff.client.response.MarketResponse;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.exceptions.BadGatewayException;
 import com.lynq.bff.exceptions.ForbiddenException;
@@ -99,5 +102,56 @@ class AnalyticsServiceTest {
         () -> analyticsService.getSalary(JOB_ID, CALLER));
 
     assertThat(thrown.getMessage(), is("The salary insights could not be read"));
+  }
+
+  @Test
+  void readsTheBenchmarkOfTheCaller() {
+    CandidateBenchmarkResponse benchmark =
+        CandidateBenchmarkResponse.builder().marketFit(61).peerGroupSize(38).build();
+    when(lynqAnalyticsClient.getCandidateBenchmark(REQUEST_UUID, AUTHORIZATION))
+        .thenReturn(new GlobalRestResponse<>(true, benchmark));
+
+    assertThat(analyticsService.getCandidateBenchmark(CALLER), is(sameInstance(benchmark)));
+  }
+
+  @Test
+  void readsTheMarketInTheRequestedCurrency() {
+    MarketResponse market = MarketResponse.builder().openJobPosts(30).build();
+    when(lynqAnalyticsClient.getMarket("USD", REQUEST_UUID, AUTHORIZATION))
+        .thenReturn(new GlobalRestResponse<>(true, market));
+
+    assertThat(analyticsService.getMarket("USD", CALLER), is(sameInstance(market)));
+  }
+
+  @Test
+  void readsTheJobPostsOfTheCallingCompany() {
+    CompanyJobsResponse jobs = CompanyJobsResponse.builder().build();
+    when(lynqAnalyticsClient.getCompanyJobs(REQUEST_UUID, AUTHORIZATION))
+        .thenReturn(new GlobalRestResponse<>(true, jobs));
+
+    assertThat(analyticsService.getCompanyJobs(CALLER), is(sameInstance(jobs)));
+  }
+
+  @Test
+  void keepsTheRefusalOfTheCompanyJobPostsToACandidate() {
+    when(lynqAnalyticsClient.getCompanyJobs(REQUEST_UUID, AUTHORIZATION))
+        .thenThrow(FeignErrors.status(403, """
+            {"success": false, "reason": "Only users of type COMPANY can perform this action"}"""));
+
+    ForbiddenException thrown = assertThrows(ForbiddenException.class,
+        () -> analyticsService.getCompanyJobs(CALLER));
+
+    assertThat(thrown.getMessage(), is("Only users of type COMPANY can perform this action"));
+  }
+
+  @Test
+  void answersBadGatewayWhenTheMarketCannotBeReached() {
+    when(lynqAnalyticsClient.getMarket(null, REQUEST_UUID, AUTHORIZATION))
+        .thenThrow(FeignErrors.unreachable());
+
+    BadGatewayException thrown = assertThrows(BadGatewayException.class,
+        () -> analyticsService.getMarket(null, CALLER));
+
+    assertThat(thrown.getMessage(), is("The market could not be read"));
   }
 }

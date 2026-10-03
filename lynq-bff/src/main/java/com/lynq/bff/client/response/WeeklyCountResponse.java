@@ -14,13 +14,8 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class CompanyJobResponse {
+public class WeeklyCountResponse {
 
-  private String jobId;
-  private String title;
-  private String status;
-  private LocalDate publishedOn;
-  private Integer applications;
-  private Double medianScore;
-  private boolean insufficientData;
+  private LocalDate weekStart;
+  private Integer jobPosts;
 }

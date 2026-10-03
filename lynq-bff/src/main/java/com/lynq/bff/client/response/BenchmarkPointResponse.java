@@ -14,13 +14,11 @@ import lombok.Setter;
 @AllArgsConstructor
 @Builder
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class CompanyJobResponse {
+public class BenchmarkPointResponse {
 
-  private String jobId;
-  private String title;
-  private String status;
-  private LocalDate publishedOn;
-  private Integer applications;
-  private Double medianScore;
-  private boolean insufficientData;
+  private LocalDate snapshotOn;
+  private Integer marketFit;
+  private Integer aboveThresholdPct;
+  private Integer peerPercentile;
+  private Integer peerGroupSize;
 }
