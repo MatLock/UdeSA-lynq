@@ -1,5 +1,6 @@
 package com.lynq.backend.controller.response;
 
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -11,12 +12,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class IngestJobPostsRestResponse {
+public class VerificationCandidatesRestResponse {
 
-  private int jobs;
-  private int companies;
-  private int skills;
-  private int similarityTags;
-  private int skipped;
-  private int reopened;
+  private List<VerificationCandidateRestResponse> candidates;
 }

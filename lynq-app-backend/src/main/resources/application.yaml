@@ -47,6 +47,10 @@ lynq:
     topic-arn: ${LYNQ_DOMAIN_EVENTS_TOPIC_ARN:arn:aws:sns:us-east-1:000000000000:lynq-domain-events}
     publish-attempts: 3
     retry-backoff: 200ms
+  verification:
+    window-days: 20
+    quota-per-category: 10
+    expire-after-days: 25
 
 
 server:

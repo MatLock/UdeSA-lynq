@@ -11,12 +11,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class IngestJobPostsRestResponse {
+public class ExpireJobPostsRestResponse {
 
-  private int jobs;
-  private int companies;
-  private int skills;
-  private int similarityTags;
-  private int skipped;
-  private int reopened;
+  private int expired;
 }

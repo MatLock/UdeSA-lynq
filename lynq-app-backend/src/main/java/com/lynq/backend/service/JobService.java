@@ -16,6 +16,7 @@ import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.JobCompanyRestResponse;
 import com.lynq.backend.controller.response.JobPostedByRestResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
+import com.lynq.backend.enums.CloseReason;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.WorkType;
@@ -171,6 +172,7 @@ public class JobService {
     job.setJobStatus(JobStatus.OPEN);
     job.setCreatedOn(LocalDate.now(ZoneOffset.UTC));
     job.setClosedOn(null);
+    job.setCloseReason(null);
 
     JobPostEntity saved = jobPostRepository.save(job);
     domainEventPublisher.publish(
@@ -190,6 +192,7 @@ public class JobService {
 
     job.setJobStatus(JobStatus.CLOSE);
     job.setClosedOn(LocalDate.now(ZoneOffset.UTC));
+    job.setCloseReason(CloseReason.OWNER);
 
     JobPostEntity saved = jobPostRepository.save(job);
     domainEventPublisher.publish(DomainEvents.jobPostClosed(job, Instant.now()));
@@ -458,6 +461,7 @@ public class JobService {
 
     job.setJobStatus(status);
     job.setClosedOn(status == JobStatus.CLOSE ? LocalDate.now(ZoneOffset.UTC) : null);
+    job.setCloseReason(status == JobStatus.CLOSE ? CloseReason.OWNER : null);
   }
 
   private void updateSkills(JobPostEntity job, List<String> skills) {
