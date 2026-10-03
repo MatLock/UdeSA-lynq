@@ -194,6 +194,8 @@ lynq_feeders:
     LYNQ_LLM_TIMEOUT: "300"
     HTTP_TIMEOUT: "30"
     SCRAPE_TIMEOUT: "25"
+    VERIFY_MAX_CHECKS: "40"
+    VERIFY_MAX_CONSECUTIVE_FAILURES: "3"
   cron:
     schedule: "0 6 * * *"
     timeZone: Etc/UTC
@@ -203,8 +205,8 @@ lynq_feeders:
     failedJobsHistoryLimit: 3
     startingDeadlineSeconds: 600
     backoffLimit: 1
-    # The trigger pod only waits for the 202, not for the run: the ingest goes on
-    # in the lynq-feeders pod after this one is gone.
+    # The trigger pod only waits for the two 202s, not for the runs: the ingest
+    # and the verification go on in the lynq-feeders pod after this one is gone.
     activeDeadlineSeconds: 120
     requestTimeoutSeconds: 30
 

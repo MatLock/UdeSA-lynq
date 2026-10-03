@@ -31,7 +31,7 @@ spec:
         spec:
           restartPolicy: Never
           containers:
-            - name: trigger-ingest
+            - name: trigger-ingest-and-verify
               image: {{ .Values.lynq_feeders.cron.image }}
               resources:
                 requests:
@@ -45,14 +45,18 @@ spec:
                 - |
                   set -eu
                   REQUEST_UUID="$(cat /proc/sys/kernel/random/uuid)"
-                  echo "Triggering lynq-feeders ingest, lynq-request-uuid=${REQUEST_UUID}"
-                  # The endpoint answers 202 with no body and runs the ingest in
-                  # the background, so this waits for the acknowledgement only —
-                  # the run itself is followed in the lynq-feeders pod logs,
-                  # filtering by the request uuid printed above.
-                  curl -sS --fail-with-body \
-                    --max-time {{ .Values.lynq_feeders.cron.requestTimeoutSeconds }} \
-                    -o /dev/null -w 'lynq-feeders answered HTTP %{http_code}\n' \
-                    -X POST \
-                    -H "lynq-request-uuid: ${REQUEST_UUID}" \
-                    "http://lynq-feeders-service:8089/lynq-feeders/ingest"
+                  echo "Triggering lynq-feeders ingest and verify, lynq-request-uuid=${REQUEST_UUID}"
+                  # Both endpoints answer 202 with no body and run in the
+                  # background, so this waits for the acknowledgements only —
+                  # the runs are followed in the lynq-feeders pod logs,
+                  # filtering by the request uuid printed above. The verify run
+                  # waits inside lynq-feeders for the ingest to finish, so the
+                  # postings the ingest saw today are not expired by policy.
+                  for RUN in ingest verify; do
+                    curl -sS --fail-with-body \
+                      --max-time {{ .Values.lynq_feeders.cron.requestTimeoutSeconds }} \
+                      -o /dev/null -w "lynq-feeders ${RUN} answered HTTP %{http_code}\n" \
+                      -X POST \
+                      -H "lynq-request-uuid: ${REQUEST_UUID}" \
+                      "http://lynq-feeders-service:8089/lynq-feeders/${RUN}"
+                  done
