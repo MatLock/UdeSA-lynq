@@ -4,6 +4,7 @@ import TitleOutlinedIcon from '@mui/icons-material/TitleOutlined'
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 import BusinessCenterOutlinedIcon from '@mui/icons-material/BusinessCenterOutlined'
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined'
+import CurrencyExchangeOutlinedIcon from '@mui/icons-material/CurrencyExchangeOutlined'
 import LoadingOverlay from '../../components/LoadingOverlay/LoadingOverlay'
 import SkillsField from '../../components/SkillsField/SkillsField'
 import Toast from '../../components/Toast/Toast'
@@ -30,6 +31,7 @@ const CreateJobPage = () => {
   const [workType, setWorkType] = useState('')
   const [salaryRangeDown, setSalaryRangeDown] = useState('')
   const [salaryRangeTop, setSalaryRangeTop] = useState('')
+  const [salaryCurrency, setSalaryCurrency] = useState('ARS')
   // AI-generated then user-editable; the SkillsField component owns the editing
   // UI and generation, this page just holds the value that ships with the job.
   const [skills, setSkills] = useState([])
@@ -76,6 +78,7 @@ const CreateJobPage = () => {
         workType,
         salaryRangeDown,
         salaryRangeTop,
+        salaryCurrency,
         skills,
         similarityTags,
       })
@@ -205,6 +208,24 @@ const CreateJobPage = () => {
               {errors.salaryRangeTop && (
                 <p className="create-job-error" role="alert">{errors.salaryRangeTop}</p>
               )}
+            </div>
+          </div>
+
+          <div className="create-job-field">
+            <label htmlFor="create-job-salary-currency">{t.currencyLabel}</label>
+            <div className="create-job-control">
+              <span className="create-job-field-icon tone-blue">
+                <CurrencyExchangeOutlinedIcon sx={{ fontSize: 18 }} />
+              </span>
+              <select
+                id="create-job-salary-currency"
+                className="create-job-select"
+                value={salaryCurrency}
+                onChange={(event) => setSalaryCurrency(event.target.value)}
+              >
+                <option value="ARS">{t.currencyArs}</option>
+                <option value="USD">{t.currencyUsd}</option>
+              </select>
             </div>
           </div>
 

@@ -103,6 +103,7 @@ class JobServiceTest {
   private static final WorkType WORK_TYPE = WorkType.REMOTE;
   private static final Integer SALARY_RANGE_DOWN = 80000;
   private static final Integer SALARY_RANGE_TOP = 120000;
+  private static final String SALARY_CURRENCY = "USD";
   private static final JobPostSource JOB_POST_TYPE = JobPostSource.LYNQ;
 
   private static final List<String> TAGS = List.of("Backend Development");
@@ -258,7 +259,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
     ArgumentCaptor<JobPostEntity> jobCaptor = ArgumentCaptor.forClass(JobPostEntity.class);
 
-    jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+    jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_POST_TYPE, NO_SKILLS, List.of("Backend Development", "  ", "Backend Development"));
 
     verify(jobPostRepository).save(jobCaptor.capture());
@@ -274,7 +275,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
     ArgumentCaptor<JobPostEntity> jobCaptor = ArgumentCaptor.forClass(JobPostEntity.class);
 
-    jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+    jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_POST_TYPE, NO_SKILLS, TAGS);
 
     verify(jobPostRepository).save(jobCaptor.capture());
@@ -293,13 +294,52 @@ class JobServiceTest {
   }
 
   @Test
+  void createJobStoresTheSalaryCurrencyItIsGiven() {
+    stubAuthenticatedCompanyUserWithCompany(companyUser());
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    JobPostEntity saved = jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
+        SALARY_RANGE_TOP, "USD", JOB_POST_TYPE, NO_SKILLS, TAGS);
+
+    assertThat(saved.getSalaryCurrency(), is("USD"));
+    JobPostPublishedPayload payload = (JobPostPublishedPayload) publishedEvents().getFirst()
+        .payload();
+    assertThat(payload.salaryCurrency(), is("USD"));
+  }
+
+  @Test
+  void createJobDefaultsTheSalaryCurrencyToArsWhenThereIsASalary() {
+    stubAuthenticatedCompanyUserWithCompany(companyUser());
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    JobPostEntity saved = jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, null,
+        SALARY_RANGE_TOP, null, JOB_POST_TYPE, NO_SKILLS, TAGS);
+
+    assertThat(saved.getSalaryCurrency(), is("ARS"));
+  }
+
+  @Test
+  void createJobLeavesTheSalaryCurrencyEmptyWithoutASalary() {
+    stubAuthenticatedCompanyUserWithCompany(companyUser());
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    JobPostEntity saved = jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, null, null, "USD",
+        JOB_POST_TYPE, NO_SKILLS, TAGS);
+
+    assertThat(saved.getSalaryCurrency(), is(nullValue()));
+  }
+
+  @Test
   void createJobPersistsJobSkillsWhenSkillsProvided() {
     stubAuthenticatedCompanyUserWithCompany(companyUser());
     when(jobPostRepository.save(any(JobPostEntity.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
     ArgumentCaptor<JobPostEntity> jobCaptor = ArgumentCaptor.forClass(JobPostEntity.class);
 
-    jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+    jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_POST_TYPE, SKILLS, TAGS);
 
     verify(jobPostRepository).save(jobCaptor.capture());
@@ -320,7 +360,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
     ArgumentCaptor<JobPostEntity> jobCaptor = ArgumentCaptor.forClass(JobPostEntity.class);
 
-    jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+    jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_POST_TYPE, SKILLS_WITH_DUPLICATE, TAGS);
 
     verify(jobPostRepository).save(jobCaptor.capture());
@@ -335,7 +375,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
     ArgumentCaptor<JobPostEntity> jobCaptor = ArgumentCaptor.forClass(JobPostEntity.class);
 
-    jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+    jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_POST_TYPE, NO_SKILLS, TAGS);
 
     verify(jobPostRepository).save(jobCaptor.capture());
@@ -349,7 +389,7 @@ class JobServiceTest {
     when(jobPostRepository.save(any(JobPostEntity.class))).thenReturn(persisted);
 
     JobPostEntity result = jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
-        SALARY_RANGE_TOP, JOB_POST_TYPE, NO_SKILLS, TAGS);
+        SALARY_RANGE_TOP, SALARY_CURRENCY, JOB_POST_TYPE, NO_SKILLS, TAGS);
 
     assertThat(result, is(sameInstance(persisted)));
   }
@@ -361,7 +401,7 @@ class JobServiceTest {
 
     BadRequestException exception = assertThrows(BadRequestException.class,
         () -> jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
-            SALARY_RANGE_TOP, JOB_POST_TYPE, NO_SKILLS, TAGS));
+            SALARY_RANGE_TOP, SALARY_CURRENCY, JOB_POST_TYPE, NO_SKILLS, TAGS));
     assertThat(exception.getMessage(), is(AUTHENTICATED_USER_NOT_FOUND));
     verify(jobPostRepository, never()).save(any());
   }
@@ -375,7 +415,7 @@ class JobServiceTest {
 
     BadRequestException exception = assertThrows(BadRequestException.class,
         () -> jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
-            SALARY_RANGE_TOP, JOB_POST_TYPE, NO_SKILLS, TAGS));
+            SALARY_RANGE_TOP, SALARY_CURRENCY, JOB_POST_TYPE, NO_SKILLS, TAGS));
     assertThat(exception.getMessage(), is(USER_NOT_LINKED_TO_COMPANY));
     verify(jobPostRepository, never()).save(any());
   }
@@ -386,7 +426,7 @@ class JobServiceTest {
     Pageable pageable = PageRequest.of(0, 20);
     stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA, SKILL_SPRING)));
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
-        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID, null,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
@@ -534,7 +574,7 @@ class JobServiceTest {
     UserEntity owner = companyUser();
     stubAuthenticatedCompanyCaller(owner);
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
-        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.CLOSE,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID, null,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
@@ -595,7 +635,7 @@ class JobServiceTest {
   void aScrapedCompanyFallsBackToThePortalLogoUrl() {
     stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA)));
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
-        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, null, COMPANY_LOGO_URL,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
@@ -615,7 +655,7 @@ class JobServiceTest {
   void anUploadedCompanyLogoWinsOverThePortalOne() {
     stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA)));
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
-        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID, COMPANY_LOGO_URL,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
@@ -636,7 +676,7 @@ class JobServiceTest {
   void getJobDetailsMapsProjectionFieldsIncludingCompanyPosterAndLynqScore() {
     stubAuthenticatedUser(candidateUser(List.of(SKILL_JAVA, SKILL_SPRING)));
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
-        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID, null,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
@@ -1042,7 +1082,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
-        UPDATED_WORK_TYPE, UPDATED_STATUS, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
+        UPDATED_WORK_TYPE, UPDATED_STATUS, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SALARY_CURRENCY,
         SKILLS, TAGS);
 
     assertThat(result, is(sameInstance(job)));
@@ -1055,6 +1095,42 @@ class JobServiceTest {
   }
 
   @Test
+  void updateJobReplacesTheSalaryCurrencyAndPublishesIt() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
+    job.setSalaryCurrency("ARS");
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
+        UPDATED_WORK_TYPE, JobStatus.OPEN, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
+        "USD", SKILLS, TAGS);
+
+    assertThat(result.getSalaryCurrency(), is("USD"));
+    JobPostUpdatedPayload payload = (JobPostUpdatedPayload) publishedEvents().getFirst()
+        .payload();
+    assertThat(payload.salaryCurrency(), is("USD"));
+  }
+
+  @Test
+  void updateJobClearsTheSalaryCurrencyWhenTheSalaryIsRemoved() {
+    UserEntity owner = companyUser();
+    JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
+    job.setSalaryCurrency("USD");
+    stubAuthenticatedUser(owner);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+    when(jobPostRepository.save(any(JobPostEntity.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
+        UPDATED_WORK_TYPE, JobStatus.OPEN, null, null, "USD", SKILLS, TAGS);
+
+    assertThat(result.getSalaryCurrency(), is(nullValue()));
+  }
+
+  @Test
   void updateJobClosingOpenJobStampsClosedOnWithToday() {
     UserEntity owner = companyUser();
     JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
@@ -1064,7 +1140,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
-        UPDATED_WORK_TYPE, JobStatus.CLOSE, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
+        UPDATED_WORK_TYPE, JobStatus.CLOSE, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SALARY_CURRENCY,
         SKILLS, TAGS);
 
     assertThat(result.getJobStatus(), is(JobStatus.CLOSE));
@@ -1083,7 +1159,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
-        UPDATED_WORK_TYPE, JobStatus.OPEN, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
+        UPDATED_WORK_TYPE, JobStatus.OPEN, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SALARY_CURRENCY,
         SKILLS, TAGS);
 
     assertThat(result.getJobStatus(), is(JobStatus.OPEN));
@@ -1103,7 +1179,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     JobPostEntity result = jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION,
-        UPDATED_WORK_TYPE, JobStatus.CLOSE, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
+        UPDATED_WORK_TYPE, JobStatus.CLOSE, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SALARY_CURRENCY,
         SKILLS, TAGS);
 
     assertThat(result.getJobStatus(), is(JobStatus.CLOSE));
@@ -1121,7 +1197,7 @@ class JobServiceTest {
     ArgumentCaptor<List<JobPostSkillEntity>> removedCaptor = ArgumentCaptor.forClass(List.class);
 
     jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
-        UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
+        UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SALARY_CURRENCY,
         List.of(SKILL_JAVA, SKILL_POSTGRES), TAGS);
 
     verify(jobPostSkillRepository).deleteAll(removedCaptor.capture());
@@ -1141,7 +1217,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
-        UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP,
+        UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SALARY_CURRENCY,
         Arrays.asList("  Java  ", "Java", "  ", SKILL_SPRING), TAGS);
 
     assertThat(job.getSkills().stream().map(JobPostSkillEntity::getSkill).toList(),
@@ -1158,7 +1234,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
-        UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, NO_SKILLS, TAGS);
+        UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SALARY_CURRENCY, NO_SKILLS, TAGS);
 
     assertThat(job.getSkills(), is(empty()));
   }
@@ -1170,7 +1246,7 @@ class JobServiceTest {
 
     NotFoundException exception = assertThrows(NotFoundException.class,
         () -> jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
-            UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS, TAGS));
+            UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SALARY_CURRENCY, SKILLS, TAGS));
     assertThat(exception.getMessage(), is(JOB_POST_NOT_FOUND));
     verify(jobPostRepository, never()).save(any());
   }
@@ -1184,7 +1260,7 @@ class JobServiceTest {
 
     ForbiddenException exception = assertThrows(ForbiddenException.class,
         () -> jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE, UPDATED_STATUS,
-            UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS, TAGS));
+            UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SALARY_CURRENCY, SKILLS, TAGS));
     assertThat(exception.getMessage(), is(ONLY_JOB_OWNER_CAN_UPDATE));
     verify(jobPostRepository, never()).save(any());
     verify(jobPostSkillRepository, never()).deleteAll(any());
@@ -1374,7 +1450,7 @@ class JobServiceTest {
 
   private JobWithDetailsProjection projectionWithId(String jobId) {
     return new JobWithDetailsProjection(
-        jobId, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        jobId, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         null, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID, null,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION, null,
@@ -1611,7 +1687,7 @@ class JobServiceTest {
   // reads, so a test can stub only what it is actually about.
   private void stubJobDetails() {
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
-        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, COMPANY_FILE_ID, null,
         POSTER_ID, POSTER_FULL_NAME, POSTER_FILE_ID, POSTER_CURRENT_POSITION,
@@ -1630,7 +1706,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     JobPostEntity job = jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
-        SALARY_RANGE_TOP, JOB_POST_TYPE, SKILLS, TAGS);
+        SALARY_RANGE_TOP, SALARY_CURRENCY, JOB_POST_TYPE, SKILLS, TAGS);
 
     InOrder order = inOrder(jobPostRepository, domainEventPublisher);
     order.verify(jobPostRepository).save(any(JobPostEntity.class));
@@ -1727,7 +1803,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE,
-        JobStatus.OPEN, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS, TAGS);
+        JobStatus.OPEN, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SALARY_CURRENCY, SKILLS, TAGS);
 
     List<DomainEvent> events = publishedEvents();
     assertThat(events, hasSize(1));
@@ -1752,7 +1828,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE,
-        JobStatus.CLOSE, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS, TAGS);
+        JobStatus.CLOSE, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SALARY_CURRENCY, SKILLS, TAGS);
 
     List<DomainEvent> events = publishedEvents();
     assertThat(events.stream().map(DomainEvent::eventType).toList(),
@@ -1774,7 +1850,7 @@ class JobServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     jobService.updateJob(JOB_ID, UPDATED_TITLE, UPDATED_DESCRIPTION, UPDATED_WORK_TYPE,
-        JobStatus.OPEN, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SKILLS, TAGS);
+        JobStatus.OPEN, UPDATED_SALARY_RANGE_DOWN, UPDATED_SALARY_RANGE_TOP, SALARY_CURRENCY, SKILLS, TAGS);
 
     List<DomainEvent> events = publishedEvents();
     assertThat(events.stream().map(DomainEvent::eventType).toList(),
@@ -1862,7 +1938,7 @@ class JobServiceTest {
 
   private void stubSingleJob(String concatenatedSkills) {
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
-        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, null, null,
         POSTER_ID, POSTER_FULL_NAME, null, POSTER_CURRENT_POSITION, concatenatedSkills,
@@ -1873,7 +1949,7 @@ class JobServiceTest {
 
   private void stubSingleJob(String concatenatedSkills, String concatenatedTags) {
     JobWithDetailsProjection projection = new JobWithDetailsProjection(
-        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+        JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_URL, JOB_POST_TYPE, CREATED_ON, TOTAL_SEEN, JobStatus.OPEN,
         COMPANY_ID, COMPANY_NAME, COMPANY_ABOUT, COMPANY_SIZE, null, null,
         POSTER_ID, POSTER_FULL_NAME, null, POSTER_CURRENT_POSITION, concatenatedSkills,

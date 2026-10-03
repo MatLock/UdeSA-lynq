@@ -55,6 +55,7 @@ public class JobControllerImpl implements JobController {
         request.getWorkType(),
         request.getSalaryRangeDown(),
         request.getSalaryRangeTop(),
+        request.getSalaryCurrency(),
         request.getJobPostSource(),
         request.getSkills(),
         request.getSimilarityTags());
@@ -66,6 +67,7 @@ public class JobControllerImpl implements JobController {
         .workType(job.getWorkType())
         .salaryRangeDown(job.getSalaryRangeDown())
         .salaryRangeTop(job.getSalaryRangeTop())
+        .salaryCurrency(job.getSalaryCurrency())
         .jobPostSource(job.getJobPostSource())
         .createdOn(job.getCreatedOn())
         .totalSeen(job.getTotalSeen())
@@ -93,6 +95,7 @@ public class JobControllerImpl implements JobController {
         request.getStatus(),
         request.getSalaryRangeDown(),
         request.getSalaryRangeTop(),
+        request.getSalaryCurrency(),
         request.getSkills(),
         request.getSimilarityTags());
 
@@ -103,6 +106,7 @@ public class JobControllerImpl implements JobController {
         .workType(job.getWorkType())
         .salaryRangeDown(job.getSalaryRangeDown())
         .salaryRangeTop(job.getSalaryRangeTop())
+        .salaryCurrency(job.getSalaryCurrency())
         .jobPostSource(job.getJobPostSource())
         .jobStatus(job.getJobStatus())
         .createdOn(job.getCreatedOn())

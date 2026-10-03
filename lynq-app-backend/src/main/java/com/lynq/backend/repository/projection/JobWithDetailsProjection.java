@@ -12,6 +12,7 @@ public record JobWithDetailsProjection(
     WorkType workType,
     Integer salaryRangeDown,
     Integer salaryRangeTop,
+    String salaryCurrency,
     String jobUrl,
     JobPostSource jobPostSource,
     LocalDate createdOn,

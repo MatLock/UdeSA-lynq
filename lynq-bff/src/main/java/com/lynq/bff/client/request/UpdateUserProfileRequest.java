@@ -22,4 +22,6 @@ public class UpdateUserProfileRequest {
   private String githubUrl;
   private String linkedinUrl;
   private LocalDate birthDate;
+  private Integer expectedSalary;
+  private String expectedSalaryCurrency;
 }

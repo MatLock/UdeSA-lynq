@@ -85,6 +85,15 @@ Bumeran posting has no logo, and `lynq-app-backend` keeps whatever an earlier ru
 found rather than blanking it. Neither portal publishes a company description, so
 `about` stays empty for scraped companies.
 
+Each posting is also sent with its `category` — the feeder category it was scraped
+under, e.g. `TECNOLOGIA` — and the `salaryCurrency` of its salary range. Only
+Computrabajo contributes salaries: its listing cards show a `$` range, parsed as
+`ARS`. Bumeran's `searchV2` listing carries no salary at all — the only related
+field, `salarioObligatorio`, says whether applicants must state their expected
+salary, not what the post pays — and the feeder does not open each posting's
+detail page to look for one, since that multiplies requests and the risk of being
+blocked. Bumeran postings are ingested without salary or currency.
+
 Skill extraction is not best-effort: a posting stored with no skills and no
 similarity tags scores 0 on the LyNQ score for every candidate, and because the
 backend replaces a job post's skills on every ingest, a degraded run also wipes

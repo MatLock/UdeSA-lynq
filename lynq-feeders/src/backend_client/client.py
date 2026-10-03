@@ -48,6 +48,8 @@ def to_ingest_payload(listing: Listing) -> dict:
         "workType": REMOTE if listing.remote else IN_OFFICE,
         "salaryRangeDown": _as_int(listing.salary_min),
         "salaryRangeTop": _as_int(listing.salary_max),
+        "salaryCurrency": listing.currency,
+        "category": listing.category,
         "jobUrl": listing.apply_url,
         "jobPostSource": listing.source.upper(),
         "companyName": listing.company,

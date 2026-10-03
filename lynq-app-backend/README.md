@@ -316,7 +316,7 @@ Every change analytics needs is published to the SNS topic `lynq-domain-events`,
 | `JobPostReopened`                | `JOB_POST`    | `refreshJob`, and `updateJob` when it reopens the post       | `jobId`, `reopenedOn` |
 | `ApplicationSubmitted`           | `APPLICATION` | `applyToJob`                                                | `applicationId`, `jobId`, `userId`, `appliedOn`, `lynqScore` computed when the candidate applied |
 | `CandidateSkillsUpdated`         | `CANDIDATE`   | `createResume`                                              | `userId`, every `skills` and `similarityTags` the candidate has |
-| `CandidateExpectedSalaryUpdated` | `CANDIDATE`   | the replay; the profile update emits it once it takes a salary | `userId`, `expectedSalary`, `currency` |
+| `CandidateExpectedSalaryUpdated` | `CANDIDATE`   | `updateUserProfile` when the expected salary or its currency changes, and the replay | `userId`, `expectedSalary`, `currency` |
 
 Skills and tags travel sorted, so the same state always serializes the same way.
 
@@ -353,9 +353,9 @@ Base path: `/lynq-backend-app` (Spring `server.servlet.context-path`).
 
 | Method | Path                            | Body / Params                                                        | Description                                              |
 | ------ | ------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------- |
-| GET    | `/dmz/user`                         | —                                                                    | Get the authenticated user's profile (+ pre-signed image URL). |
+| GET    | `/dmz/user`                         | —                                                                    | Get the authenticated user's profile (+ pre-signed image URL), with their `expectedSalary` and `expectedSalaryCurrency`; the public `/dmz/user/{userId}` never carries them. |
 | POST   | `/dmz/user`                         | `{fullName, currentPosition?, about?, githubUrl?, linkedinUrl?, birthDate}` | Create the profile for the authenticated user. |
-| PATCH  | `/dmz/user`                         | Any subset of profile fields                                         | Partially update the profile (non-null fields only).    |
+| PATCH  | `/dmz/user`                         | Any subset of profile fields, `expectedSalary?` (positive), `expectedSalaryCurrency?` (`ARS`/`USD`) | Partially update the profile (non-null fields only). The currency defaults to the stored one, else `ARS`, and is ignored without a salary; a changed expected salary emits `CandidateExpectedSalaryUpdated`. |
 | GET    | `/dmz/user/generate-upload-image`   | `?file-name=`                                                        | Register the profile image in `lynq-file-storage`; returns `{preSignedUrl, fileId}`. |
 | POST   | `/dmz/user/confirm-upload-image`    | `?file-id=`                                                          | Mark the uploaded profile image available (204).         |
 | GET    | `/dmz/user/generate-upload-resume`  | `?file-name=`                                                        | Register a résumé PDF; returns `{preSignedUrl, fileId}` (`CANDIDATE` only). |
@@ -365,7 +365,7 @@ Base path: `/lynq-backend-app` (Spring `server.servlet.context-path`).
 | POST   | `/dmz/company`                      | `{fullName, currentPosition, userAbout, birthDate, companyName, companyAbout, companySize?, …}` | Create the authenticated user as a `COMPANY` and its company. |
 | GET    | `/dmz/company/generate-upload-image`| `?file-name=`                                                        | Register the company logo in `lynq-file-storage`; returns `{preSignedUrl, fileId}`. |
 | POST   | `/dmz/company/confirm-upload-image` | `?file-id=`                                                          | Mark the uploaded logo available (204).                  |
-| POST   | `/dmz/job`                          | `{title, description, workType, salaryRangeDown?, salaryRangeTop?, jobPostSource, skills?}` | Create a job post (`COMPANY` users only).                |
+| POST   | `/dmz/job`                          | `{title, description, workType, salaryRangeDown?, salaryRangeTop?, salaryCurrency?, jobPostSource, skills?}` | Create a job post (`COMPANY` users only). `salaryCurrency` is `ARS` or `USD`, `ARS` when a salary comes without one, and empty without a salary; `PATCH /dmz/job/{jobId}` follows the same rule. |
 | GET    | `/dmz/job`                          | `?page=0&size=20&filterValue=`                                       | Paginated feed of OPEN jobs; free-text filter; LyNQ score per job for candidates. |
 
 Responses are wrapped in `GlobalRestResponse<T>`:
@@ -466,6 +466,7 @@ curl -X POST http://localhost:8082/lynq-backend-app/dmz/job \
     "workType": "REMOTE",
     "salaryRangeDown": 90000,
     "salaryRangeTop": 130000,
+    "salaryCurrency": "USD",
     "jobPostSource": "LYNQ",
     "skills": ["Java", "Spring Boot", "MySQL"]
   }'

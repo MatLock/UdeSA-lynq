@@ -25,5 +25,7 @@ public class GetUserResponse {
   private String linkedinUrl;
   private LocalDate birthDate;
   private LocalDate createdOn;
+  private Integer expectedSalary;
+  private String expectedSalaryCurrency;
   private String companyId;
 }

@@ -1,6 +1,7 @@
 package com.lynq.analytics.controller;
 
 import com.lynq.analytics.controller.response.GlobalRestResponse;
+import com.lynq.analytics.stats.SalaryInsights;
 import com.lynq.analytics.stats.Standing;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -26,4 +27,17 @@ public interface AnalyticsController {
   ResponseEntity<GlobalRestResponse<Standing>> getStanding(
       String jobId,
       @Parameter(hidden = true) String userId);
+
+  @Operation(
+      summary = "Read the salary medians of a job post's position and of similar candidates",
+      description = "Returns two blocks in the currency of the job post, ARS when it has no "
+          + "salary. positionSalary summarises the job posts similar to this one that publish a "
+          + "salary in that currency, each one counted at the middle of its range; "
+          + "peersExpectedSalary summarises the expected salary that candidates similar to the job "
+          + "post declared in that currency. Each block carries the median, p25, p75, the number "
+          + "of values and insufficientData: below five values the median and quartiles are null, "
+          + "since they would give away the few salaries behind them. Open to any authenticated "
+          + "user; fails with 404 when the job post is unknown. Cached for an hour per job post.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<SalaryInsights>> getSalary(String jobId);
 }

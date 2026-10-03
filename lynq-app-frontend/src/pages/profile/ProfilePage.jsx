@@ -5,6 +5,8 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import GitHubIcon from '@mui/icons-material/GitHub'
 import LinkedInIcon from '@mui/icons-material/LinkedIn'
 import CakeOutlinedIcon from '@mui/icons-material/CakeOutlined'
+import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined'
+import CurrencyExchangeOutlinedIcon from '@mui/icons-material/CurrencyExchangeOutlined'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined'
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined'
@@ -30,7 +32,7 @@ import './ProfilePage.css'
 // birthDate) plus password. The update service call will be wired in later.
 const ProfilePage = () => {
   const t = strings.pages.profile
-  const { user, accessToken, updateUser, applyTokens } = useAuth()
+  const { user, accessToken, updateUser, applyTokens, isCompany } = useAuth()
   // Refresh-aware fetcher: transparently mints a new access token and retries
   // when the current one has expired, so leaving the profile tab open past the
   // token lifetime still loads/saves.
@@ -60,6 +62,9 @@ const ProfilePage = () => {
   const [githubUrl, setGithubUrl] = useState('')
   const [linkedinUrl, setLinkedinUrl] = useState('')
   const [birthDate, setBirthDate] = useState('')
+  const [expectedSalary, setExpectedSalary] = useState('')
+  const [expectedSalaryCurrency, setExpectedSalaryCurrency] = useState('ARS')
+  const [expectedSalaryError, setExpectedSalaryError] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -82,6 +87,8 @@ const ProfilePage = () => {
         setGithubUrl(profile.githubUrl ?? '')
         setLinkedinUrl(profile.linkedinUrl ?? '')
         setBirthDate(profile.birthDate ?? '')
+        setExpectedSalary(profile.expectedSalary != null ? String(profile.expectedSalary) : '')
+        setExpectedSalaryCurrency(profile.expectedSalaryCurrency ?? 'ARS')
         // Prefer the locally cached upload over the (short-lived) pre-signed URL.
         setImagePreview(
           profileImageCache.read(user?.id) ?? profile.userProfileImageUrl ?? '',
@@ -144,6 +151,11 @@ const ProfilePage = () => {
       return
     }
     setPasswordError('')
+    if (expectedSalary !== '' && !(Number(expectedSalary) > 0)) {
+      setExpectedSalaryError(t.expectedSalaryInvalid)
+      return
+    }
+    setExpectedSalaryError('')
     setToast(null)
     setSaving(true)
     try {
@@ -157,6 +169,10 @@ const ProfilePage = () => {
         githubUrl,
         linkedinUrl,
         birthDate: birthDate || null,
+        ...(expectedSalary !== '' && {
+          expectedSalary: Number(expectedSalary),
+          expectedSalaryCurrency,
+        }),
       })
       // Reflect the saved values in the session so the sidebar stays in sync.
       updateUser({
@@ -166,6 +182,8 @@ const ProfilePage = () => {
         githubUrl: updated.githubUrl,
         linkedinUrl: updated.linkedinUrl,
         birthDate: updated.birthDate,
+        expectedSalary: updated.expectedSalary,
+        expectedSalaryCurrency: updated.expectedSalaryCurrency,
       })
 
       // Password change is a separate IAM call and rotates both tokens; only
@@ -342,6 +360,52 @@ const ProfilePage = () => {
               />
             </div>
           </div>
+
+          {!isCompany && (
+            <div className="profile-salary">
+              <div className="profile-row">
+                <div className="profile-field">
+                  <label htmlFor="profile-expected-salary">{t.expectedSalaryLabel}</label>
+                  <div className="profile-control">
+                    <span className="profile-field-icon tone-purple">
+                      <PaymentsOutlinedIcon sx={{ fontSize: 18 }} />
+                    </span>
+                    <input
+                      id="profile-expected-salary"
+                      type="number"
+                      min="1"
+                      placeholder={t.expectedSalaryPlaceholder}
+                      value={expectedSalary}
+                      aria-invalid={Boolean(expectedSalaryError)}
+                      onChange={(event) => setExpectedSalary(event.target.value)}
+                    />
+                  </div>
+                  {expectedSalaryError && (
+                    <p className="profile-error" role="alert">{expectedSalaryError}</p>
+                  )}
+                </div>
+
+                <div className="profile-field profile-field--currency">
+                  <label htmlFor="profile-expected-salary-currency">{t.expectedSalaryCurrencyLabel}</label>
+                  <div className="profile-control">
+                    <span className="profile-field-icon tone-blue">
+                      <CurrencyExchangeOutlinedIcon sx={{ fontSize: 18 }} />
+                    </span>
+                    <select
+                      id="profile-expected-salary-currency"
+                      className="profile-select"
+                      value={expectedSalaryCurrency}
+                      onChange={(event) => setExpectedSalaryCurrency(event.target.value)}
+                    >
+                      <option value="ARS">ARS</option>
+                      <option value="USD">USD</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <p className="profile-hint">{t.expectedSalaryHint}</p>
+            </div>
+          )}
 
           <div className="profile-field">
             <label htmlFor="profile-password">{t.passwordLabel}</label>

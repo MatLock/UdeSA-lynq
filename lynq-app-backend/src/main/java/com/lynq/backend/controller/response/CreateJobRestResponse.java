@@ -23,6 +23,7 @@ public class CreateJobRestResponse {
   private WorkType workType;
   private Integer salaryRangeDown;
   private Integer salaryRangeTop;
+  private String salaryCurrency;
   private JobPostSource jobPostSource;
   private LocalDate createdOn;
   private Long totalSeen;

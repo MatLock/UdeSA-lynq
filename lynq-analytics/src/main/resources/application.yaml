@@ -59,6 +59,9 @@ lynq:
       min-sample: 5
     standing:
       min-applicants: 5
+    salary:
+      min-sample: 5
+      default-currency: ARS
     cache:
       ttl: PT1H
     tag-frequency:

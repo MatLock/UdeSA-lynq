@@ -86,6 +86,8 @@ const withProfile = (user, profile) =>
         githubUrl: profile.githubUrl,
         linkedinUrl: profile.linkedinUrl,
         birthDate: profile.birthDate,
+        expectedSalary: profile.expectedSalary,
+        expectedSalaryCurrency: profile.expectedSalaryCurrency,
       }
     : user
 
