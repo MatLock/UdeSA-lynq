@@ -176,12 +176,14 @@
 /* The input (or its eye-button wrapper) fills the rest of the control row. */
 .profile-control > input,
 .profile-control > .profile-input-wrap,
+.profile-control > .profile-select,
 .profile-control > .profile-textarea {
   flex: 1;
   min-width: 0;
 }
 
 .profile-field input,
+.profile-select,
 .profile-textarea {
   width: 100%;
   box-sizing: border-box;
@@ -202,6 +204,7 @@
 }
 
 .profile-field input:focus,
+.profile-select:focus,
 .profile-textarea:focus {
   border-color: var(--brand-purple);
   box-shadow: none;
@@ -282,5 +285,35 @@
 @media (max-width: 560px) {
   .profile-save {
     width: 100%;
+  }
+}
+
+.profile-row {
+  display: flex;
+  gap: 12px;
+}
+
+.profile-row > .profile-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-row > .profile-field--currency {
+  flex: 0 0 140px;
+}
+
+.profile-salary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (max-width: 560px) {
+  .profile-row {
+    flex-direction: column;
+  }
+
+  .profile-row > .profile-field--currency {
+    flex-basis: auto;
   }
 }

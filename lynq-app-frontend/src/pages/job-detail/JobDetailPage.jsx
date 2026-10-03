@@ -11,6 +11,7 @@ import CompanyIcon from '../../components/CompanyIcon/CompanyIcon.jsx'
 import UserIcon from '../../components/UserIcon/UserIcon.jsx'
 import Spinner from '../../components/Spinner/Spinner.jsx'
 import CandidateStandingCard from '../../components/CandidateStandingCard/CandidateStandingCard.jsx'
+import SalaryInsightsCard from '../../components/SalaryInsightsCard/SalaryInsightsCard.jsx'
 import formatRelativeDate from '../../utils/formatRelativeDate'
 import downloadFile from '../../utils/downloadFile'
 import resumeLabel from '../../utils/resumeLabel'
@@ -508,7 +509,7 @@ const JobHero = ({
 )
 
 // Left column: the long-form description and skills list.
-const JobMainColumn = ({ t, job, skills }) => (
+const JobMainColumn = ({ t, job, skills, salaryInsights }) => (
   <div className="job-detail-col job-detail-col--main">
     <section className="job-detail-card">
       <h2 className="job-detail-card-title">{t.descriptionHeading}</h2>
@@ -516,6 +517,8 @@ const JobMainColumn = ({ t, job, skills }) => (
         {job.description || t.noDescription}
       </p>
     </section>
+
+    {salaryInsights}
 
     <section className="job-detail-card">
       <h2 className="job-detail-card-title">{t.skillsHeading}</h2>
@@ -777,7 +780,23 @@ const JobDetailPage = () => {
         />
 
         <div className="job-detail-grid">
-          <JobMainColumn t={t} job={job} skills={skills} />
+          <JobMainColumn
+            t={t}
+            job={job}
+            skills={skills}
+            salaryInsights={
+              <SalaryInsightsCard
+                authFetch={authFetch}
+                jobId={jobId}
+                job={job}
+                expectedSalary={
+                  isCompany
+                    ? null
+                    : { amount: user?.expectedSalary, currency: user?.expectedSalaryCurrency }
+                }
+              />
+            }
+          />
 
           {/* Right column: at-a-glance facts, company and recruiter. */}
           <aside className="job-detail-col job-detail-col--side">

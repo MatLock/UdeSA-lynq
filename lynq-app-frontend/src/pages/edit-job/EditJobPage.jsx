@@ -5,6 +5,7 @@ import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined'
 import BusinessCenterOutlinedIcon from '@mui/icons-material/BusinessCenterOutlined'
 import ToggleOnOutlinedIcon from '@mui/icons-material/ToggleOnOutlined'
 import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined'
+import CurrencyExchangeOutlinedIcon from '@mui/icons-material/CurrencyExchangeOutlined'
 import LoadingOverlay from '../../components/LoadingOverlay/LoadingOverlay'
 import SkillsField from '../../components/SkillsField/SkillsField'
 import Spinner from '../../components/Spinner/Spinner'
@@ -48,6 +49,7 @@ const EditJobPage = () => {
   const [salaryRangeTop, setSalaryRangeTop] = useState(
     passedJob?.salaryRangeTop != null ? String(passedJob.salaryRangeTop) : '',
   )
+  const [salaryCurrency, setSalaryCurrency] = useState(passedJob?.salaryCurrency ?? 'ARS')
   const [skills, setSkills] = useState(passedJob?.skills ?? [])
   // Similarity tags. Never shown or edited — they only widen how the LyNQ score
   // matches candidates — but they are round-tripped so saving an edit does not
@@ -75,6 +77,7 @@ const EditJobPage = () => {
         setStatus(job.jobStatus ?? 'OPEN')
         setSalaryRangeDown(job.salaryRangeDown != null ? String(job.salaryRangeDown) : '')
         setSalaryRangeTop(job.salaryRangeTop != null ? String(job.salaryRangeTop) : '')
+        setSalaryCurrency(job.salaryCurrency ?? 'ARS')
         setSkills(job.skills ?? [])
         setSimilarityTags(job.similarityTags ?? [])
       } catch {
@@ -127,6 +130,7 @@ const EditJobPage = () => {
         status,
         salaryRangeDown,
         salaryRangeTop,
+        salaryCurrency,
         skills,
         similarityTags,
       })
@@ -304,6 +308,24 @@ const EditJobPage = () => {
               {errors.salaryRangeTop && (
                 <p className="create-job-error" role="alert">{errors.salaryRangeTop}</p>
               )}
+            </div>
+          </div>
+
+          <div className="create-job-field">
+            <label htmlFor="edit-job-salary-currency">{t.currencyLabel}</label>
+            <div className="create-job-control">
+              <span className="create-job-field-icon tone-blue">
+                <CurrencyExchangeOutlinedIcon sx={{ fontSize: 18 }} />
+              </span>
+              <select
+                id="edit-job-salary-currency"
+                className="create-job-select"
+                value={salaryCurrency}
+                onChange={(event) => setSalaryCurrency(event.target.value)}
+              >
+                <option value="ARS">{t.currencyArs}</option>
+                <option value="USD">{t.currencyUsd}</option>
+              </select>
             </div>
           </div>
 

@@ -192,3 +192,6 @@ date,prompt
 "02-10-2026","when lynq-analytics answers 403 right after applying, say the application is being recorded and retry a few times, and hide the card on any other error"
 "02-10-2026","put the CandidateStandingCard in JobDetailPage under the LYNQ score chip, only when the candidate has applied"
 "02-10-2026","update the standing threshold reason on the analytics page: below five applicants the rank is shown but not the median"
+"03-10-2026","add a currency selector ARS/USD, default ARS, to create-job and edit-job"
+"03-10-2026","add expected salary and currency to the ProfilePage, only for candidates"
+"03-10-2026","add a SalaryInsightsCard under the description in JobDetailPage calling GET /analytics/job/{jobId}/salary, with a box plot per block and the empty state when there is not enough data"

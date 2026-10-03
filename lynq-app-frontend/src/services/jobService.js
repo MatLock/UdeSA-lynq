@@ -95,6 +95,7 @@ const get_my_jobs = async (authFetch, { page = 0, size = 20 } = {}) => {
  * @param {'OPEN' | 'CLOSE'} job.status
  * @param {number} [job.salaryRangeDown]
  * @param {number} [job.salaryRangeTop]
+ * @param {'ARS' | 'USD'} [job.salaryCurrency]
  * @param {string[]} [job.skills]
  * @returns {Promise<object>} The unwrapped UpdateJobRestResponse.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
@@ -109,6 +110,7 @@ const update_job = async (
     status,
     salaryRangeDown,
     salaryRangeTop,
+    salaryCurrency,
     skills,
     similarityTags,
   } = {},
@@ -119,6 +121,9 @@ const update_job = async (
   }
   if (salaryRangeTop != null && String(salaryRangeTop) !== '') {
     body.salaryRangeTop = Number(salaryRangeTop);
+  }
+  if (salaryCurrency) {
+    body.salaryCurrency = salaryCurrency;
   }
   body.skills = skills ?? [];
   // Similarity tags are replaced wholesale, exactly like the skills.
@@ -148,6 +153,7 @@ const update_job = async (
  * @param {'REMOTE' | 'IN_OFFICE'} job.workType
  * @param {number} [job.salaryRangeDown]
  * @param {number} [job.salaryRangeTop]
+ * @param {'ARS' | 'USD'} [job.salaryCurrency]
  * @param {string[]} [job.skills]
  * @returns {Promise<object>} The unwrapped CreateJobRestResponse.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
@@ -295,7 +301,16 @@ const refresh_job = async (authFetch, jobId) => {
 
 const create_job = async (
   authFetch,
-  { title, description, workType, salaryRangeDown, salaryRangeTop, skills, similarityTags } = {},
+  {
+    title,
+    description,
+    workType,
+    salaryRangeDown,
+    salaryRangeTop,
+    salaryCurrency,
+    skills,
+    similarityTags,
+  } = {},
 ) => {
   const body = {
     title,
@@ -308,6 +323,9 @@ const create_job = async (
   }
   if (salaryRangeTop != null && String(salaryRangeTop) !== '') {
     body.salaryRangeTop = Number(salaryRangeTop);
+  }
+  if (salaryCurrency) {
+    body.salaryCurrency = salaryCurrency;
   }
   if (skills?.length) {
     body.skills = skills;
