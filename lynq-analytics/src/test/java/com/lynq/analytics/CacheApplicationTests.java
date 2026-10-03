@@ -97,7 +97,7 @@ class CacheApplicationTests extends AbstractE2ETest {
 
   @Test
   void hasNoCacheOutsideTheDeclaredOnes() {
-    assertThat(cacheManager.getCache("market"), is(nullValue()));
+    assertThat(cacheManager.getCache("trends"), is(nullValue()));
   }
 
   private double gets(String cache, String result) {

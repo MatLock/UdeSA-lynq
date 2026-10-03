@@ -26,6 +26,12 @@ k8s_namespace: prod
 #   lynq-feeders-secret         (Opaque)
 #     LYNQ_INTERNAL_TOKEN       -> same value as in lynq-app-backend-secret
 #
+#   lynq-analytics-secret       (Opaque)
+#     LYNQ_INTERNAL_TOKEN       -> same value as in lynq-app-backend-secret; guards
+#                                  lynq-analytics' /internal/** routes, read by
+#                                  the snapshot CronJob, and presented to
+#                                  lynq-app-backend's /internal/score/batch
+#
 #   lynq-file-storage-secret    (Opaque)
 #     DB_USERNAME, DB_PASSWORD
 #     AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   (omit if using IRSA)
@@ -196,6 +202,25 @@ lynq_feeders:
     backoffLimit: 1
     # The trigger pod only waits for the 202, not for the run: the ingest goes on
     # in the lynq-feeders pod after this one is gone.
+    activeDeadlineSeconds: 120
+    requestTimeoutSeconds: 30
+
+lynq_analytics:
+  cron:
+    # Off until lynq-analytics is deployed by the chart: the trigger calls
+    # lynq-analytics-service and reads lynq-analytics-secret, neither of which
+    # exists yet.
+    enabled: false
+    # 08:00 UTC is 05:00 in Buenos Aires, two hours after the feeders' run, so
+    # the day's snapshot includes what they ingested and closed.
+    schedule: "0 8 * * *"
+    timeZone: Etc/UTC
+    image: curlimages/curl:8.11.1
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    startingDeadlineSeconds: 600
+    backoffLimit: 1
+    # The trigger pod only waits for the 202, not for the snapshot.
     activeDeadlineSeconds: 120
     requestTimeoutSeconds: 30
 

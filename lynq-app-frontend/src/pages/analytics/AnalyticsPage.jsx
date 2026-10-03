@@ -1,28 +1,15 @@
 import strings from "../../i18n";
 import useAuth from "../../hooks/useAuth";
-import ChartCard from "../../components/ds/ChartCard/ChartCard";
-import CalloutNote from "../../components/ds/CalloutNote/CalloutNote";
-import LevelChip from "../../components/ds/LevelChip/LevelChip";
-import DataTable from "../../components/ds/DataTable/DataTable";
+import useApi from "../../hooks/useApi";
+import CandidateBenchmarkBlock from "../../components/CandidateBenchmarkBlock/CandidateBenchmarkBlock";
+import CompanyJobsCard from "../../components/CompanyJobsCard/CompanyJobsCard";
+import MarketBlock from "../../components/MarketBlock/MarketBlock";
 import "./AnalyticsPage.css";
 
 const AnalyticsPage = () => {
   const t = strings.pages.analytics;
-  const levels = strings.ds.levels;
   const { isCompany } = useAuth();
-
-  const pending = isCompany ? t.company : t.candidate;
-
-  const readinessColumns = [
-    { key: "chart", header: t.readiness.chart },
-    { key: "source", header: t.readiness.source, code: true },
-    {
-      key: "level",
-      header: t.readiness.level,
-      render: (row) => <LevelChip level={row.levelKey}>{row.level}</LevelChip>,
-    },
-    { key: "blockedBy", header: t.readiness.blockedBy },
-  ];
+  const { authFetch } = useApi();
 
   return (
     <main className="analytics-page">
@@ -31,35 +18,23 @@ const AnalyticsPage = () => {
         <p className="ds-lead">{t.subtitle}</p>
       </header>
 
-      <CalloutNote headline={t.shellNote.headline} variant="gap">
-        {t.shellNote.body}
-      </CalloutNote>
-
-      <section className="analytics-grid">
-        {pending.map((card) => (
-          <ChartCard
-            key={card.key}
-            title={card.title}
-            where={card.where}
-            level={card.level}
-            levelLabel={levels[card.level]}
-            sampleSize={0}
-            emptyState={{
-              whatIsMissing: card.whatIsMissing,
-              fallbackShown: card.fallbackShown,
-              thresholdReason: card.thresholdReason,
-            }}
-          />
-        ))}
+      <section className="analytics-section" aria-labelledby="analytics-role-heading">
+        <h2 id="analytics-role-heading">
+          {isCompany ? t.companyHeading : t.candidateHeading}
+        </h2>
+        {isCompany ? (
+          <CompanyJobsCard authFetch={authFetch} />
+        ) : (
+          <CandidateBenchmarkBlock authFetch={authFetch} />
+        )}
       </section>
 
-      <section className="analytics-readiness">
-        <h2>{t.readiness.title}</h2>
-        <DataTable
-          columns={readinessColumns}
-          rows={t.readiness.rows}
-          rowKey={(row) => row.chart}
-        />
+      <section className="analytics-section" aria-labelledby="analytics-market-heading">
+        <div>
+          <h2 id="analytics-market-heading">{t.marketHeading}</h2>
+          <p className="analytics-section-lead">{t.marketLead}</p>
+        </div>
+        <MarketBlock authFetch={authFetch} />
       </section>
     </main>
   );

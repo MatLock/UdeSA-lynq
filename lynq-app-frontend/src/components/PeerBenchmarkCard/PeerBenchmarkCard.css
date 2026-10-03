@@ -1,0 +1,56 @@
+.peer-strip-track {
+  stroke: var(--rule-strong);
+  stroke-width: 2;
+}
+
+.peer-strip-middle {
+  fill: var(--level-snapshot-wash);
+  stroke: var(--level-snapshot);
+  stroke-width: 1;
+}
+
+.peer-strip-median {
+  stroke: var(--ink-muted);
+  stroke-width: 2;
+}
+
+.peer-strip-you {
+  fill: var(--level-snapshot);
+  stroke: var(--surface-raised);
+  stroke-width: 2;
+}
+
+.peer-strip-axis {
+  fill: var(--ink-muted);
+}
+
+.peer-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.peer-legend::before {
+  content: "";
+  flex-shrink: 0;
+}
+
+.peer-legend--you::before {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--level-snapshot);
+}
+
+.peer-legend--median::before {
+  width: 2px;
+  height: 12px;
+  background: var(--ink-muted);
+}
+
+.peer-legend--middle::before {
+  width: 12px;
+  height: 8px;
+  background: var(--level-snapshot-wash);
+  border: 1px solid var(--level-snapshot);
+}

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lynq.analytics.client.LynqIamClient;
 import com.lynq.analytics.filter.AuthHeaderExistenceFilter;
 import com.lynq.analytics.filter.IamAuthenticationFilter;
+import com.lynq.analytics.filter.InternalTokenFilter;
 import com.lynq.analytics.filter.RequestUuidFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,9 +25,13 @@ class FilterConfigTest {
 
   private static final String URL_PATTERN_ALL = "/*";
 
+  private static final String URL_PATTERN_INTERNAL = "/internal/*";
+  private static final String INTERNAL_TOKEN = "the-internal-token";
+
   private static final int REQUEST_UUID_FILTER_ORDER = 0;
-  private static final int AUTH_HEADER_EXISTENCE_FILTER_ORDER = 1;
-  private static final int IAM_AUTHENTICATION_FILTER_ORDER = 2;
+  private static final int INTERNAL_TOKEN_FILTER_ORDER = 1;
+  private static final int AUTH_HEADER_EXISTENCE_FILTER_ORDER = 2;
+  private static final int IAM_AUTHENTICATION_FILTER_ORDER = 3;
 
   @Mock
   private LynqIamClient lynqIamClient;
@@ -60,6 +65,16 @@ class FilterConfigTest {
     FilterRegistrationBean<RequestUuidFilter> registration = filterConfig.createRequestUuidFilter(objectMapper);
 
     assertThat(registration.getOrder(), is(REQUEST_UUID_FILTER_ORDER));
+  }
+
+  @Test
+  void createInternalTokenFilterGuardsOnlyTheInternalPathsAfterTheRequestUuid() {
+    FilterRegistrationBean<InternalTokenFilter> registration =
+        filterConfig.createInternalTokenFilter(objectMapper, INTERNAL_TOKEN);
+
+    assertThat(registration.getFilter(), is(instanceOf(InternalTokenFilter.class)));
+    assertThat(registration.getUrlPatterns(), contains(URL_PATTERN_INTERNAL));
+    assertThat(registration.getOrder(), is(INTERNAL_TOKEN_FILTER_ORDER));
   }
 
   @Test

@@ -25,7 +25,7 @@ public class AuthHeaderExistenceFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return PublicPaths.isPublic(request);
+        return PublicPaths.skipsUserAuthentication(request);
     }
 
     @Override

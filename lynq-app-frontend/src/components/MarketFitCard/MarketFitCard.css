@@ -1,0 +1,37 @@
+.market-fit-reach {
+  margin: 0;
+  font-size: 15px;
+  line-height: 21px;
+  color: var(--ink);
+}
+
+.fit-trend-axis {
+  stroke: var(--rule-strong);
+  stroke-width: 1;
+}
+
+.fit-trend-threshold {
+  stroke: var(--rule-hairline);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.fit-trend-line {
+  fill: none;
+  stroke: var(--level-snapshot);
+  stroke-width: 2;
+}
+
+.fit-trend-hit {
+  fill: transparent;
+}
+
+.fit-trend-you {
+  fill: var(--level-snapshot);
+  stroke: var(--surface-raised);
+  stroke-width: 2;
+}
+
+.fit-trend-label {
+  fill: var(--ink-muted);
+}

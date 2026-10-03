@@ -44,7 +44,7 @@ class CacheConfigTest {
   @Test
   void hasOneCachePerEndpoint() {
     assertThat(cacheManager.getCacheNames(), containsInAnyOrder("time-to-fill", "standing",
-        "salary"));
+        "salary", "benchmark", "market", "company-jobs"));
   }
 
   @Test

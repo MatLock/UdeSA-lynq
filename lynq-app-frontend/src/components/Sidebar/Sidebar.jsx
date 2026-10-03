@@ -35,8 +35,6 @@ const LogoutIcon = () => (
 // Collapsible left navigation bar. The menu adapts to the user type (candidate
 // vs company); each entry navigates to its section and the active route is
 // highlighted. Owns its collapsed/expanded state.
-const ANALYTICS_LINK_VISIBLE = false
-
 const Sidebar = () => {
   const t = strings.sidebar
   const { user, isCompany, logout } = useAuth()
@@ -58,9 +56,7 @@ const Sidebar = () => {
           { key: 'resume', icon: <DescriptionOutlinedIcon />, label: t.resume, to: '/my-resume' },
           { key: 'applications', icon: <MarkEmailUnreadOutlinedIcon />, label: t.applications, to: '/user/application' },
         ]),
-    ...(ANALYTICS_LINK_VISIBLE
-      ? [{ key: 'analytics', icon: <InsightsOutlinedIcon />, label: t.analytics, to: '/analytics' }]
-      : []),
+    { key: 'analytics', icon: <InsightsOutlinedIcon />, label: t.analytics, to: '/analytics' },
   ]
 
   const localeCodes = Object.keys(locales)

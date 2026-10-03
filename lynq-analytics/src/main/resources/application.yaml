@@ -50,6 +50,10 @@ spring:
 lynq:
   iam:
     url: http://localhost:8080/lynq-iam
+  backend:
+    url: http://localhost:8082/lynq-backend-app
+  internal:
+    token: ${LYNQ_INTERNAL_TOKEN:local-internal-token-not-a-secret}
   analytics:
     events:
       queue: ${LYNQ_ANALYTICS_EVENTS_QUEUE:lynq-analytics-events}
@@ -64,9 +68,22 @@ lynq:
       default-currency: ARS
     cache:
       ttl: PT1H
-    tag-frequency:
-      cron: ${LYNQ_ANALYTICS_TAG_FREQUENCY_CRON:0 0 8 * * *}
-      zone: Etc/UTC
+    snapshot:
+      zone: America/Argentina/Buenos_Aires
+    benchmark:
+      reach-threshold: 60
+      min-relevant-jobs: 5
+      min-peers: 5
+      relevance-threshold-tags: 1
+      peer-threshold-tags: 2
+      skill-unlocks: 5
+      pairs-per-request: 2000
+      series-days: 90
+    market:
+      top-skills: 10
+      weeks: 12
+      min-sample: 5
+      currencies: [ ARS, USD ]
 
 
 server:

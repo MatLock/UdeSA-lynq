@@ -1,10 +1,10 @@
 # lynq-analytics
 
-Analytics service for the Lynq platform. It will serve the numbers that sit next to a job post: the estimated **time to fill** a company can expect, a candidate's **standing** among the applicants of a post, and **salary medians** for a position and for similar candidates.
+Analytics service for the Lynq platform. It serves the numbers that sit next to a job post — the estimated **time to fill** a company can expect, a candidate's **standing** among the applicants of a post, and **salary medians** for a position and for similar candidates — and the ones behind the analytics page: a candidate's **market fit** and their position among similar candidates, the **market** the platform sees, and a company's comparison of its own job posts.
 
 It does not read `lynq_backend_db`. Its data will arrive as domain events published by `lynq-app-backend` (SNS topic `lynq-domain-events` → SQS queue `lynq-analytics-events`) and be projected into its own schema, `lynq_analytics_db`.
 
-Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. Job post, candidate and application events are also projected into a read model, over which the service resolves similar job posts and similar candidates. Two analytics are served: a candidate's **standing** among the applicants of a job post, and the **salary** medians of the position and of similar candidates. Time to fill comes next.
+Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. Job post, candidate and application events are also projected into a read model, over which the service resolves similar job posts and similar candidates. Served today: a candidate's **standing** among the applicants of a job post, the **salary** medians of the position and of similar candidates, the candidate's **market fit** against the open job posts and their percentile among similar candidates, the **market** (skill demand, salaries by category and work type, job posts published per week) and the **company job posts** comparison. The first two are computed on request; market fit and market read a **daily snapshot** that a Kubernetes CronJob triggers. Time to fill comes next.
 
 ---
 
@@ -16,7 +16,7 @@ Today the service boots, authenticates every request against [`lynq-iam`](../lyn
 | Framework         | Spring Boot 4.0.6 (Web, Data JPA, Actuator, AOP, Security, Validation)       |
 | Web server        | Jetty (Tomcat excluded)                                                      |
 | Persistence       | MySQL 9 (`lynq_analytics_db`), Hibernate / Spring Data JPA, Liquibase migrations |
-| Inter-service     | Spring Cloud OpenFeign — client for `lynq-iam`                               |
+| Inter-service     | Spring Cloud OpenFeign — clients for `lynq-iam` and `lynq-app-backend`       |
 | Messaging         | Spring Cloud AWS 4 SQS (`@SqsListener`), AWS SDK v2                          |
 | Cache             | Spring Cache over Redis (Spring Data Redis, Lettuce)                         |
 | Docs              | springdoc-openapi (Swagger UI)                                              |
@@ -34,8 +34,11 @@ Every request passes through an ordered filter chain before reaching a controlle
 | Order | Filter                       | Scope                        | Purpose                                                                                          |
 | :---: | ---------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------ |
 | 0     | `RequestUuidFilter`          | `/*`                         | Require the `lynq-request-uuid` header; bind it to SLF4J MDC (`requestId`) and echo it back on the response. `403` if missing. |
-| 1     | `AuthHeaderExistenceFilter`  | `/*` (Swagger paths exempt)  | `401` if the `Authorization` header is missing or blank.                                         |
-| 2     | `IamAuthenticationFilter`    | `/*` (Swagger paths exempt)  | Call `lynq-iam` for the token's user info, then load a `LynqUserPrincipal` — with the roles it reports as authorities — into the `SecurityContext`. `401` if IAM will not resolve the token, `503` if IAM is unreachable. |
+| 1     | `InternalTokenFilter`        | `/internal/*`                | `401` unless the `lynq-internal-token` header matches `lynq.internal.token`; an empty configured token refuses every call. |
+| 2     | `AuthHeaderExistenceFilter`  | `/*` (Swagger and `/internal` exempt) | `401` if the `Authorization` header is missing or blank.                                |
+| 3     | `IamAuthenticationFilter`    | `/*` (Swagger and `/internal` exempt) | Call `lynq-iam` for the token's user info, then load a `LynqUserPrincipal` — with the roles it reports as authorities — into the `SecurityContext`. `401` if IAM will not resolve the token, `503` if IAM is unreachable. |
+
+`/internal/**` has no user behind it — the caller is the snapshot CronJob — so it skips the bearer-token filters and is guarded by the shared internal token instead, as `lynq-app-backend`'s internal routes are.
 
 > This service does **not** verify the access token's signature. Every request reaches it through
 > [`lynq-bff`](../lynq-bff), which validates the signature before proxying, which is also why the
@@ -60,6 +63,7 @@ post, or a candidate applied to it, is checked against the read model by the end
 | `GET /dmz/analytics/candidate/me/benchmark`   | `CANDIDATE` | —                                  | K5   |
 | `GET /dmz/analytics/job/{jobId}/salary`       | none        | —                                  | F9   |
 | `GET /dmz/analytics/market`                   | none        | —                                  | K8   |
+| `POST /internal/snapshot`                     | —           | the internal token, not a user     | K3   |
 
 `HasRoleAuthorizationTest` pins the mechanism on a test-only controller: each role reaches its
 route, the other role and a caller without roles get `403` with the role named in `reason`, and an
@@ -170,7 +174,7 @@ weight = ln((N + 1) / (df + 1))        N = job posts
 
 A tag in every job post weighs `0`; a tag seen once weighs `ln((N + 1) / 2)`. Candidate tags do not change the weights: rarity is what the market asks for. Tags are stored lower-cased and compared ignoring case. A tag missing from the table, from a post published after the last run, weighs as much as the rarest known one; with an empty table every tag weighs `1` and the metrics reduce to counting tags.
 
-`TagFrequencyScheduler` recomputes the whole table daily at 08:00 UTC (05:00 in Buenos Aires, after the feeders' 06:00 UTC run), and on startup if the table is empty. Every tag seen is upserted and the ones no job post has anymore are removed.
+The table is recomputed as the first step of the [daily snapshot](#daily-snapshot), and on startup if it is empty. Every tag seen is upserted and the ones no job post has anymore are removed.
 
 The **median weight** the thresholds use is taken over occurrences — every row of `job_post_tags` with the weight of its tag — not over distinct tags. Most distinct tags appear in one or two posts, so a median over them sits near the maximum weight and no threshold would admit anything; per occurrence it is the weight of a typical tag in a typical post.
 
@@ -199,8 +203,6 @@ Matches are ordered by score and then by skills in common. `Distribution.of(valu
 | `lynq.analytics.similarity.fallback-threshold-tags` | `1`           | `k` when the sample is short |
 | `lynq.analytics.similarity.min-sample`            | `5`             | below it, fall back |
 | `lynq.analytics.standing.min-applicants`          | `5`             | below it, the standing has no `medianScore` |
-| `lynq.analytics.tag-frequency.cron`               | `0 0 8 * * *`   | env `LYNQ_ANALYTICS_TAG_FREQUENCY_CRON`; `-` disables it |
-| `lynq.analytics.tag-frequency.zone`               | `Etc/UTC`       | |
 
 ---
 
@@ -275,6 +277,107 @@ Matches are ordered by score and then by skills in common. `Distribution.of(valu
 
 ---
 
+## Daily snapshot
+
+Some numbers cannot be computed on request. A candidate's percentile among similar candidates needs the market fit of every one of them, and a chart with a date on its axis needs the state of each day, which the read model overwrites. Those are written once a day by the snapshot, which reads the **current state of the read model** — never the events — and replaces the rows of the day, so running it twice the same day gives the same result.
+
+`POST /internal/snapshot` takes it. There is no schedule inside the service: the `lynq-analytics-snapshot-cronjob` in the Helm chart calls it every day at 05:00 in Buenos Aires (08:00 UTC), two hours after the feeders, so the day includes what they ingested and closed.
+
+- **Trigger** — authenticated with the `lynq-internal-token` header, not a bearer token. It answers `202` with no body and runs in the background; a second call while one is running gets `409`. The run is logged under the `lynq-request-uuid` of the trigger, and that uuid travels to `lynq-app-backend` with the score batches.
+- **Date** — today in `lynq.analytics.snapshot.zone` (`America/Argentina/Buenos_Aires`).
+- **Steps** — in order: the [tag weights](#tag-weights), the [daily aggregates](#market) of the open job posts, and the [candidate benchmark](#market-fit). A failing step is logged and the next one still runs; each step writes all of its rows in one transaction or none.
+- **Holes** — a day the snapshot did not run, or a step failed, has no rows. The charts show it as a hole, which is honest; nothing reconstructs it automatically.
+
+```bash
+curl -X POST http://localhost:8091/lynq-analytics/internal/snapshot \
+  -H "lynq-request-uuid: $(uuidgen)" -H "lynq-internal-token: local-internal-token-not-a-secret"
+```
+
+| Table                          | Key                                           | Written by        |
+| ------------------------------ | --------------------------------------------- | ----------------- |
+| `candidate_daily_benchmark`    | `snapshot_on`, `candidate_id`                 | market fit        |
+| `candidate_daily_skill_unlocks`| `snapshot_on`, `candidate_id`, `skill`        | market fit        |
+| `job_daily_stats`              | `snapshot_on`, `category`                     | daily aggregates  |
+| `skill_daily_demand`           | `snapshot_on`, `skill`                        | daily aggregates  |
+| `category_daily_salary`        | `snapshot_on`, `category`, `work_type`, `currency` | daily aggregates |
+
+Skills and categories are grouped the way MySQL's collation compares them — ignoring case and accents — and stored under their most frequent spelling. A job post without a category is stored under the empty category and answered as `null`.
+
+---
+
+## Market fit
+
+`GET /dmz/analytics/candidate/me/benchmark` — where the caller stands in the market, beyond any single job post. Only `CANDIDATE` users, and always the caller: there is no user id in the path, or anyone could read anyone's profile.
+
+The `lynqScore` is a candidate against a job post, not a property of the candidate, so the standing of a job post has no counterpart across posts. The snapshot gives each candidate three numbers a day:
+
+| Number | Definition |
+| ------ | ---------- |
+| **Market fit** | the median `lynqScore` of the candidate against the open job posts relevant to them |
+| **Reach** | the share of those job posts where the score is above `reach-threshold` (60) |
+| **Percentile among peers** | where the market fit falls among the candidates similar to them, the candidate included among the tied |
+
+- **Relevant job posts** — the open ones whose tags [overlap](#metrics) the candidate's by at least one median tag weight (`relevance-threshold-tags`, 1). Weighted, as everywhere else in the service: a tag every post carries does not make the whole market relevant.
+- **Peers** — the candidates whose tags overlap the candidate's by at least two median tag weights (`peer-threshold-tags`, 2), and who have a market fit of their own.
+- **Scores** — analytics does not score: it only receives scores inside `ApplicationSubmitted`, for real applications. The snapshot sends every candidate and relevant job post pair to `lynq-app-backend`'s `POST /internal/score/batch`, the same calculator as a pure function, in requests of up to `pairs-per-request` (2000) pairs. If the backend is down, the step writes nothing.
+- **Skill coverage** — of the skills the relevant job posts ask for, counted per job post, the share the candidate has; compared with the median coverage of the peers.
+- **Skills that unlock job posts** — for each skill the candidate lacks in the relevant job posts at or below the threshold, the snapshot scores the candidate again with that skill added, against those posts, and counts the ones that go above the threshold. The top `skill-unlocks` (5) are kept.
+- **Thresholds** — below `min-relevant-jobs` (5) relevant job posts the fit, the reach and the coverage are `null`; `jobs_scored` is kept, since it is what makes the number auditable. Below `min-peers` (5) peers the percentile and the peers' quartiles are `null`, and `peer_group_size` is still answered: with four people, each point of a distribution is someone a colleague can recognise.
+- **Without skills or tags** — a candidate with neither gets no row: a hole is better than a zero that looks like data.
+- **The threshold is stored** — every row carries the `reach_threshold` it was computed with. Changing `lynq.analytics.benchmark.reach-threshold` does not rewrite the past rows, and the series shows where it changed.
+
+```json
+{
+  "success": true,
+  "data": {
+    "snapshotOn": "2026-10-03", "marketFit": 61, "jobsScored": 40,
+    "aboveThresholdPct": 55, "reachThreshold": 60,
+    "peerPercentile": 72, "peerGroupSize": 38,
+    "peerFitP25": 40, "peerFitMedian": 52, "peerFitP75": 66,
+    "skillCoveragePct": 45, "peerCoverageMedian": 38,
+    "skillUnlocks": [{ "skill": "Kafka", "jobsUnlocked": 4 }],
+    "series": [{ "snapshotOn": "2026-10-03", "marketFit": 61, "aboveThresholdPct": 55,
+                 "peerPercentile": 72, "peerGroupSize": 38 }]
+  }
+}
+```
+
+The answer is the latest row of the caller with the series of the last `series-days` (90). Before the first snapshot that includes them, `snapshotOn` is `null` and the lists are empty.
+
+| Property                                         | Default | |
+| ------------------------------------------------ | ------- | - |
+| `lynq.analytics.benchmark.reach-threshold`       | `60`    | stored with each row |
+| `lynq.analytics.benchmark.min-relevant-jobs`     | `5`     | below it, no fit, reach or coverage |
+| `lynq.analytics.benchmark.min-peers`             | `5`     | below it, no percentile |
+| `lynq.analytics.benchmark.relevance-threshold-tags` | `1`  | median tag weights a relevant job post shares |
+| `lynq.analytics.benchmark.peer-threshold-tags`   | `2`     | median tag weights a peer shares |
+| `lynq.analytics.benchmark.skill-unlocks`         | `5`     | skills kept per candidate |
+| `lynq.analytics.benchmark.pairs-per-request`     | `2000`  | pairs per score batch; the backend takes up to 5000 |
+| `lynq.analytics.benchmark.series-days`           | `90`    | days of the series |
+
+---
+
+## Market
+
+`GET /dmz/analytics/market?currency=ARS` — what the platform sees, for any authenticated user.
+
+| Field              | Source | |
+| ------------------ | ------ | - |
+| `snapshotOn`, `openJobPosts`, `openWithSalary` | `job_daily_stats` of the latest snapshot | |
+| `skillDemand`      | `skill_daily_demand` | the `top-skills` (10) skills most open job posts ask for, with `weeklyChange` against the snapshot seven days earlier, `null` without one |
+| `salary`           | `category_daily_salary` in `currency` | per category and work type, the n, median, p25 and p75 of the open job posts with a salary, each counted at the middle of its range; the statistics are withheld below `min-sample` (5) and `insufficientData` is `true` |
+| `publishedPerWeek` | the `job_posts` read model | job posts published in each of the last `weeks` (12) complete weeks, Monday to Sunday |
+
+The published job posts are counted from the read model and not from the snapshot: `published_on` is a fact with a date, so the count is exact and covers the history a replay brings, where a snapshot only knows the days since it started. Open posts, demand and salaries change state, so those need the snapshot.
+
+`currency` is `ARS` or `USD` (`lynq.analytics.market.currencies`), `ARS` when absent; any other is a `400`.
+
+### Company job posts
+
+`GET /dmz/analytics/company/me/jobs` — every job post the caller published, newest first, with its status, its applications and the median score of its applicants, `null` with `insufficientData` below `lynq.analytics.standing.min-applicants` (5). Only `COMPANY` users, and always the caller. Computed on request over the read model.
+
+---
+
 ## Cache
 
 The analytics are computed on request over the read model, and Redis keeps each answer for an hour (`CacheConfig`, a `RedisCacheManager` behind `@EnableCaching`). There is one cache per endpoint, declared in `AnalyticsCaches`; a cache not declared there does not exist, so a misspelt name fails instead of creating a cache without its TTL.
@@ -284,11 +387,15 @@ The analytics are computed on request over the read model, and Redis keeps each 
 | `time-to-fill` | `GET /dmz/analytics/job/{jobId}/time-to-fill` | `jobId`        |
 | `salary`       | `GET /dmz/analytics/job/{jobId}/salary`   | `jobId`            |
 | `standing`     | `GET /dmz/analytics/job/{jobId}/standing` | `jobId:userId`     |
+| `benchmark`    | `GET /dmz/analytics/candidate/me/benchmark` | `userId`         |
+| `market`       | `GET /dmz/analytics/market`               | `currency`         |
+| `company-jobs` | `GET /dmz/analytics/company/me/jobs`      | `userId`           |
 
-The standing is keyed by the candidate too: it holds the caller's own rank and score, and one candidate must never be served another's. The other two answers are the same for every caller of a job post.
+The standing is keyed by the candidate too: it holds the caller's own rank and score, and one candidate must never be served another's. The benchmark and the company job posts are keyed by the caller for the same reason. The salary and the time to fill are the same for every caller of a job post.
 
 - **Keys** — `lynq-analytics::<cache>::<key>` in Redis, e.g. `lynq-analytics::standing::7777…:1111…`.
 - **TTL** — `lynq.analytics.cache.ttl`, default `PT1H`, the same for every cache. Nothing is evicted when an event arrives: an answer can be up to an hour behind the read model.
+- **After the snapshot** — each snapshot step that succeeds clears its cache whole, `market` after the daily aggregates and `benchmark` after the candidate benchmark, once its rows are committed. A failed step evicts nothing, so yesterday's answer stays.
 - **Values** — JSON with the type of the value recorded, so a response record comes back as itself; only types under `com.lynq.analytics`, `java.lang`, `java.util` and `java.time` are read back. Nulls are not cached, and neither is an exception, so a `403` or `404` is never stored.
 - **Redis down** — a cache error is logged and the call goes on uncached (`LoggingCacheErrorHandler`). Command and connect timeouts are 500 ms, so an outage costs half a second per request, not the driver's default minute.
 - **Writes** — immediate: a request waits for Redis to confirm the entry. Spring Data Redis 4 writes in the background by default with Lettuce, which lets an eviction overtake the write it follows and hides write failures from the error handler; waiting costs under a millisecond next to computing a median.
@@ -305,8 +412,9 @@ Each endpoint's service method declares `@Cacheable(cacheNames = AnalyticsCaches
 - JDK 21
 - Maven 3.9+
 - A reachable MySQL 9 with the `lynq_analytics_db` database, a running `lynq-iam`, Redis, and LocalStack with the domain events queue (`docker compose up localstack redis`)
+- A running `lynq-app-backend` to take the [daily snapshot](#daily-snapshot); the rest of the service works without it
 
-The default `application.yaml` targets `localhost:3306` (MySQL, `root` / `federico`), `lynq-iam` at `http://localhost:8080/lynq-iam`, SQS at `http://localhost:4566` and Redis at `localhost:6379` (`root` / `password`, the compose defaults).
+The default `application.yaml` targets `localhost:3306` (MySQL, `root` / `federico`), `lynq-iam` at `http://localhost:8080/lynq-iam`, `lynq-app-backend` at `http://localhost:8082/lynq-backend-app` with the local internal token, SQS at `http://localhost:4566` and Redis at `localhost:6379` (`root` / `password`, the compose defaults).
 
 ```bash
 mvn clean package
@@ -339,12 +447,13 @@ mvn test
 | `DB_USERNAME`  | MySQL user                         | |
 | `DB_PASSWORD`  | MySQL password                     | |
 | `LYNQ_IAM_URL` | `lynq.iam.url` (Feign client)      | default `http://lynq-iam:8080/lynq-iam` |
+| `LYNQ_BACKEND_URL` | `lynq.backend.url` (Feign client) | default `http://lynq-app-backend:8080/lynq-backend-app` |
+| `LYNQ_INTERNAL_TOKEN` | `lynq.internal.token`          | shared secret: checked on `/internal/**` and presented to `lynq-app-backend`; empty refuses every internal call |
 | `LYNQ_ANALYTICS_EVENTS_QUEUE` | `lynq.analytics.events.queue` | default `lynq-analytics-events` |
 | `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | AWS SDK default chains | unset in EKS when the pod role provides them |
 | `SPRING_CLOUD_AWS_SQS_ENDPOINT` | SQS endpoint override | only against LocalStack, e.g. `http://localstack:4566` |
 | `REDIS_ADDRESS`, `REDIS_PORT` | `spring.data.redis.host` / `port` | |
 | `REDIS_USERNAME`, `REDIS_PASSWORD` | Redis ACL user | |
-| `LYNQ_ANALYTICS_TAG_FREQUENCY_CRON` | `lynq.analytics.tag-frequency.cron` | default `0 0 8 * * *` (UTC) |
 
 ---
 
@@ -369,19 +478,19 @@ lynq-analytics/
     │   │   ├── LynqAnalyticsApplication.java
     │   │   ├── aspect/          # @AuditLog + LogAspect
     │   │   ├── cache/           # AnalyticsCaches: one cache per endpoint
-    │   │   ├── client/          # LynqIamClient (Feign) and its response
-    │   │   ├── config/          # AppConfig, FilterConfig, OpenApiConfig, SecurityConfig, SimilarityConfig, StandingConfig, SalaryConfig, CacheConfig and their properties
-    │   │   ├── controller/      # AnalyticsController and its impl, ControllerExceptionHandler, response envelope
+    │   │   ├── client/          # LynqIamClient and LynqBackendClient (Feign), their requests and responses
+    │   │   ├── config/          # AppConfig, FilterConfig, OpenApiConfig, SecurityConfig, SimilarityConfig, StandingConfig, SalaryConfig, CacheConfig, SnapshotConfig and their properties
+    │   │   ├── controller/      # AnalyticsController, InternalSnapshotController and their impls, ControllerExceptionHandler, response envelope
     │   │   ├── enums/           # JobStatus
-    │   │   ├── exceptions/      # BadRequest, Forbidden, NotFound, InvalidDomainEvent, UnknownJobPost
-    │   │   ├── filter/          # RequestUuid, AuthHeaderExistence, IamAuthentication, PublicPaths
+    │   │   ├── exceptions/      # BadRequest, Conflict, Forbidden, NotFound, InvalidDomainEvent, UnknownJobPost
+    │   │   ├── filter/          # RequestUuid, InternalToken, AuthHeaderExistence, IamAuthentication, PublicPaths
     │   │   ├── listener/        # DomainEventListener (SQS), the envelope and the event payloads
     │   │   ├── model/           # JPA entities
     │   │   ├── repository/      # Spring Data repositories
     │   │   ├── security/        # LynqUserPrincipal, Role, @HasRole
     │   │   ├── similarity/      # TagSimilarity, its two metrics, TagWeights and the match results
-    │   │   ├── stats/           # Distribution: n, median, p25, p75; Standing: rank, percentile, median score; SalaryDistribution and SalaryInsights
-    │   │   └── service/         # DomainEventService and the projectors; TagFrequencyService and its scheduler; SimilarityService; StandingService; SalaryService
+    │   │   ├── stats/           # Distribution, PercentileRank, Folding; Standing; SalaryDistribution and SalaryInsights; MarketFit, CandidateBenchmark, Market and CompanyJobs
+    │   │   └── service/         # DomainEventService and the projectors; TagFrequencyService; SimilarityService; StandingService; SalaryService; DailySnapshotService, DailyAggregatesService, CandidateBenchmarkService and BatchScorer; the benchmark, market and company job posts queries
     │   └── resources/
     │       ├── application.yaml
     │       ├── application-production.yaml

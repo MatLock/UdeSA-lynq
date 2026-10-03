@@ -2,6 +2,7 @@ package com.lynq.analytics.controller.handler;
 
 import com.lynq.analytics.controller.response.ErrorRestResponse;
 import com.lynq.analytics.exceptions.BadRequestException;
+import com.lynq.analytics.exceptions.ConflictException;
 import com.lynq.analytics.exceptions.ForbiddenException;
 import com.lynq.analytics.exceptions.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,6 +74,19 @@ class ControllerExceptionHandlerTest {
     ResponseEntity<ErrorRestResponse<Void>> response = handler.handleNotFound(exception);
 
     assertThat(response.getStatusCode(), is(HttpStatus.NOT_FOUND));
+    assertThat(response.getBody().isSuccess(), is(false));
+    assertThat(response.getBody().getReason(), is(ERROR_MESSAGE));
+    assertThat(response.getBody().getData(), is(nullValue()));
+  }
+
+  @Test
+  void handleConflictReturnsConflictStatusWithMessage() {
+    ConflictException exception = mock(ConflictException.class);
+    when(exception.getMessage()).thenReturn(ERROR_MESSAGE);
+
+    ResponseEntity<ErrorRestResponse<Void>> response = handler.handleConflict(exception);
+
+    assertThat(response.getStatusCode(), is(HttpStatus.CONFLICT));
     assertThat(response.getBody().isSuccess(), is(false));
     assertThat(response.getBody().getReason(), is(ERROR_MESSAGE));
     assertThat(response.getBody().getData(), is(nullValue()));

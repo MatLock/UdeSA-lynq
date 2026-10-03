@@ -13,6 +13,7 @@ const numbers = {
   },
   marketFit: {
     name: 'Tu fit de mercado',
+    value: (fit) => `${fit} de 100`,
     set: (jobs) => `sobre ${jobs} avisos abiertos relevantes`,
   },
   marketReach: {
@@ -42,6 +43,35 @@ const numbers = {
   },
   distribution: { median: 'mediana', p25: 'p25', p75: 'p75' },
   asOfToday: 'al día de hoy',
+  skillCoverage: {
+    name: 'Tu cobertura de skills',
+    value: (percent) => `${percent} % de lo que piden`,
+    set: (jobs) => `sobre las skills de ${jobs} avisos abiertos relevantes`,
+  },
+  skillUnlocks: {
+    name: 'Las skills que más avisos te abren',
+    value: (jobs) => (jobs === 1 ? '1 aviso' : `${jobs} avisos`),
+    set: (threshold) => `avisos relevantes que pasarían de ${threshold} si la sumaras`,
+  },
+  skillDemand: {
+    name: 'Las skills más pedidas',
+    set: (jobs) => `entre ${jobs} avisos abiertos`,
+    change: (delta) => (delta > 0 ? `+${delta} en la semana` : `${delta} en la semana`),
+  },
+  marketSalary: {
+    name: 'Salario por categoría y modalidad',
+    set: (jobs, currency) => `sobre ${jobs} avisos abiertos con salario en ${currency}`,
+  },
+  publishedPerWeek: {
+    name: 'Avisos publicados por semana',
+    set: (jobs, weeks) => `${jobs} avisos en las últimas ${weeks} semanas completas`,
+  },
+  companyJobs: {
+    name: 'Tus avisos, comparados',
+    applications: (count) => (count === 1 ? '1 postulación' : `${count} postulaciones`),
+    median: (score) => `mediana ${score}`,
+  },
+  asOf: (date) => `al ${date}`,
 }
 
 const es = {
@@ -468,70 +498,44 @@ const es = {
     analytics: {
       title: 'Analíticas',
       subtitle: 'Lo que los datos de Lynq pueden decir sobre una búsqueda, un aviso y un perfil.',
-      shellNote: {
-        headline: 'Todavía no hay datos que mostrar.',
-        body: 'Las tarjetas de abajo son las que van a aparecer acá, con su forma y su nivel de cálculo ya definidos. Cada una espera su endpoint en lynq-analytics; mientras tanto declara cuánta muestra tiene, que es cero.',
+      candidateHeading: 'Tu búsqueda',
+      companyHeading: 'Tus avisos',
+      marketHeading: 'El mercado',
+      marketLead: 'Lo que piden los avisos abiertos que ve Lynq, de todas las fuentes.',
+      unavailable: 'No pudimos cargar esta sección. Probá de nuevo en un rato.',
+      benchmark: {
+        noSnapshot: 'Todavía no hay una foto de tu perfil. La saca el proceso diario de las 05:00 si tu perfil tiene skills: cargá un CV y volvé mañana.',
+        fitMissing: (min) => `Hacen falta al menos ${min} avisos abiertos parecidos a tu perfil para medir tu fit.`,
+        peersMissing: (min) => `Con menos de ${min} pares el percentil queda vacío: es un umbral de privacidad, no estadístico.`,
+        peersMiddle: 'mitad central de tus pares',
+        peersMedian: 'mediana de tus pares',
+        you: 'Tu fit de mercado',
+        trend: 'tu fit de mercado, día por día',
+        coverageYou: 'Vos',
+        coveragePeers: 'Mediana de tus pares',
+        coveragePeersMissing: (min) => `La mediana de tus pares aparece desde ${min} pares.`,
+        unlocksEmpty: (threshold) => `Ninguna skill sola lleva un aviso relevante por encima de ${threshold}.`,
       },
-      candidate: [
-        {
-          key: 'standing',
-          title: numbers.standing.name,
-          where: 'CandidateStandingCard · JobDetailPage',
-          level: 'query',
-          whatIsMissing: 'Postulate a un aviso para tener una posición que medir.',
-          thresholdReason: 'Debajo de 5 postulantes se muestra el puesto pero no la mediana: con tan pocos, la mediana deja ver el puntaje de los demás.',
+      market: {
+        currencyLabel: 'Moneda',
+        noSnapshot: 'Todavía no hay una foto del mercado: la saca el proceso diario de las 05:00.',
+        withheld: (n, min) => `N = ${n}, se muestra desde ${min}`,
+        uncategorized: 'Sin categoría',
+        categories: {
+          ADMINISTRACION: 'Administración',
+          TECNOLOGIA: 'Tecnología',
+          CONTABILIDAD: 'Contabilidad',
+          RECURSOS_HUMANOS: 'Recursos humanos',
         },
-        {
-          key: 'benchmark',
-          title: numbers.peerPercentile.name,
-          where: 'PeerBenchmarkCard · AnalyticsPage',
-          level: 'snapshot',
-          whatIsMissing: 'Lo escribe el job de las 05:00 comparándote con candidatos que comparten tus similarity tags.',
-          thresholdReason: 'Con menos de 5 pares el percentil queda vacío: es un umbral de privacidad, no estadístico.',
-        },
-        {
-          key: 'salary',
-          title: 'Tu salario esperado contra el mercado',
-          where: 'SalaryInsightsCard · JobDetailPage',
-          level: 'query',
-          whatIsMissing: 'Cargá tu salario esperado en el perfil y necesitamos avisos parecidos que publiquen el suyo.',
-          thresholdReason: 'Debajo de 5 avisos o candidatos parecidos no se muestra la mediana: con tan pocos, deja ver el salario de cada uno.',
-        },
-      ],
-      company: [
-        {
-          key: 'timeToFill',
-          title: numbers.timeToFill.name,
-          where: 'TimeToFillCard · MyJobPostsPage',
-          level: 'ingest',
-          whatIsMissing: 'Hacen falta avisos parecidos ya cerrados. Los avisos externos se cierran cuando el feeder verifica que dejaron de estar publicados.',
-          fallbackShown: 'Los que siguieron abiertos a los 25 días se reportan aparte: son dato censurado y no entran a la mediana.',
-        },
-        {
-          key: 'scoreSpread',
-          title: 'Distribución de afinidad de tus postulantes',
-          where: 'JobCandidatesPage',
-          level: 'query',
-          whatIsMissing: 'Publicá un aviso y esperá a que se postulen.',
-          thresholdReason: 'Debajo de 5 postulantes no se dibuja: la distribución no dice nada y se identifica a la gente.',
-        },
-        {
-          key: 'marketSalary',
-          title: 'Tu rango salarial contra el mercado',
-          where: 'SalaryInsightsCard · JobDetailPage',
-          level: 'query',
-          whatIsMissing: 'Hacen falta avisos parecidos que publiquen salario en la misma moneda.',
-        },
-      ],
-      readiness: {
-        title: 'Qué falta para que cada número exista',
-        chart: 'Analítica', source: 'Lee de', level: 'Nivel', blockedBy: 'Bloqueada por',
-        rows: [
-          { chart: numbers.standing.name, source: 'applications', level: '2', levelKey: 'query', blockedBy: 'nada: sale con los datos de hoy' },
-          { chart: numbers.timeToFill.name, source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'cierre verificado de avisos externos' },
-          { chart: 'Salario contra el mercado', source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'moneda del aviso y salario esperado del candidato' },
-          { chart: numbers.peerPercentile.name, source: 'candidate_daily_benchmark', level: '3', levelKey: 'snapshot', blockedBy: 'el job de las 05:00' },
-        ],
+        workType: { REMOTE: 'Remoto', IN_OFFICE: 'Presencial' },
+        salaryEmpty: (currency) => `Ningún aviso abierto publica su salario en ${currency}.`,
+        middleHalf: 'mitad central',
+        weekOf: (date) => `semana del ${date}`,
+      },
+      company: {
+        empty: 'Todavía no publicaste avisos.',
+        medianWithheld: (min) => `mediana desde ${min} postulantes`,
+        status: { OPEN: 'Abierto', CLOSE: 'Cerrado' },
       },
     },
     profile: {

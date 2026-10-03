@@ -197,6 +197,20 @@ class IamAuthenticationFilterTest {
     assertThat(body.get("reason").asText(), is(EXPECTED_IAM_UNAVAILABLE_REASON));
   }
 
+  @Test
+  void skipsInternalPathsWhichCarryTheInternalTokenInstead() {
+    when(request.getServletPath()).thenReturn("/internal/snapshot");
+
+    assertThat(filter.shouldNotFilter(request), is(true));
+  }
+
+  @Test
+  void authenticatesTheDmzPaths() {
+    when(request.getServletPath()).thenReturn("/dmz/analytics/market");
+
+    assertThat(filter.shouldNotFilter(request), is(false));
+  }
+
   private void stubHeaders() {
     when(request.getHeader(AUTHORIZATION_HEADER)).thenReturn(VALID_AUTH_HEADER_VALUE);
     when(request.getHeader(REQUEST_UUID_HEADER)).thenReturn(REQUEST_UUID_VALUE);

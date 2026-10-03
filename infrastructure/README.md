@@ -18,7 +18,7 @@ infrastructure/
 │   │   ├── ingress/
 │   │   ├── configmaps/
 │   │   ├── secrets/
-│   │   ├── cronjobs/         # Scheduled jobs (the daily lynq-feeders run)
+│   │   ├── cronjobs/         # Scheduled jobs (the daily lynq-feeders run and lynq-analytics snapshot)
 │   │   └── infra/            # Local-only MySQL / Redis / LocalStack / Ollama
 │   └── values/
 │       ├── k8s_values-local.yaml
@@ -78,11 +78,36 @@ The Job's log only shows the `202`. The run itself is in the `lynq-feeders` pod,
 kubectl -n lynq-local-namespace logs -l app=lynq-feeders -f | grep "<request-uuid>"
 ```
 
+### The lynq-analytics daily snapshot
+
+`lynq-analytics` keeps a daily snapshot of the market and of every candidate's market fit, and the
+`lynq-analytics-snapshot-cronjob` is what takes it: a `curl` trigger, like the feeders', that calls
+`POST /lynq-analytics/internal/snapshot` with the internal token and a fresh `lynq-request-uuid`. The
+endpoint answers `202` and runs in the background, so the Job only waits for the acknowledgement;
+a second trigger while a snapshot is running gets a `409`.
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `lynq_analytics.cron.enabled` | `false` | The trigger calls `lynq-analytics-service` and reads `lynq-analytics-secret`; turn it on with the chart that deploys `lynq-analytics`. |
+| `lynq_analytics.cron.schedule` | `0 8 * * *` | 05:00 in Buenos Aires, two hours after the feeders, so the day's snapshot includes what they ingested. |
+| `lynq_analytics.cron.timeZone` | `Etc/UTC` | Pinned, as the feeders'. |
+| `backoffLimit` | `1` | A missed day is a hole in the daily series, which the charts show as one. |
+| `activeDeadlineSeconds` / `requestTimeoutSeconds` | `120` / `30` | The trigger waits for the `202`, not for the snapshot. |
+
+```bash
+kubectl -n lynq-local-namespace create job --from=cronjob/lynq-analytics-snapshot-cronjob snapshot-manual
+kubectl -n lynq-local-namespace logs -l app=lynq-analytics -f | grep "<request-uuid>"
+```
+
 ### The internal token
 
 `lynq-app-backend` exposes `/internal/job-posts/ingest` for the feeder. That route is exempt from the bearer-token filters — a cron has no user behind it — and is guarded instead by a shared secret in the `lynq-internal-token` header.
 
 **The same value must be in two Secrets**: `lynq-feeders-secret` (the caller presents it) and `lynq-app-backend-secret` (the callee checks it). Locally both come from `credentials.internal.token` in `k8s_values-local.yaml`, so they cannot drift. In prod both Secrets are created outside the chart and it is on whoever provisions them to keep them equal.
+
+`lynq-analytics` uses the same token both ways: its own `/internal/**` routes check it (the snapshot
+trigger presents it), and it presents it to `lynq-app-backend`'s `/internal/score/batch` while it
+takes the snapshot. So `lynq-analytics-secret` carries the same `LYNQ_INTERNAL_TOKEN` too.
 
 If the values differ, the ingest fails closed: the backend answers `401` and the feeder's run ends with an error logged in its pod — the trigger already got its `202`, so the CronJob is green and the failure is only visible there. The same happens when the token is missing entirely — a deploy that forgets it fails loudly rather than accepting unauthenticated writes.
 
