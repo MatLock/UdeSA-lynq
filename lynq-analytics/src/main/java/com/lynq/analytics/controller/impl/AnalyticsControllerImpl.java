@@ -5,7 +5,9 @@ import com.lynq.analytics.controller.AnalyticsController;
 import com.lynq.analytics.controller.response.GlobalRestResponse;
 import com.lynq.analytics.security.HasRole;
 import com.lynq.analytics.security.Role;
+import com.lynq.analytics.service.SalaryService;
 import com.lynq.analytics.service.StandingService;
+import com.lynq.analytics.stats.SalaryInsights;
 import com.lynq.analytics.stats.Standing;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,9 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AnalyticsControllerImpl implements AnalyticsController {
 
   private final StandingService standingService;
+  private final SalaryService salaryService;
 
-  public AnalyticsControllerImpl(StandingService standingService) {
+  public AnalyticsControllerImpl(StandingService standingService, SalaryService salaryService) {
     this.standingService = standingService;
+    this.salaryService = salaryService;
   }
 
   @Override
@@ -37,5 +41,16 @@ public class AnalyticsControllerImpl implements AnalyticsController {
     return ResponseEntity
         .status(HttpStatus.OK)
         .body(new GlobalRestResponse<>(true, standing));
+  }
+
+  @Override
+  @GetMapping("/job/{jobId}/salary")
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<SalaryInsights>> getSalary(@PathVariable String jobId) {
+    SalaryInsights salary = salaryService.salary(jobId);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, salary));
   }
 }

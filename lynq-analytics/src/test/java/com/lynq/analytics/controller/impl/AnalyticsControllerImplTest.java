@@ -15,7 +15,10 @@ import com.lynq.analytics.exceptions.ForbiddenException;
 import com.lynq.analytics.exceptions.NotFoundException;
 import com.lynq.analytics.security.LynqUserPrincipal;
 import com.lynq.analytics.security.Role;
+import com.lynq.analytics.service.SalaryService;
 import com.lynq.analytics.service.StandingService;
+import com.lynq.analytics.stats.SalaryDistribution;
+import com.lynq.analytics.stats.SalaryInsights;
 import com.lynq.analytics.stats.Standing;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -36,12 +39,16 @@ class AnalyticsControllerImplTest {
   private static final String JOB_ID = "77777777-7777-7777-7777-777777777777";
   private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
   private static final String STANDING_PATH = "/dmz/analytics/job/" + JOB_ID + "/standing";
+  private static final String SALARY_PATH = "/dmz/analytics/job/" + JOB_ID + "/salary";
 
   @Autowired
   private MockMvc mockMvc;
 
   @MockitoBean
   private StandingService standingService;
+
+  @MockitoBean
+  private SalaryService salaryService;
 
   @Test
   void answersTheStandingOfTheAuthenticatedCandidate() throws Exception {
@@ -98,11 +105,55 @@ class AnalyticsControllerImplTest {
         .andExpect(status().isNotFound());
   }
 
+  @Test
+  void answersTheSalaryInsightsOfTheJobPostToACandidate() throws Exception {
+    when(salaryService.salary(JOB_ID)).thenReturn(new SalaryInsights(
+        new SalaryDistribution(300.0, 200.0, 400.0, 5, "ARS", false),
+        new SalaryDistribution(null, null, null, 2, "ARS", true)));
+
+    mockMvc.perform(as(Role.CANDIDATE, SALARY_PATH))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success", is(true)))
+        .andExpect(jsonPath("$.data.positionSalary.median", is(300.0)))
+        .andExpect(jsonPath("$.data.positionSalary.p25", is(200.0)))
+        .andExpect(jsonPath("$.data.positionSalary.p75", is(400.0)))
+        .andExpect(jsonPath("$.data.positionSalary.n", is(5)))
+        .andExpect(jsonPath("$.data.positionSalary.currency", is("ARS")))
+        .andExpect(jsonPath("$.data.positionSalary.insufficientData", is(false)))
+        .andExpect(jsonPath("$.data.peersExpectedSalary.median", is(nullValue())))
+        .andExpect(jsonPath("$.data.peersExpectedSalary.n", is(2)))
+        .andExpect(jsonPath("$.data.peersExpectedSalary.insufficientData", is(true)));
+  }
+
+  @Test
+  void answersTheSalaryInsightsToACompanyToo() throws Exception {
+    when(salaryService.salary(JOB_ID)).thenReturn(new SalaryInsights(
+        new SalaryDistribution(null, null, null, 0, "USD", true),
+        new SalaryDistribution(null, null, null, 0, "USD", true)));
+
+    mockMvc.perform(as(Role.COMPANY, SALARY_PATH))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.positionSalary.currency", is("USD")));
+  }
+
+  @Test
+  void answersNotFoundForTheSalaryOfAnUnknownJobPost() throws Exception {
+    when(salaryService.salary(JOB_ID))
+        .thenThrow(new NotFoundException("Job post '" + JOB_ID + "' not found"));
+
+    mockMvc.perform(as(Role.CANDIDATE, SALARY_PATH))
+        .andExpect(status().isNotFound());
+  }
+
   private static MockHttpServletRequestBuilder as(String role) {
+    return as(role, STANDING_PATH);
+  }
+
+  private static MockHttpServletRequestBuilder as(String role, String path) {
     List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(Role.PREFIX + role));
     LynqUserPrincipal principal = new LynqUserPrincipal(USER_ID, "janedoe", "jane@lynq.com",
         authorities);
-    return get(STANDING_PATH)
+    return get(path)
         .with(authentication(new UsernamePasswordAuthenticationToken(principal, null, authorities)));
   }
 }

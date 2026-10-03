@@ -4,7 +4,7 @@ Analytics service for the Lynq platform. It will serve the numbers that sit next
 
 It does not read `lynq_backend_db`. Its data will arrive as domain events published by `lynq-app-backend` (SNS topic `lynq-domain-events` → SQS queue `lynq-analytics-events`) and be projected into its own schema, `lynq_analytics_db`.
 
-Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. Job post, candidate and application events are also projected into a read model, over which the service resolves similar job posts and similar candidates. The first analytic is served: a candidate's **standing** among the applicants of a job post. Time to fill and salary come next.
+Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. Job post, candidate and application events are also projected into a read model, over which the service resolves similar job posts and similar candidates. Two analytics are served: a candidate's **standing** among the applicants of a job post, and the **salary** medians of the position and of similar candidates. Time to fill comes next.
 
 ---
 
@@ -237,6 +237,44 @@ Matches are ordered by score and then by skills in common. `Distribution.of(valu
 
 ---
 
+## Salary
+
+`GET /dmz/analytics/job/{jobId}/salary` — what the position pays and what similar candidates expect. Open to any authenticated user, candidate or company.
+
+```json
+{
+  "success": true,
+  "data": {
+    "positionSalary": {
+      "median": 300000.0, "p25": 200000.0, "p75": 400000.0,
+      "n": 5, "currency": "ARS", "insufficientData": false
+    },
+    "peersExpectedSalary": {
+      "median": null, "p25": null, "p75": null,
+      "n": 2, "currency": "ARS", "insufficientData": true
+    }
+  }
+}
+```
+
+| Block                 | Sample                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------- |
+| `positionSalary`      | the [similar job posts](#similarity) with a salary in the currency, each counted at the middle of its range, or at its only bound |
+| `peersExpectedSalary` | the [similar candidates](#similarity) with an expected salary declared in the currency     |
+
+- **Currency** — the job post's `salary_currency`; a post without a salary is compared in `lynq.analytics.salary.default-currency` (`ARS`). Salaries in another currency are left out rather than converted.
+- **Median, not mean** — scraped salaries mix monthly and yearly figures and carry typos; the quartiles show the spread without letting one of them drag the number.
+- **Short samples** — below `lynq.analytics.salary.min-sample` (5) values a block answers `insufficientData: true` with `median`, `p25` and `p75` null, and `n` still visible. With two candidates, a median gives their expected salaries away.
+- **Freshness** — expected salaries arrive through `CandidateExpectedSalaryUpdated` and start empty, so `peersExpectedSalary` reads "insufficient data" until candidates fill it in. The answer is cached for an hour per job post.
+- **Refusals** — `404` if analytics holds no job post with that id.
+
+| Property                                    | Default | |
+| ------------------------------------------- | ------- | - |
+| `lynq.analytics.salary.min-sample`          | `5`     | below it, the block withholds its statistics |
+| `lynq.analytics.salary.default-currency`    | `ARS`   | currency of a job post without a salary |
+
+---
+
 ## Cache
 
 The analytics are computed on request over the read model, and Redis keeps each answer for an hour (`CacheConfig`, a `RedisCacheManager` behind `@EnableCaching`). There is one cache per endpoint, declared in `AnalyticsCaches`; a cache not declared there does not exist, so a misspelt name fails instead of creating a cache without its TTL.
@@ -256,7 +294,7 @@ The standing is keyed by the candidate too: it holds the caller's own rank and s
 - **Writes** — immediate: a request waits for Redis to confirm the entry. Spring Data Redis 4 writes in the background by default with Lettuce, which lets an eviction overtake the write it follows and hides write failures from the error handler; waiting costs under a millisecond next to computing a median.
 - **Metrics** — hits, misses, puts and evictions per cache, as `cache.gets{cache,result}`, `cache.puts` and `cache.evictions` on `/actuator/prometheus`. They are what tells whether the hour is right.
 
-Each endpoint's service method declares `@Cacheable(cacheNames = AnalyticsCaches.…, key = …)` with the key above; the standing does (`StandingService`), time to fill and salary will with F8 and F9.
+Each endpoint's service method declares `@Cacheable(cacheNames = AnalyticsCaches.…, key = …)` with the key above; the standing (`StandingService`) and the salary (`SalaryService`) do, time to fill will with F8.
 
 ---
 
@@ -332,7 +370,7 @@ lynq-analytics/
     │   │   ├── aspect/          # @AuditLog + LogAspect
     │   │   ├── cache/           # AnalyticsCaches: one cache per endpoint
     │   │   ├── client/          # LynqIamClient (Feign) and its response
-    │   │   ├── config/          # AppConfig, FilterConfig, OpenApiConfig, SecurityConfig, SimilarityConfig, CacheConfig and their properties
+    │   │   ├── config/          # AppConfig, FilterConfig, OpenApiConfig, SecurityConfig, SimilarityConfig, StandingConfig, SalaryConfig, CacheConfig and their properties
     │   │   ├── controller/      # AnalyticsController and its impl, ControllerExceptionHandler, response envelope
     │   │   ├── enums/           # JobStatus
     │   │   ├── exceptions/      # BadRequest, Forbidden, NotFound, InvalidDomainEvent, UnknownJobPost
@@ -342,8 +380,8 @@ lynq-analytics/
     │   │   ├── repository/      # Spring Data repositories
     │   │   ├── security/        # LynqUserPrincipal, Role, @HasRole
     │   │   ├── similarity/      # TagSimilarity, its two metrics, TagWeights and the match results
-    │   │   ├── stats/           # Distribution: n, median, p25, p75; Standing: rank, percentile, median score
-    │   │   └── service/         # DomainEventService and the projectors; TagFrequencyService and its scheduler; SimilarityService; StandingService
+    │   │   ├── stats/           # Distribution: n, median, p25, p75; Standing: rank, percentile, median score; SalaryDistribution and SalaryInsights
+    │   │   └── service/         # DomainEventService and the projectors; TagFrequencyService and its scheduler; SimilarityService; StandingService; SalaryService
     │   └── resources/
     │       ├── application.yaml
     │       ├── application-production.yaml
