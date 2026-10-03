@@ -42,7 +42,7 @@ public class IamAuthenticationFilter extends OncePerRequestFilter {
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    return PublicPaths.isPublic(request);
+    return PublicPaths.skipsUserAuthentication(request);
   }
 
   @Override

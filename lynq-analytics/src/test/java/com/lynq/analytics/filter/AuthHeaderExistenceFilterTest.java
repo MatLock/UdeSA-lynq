@@ -114,6 +114,13 @@ class AuthHeaderExistenceFilterTest {
   }
 
   @Test
+  void shouldNotFilterInternalPathsWhichCarryTheInternalTokenInstead() {
+    when(request.getServletPath()).thenReturn("/internal/snapshot");
+
+    assertThat(filter.shouldNotFilter(request), is(true));
+  }
+
+  @Test
   void shouldFilterNonPublicPaths() {
     when(request.getServletPath()).thenReturn("/api/v1/resource");
 

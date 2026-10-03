@@ -135,6 +135,7 @@ public abstract class AbstractE2ETest {
   @DynamicPropertySource
   static void registerDynamicProperties(DynamicPropertyRegistry registry) {
     registry.add("lynq.iam.url", LYNQ_IAM::getEndpoint);
+    registry.add("lynq.backend.url", LYNQ_IAM::getEndpoint);
     registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
     registry.add("spring.datasource.username", MYSQL::getUsername);
     registry.add("spring.datasource.password", MYSQL::getPassword);

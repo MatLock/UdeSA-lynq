@@ -23,11 +23,13 @@ spring:
 lynq:
   iam:
     url: http://localhost:9999/lynq-iam
+  backend:
+    url: http://localhost:9999/lynq-backend-app
+  internal:
+    token: test-internal-token
   analytics:
     events:
       queue: lynq-analytics-events
-    tag-frequency:
-      cron: "-"
 
 server:
   port: 0

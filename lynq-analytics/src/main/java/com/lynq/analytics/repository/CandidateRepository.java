@@ -17,4 +17,8 @@ public interface CandidateRepository extends JpaRepository<CandidateEntity, Stri
       select distinct c from CandidateEntity c
       where c.id in (select s.id from CandidateEntity s join s.tags t where t in :tags)""")
   List<CandidateEntity> findSharingTags(@Param("tags") Collection<String> tags);
+
+  @EntityGraph(attributePaths = {"tags", "skills"})
+  @Query("select distinct c from CandidateEntity c")
+  List<CandidateEntity> findAllWithProfile();
 }

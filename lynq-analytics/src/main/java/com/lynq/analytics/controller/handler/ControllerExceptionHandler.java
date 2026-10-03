@@ -2,6 +2,7 @@ package com.lynq.analytics.controller.handler;
 
 import com.lynq.analytics.controller.response.ErrorRestResponse;
 import com.lynq.analytics.exceptions.BadRequestException;
+import com.lynq.analytics.exceptions.ConflictException;
 import com.lynq.analytics.exceptions.ForbiddenException;
 import com.lynq.analytics.exceptions.NotFoundException;
 import org.springframework.http.HttpHeaders;
@@ -54,6 +55,14 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
     log.error("message= Bad request", ex);
     return ResponseEntity
         .status(HttpStatus.BAD_REQUEST)
+        .body(new ErrorRestResponse<>(null, ex.getMessage()));
+  }
+
+  @ExceptionHandler(ConflictException.class)
+  public ResponseEntity<ErrorRestResponse<Void>> handleConflict(ConflictException ex) {
+    log.error("message= Conflict", ex);
+    return ResponseEntity
+        .status(HttpStatus.CONFLICT)
         .body(new ErrorRestResponse<>(null, ex.getMessage()));
   }
 
