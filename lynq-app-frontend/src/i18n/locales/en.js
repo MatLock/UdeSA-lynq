@@ -191,6 +191,20 @@ const en = {
     error: 'Something went wrong loading jobs. Please try again.',
     empty: 'No jobs found. Try a different search.',
   },
+  timeToFillCard: {
+    thisJob: 'This posting',
+    thisJobOpen: (days) => `this posting has been up for ${days} days`,
+    thisJobClosed: (days) => `this posting was up for ${days} days`,
+    middleHalf: (p25, p75) => `the middle half closed between ${p25} and ${p75} days`,
+    external: (external, total) =>
+      `${external} of ${total} come from external job boards: there it measures how long they stayed up, not whether they were filled`,
+    missing: 'There are not enough similar closed postings yet for a median of their own.',
+    overall: (days, jobs) => `Median of every closed posting: ${days} days, across ${jobs}`,
+    overallMissing: 'There are not enough closed postings on the whole platform yet either.',
+    thresholdReason: (min) =>
+      `Shown from ${min} on: with fewer, the median is that of a couple of postings.`,
+    days: (days) => `${days} days`,
+  },
   jobCard: {
     postedBy: 'Posted by:',
     source: 'Source:',

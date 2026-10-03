@@ -65,6 +65,15 @@
   border-radius: var(--radius-chip);
 }
 
+.job-candidates-time-to-fill {
+  max-width: 520px;
+  margin-top: 12px;
+}
+
+.job-candidates-time-to-fill:empty {
+  display: none;
+}
+
 /* The list is the sole scrollable region — min-height:0 lets it shrink below its
    content so the overflow scrolls here instead of pushing past the viewport. */
 .job-candidates-results {

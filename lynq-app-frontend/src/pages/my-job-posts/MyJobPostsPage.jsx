@@ -6,6 +6,7 @@ import useApi from '../../hooks/useApi'
 import useAuth from '../../hooks/useAuth'
 import jobService from '../../services/jobService'
 import JobCard from '../../components/JobCard/JobCard.jsx'
+import TimeToFillCard from '../../components/TimeToFillCard/TimeToFillCard.jsx'
 import Pagination from '../../components/Pagination/Pagination.jsx'
 import Spinner from '../../components/Spinner/Spinner.jsx'
 import './MyJobPostsPage.css'
@@ -102,24 +103,31 @@ const MyJobPostsPage = () => {
           return (
             <div className="my-jobs-list">
               {jobs.map((job) => (
-                <JobCard
-                  key={job.jobId}
-                  job={job}
-                  showScore={false}
-                  showStatus
-                  showCandidates
-                  actions={
-                    <Link
-                      to={`/job/${job.jobId}/edit`}
-                      state={{ job }}
-                      className="job-card-edit"
-                      aria-label={`${strings.jobCard.edit} — ${job.title}`}
-                    >
-                      <EditOutlinedIcon sx={{ fontSize: 15 }} />
-                      {strings.jobCard.edit}
-                    </Link>
-                  }
-                />
+                <div key={job.jobId} className="my-jobs-item">
+                  <JobCard
+                    job={job}
+                    showScore={false}
+                    showStatus
+                    showCandidates
+                    actions={
+                      <Link
+                        to={`/job/${job.jobId}/edit`}
+                        state={{ job }}
+                        className="job-card-edit"
+                        aria-label={`${strings.jobCard.edit} — ${job.title}`}
+                      >
+                        <EditOutlinedIcon sx={{ fontSize: 15 }} />
+                        {strings.jobCard.edit}
+                      </Link>
+                    }
+                  />
+                  <TimeToFillCard
+                    authFetch={authFetch}
+                    jobId={job.jobId}
+                    isClosed={job.jobStatus === 'CLOSE'}
+                    compact
+                  />
+                </div>
               ))}
             </div>
           )
