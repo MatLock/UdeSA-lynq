@@ -1,0 +1,64 @@
+{{- if .Values.lynq_analytics.cron.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: lynq-analytics-snapshot-cronjob
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-analytics
+spec:
+  schedule: {{ .Values.lynq_analytics.cron.schedule | quote }}
+  timeZone: {{ .Values.lynq_analytics.cron.timeZone | quote }}
+  # lynq-analytics refuses a second snapshot while one is running with a 409;
+  # this is the cheap second line of defence.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.lynq_analytics.cron.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.lynq_analytics.cron.failedJobsHistoryLimit }}
+  startingDeadlineSeconds: {{ .Values.lynq_analytics.cron.startingDeadlineSeconds }}
+  jobTemplate:
+    spec:
+      # A missed day is a hole in the daily series, which the charts show as
+      # such; it is better than a snapshot taken hours late.
+      backoffLimit: {{ .Values.lynq_analytics.cron.backoffLimit }}
+      activeDeadlineSeconds: {{ .Values.lynq_analytics.cron.activeDeadlineSeconds }}
+      template:
+        metadata:
+          # Not app: lynq-analytics, which is the Service selector: this pod
+          # listens on nothing.
+          labels:
+            app: lynq-analytics-cron
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: trigger-snapshot
+              image: {{ .Values.lynq_analytics.cron.image }}
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 16Mi
+                limits:
+                  memory: 32Mi
+              env:
+                - name: LYNQ_INTERNAL_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: lynq-analytics-secret
+                      key: LYNQ_INTERNAL_TOKEN
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+                  REQUEST_UUID="$(cat /proc/sys/kernel/random/uuid)"
+                  echo "Triggering the lynq-analytics daily snapshot, lynq-request-uuid=${REQUEST_UUID}"
+                  # The endpoint answers 202 with no body and takes the snapshot
+                  # in the background; the run is followed in the lynq-analytics
+                  # pod logs, filtering by the request uuid printed above.
+                  curl -sS --fail-with-body \
+                    --max-time {{ .Values.lynq_analytics.cron.requestTimeoutSeconds }} \
+                    -o /dev/null -w 'lynq-analytics answered HTTP %{http_code}\n' \
+                    -X POST \
+                    -H "lynq-request-uuid: ${REQUEST_UUID}" \
+                    -H "lynq-internal-token: ${LYNQ_INTERNAL_TOKEN}" \
+                    "http://lynq-analytics-service:8080/lynq-analytics/internal/snapshot"
+{{- end }}
