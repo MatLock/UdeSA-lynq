@@ -16,23 +16,38 @@ class EntryEdit(BaseModel):
     )
     description: str = Field(
         default="",
-        description="The whole description of the entry as it should read; empty to keep it",
+        description=(
+            "The whole description of the entry as it should read, in the language of the "
+            "resume: every line of the original in its place, new lines after them; empty to keep it"
+        ),
     )
     achievements: list[str] = Field(
         default_factory=list,
-        description="The whole list of achievements as it should read; empty to keep it",
+        description=(
+            "The whole list of achievements as it should read, in the language of the resume, "
+            "one item per achievement, the original items in their order and new ones after; empty to keep it"
+        ),
     )
 
 
 class SkillsEdit(BaseModel):
     technical: list[str] = Field(
-        default_factory=list, description="The whole technical bucket; empty to keep it"
+        default_factory=list, description=(
+            "The whole technical bucket: every current skill in its current order, then the new "
+            "ones at the end; empty to keep it"
+        )
     )
     tools: list[str] = Field(
-        default_factory=list, description="The whole tools bucket; empty to keep it"
+        default_factory=list, description=(
+            "The whole tools bucket: every current skill in its current order, then the new "
+            "ones at the end; empty to keep it"
+        )
     )
     soft: list[str] = Field(
-        default_factory=list, description="The whole soft bucket; empty to keep it"
+        default_factory=list, description=(
+            "The whole soft bucket: every current skill in its current order, then the new "
+            "ones at the end; empty to keep it"
+        )
     )
 
     def buckets(self) -> dict[str, list[str]]:
@@ -57,7 +72,10 @@ class EditProposal(BaseModel):
         description="What the candidate asked for that the resume does not back",
     )
     summary: str = Field(
-        default="", description="The whole summary as it should read; empty to keep it"
+        default="",
+        description=(
+            "The whole summary as it should read, in the language of the resume; empty to keep it"
+        ),
     )
     entries: list[EntryEdit] = Field(
         default_factory=list, description="The work experience entries to rewrite"
@@ -99,12 +117,18 @@ class PartVerdict(BaseModel):
     id: str = Field(default="", description="The id of the part, as given")
     evidence: str = Field(
         default="",
-        description="The words of the resume that back the change, quoted; empty when nothing does",
+        description=(
+            "The line counts of the original and the proposed text, then the words of the "
+            "resume that back the change, quoted; no quote when nothing does"
+        ),
     )
     ok: bool = Field(default=False, description="true when the resume supports the change")
     kind: str = Field(
         default="",
-        description="When rejected: invented, unsupported_skill, dropped_skill, wording, language or padding",
+        description=(
+            "When rejected: language, dropped_content, reordered, dropped_skill, invented, "
+            "unsupported_skill, wording or padding"
+        ),
     )
     reason: str = Field(
         default="", description="When rejected: one sentence for the candidate, in their language"

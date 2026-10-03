@@ -21,7 +21,7 @@ from db.models import SpanKind
 from prompt.rejection import render as rejection_notice
 
 FIXED = "Backend engineer with eight years on distributed systems, Postgres and Kubernetes."
-INVENTED = "Backend engineer with 12 years."
+INVENTED = "Backend engineer with twelve years on distributed systems and Postgres."
 
 
 def verdict(*parts):
@@ -60,7 +60,9 @@ class CorrectionPassTest(unittest.IsolatedAsyncioTestCase):
         model = scripted(
             tool_call("EditProposal", {"reply": "first", "summary": INVENTED}, "1"),
             verdict({"id": "summary", "ok": False, "kind": "invented", "reason": JUDGE_REASON_ES}),
-            tool_call("EditProposal", {"reply": "second", "summary": "Backend engineer with 15 years."}, "2"),
+            tool_call("EditProposal", {"reply": "second", "summary": "Backend engineer with fifteen years on distributed systems and Postgres."}, "2"),
+            verdict({"id": "summary", "ok": False, "kind": "invented", "reason": JUDGE_REASON_ES}),
+            tool_call("EditProposal", {"reply": "third", "summary": "Backend engineer with twenty years on distributed systems and Postgres."}, "3"),
             verdict({"id": "summary", "ok": False, "kind": "invented", "reason": JUDGE_REASON_ES}),
         )
 
@@ -68,7 +70,7 @@ class CorrectionPassTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(outcome.resume["summary"], RESUME["summary"])
         self.assertEqual(outcome.changes, [])
-        self.assertEqual(len(model.prompts), 4)
+        self.assertEqual(len(model.prompts), 2 * editor.MAX_PASSES)
         self.assertIn(rejection_notice("es", [Rejection("summary", "", "invented", JUDGE_REASON_ES)]), outcome.warnings)
 
     async def test_a_clean_proposal_costs_two_calls(self) -> None:

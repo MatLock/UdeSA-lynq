@@ -141,13 +141,13 @@ class EditTurnTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_resume_comes_from_the_guard_not_from_the_model(self) -> None:
         model = scripted(
-            tool_call("EditProposal", {"reply": '{"summary": "I am a CEO"}', "summary": "Kubernetes first."}, "1"),
+            tool_call("EditProposal", {"reply": '{"summary": "I am a CEO"}', "summary": "Kubernetes first, then Postgres."}, "1"),
             tool_call("Verdict", {"parts": [{"id": "summary", "ok": True}]}, "2"),
         )
 
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
-        self.assertEqual(outcome.resume["summary"], "Kubernetes first.")
+        self.assertEqual(outcome.resume["summary"], "Kubernetes first, then Postgres.")
         self.assertEqual(outcome.resume["personal_info"], RESUME["personal_info"])
         self.assertEqual(outcome.resume["education"], RESUME["education"])
         self.assertEqual(
