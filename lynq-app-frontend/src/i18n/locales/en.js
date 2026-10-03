@@ -13,6 +13,7 @@ const numbers = {
   },
   marketFit: {
     name: 'Your market fit',
+    value: (fit) => `${fit} out of 100`,
     set: (jobs) => `across ${jobs} relevant open postings`,
   },
   marketReach: {
@@ -42,6 +43,35 @@ const numbers = {
   },
   distribution: { median: 'median', p25: 'p25', p75: 'p75' },
   asOfToday: 'as of today',
+  skillCoverage: {
+    name: 'Your skill coverage',
+    value: (percent) => `${percent}% of what they ask for`,
+    set: (jobs) => `over the skills of ${jobs} relevant open postings`,
+  },
+  skillUnlocks: {
+    name: 'The skills that open the most postings',
+    value: (jobs) => (jobs === 1 ? '1 posting' : `${jobs} postings`),
+    set: (threshold) => `relevant postings that would go above ${threshold} if you added it`,
+  },
+  skillDemand: {
+    name: 'The most requested skills',
+    set: (jobs) => `among ${jobs} open postings`,
+    change: (delta) => (delta > 0 ? `+${delta} this week` : `${delta} this week`),
+  },
+  marketSalary: {
+    name: 'Salary by category and work type',
+    set: (jobs, currency) => `across ${jobs} open postings with a salary in ${currency}`,
+  },
+  publishedPerWeek: {
+    name: 'Postings published per week',
+    set: (jobs, weeks) => `${jobs} postings in the last ${weeks} complete weeks`,
+  },
+  companyJobs: {
+    name: 'Your postings, compared',
+    applications: (count) => (count === 1 ? '1 application' : `${count} applications`),
+    median: (score) => `median ${score}`,
+  },
+  asOf: (date) => `as of ${date}`,
 }
 
 const en = {
@@ -468,70 +498,44 @@ const en = {
     analytics: {
       title: 'Analytics',
       subtitle: 'What Lynq data can say about a search, a posting and a profile.',
-      shellNote: {
-        headline: 'There is no data to show yet.',
-        body: 'The cards below are the ones that will appear here, with their shape and computation level already decided. Each one is waiting for its endpoint in lynq-analytics; until then it states how much sample it has, which is none.',
+      candidateHeading: 'Your search',
+      companyHeading: 'Your postings',
+      marketHeading: 'The market',
+      marketLead: 'What the open postings Lynq sees ask for, from every source.',
+      unavailable: 'We could not load this section. Try again in a while.',
+      benchmark: {
+        noSnapshot: 'There is no snapshot of your profile yet. The daily 05:00 run takes it if your profile has skills: upload a resume and come back tomorrow.',
+        fitMissing: (min) => `At least ${min} open postings similar to your profile are needed to measure your fit.`,
+        peersMissing: (min) => `With fewer than ${min} peers the percentile stays empty: it is a privacy threshold, not a statistical one.`,
+        peersMiddle: 'middle half of your peers',
+        peersMedian: 'median of your peers',
+        you: 'Your market fit',
+        trend: 'your market fit, day by day',
+        coverageYou: 'You',
+        coveragePeers: 'Median of your peers',
+        coveragePeersMissing: (min) => `The median of your peers shows from ${min} peers.`,
+        unlocksEmpty: (threshold) => `No single skill takes a relevant posting above ${threshold}.`,
       },
-      candidate: [
-        {
-          key: 'standing',
-          title: numbers.standing.name,
-          where: 'CandidateStandingCard · JobDetailPage',
-          level: 'query',
-          whatIsMissing: 'Apply to a posting so there is a position to measure.',
-          thresholdReason: 'Below 5 applicants the rank is shown but not the median: with so few, the median gives the others\' scores away.',
+      market: {
+        currencyLabel: 'Currency',
+        noSnapshot: 'There is no snapshot of the market yet: the daily 05:00 run takes it.',
+        withheld: (n, min) => `N = ${n}, shown from ${min}`,
+        uncategorized: 'No category',
+        categories: {
+          ADMINISTRACION: 'Administration',
+          TECNOLOGIA: 'Technology',
+          CONTABILIDAD: 'Accounting',
+          RECURSOS_HUMANOS: 'Human resources',
         },
-        {
-          key: 'benchmark',
-          title: numbers.peerPercentile.name,
-          where: 'PeerBenchmarkCard · AnalyticsPage',
-          level: 'snapshot',
-          whatIsMissing: 'Written by the 05:00 job, comparing you against candidates who share your similarity tags.',
-          thresholdReason: 'With fewer than 5 peers the percentile stays empty: that threshold is about privacy, not statistics.',
-        },
-        {
-          key: 'salary',
-          title: 'Your expected salary against the market',
-          where: 'SalaryInsightsCard · JobDetailPage',
-          level: 'query',
-          whatIsMissing: 'Set your expected salary in your profile, and we need similar postings that publish theirs.',
-          thresholdReason: 'Below 5 similar postings or candidates the median is not shown: with so few, it gives away each salary.',
-        },
-      ],
-      company: [
-        {
-          key: 'timeToFill',
-          title: numbers.timeToFill.name,
-          where: 'TimeToFillCard · MyJobPostsPage',
-          level: 'ingest',
-          whatIsMissing: 'It needs similar postings that already closed. External postings close when the feeder verifies they are gone.',
-          fallbackShown: 'The ones still open at day 25 are reported separately: they are censored data and do not enter the median.',
-        },
-        {
-          key: 'scoreSpread',
-          title: 'Affinity spread of your applicants',
-          where: 'JobCandidatesPage',
-          level: 'query',
-          whatIsMissing: 'Publish a posting and wait for applications.',
-          thresholdReason: 'Below 5 applicants it is not drawn: the spread says nothing and it identifies people.',
-        },
-        {
-          key: 'marketSalary',
-          title: 'Your salary range against the market',
-          where: 'SalaryInsightsCard · JobDetailPage',
-          level: 'query',
-          whatIsMissing: 'It needs similar postings publishing a salary in the same currency.',
-        },
-      ],
-      readiness: {
-        title: 'What each number is waiting for',
-        chart: 'Analytic', source: 'Reads from', level: 'Level', blockedBy: 'Blocked by',
-        rows: [
-          { chart: numbers.standing.name, source: 'applications', level: '2', levelKey: 'query', blockedBy: 'nothing: it works with today data' },
-          { chart: numbers.timeToFill.name, source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'verified closing of external postings' },
-          { chart: 'Salary against the market', source: 'job_posts', level: '2', levelKey: 'query', blockedBy: 'posting currency and candidate expected salary' },
-          { chart: numbers.peerPercentile.name, source: 'candidate_daily_benchmark', level: '3', levelKey: 'snapshot', blockedBy: 'the 05:00 job' },
-        ],
+        workType: { REMOTE: 'Remote', IN_OFFICE: 'On-site' },
+        salaryEmpty: (currency) => `No open posting publishes its salary in ${currency}.`,
+        middleHalf: 'middle half',
+        weekOf: (date) => `week of ${date}`,
+      },
+      company: {
+        empty: 'You have not published any postings yet.',
+        medianWithheld: (min) => `median from ${min} applicants`,
+        status: { OPEN: 'Open', CLOSE: 'Closed' },
       },
     },
     profile: {

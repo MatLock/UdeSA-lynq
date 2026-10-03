@@ -1,0 +1,38 @@
+.market-filters {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.market-filters-label {
+  margin-right: var(--space-1);
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+.market-filters-option {
+  min-width: 56px;
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: var(--border-hairline) solid var(--border-control);
+  border-radius: var(--radius-square);
+  cursor: pointer;
+}
+
+.market-filters-option + .market-filters-option {
+  border-left: 0;
+}
+
+.market-filters-option[aria-pressed="true"] {
+  color: var(--ink-on-action);
+  background: var(--action);
+  border-color: var(--action);
+}
+
+.market-filters-option:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+}

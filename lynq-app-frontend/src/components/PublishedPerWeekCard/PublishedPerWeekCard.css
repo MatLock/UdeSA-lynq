@@ -1,0 +1,12 @@
+.published-weeks-axis {
+  stroke: var(--rule-strong);
+  stroke-width: 1;
+}
+
+.published-weeks-bar {
+  fill: var(--level-query);
+}
+
+.published-weeks-label {
+  fill: var(--ink-muted);
+}
