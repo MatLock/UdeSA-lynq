@@ -19,8 +19,8 @@ conversation API, which is reachable only from `lynq-bff`.
 | `GET` | `/lynq-agent/dmz/conversation/{id}` | The thread, the current resume and the list of versions |
 | `PATCH` | `/lynq-agent/dmz/conversation/{id}/applied` | Closes the conversation once `lynq-bff` applied with one of its resumes |
 
-Creating a conversation calls lynq-ml's `POST /dmz/skill-enhance` once and freezes the
-answer into `job_snapshot.extractedSkills`; if lynq-ml is unavailable the skills the
+Creating a conversation calls lynq-llm's `POST /dmz/skill-enhance` once and freezes the
+answer into `job_snapshot.extractedSkills`; if lynq-llm is unavailable the skills the
 posting already declares are used instead, and the conversation still opens.
 
 The greeting it answers with costs nothing: it is a Jinja template per language,
@@ -122,20 +122,34 @@ any of them, so they cannot be asked for, let alone done.
 proposal part by part, each part beside the text it replaces in the **base** resume, and
 says for each one whether the resume supports it. It never rewrites: `ok`, or a `kind`
 and a `reason` written in the candidate's language. The one rule it applies is that a
-change may only say what the candidate's own resume already says, and the kinds are the
-ways of breaking it:
+change may only say what the candidate's own resume already says — where, in the order
+and in the language the resume says it. Tailoring is a choice of words: the text after
+the change carries the same facts, the same lines and the same skills as before. The
+checks run in a fixed order and the first failure names the kind:
 
 | kind | what the judge saw |
 | --- | --- |
-| `invented` | a number, a duration, a result, a team size, a responsibility, a role or an employer the resume does not state |
+| `language` | prose not in the language of the resume — a translation into the candidate's chat language included |
+| `dropped_content` | fewer lines than the original, a line with no counterpart at its position, or two lines merged into one |
+| `reordered` | the same lines, or the same skills, in another order; a new skill anywhere but at the end of its bucket |
+| `dropped_skill` | a bucket that leaves out a skill the current one has: a bucket may be grown at its end, never shrunk |
+| `invented` | a number, a duration, a result, a team size, a responsibility, a role or an employer the resume does not state — a requirement of the posting written in as if met counts |
 | `unsupported_skill` | a technology the resume names nowhere — and in an entry of the experience, one that entry does not name: a technology never moves into a job that never used it |
 | `wording` | the posting's spelling of a technology the resume spells otherwise (`PostgreSQL` over `Postgres`) |
-| `language` | prose not in the language of the resume |
 | `padding` | much more text than the original, not a rephrasing |
-| `dropped_skill` | a bucket that leaves out a skill the current one has: a bucket may be reordered and grown, never shrunk |
 
-The judge has to **quote before it decides**: for every part it copies into `evidence`
-the words of the resume that back the change, and it may only approve what it quoted. A
+Each part reaches the judge with its lines numbered and counted — one line for the role,
+one per bullet, one per achievement, one per skill — because a model asked to notice
+that eleven lines became nine does far better when it reads `lines="11"` and
+`lines="9"` than when it has to count prose. The editing agent is held to the same
+shape from its side: its prompt says a description is rewritten line for line, the
+achievements item for item, a bucket in its order with new skills at the end, and
+everything in the language of the resume whatever language the candidate writes in.
+
+The judge has to **quote before it decides**: for every part it writes into `evidence`
+the two line counts and then the words of the resume that back the change — copied from
+the resume, never from the proposal, since Nova Pro was seen quoting the proposed
+sentence as its own evidence — and it may only approve what it quoted. A
 model that has to find the sentence is far less likely to say "the resume does not
 mention Kubernetes" when the Acme entry lists it — which is exactly what `qwen2.5:7b` did
 before this field existed. The quote stays in the trace, so a wrong verdict can be
@@ -149,15 +163,32 @@ approved (`unjudged`): the safe default costs a correction pass, never an invent
 **The `apply` step** (`src/agent/apply.py`) is the only code that touches the resume, and
 it decides nothing about content. Before the judge, `plan` resolves each part to its
 place — which entry a `company`/`position` names (a paraphrased position still finds its
-entry by company when that is unambiguous), which bucket — and the one rejection the code
-makes on its own is an entry the resume does not have (`unknown_entry`). After the judge,
-`commit` writes the approved parts and records each as a change.
+entry by company when that is unambiguous), which bucket — and rejects on its own what
+is mechanical to check: an entry the resume does not have (`unknown_entry`), and a part
+whose **shape** changed. The shape of a text is its lines, its numbers and the
+technologies it names; the shape of a bucket is its skills and their order; and the
+rule is the same for both: everything the base resume has stays in its place, and
+anything new goes after it and has to be found in the resume. A description, a summary
+or an achievements list with fewer lines than the base, without one of its numbers, or
+without a technology the base named — any name from the skill buckets or the
+`technologies` of an entry — is `cut`; one with a line moved as it was is `moved`. A
+bucket missing a skill is `cut`, one that moves a skill or inserts before the last
+original one is `moved`, and one that appends a skill the resume names nowhere, spelled
+as the resume spells it, is `unbacked`. All of this happens before the judge reads a
+word. These are the code's kinds, and `docs/queries.sql` groups them apart from the
+judge's, so the trace says how often the guard fired and how often the judge did. The
+achievements a model sends as one string with newlines in it are split back into one
+item each before any of this, and an entry reaches the judge whole on both sides — a
+field the proposal left alone is shown as the base has it, not as missing. A paraphrase
+that drops or moves content without changing the counts, an added line that says what
+the resume does not, still reach the judge, which is what the judge is for. After the
+judge, `commit` writes the approved parts and records each as a change.
 
 The parts are independent — a summary the judge rejects does not hold back skills it
-approves — and a rejection goes back to the editor **once**, with its reason, as the next
-message of the same thread: the model re-proposes the rejected parts with the reason in
-hand, and what is still rejected after that stays out — and reaches the candidate as a
-warning, in their language (`resources/rejections/`), because the reply is the model's
+approves — and a rejection goes back to the editor up to **twice** (`MAX_PASSES = 3`),
+with its reason, as the next message of the same thread: the model re-proposes the
+rejected parts with the reason in hand, and what is still rejected after the last pass
+stays out — and reaches the candidate as a warning, in their language (`resources/rejections/`), because the reply is the model's
 and the document is the judge's, and the chat must never promise what the resume beside it
 does not say. Each pass leaves a `kind='tool'` span named `apply` whose input is the
 parts and whose output is `OK` or the list of rejections with their kinds;
@@ -169,7 +200,10 @@ What this design gives up, and what it gives: the previous guard was a set of le
 rules in code — digits, alias tables, prefix matches — that could be *proven* to stop an
 invented number or technology, and could not see an invented responsibility at all. The
 judge sees all of it, and none of it is provable: it is a model's reading, measured, not
-guaranteed. The trace keeps every verdict, so the thesis can report how often the judge
+guaranteed. The structure guard in `plan` is the one piece of that older idea kept on
+purpose: that nothing is removed or reordered is a property of counts and positions,
+provable in code, and Nova Pro was seen approving a bucket missing `Git` with the
+original list quoted as its evidence. The trace keeps every verdict, so the thesis can report how often the judge
 agreed with a person on a labelled sample, which is a result the rules could never give.
 
 **The model never sees `personal_info`.** The code splits it off before rendering any
@@ -254,7 +288,7 @@ resolved from the token against lynq-iam's `/auth/user-info`, the same way lynq-
 resolves it, and that resolved user is the one a conversation belongs to — a `user-id`
 header names nobody. A missing `Authorization` is a 401, a token lynq-iam refuses is a 401,
 and lynq-iam being unreachable is a 503. Creating a conversation relays the same credential
-to lynq-ml, which resolves it for itself.
+to lynq-llm, which resolves it for itself.
 
 The roles that token carries are read too: tailoring a resume is a candidate's operation, so
 the four conversation routes sit behind `CandidatePrincipal` and answer 403 to anyone else.
@@ -351,8 +385,8 @@ guarantees are checked there.
 | `AGENT_MODEL_RETRIES` | `2` | Times a model call is retried when Bedrock rejects what the model emitted |
 | `AGENT_TURN_TIMEOUT` | `600` | Seconds before a `RUNNING` turn is treated as a dead process. Operational, never copied onto the row |
 | `AGENT_JOB_DESCRIPTION_MAX_CHARS` | `6000` | The posting is truncated to this before it is frozen into the snapshot |
-| `LYNQ_ML_URL` | `http://localhost:8084/lynq-ml` | Where the skill extraction of the posting is asked for |
-| `ML_TIMEOUT` | `300` | Seconds allowed for the lynq-ml call |
+| `LYNQ_LLM_URL` | `http://localhost:8084/lynq-llm` | Where the skill extraction of the posting is asked for |
+| `LYNQ_LLM_TIMEOUT` | `300` | Seconds allowed for the lynq-llm call |
 | `LYNQ_IAM_URL` | `http://localhost:8080/lynq-iam` | Where the caller's token is resolved |
 | `LYNQ_IAM_TIMEOUT` | `10` | Seconds allowed for that lookup |
 | `LLM_PROVIDER` | `ollama` | `ollama` for local development, `bedrock` in the cloud |

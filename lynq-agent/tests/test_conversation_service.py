@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from tests.support import JOB, RESUME, STUB_REPLY, TemporaryDatabase, stub_loop
 
 from agent.context import Intent, SpanRecord, TurnOutcome
-from client.lynq_ml_client import SkillExtractionFailed
+from client.lynq_llm_client import SkillExtractionFailed
 from config import Settings, reset_settings
 from db import repository
 from db.models import (
@@ -91,8 +91,8 @@ class ConversationServiceTest(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.database = TemporaryDatabase()
         await self.database.create_schema()
-        self.lynq_ml = AsyncMock()
-        self.lynq_ml.extract_skills.return_value = ["Kubernetes", "PostgreSQL"]
+        self.lynq_llm = AsyncMock()
+        self.lynq_llm.extract_skills.return_value = ["Kubernetes", "PostgreSQL"]
 
     async def asyncTearDown(self) -> None:
         await self.database.dispose()
@@ -102,7 +102,7 @@ class ConversationServiceTest(unittest.IsolatedAsyncioTestCase):
 
         return ConversationService(
             session_factory=self.database.session_factory,
-            lynq_ml_client=self.lynq_ml,
+            lynq_llm_client=self.lynq_llm,
             settings=settings_with(**settings),
             loop_runner=loop_runner,
         )
@@ -176,7 +176,7 @@ class ConversationServiceTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(conversation.job_snapshot["description"]), 100)
 
     async def test_create_falls_back_to_the_posting_skills(self) -> None:
-        self.lynq_ml.extract_skills.side_effect = SkillExtractionFailed("lynq-ml down")
+        self.lynq_llm.extract_skills.side_effect = SkillExtractionFailed("lynq-llm down")
 
         created = await self._create()
 

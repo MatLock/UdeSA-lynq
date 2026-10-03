@@ -1005,7 +1005,7 @@ public interface UserController {
       summary = "Suggest upskilling courses for the authenticated candidate against a job post",
       description = "Returns an AI upskilling recommendation (a verdict plus course suggestions) "
           + "for the authenticated user against the job post identified by 'jobPostId'. The user "
-          + "and job information is read from the database and forwarded to the lynq-ml service. "
+          + "and job information is read from the database and forwarded to the lynq-llm service. "
           + "Only CANDIDATE-type users may call it; the caller identity is resolved from the bearer "
           + "token. Fails with 403 when the caller is not a CANDIDATE and 404 when the job post "
           + "does not exist.",

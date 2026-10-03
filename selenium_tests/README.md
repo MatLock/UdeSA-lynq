@@ -34,13 +34,13 @@ language the UI runs in; the scripts themselves are in English.
 5. **Logs back in as the candidate** and builds up three resumes — applying asks
    which one to send, so they come before the application:
    1. **From a PDF, and named**: uploads `files/resume_mock_en.pdf` through the
-      wizard's upload path (the ML service reads the document into a structured
+      wizard's upload path (the LLM service reads the document into a structured
       resume, so this step waits up to `EXTRA_LONG_TIMEOUT_MS`), then assigns an
       alias from the viewer's *Asignar alias* button and overrides it —
       asserting the success toast, that the button switches to *Editar alias*,
       and that reopening the dialog comes prefilled with the alias on file.
    2. **By translating it into Spanish**: opens *Traducir CV*, picks *Español*
-      explicitly as the target language, waits for the ML translation, generates
+      explicitly as the target language, waits for the LLM translation, generates
       the template preview and asserts the PDF canvas actually draws content
       (fraction of non-white pixels), then confirms with *Usar esta plantilla* —
       asserting the success toast and that the switcher now offers a second
@@ -77,7 +77,7 @@ already in the database.
   `chromedriver` on its own).
 - The application running: the frontend plus `lynq-iam`, `lynq-app-backend`,
   `lynq-bff`, `lynq-file-storage` (uploading the pictures needs the storage
-  service) and `lynq-ml` (the resume import and the AI skill generation).
+  service) and `lynq-llm` (the resume import and the AI skill generation).
 
 ```bash
 docker compose up -d

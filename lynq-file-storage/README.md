@@ -403,7 +403,7 @@ Service URLs:
 
 ## Running with Docker
 
-The repo-root `docker-compose.yaml` provisions the whole platform — MySQL, LocalStack, `lynq-iam`, `lynq-ml` (+ Ollama), this service, `lynq-app-backend`, and the frontend. Run compose from the repository root (one level up):
+The repo-root `docker-compose.yaml` provisions the whole platform — MySQL, LocalStack, `lynq-iam`, `lynq-llm` (+ Ollama), this service, `lynq-app-backend`, and the frontend. Run compose from the repository root (one level up):
 
 ```bash
 # Build the jar first (the image just COPYs it in)

@@ -2,7 +2,7 @@
 
 Kubernetes deployment for the Lynq platform, packaged as a Helm chart. The same chart runs both a self-contained local cluster (minikube) and the production cluster (AWS EKS); a small set of flags in the values files is what tells the two environments apart. In production the chart is not installed by hand — Terraform coordinates it — while locally you install it directly with Helm.
 
-The chart deploys the application modules (`lynq-iam`, `lynq-bff`, `lynq-app-backend`, `lynq-file-storage`, `lynq-ml`, and the frontend) together with their configuration, and — locally only — their infrastructure dependencies (MySQL, Redis, LocalStack). In production those dependencies come from managed services (RDS, ElastiCache, S3), the frontend is served from Cloudflare, and secrets are created outside the chart.
+The chart deploys the application modules (`lynq-iam`, `lynq-bff`, `lynq-app-backend`, `lynq-file-storage`, `lynq-llm`, and the frontend) together with their configuration, and — locally only — their infrastructure dependencies (MySQL, Redis, LocalStack). In production those dependencies come from managed services (RDS, ElastiCache, S3), the frontend is served from Cloudflare, and secrets are created outside the chart.
 
 
 ## Layout
@@ -52,7 +52,7 @@ All credentials live in a single `credentials` block in `k8s_values-local.yaml` 
 
 ## Scheduled jobs
 
-`lynq-feeders` is the only workload that is not driven by users. It scrapes Bumeran and Computrabajo, asks `lynq-ml` for skills and similarity tags, and hands the batch to `lynq-app-backend`. The Deployment serves the endpoint; a CronJob calls it.
+`lynq-feeders` is the only workload that is not driven by users. It scrapes Bumeran and Computrabajo, asks `lynq-llm` for skills and similarity tags, and hands the batch to `lynq-app-backend`. The Deployment serves the endpoint; a CronJob calls it.
 
 The ingest endpoint answers `202` with no body and does the work in the background, so the CronJob pod is a trigger and nothing more: it is done in milliseconds, whatever the run costs. A run is ~80 postings, each an LLM generation, and used to hold the trigger's connection open for up to 90 minutes — any hiccup on that connection failed the Job even though the ingest itself was fine.
 
@@ -119,7 +119,7 @@ Prerequisites: a running minikube cluster, `helm`, and (by default) an Ollama se
    images — including `lynq-app-frontend`, which is built on each release with the
    local ingress URLs baked in. No manual frontend build is needed.
 
-The platform is then reachable on the shared host: the frontend at `http://lynq.local/` and the gateway at `http://lynq.local/lynq-bff` (path-based routing; the more specific path takes precedence). Everything behind the gateway — `lynq-iam`, `lynq-app-backend`, `lynq-ml`, `lynq-file-storage` — has no Ingress and is reachable only from inside the cluster; the browser's auth calls reach `lynq-iam` relayed by the gateway.
+The platform is then reachable on the shared host: the frontend at `http://lynq.local/` and the gateway at `http://lynq.local/lynq-bff` (path-based routing; the more specific path takes precedence). Everything behind the gateway — `lynq-iam`, `lynq-app-backend`, `lynq-llm`, `lynq-file-storage` — has no Ingress and is reachable only from inside the cluster; the browser's auth calls reach `lynq-iam` relayed by the gateway.
 
 > **macOS (docker driver).** On Mac, minikube runs with the `docker` driver by
 > default, and its IP (e.g. `192.168.49.2`) lives inside Docker's internal
@@ -152,8 +152,8 @@ Production runs on AWS EKS and is applied **only with Terraform** (local uses He
 - **The EKS cluster itself and its EC2 worker nodes** (`eks.tf`). The control plane is AWS-managed; the workers are a managed node group of `t3.medium` on-demand instances (2 by default, max 3). Both live in the VPC you pass in, so pods reach the MySQL/Redis EC2 over the internal network. The cluster's OIDC provider is created too, which is what makes IRSA possible later.
 - **MySQL + Redis on an EC2 instance** (`ec2-lynq-redis-db`), reachable from EKS over the internal network. Two security groups open `3306` and `6379` to the VPC CIDR, and a third opens `22` to a single admin IP. The apps' `DB_URL` / `REDIS_ADDRESS` are derived automatically from the instance's private DNS.
 - **S3 bucket** (private, with CORS for pre-signed uploads) for `lynq-file-storage`, the only service that talks to S3.
-- **External Secrets.** `manageSecrets: false` — Helm renders no Secrets; Terraform creates `dockerhub-secret`, `lynq-iam-secret`, `lynq-bff-secret`, `lynq-app-backend-secret`, `lynq-file-storage-secret`, and `lynq-ml-secret`, and the deployments consume them by reference. Sensitive values are supplied at apply time via `TF_VAR_*` (never committed).
-- **Internet exposure via a shared ALB.** Only `lynq-bff` is exposed: it sits behind a single AWS ALB (AWS Load Balancer Controller) with a `group.name`, path-based routing on one domain, and TLS terminated at the ALB. It is the entry point for everything, identity included — it relays the auth calls to `lynq-iam`, which like the DMZ services (`lynq-app-backend`, `lynq-ml`, `lynq-file-storage`) has no Ingress and can only be reached from inside the cluster. The public DNS record is a CNAME to the ALB hostname read off `lynq-bff-ingress`.
+- **External Secrets.** `manageSecrets: false` — Helm renders no Secrets; Terraform creates `dockerhub-secret`, `lynq-iam-secret`, `lynq-bff-secret`, `lynq-app-backend-secret`, `lynq-file-storage-secret`, and `lynq-llm-secret`, and the deployments consume them by reference. Sensitive values are supplied at apply time via `TF_VAR_*` (never committed).
+- **Internet exposure via a shared ALB.** Only `lynq-bff` is exposed: it sits behind a single AWS ALB (AWS Load Balancer Controller) with a `group.name`, path-based routing on one domain, and TLS terminated at the ALB. It is the entry point for everything, identity included — it relays the auth calls to `lynq-iam`, which like the DMZ services (`lynq-app-backend`, `lynq-llm`, `lynq-file-storage`) has no Ingress and can only be reached from inside the cluster. The public DNS record is a CNAME to the ALB hostname read off `lynq-bff-ingress`.
 - **Certificate + DNS.** Terraform creates the ACM certificate for `api.lynqoficial.com`, validates it via a Cloudflare DNS record, feeds the ARN into the Ingress, and points `api.lynqoficial.com` at the ALB (Cloudflare CNAME, DNS-only). DNS for `lynqoficial.com` lives in Cloudflare.
 - **Frontend on Cloudflare.** `localFrontend: false` — the frontend is deployed separately with Wrangler, outside this chart.
 
@@ -250,14 +250,14 @@ export TF_VAR_dockerhub_token=<dockerhub-access-token>
 export TF_VAR_cloudflare_api_token=<cloudflare-dns-token>
 ```
 
-`lynq-ml`'s LLM backend is plain (non-secret) config, so it stays in `prod.tfvars` rather than the environment — `bedrock_model_id` (any Converse-capable model: `anthropic.*`, `amazon.nova-*`, `meta.llama*`, `mistral.*`) and `bedrock_region`.
+`lynq-llm`'s LLM backend is plain (non-secret) config, so it stays in `prod.tfvars` rather than the environment — `bedrock_model_id` (any Converse-capable model: `anthropic.*`, `amazon.nova-*`, `meta.llama*`, `mistral.*`) and `bedrock_region`.
 
 No AWS credentials are set here either. Terraform creates two least-privilege IAM users and writes each access key straight into the Secret of the one service that needs it:
 
 | IAM user | Permissions | Secret |
 | --- | --- | --- |
 | `lynq-backend-s3` (`s3.tf`) | `s3:GetObject/PutObject/DeleteObject` + `ListBucket`, scoped to the bucket | `lynq-file-storage-secret` |
-| `lynq-ml-bedrock` (`bedrock.tf`) | `bedrock:InvokeModel` on the configured model, `ListFoundationModels` for the health probe | `lynq-ml-secret` |
+| `lynq-llm-bedrock` (`bedrock.tf`) | `bedrock:InvokeModel` on the configured model, `ListFoundationModels` for the health probe | `lynq-llm-secret` |
 
 `lynq-app-backend` gets no bucket credentials; it delegates every file operation to `lynq-file-storage` over HTTP. Both users can be replaced by IRSA roles once the cluster has an OIDC provider — the services read the standard AWS credential chain, so no code changes.
 

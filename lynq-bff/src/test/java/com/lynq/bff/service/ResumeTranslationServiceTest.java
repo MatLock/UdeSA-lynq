@@ -11,7 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.lynq.bff.client.LynqBackendClient;
-import com.lynq.bff.client.LynqMlClient;
+import com.lynq.bff.client.LynqLlmClient;
 import com.lynq.bff.client.request.TranslateResumeRequest;
 import com.lynq.bff.client.response.SupportedLanguageResponse;
 import com.lynq.bff.client.response.UserResumeResponse;
@@ -52,14 +52,14 @@ class ResumeTranslationServiceTest {
   private LynqBackendClient lynqBackendClient;
 
   @Mock
-  private LynqMlClient lynqMlClient;
+  private LynqLlmClient lynqLlmClient;
 
   private ResumeTranslationService resumeTranslationService;
 
   @BeforeEach
   void setUp() {
     resumeTranslationService =
-        new ResumeTranslationService(lynqBackendClient, lynqMlClient);
+        new ResumeTranslationService(lynqBackendClient, lynqLlmClient);
   }
 
   @Test
@@ -72,14 +72,14 @@ class ResumeTranslationServiceTest {
   }
 
   @Test
-  void translateSendsLynqMlTheSourceResumeAndTheNormalizedLanguage() {
+  void translateSendsLynqLlmTheSourceResumeAndTheNormalizedLanguage() {
     givenHappyPath();
 
     resumeTranslationService.translate(RESUME_ID, " fr ", CALLER);
 
     ArgumentCaptor<TranslateResumeRequest> captor =
         ArgumentCaptor.forClass(TranslateResumeRequest.class);
-    verify(lynqMlClient).translateResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    verify(lynqLlmClient).translateResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     assertThat(captor.getValue().getResume(), is(SOURCE_RESUME));
     assertThat(captor.getValue().getLanguage(), is(TARGET_LANGUAGE));
   }
@@ -100,7 +100,7 @@ class ResumeTranslationServiceTest {
     assertThrows(BadRequestException.class,
         () -> resumeTranslationService.translate(RESUME_ID, " ", CALLER));
 
-    verify(lynqMlClient, never()).translateResume(any(), any(), any());
+    verify(lynqLlmClient, never()).translateResume(any(), any(), any());
   }
 
   @Test
@@ -110,7 +110,7 @@ class ResumeTranslationServiceTest {
     assertThrows(BadRequestException.class,
         () -> resumeTranslationService.translate("someone-elses", TARGET_LANGUAGE, CALLER));
 
-    verify(lynqMlClient, never()).translateResume(any(), any(), any());
+    verify(lynqLlmClient, never()).translateResume(any(), any(), any());
   }
 
   @Test
@@ -121,7 +121,7 @@ class ResumeTranslationServiceTest {
     assertThrows(BadRequestException.class,
         () -> resumeTranslationService.translate(RESUME_ID, "DE", CALLER));
 
-    verify(lynqMlClient, never()).translateResume(any(), any(), any());
+    verify(lynqLlmClient, never()).translateResume(any(), any(), any());
   }
 
   @Test
@@ -134,7 +134,7 @@ class ResumeTranslationServiceTest {
     assertThrows(BadRequestException.class,
         () -> resumeTranslationService.translate(RESUME_ID, TARGET_LANGUAGE, CALLER));
 
-    verify(lynqMlClient, never()).translateResume(any(), any(), any());
+    verify(lynqLlmClient, never()).translateResume(any(), any(), any());
   }
 
   @Test
@@ -145,14 +145,14 @@ class ResumeTranslationServiceTest {
     assertThrows(BadRequestException.class,
         () -> resumeTranslationService.translate(RESUME_ID, "en", CALLER));
 
-    verify(lynqMlClient, never()).translateResume(any(), any(), any());
+    verify(lynqLlmClient, never()).translateResume(any(), any(), any());
   }
 
   @Test
   void translateAnswersBadGatewayWhenTheTranslationFails() {
     givenResumes(resume(RESUME_ID, RESUME_NAME, SOURCE_LANGUAGE));
     givenSupportedLanguages("EN", "FR");
-    when(lynqMlClient.translateResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
+    when(lynqLlmClient.translateResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenThrow(new IllegalStateException("llm exploded"));
 
     BadGatewayException exception = assertThrows(BadGatewayException.class,
@@ -181,7 +181,7 @@ class ResumeTranslationServiceTest {
   }
 
   private void givenTranslation() {
-    lenient().when(lynqMlClient.translateResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
+    lenient().when(lynqLlmClient.translateResume(any(), eq(REQUEST_UUID), eq(AUTHORIZATION)))
         .thenReturn(new GlobalRestResponse<>(true, TRANSLATED_RESUME));
   }
 

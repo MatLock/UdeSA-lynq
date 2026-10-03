@@ -161,7 +161,7 @@ class JudgePromptTest(unittest.TestCase):
     def test_it_names_every_kind_of_rejection(self) -> None:
         prompt = rendered_judge()
 
-        for kind in ("invented", "unsupported_skill", "dropped_skill", "wording", "language", "padding"):
+        for kind in ("language", "dropped_content", "reordered", "dropped_skill", "invented", "unsupported_skill", "wording", "padding"):
             self.assertIn(f"`kind: {kind}`", prompt)
 
     def test_the_posting_is_not_evidence(self) -> None:
@@ -170,18 +170,34 @@ class JudgePromptTest(unittest.TestCase):
     def test_it_has_to_quote_the_resume_before_approving(self) -> None:
         prompt = rendered_judge()
 
-        self.assertIn("quote it in `evidence`", prompt)
+        self.assertIn("Start the `evidence` of every part with its two counts", prompt)
+        self.assertIn("The quote is copied from `<resume>`, word for word, never from `<proposed>`", prompt)
         self.assertIn("You may only approve a part whose `evidence` you quoted", prompt)
         self.assertIn("A technology listed in the `technologies` of an entry", prompt)
 
     def test_the_reason_is_written_for_the_candidate_in_their_language(self) -> None:
         self.assertIn("Write each `reason` in Spanish (es)", rendered_judge())
-        self.assertIn("not written in English (en), the language the resume is written in", rendered_judge())
+        self.assertIn("The resume is written in English (en). A proposed text in any other language", rendered_judge())
 
     def test_each_part_travels_with_its_original(self) -> None:
         prompt = rendered_judge()
 
-        self.assertIn('<part id="summary" section="summary"> <original>Backend engineer.</original> <proposed>Backend engineer with 12 years.</proposed> </part>', prompt)
+        self.assertIn('<part id="summary" section="summary"> <original lines="1"> 1| Backend engineer. </original> <proposed lines="1"> 1| Backend engineer with 12 years. </proposed> </part>', prompt)
+
+    def test_the_lines_of_an_entry_are_numbered_and_counted(self) -> None:
+        prompt = rendered_judge(parts=[Part(
+            "entry:0", "work_experience", "Backend Engineer at Acme",
+            "Built services.\n- Ran Kubernetes.\nCut costs.", "Built services.\n- Ran Kubernetes.",
+        )])
+
+        self.assertIn('<original lines="3"> 1| Built services. 2| - Ran Kubernetes. 3| Cut costs. </original>', prompt)
+        self.assertIn('<proposed lines="2"> 1| Built services. 2| - Ran Kubernetes. </proposed>', prompt)
+
+    def test_the_skills_of_a_bucket_are_numbered_one_per_skill(self) -> None:
+        prompt = rendered_judge(parts=[Part("skills:technical", "skills", "technical", "Java, Postgres", "Java, Postgres, Kubernetes")])
+
+        self.assertIn('<original lines="2"> 1| Java 2| Postgres </original>', prompt)
+        self.assertIn('<proposed lines="3"> 1| Java 2| Postgres 3| Kubernetes </proposed>', prompt)
 
     def test_the_resume_travels_without_personal_info(self) -> None:
         prompt = rendered_judge()

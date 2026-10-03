@@ -11,8 +11,8 @@ lynq:
     url: http://localhost:9999/lynq-iam
   backend:
     url: http://localhost:9999/lynq-backend-app
-  ml:
-    url: http://localhost:9999/lynq-ml
+  llm:
+    url: http://localhost:9999/lynq-llm
   file-storage:
     url: http://localhost:9999/lynq-file-storage
   analytics:

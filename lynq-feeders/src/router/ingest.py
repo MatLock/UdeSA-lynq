@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, Header, HTTPException, Res
 from backend_client import BackendClient, BackendError
 from config import get_settings
 from logging_context import request_uuid_ctx
-from ml_client import MlClient
+from llm_client import LlmClient
 from model import IngestOverrides
 from service import EnrichmentError, IngestService
 
@@ -39,11 +39,11 @@ def build_service() -> IngestService:
     settings = get_settings()
     return IngestService(
         settings=settings,
-        ml_client=MlClient(
-            base_url=settings.ml_url,
+        llm_client=LlmClient(
+            base_url=settings.llm_url,
             system_user_id=settings.system_user_id,
             internal_token=settings.internal_token,
-            timeout=settings.ml_timeout,
+            timeout=settings.llm_timeout,
         ),
         backend_client=BackendClient(
             base_url=settings.backend_url,

@@ -107,7 +107,7 @@ variable "s3_cors_allowed_origins" {
 }
 
 variable "ollama_base_url" {
-  description = "External Ollama base URL for lynq-ml."
+  description = "External Ollama base URL for lynq-llm."
   type        = string
 }
 
@@ -178,7 +178,7 @@ variable "jwt_secret" {
 
 variable "bedrock_model_id" {
   description = <<-EOT
-    Bedrock model id lynq-ml calls through the Converse API (only if
+    Bedrock model id lynq-llm calls through the Converse API (only if
     LLM_PROVIDER=bedrock). Any Converse-capable model works, e.g.
     anthropic.claude-sonnet-4-5-20250929-v1:0, amazon.nova-pro-v1:0 or
     meta.llama3-3-70b-instruct-v1:0.
@@ -188,7 +188,7 @@ variable "bedrock_model_id" {
 }
 
 variable "bedrock_region" {
-  description = "Region whose Bedrock endpoint lynq-ml calls (the model must be enabled there)."
+  description = "Region whose Bedrock endpoint lynq-llm calls (the model must be enabled there)."
   type        = string
   default     = "us-east-1"
 }

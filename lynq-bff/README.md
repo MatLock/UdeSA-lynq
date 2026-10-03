@@ -28,7 +28,7 @@ It does five things.
    BFF rather than a proxy: see [Flows the gateway owns](#flows-the-gateway-owns). Downstream
    services stay unaware of each other, and none of them orchestrates another.
 
-Everything behind it — lynq-app-backend, lynq-ml, lynq-file-storage, lynq-analytics — exposes its API under a
+Everything behind it — lynq-app-backend, lynq-llm, lynq-file-storage, lynq-analytics — exposes its API under a
 `/dmz` prefix and is reached only through here. That is why none of them checks the token's
 signature for itself.
 
@@ -50,7 +50,7 @@ is never appears in the URL.
 | `/lynq-bff/user/**`, `/lynq-bff/company/**`, `/lynq-bff/job/**` | lynq-app-backend   |
 | `/lynq-bff/files/**`                                      | lynq-file-storage  |
 | `/lynq-bff/analytics/job/{jobId}/time-to-fill`, `/lynq-bff/analytics/job/{jobId}/standing`, `/lynq-bff/analytics/job/{jobId}/salary` | lynq-analytics |
-| `/lynq-bff/skill-enhance`, `/lynq-bff/translate`, `/lynq-bff/detect-language` | lynq-ml |
+| `/lynq-bff/skill-enhance`, `/lynq-bff/translate`, `/lynq-bff/detect-language` | lynq-llm |
 | `/lynq-bff/auth/register`, `/lynq-bff/auth/login/username`, `/lynq-bff/auth/login/email`, `/lynq-bff/auth/refresh`, `/lynq-bff/auth/update-password`, `/lynq-bff/auth/check-username`, `/lynq-bff/auth/check-email` | lynq-iam |
 
 For example:
@@ -60,7 +60,7 @@ GET  /lynq-bff/user/generate-upload-image?file-name=avatar.png
   -> GET  /lynq-backend-app/dmz/user/generate-upload-image?file-name=avatar.png
 
 POST /lynq-bff/skill-enhance
-  -> POST /lynq-ml/dmz/skill-enhance
+  -> POST /lynq-llm/dmz/skill-enhance
 
 POST /lynq-bff/files/upload-url
   -> POST /lynq-file-storage/dmz/files/upload-url
@@ -89,16 +89,16 @@ so `GET /auth/login/email` is a `405` rather than a relay.
   are not in the allowlist, so they are a plain `404` here. Every other route lynq-iam grows is
   closed the same way until it is named — the auth relay is an allowlist of exact paths, one exact
   verb each, not an `/auth` prefix.
-- **lynq-ml's `/health`.** It sits outside the DMZ so infra probes can reach it without a token.
-- **lynq-ml's evaluations** — `upskilling_suggestion` and `candidate-explanation`. Their payload is
+- **lynq-llm's `/health`.** It sits outside the DMZ so infra probes can reach it without a token.
+- **lynq-llm's evaluations** — `upskilling_suggestion` and `candidate-explanation`. Their payload is
   a job post plus a candidate, assembled from lynq-app-backend's database once it has checked the
   caller may see them. The browser does not have that payload and must not be trusted to supply one,
   so these are reached through `/lynq-bff/job/{jobId}/…` instead. `403` here.
-- **lynq-ml's URL-taking endpoints** — `parse-resume` and `resume-template-creation`. They hand a
+- **lynq-llm's URL-taking endpoints** — `parse-resume` and `resume-template-creation`. They hand a
   caller-supplied URL (`preSignedUrl`, `profile_url`, `put_resume_url`) straight to
   `urllib.request.urlopen` server-side, with no check on the scheme or the host. That is safe while
   the URLs come from lynq-file-storage and never from a browser; relaying them from here would make
-  the gateway an SSRF vector. `403` until lynq-ml validates the URLs it is given.
+  the gateway an SSRF vector. `403` until lynq-llm validates the URLs it is given.
   `resume-template-creation` is instead **driven** by `POST /lynq-bff/resume/preview` below, which
   signs both URLs itself one step earlier in the same flow — so the browser never supplies one.
 
@@ -114,9 +114,9 @@ downstream service has to know another one exists.
 
 | Gateway path                                    | What it composes                                  |
 | ----------------------------------------------- | ------------------------------------------------- |
-| `POST /lynq-bff/resume/preview`                 | lynq-app-backend + lynq-file-storage + lynq-ml    |
+| `POST /lynq-bff/resume/preview`                 | lynq-app-backend + lynq-file-storage + lynq-llm   |
 | `DELETE /lynq-bff/resume/preview/{fileId}`      | lynq-file-storage                                 |
-| `POST /lynq-bff/resume/document/{fileId}/import`| lynq-app-backend + lynq-file-storage + lynq-ml    |
+| `POST /lynq-bff/resume/document/{fileId}/import`| lynq-app-backend + lynq-file-storage + lynq-llm   |
 | `DELETE /lynq-bff/resume/{resumeId}`            | lynq-app-backend + lynq-file-storage              |
 
 ### Resume deletion
@@ -148,7 +148,7 @@ POST /lynq-bff/resume/preview   { resume, template }
 
   1. GET    lynq-app-backend  /dmz/user                     who is calling, and their avatar URL
   2. POST   lynq-file-storage /dmz/files/upload-url          register the PDF, get a signed PUT
-  3. POST   lynq-ml           /dmz/resume-template-creation  render the template, PUT the PDF
+  3. POST   lynq-llm           /dmz/resume-template-creation  render the template, PUT the PDF
   4. POST   lynq-file-storage /dmz/files/{fileId}/confirm    mark it available
   5. GET    lynq-file-storage /dmz/files/{fileId}/download-url  sign a URL to read it
 
@@ -157,7 +157,7 @@ POST /lynq-bff/resume/preview   { resume, template }
 
 Three things this flow is responsible for, and a proxy could not be:
 
-- **The URLs lynq-ml fetches are signed inside the flow** (step 2 for the PUT, step 1 for the
+- **The URLs lynq-llm fetches are signed inside the flow** (step 2 for the PUT, step 1 for the
   avatar). That is what makes calling `resume-template-creation` safe here while relaying it from a
   browser stays refused.
 - **Nothing is persisted.** The `fileId` goes back to the browser, which either sends it to
@@ -185,9 +185,9 @@ POST /lynq-bff/resume/document/{fileId}/import?language=es
 
   1. POST   lynq-app-backend  /dmz/user/confirm-upload-resume  the document is really there
   2. GET    lynq-file-storage /dmz/files/{fileId}/download-url  sign a URL to read it
-  3. POST   lynq-ml           /dmz/parse-resume                 read it into resume JSON
-  4. POST   lynq-ml           /dmz/detect-language              which language is it written in
-  5. POST   lynq-ml           /dmz/resume/skill-extraction      generalize its skills into tags
+  3. POST   lynq-llm           /dmz/parse-resume                 read it into resume JSON
+  4. POST   lynq-llm           /dmz/detect-language              which language is it written in
+  5. POST   lynq-llm           /dmz/resume/skill-extraction      generalize its skills into tags
   6. POST   lynq-app-backend  /dmz/user/resume                  store it against the candidate
 
   -> 201 { "success": true, "data": { …the stored resume… } }
@@ -200,7 +200,7 @@ POST /lynq-bff/resume/document/{fileId}/import?language=es
 - **The language is classified, not assumed.** A candidate using the app in Spanish may well upload
   a resume written in English, and the stored language is what later decides which of their resumes
   is shown. `?language=` is only the fallback for a resume with no prose to classify. The text sent
-  to lynq-ml is the resume's own prose (summary, headline, the descriptions of its sections) —
+  to lynq-llm is the resume's own prose (summary, headline, the descriptions of its sections) —
   `ParsedResume` is the one place the gateway looks inside a resume, and it skips the skill lists and
   the English JSON keys that would drag the classification towards English.
 - **The skills are parsed, the capabilities are derived.** Step 3 only recovers what the candidate
@@ -227,13 +227,13 @@ nothing replaces them: the gateway names a caller with their token and nothing e
 client-supplied value cannot survive the hop, and cannot be mistaken for one the gateway vouched
 for.
 
-Downstream, lynq-app-backend, lynq-file-storage, lynq-ml and lynq-agent each call lynq-iam's
+Downstream, lynq-app-backend, lynq-file-storage, lynq-llm and lynq-agent each call lynq-iam's
 `/auth/user-info` with the relayed `Authorization` header and build their own principal from the
 answer. That is what lynq-file-storage records as a file's owner, and what it checks before letting
 anyone read, confirm or delete that file.
 
 The one caller that carries no user token is **lynq-feeders**, a scheduled scrape: it reaches
-lynq-ml and lynq-app-backend through their `/internal/**` routes, which the shared
+lynq-llm and lynq-app-backend through their `/internal/**` routes, which the shared
 `lynq-internal-token` guards. Nothing under `/internal` is relayed by this gateway.
 
 ---
@@ -300,7 +300,7 @@ in these cases:
 | ------ | ----------------------------------------------------------------------- |
 | 400    | A flow's request is missing something it needs (e.g. a preview with no resume or no template). |
 | 401    | Missing `Authorization` header — including on `/auth/refresh`, whose credential is not verified here but must be present — or an invalid/expired token signature. A correctly signed token with no `sub` claim is rejected here too: the caller id is forwarded downstream, so an anonymous one is no good. |
-| 403    | Missing `lynq-request-uuid` header, a lynq-ml endpoint the gateway does not relay (see above), or a flow the caller's role may not run (`@HasRole`). |
+| 403    | Missing `lynq-request-uuid` header, a lynq-llm endpoint the gateway does not relay (see above), or a flow the caller's role may not run (`@HasRole`). |
 | 404    | A resource the gateway does not route — the mappings are an allowlist.  |
 | 405    | An HTTP verb the gateway does not relay (only GET/POST/PUT/PATCH/DELETE).|
 | 502    | A relayed service could not be reached at all — a DMZ one or lynq-iam — or a step of a flow failed — in which case the flow has already undone what it had done. |
@@ -314,7 +314,7 @@ in these cases:
 | `JWT_SECRET`                              | the shared development secret                | Must be **the same secret lynq-iam signs with**. |
 | `LYNQ_IAM_URL`                            | `http://localhost:8080/lynq-iam`             | lynq-iam base URL, for the relayed auth routes. |
 | `LYNQ_BACKEND_URL`                        | `http://localhost:8082/lynq-backend-app`     | lynq-app-backend base URL, context path included. |
-| `LYNQ_ML_URL`                             | `http://localhost:8084/lynq-ml`              | lynq-ml base URL.                             |
+| `LYNQ_LLM_URL`                            | `http://localhost:8084/lynq-llm`             | lynq-llm base URL.                            |
 | `LYNQ_FILE_STORAGE_URL`                   | `http://localhost:8085/lynq-file-storage`    | lynq-file-storage base URL.                   |
 
 The service listens on `8087` (management/actuator on `8088`) with context path `/lynq-bff`. Under
@@ -329,7 +329,7 @@ the `production` profile those become `8080` and `8081`, matching the other Java
   header map and a `byte[]` body. Their return type is `feign.Response`, which Feign hands back
   undecoded — so a non-2xx answer arrives as data instead of a `FeignException`, which is exactly
   what relaying wants. The flow clients (`LynqBackendClient`, `LynqFileStorageClient`,
-  `LynqMlClient`) are typed, one method per endpoint the gateway actually calls, and a non-2xx
+  `LynqLlmClient`) are typed, one method per endpoint the gateway actually calls, and a non-2xx
   answer raises — a flow needs to know a step failed so it can roll back.
 - **The auth relay is its own client, not a `DmzClient` sibling.** `LynqIamAuthClient` repeats the
   five-argument shape against `/auth/{path}` instead of inheriting it: lynq-iam is not behind the
@@ -339,10 +339,10 @@ the `production` profile those become `8080` and `8081`, matching the other Java
   body, query string, headers, response — lives once in `RelayExchange`; what stays in each service
   is who to call, and whether the verified caller id is injected. The DMZ relay injects it; the auth
   relay deliberately does not, because lynq-iam reads the credential rather than a header.
-- **Feign timeouts are per client name, so the relay clients need their own.** The lynq-ml
+- **Feign timeouts are per client name, so the relay clients need their own.** The lynq-llm
   endpoints are LLM generations either way, whether a flow calls them or the browser's request is
-  relayed to them — but `spring.cloud.openfeign.client.config.lynqMl` only covers the typed client.
-  `lynqMlDmz` carries the same 310s read timeout, or the gateway answers `502` at 60s while lynq-ml
+  relayed to them — but `spring.cloud.openfeign.client.config.lynqLlm` only covers the typed client.
+  `lynqLlmDmz` carries the same 310s read timeout, or the gateway answers `502` at 60s while lynq-llm
   is still writing a perfectly good answer.
 - **Apache HttpClient 5, explicitly.** Feign's default client is backed by `HttpURLConnection`,
   which throws on PATCH — and lynq-app-backend exposes PATCH on profiles, companies and job posts.

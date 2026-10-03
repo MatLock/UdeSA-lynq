@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import unittest
 
-from tests.fixtures.spanish import JUDGE_REASON_ES, REJECTED_SUMMARY_ES, REJECTION_OPENING_ES, UNKNOWN_ENTRY_ES
+from tests.fixtures.spanish import CUT_ES, JUDGE_REASON_ES, MOVED_ES, UNBACKED_ES, REJECTED_SUMMARY_ES, REJECTION_OPENING_ES, UNKNOWN_ENTRY_ES
 
-from agent.apply import UNKNOWN_ENTRY, Rejection
+from agent.apply import CUT, MOVED, UNBACKED, UNKNOWN_ENTRY, Rejection
 from agent.judge import UNJUDGED
 from prompt.rejection import render
 
@@ -21,6 +21,18 @@ class RejectionNoticeTest(unittest.TestCase):
 
         self.assertIn(f"(CTO at Initech), {UNKNOWN_ENTRY_ES}", notice)
         self.assertNotIn(UNKNOWN_ENTRY, notice)
+
+    def test_the_structure_guards_rejections_are_translated_and_their_detail_stays_out(self) -> None:
+        notice = render("es", [
+            Rejection("work_experience", "Backend Engineer at Acme", CUT, "the original has 3 lines and the proposal 2"),
+            Rejection("skills", "technical", MOVED, "the bucket keeps its skills in their order"),
+            Rejection("skills", "tools", UNBACKED, "the resume names these nowhere: Go"),
+        ])
+
+        self.assertIn(f"(Backend Engineer at Acme), {CUT_ES}", notice)
+        self.assertIn(f"(technical), {MOVED_ES}", notice)
+        self.assertIn(f"(tools), {UNBACKED_ES}", notice)
+        self.assertNotIn("the original has", notice)
 
     def test_several_rejections_are_one_notice(self) -> None:
         notice = render(

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from backend_client import BackendError, IngestStats
 from config import Settings
-from ml_client import MlError, SkillEnhanceResult
+from llm_client import LlmError, SkillEnhanceResult
 from scraper.base import Listing
 from service import EnrichmentError, IngestService
 
@@ -17,7 +17,7 @@ def _settings(**overrides) -> Settings:
     settings.categories = overrides.get("categories", ["TECNOLOGIA"])
     settings.sources = overrides.get("sources", ["bumeran"])
     settings.jobs_per_category = overrides.get("jobs_per_category", 10)
-    settings.ml_concurrency = overrides.get("ml_concurrency", 2)
+    settings.llm_concurrency = overrides.get("llm_concurrency", 2)
     return settings
 
 
@@ -38,12 +38,12 @@ def _scraper(source="bumeran", listings=None, error=None):
     return scraper
 
 
-def _ml(result=None, error=None):
-    ml = MagicMock()
-    ml.skill_enhance = AsyncMock(
+def _llm(result=None, error=None):
+    llm = MagicMock()
+    llm.skill_enhance = AsyncMock(
         return_value=result or SkillEnhanceResult(["Python"], ["Backend"]), side_effect=error
     )
-    return ml
+    return llm
 
 
 def _backend(stats=None, error=None):
@@ -57,7 +57,7 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
     async def test_scrapes_enriches_and_ingests(self):
         backend = _backend(IngestStats(jobs=1, companies=1, skills=1, similarityTags=1))
         service = IngestService(
-            _settings(), _ml(), backend, scrapers=[_scraper(listings=[_listing()])]
+            _settings(), _llm(), backend, scrapers=[_scraper(listings=[_listing()])]
         )
 
         report = await service.run(REQUEST_UUID)
@@ -72,7 +72,7 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
         listing = _listing()
         service = IngestService(
             _settings(),
-            _ml(SkillEnhanceResult(["Python", "FastAPI"], ["Backend Development"])),
+            _llm(SkillEnhanceResult(["Python", "FastAPI"], ["Backend Development"])),
             _backend(),
             scrapers=[_scraper(listings=[listing])],
         )
@@ -87,7 +87,7 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
         computrabajo = _scraper("computrabajo", [_listing("2", "computrabajo")])
         settings = _settings(categories=["TECNOLOGIA", "CONTABILIDAD"], sources=["bumeran"])
         service = IngestService(
-            settings, _ml(), _backend(), scrapers=[bumeran, computrabajo]
+            settings, _llm(), _backend(), scrapers=[bumeran, computrabajo]
         )
 
         report = await service.run(REQUEST_UUID)
@@ -99,7 +99,7 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
     async def test_passes_the_per_category_limit_to_the_scraper(self):
         scraper = _scraper(listings=[_listing()])
         service = IngestService(
-            _settings(jobs_per_category=3), _ml(), _backend(), scrapers=[scraper]
+            _settings(jobs_per_category=3), _llm(), _backend(), scrapers=[scraper]
         )
 
         await service.run(REQUEST_UUID)
@@ -110,7 +110,7 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
         settings = _settings(categories=["TECNOLOGIA", "CONTABILIDAD"])
         scraper = _scraper(listings=[_listing("same")])
         backend = _backend()
-        service = IngestService(settings, _ml(), backend, scrapers=[scraper])
+        service = IngestService(settings, _llm(), backend, scrapers=[scraper])
 
         report = await service.run(REQUEST_UUID)
 
@@ -121,18 +121,18 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
     async def test_same_id_from_different_sources_is_kept(self):
         scraper = _scraper(listings=[_listing("1", "bumeran"), _listing("1", "computrabajo")])
         backend = _backend()
-        service = IngestService(_settings(), _ml(), backend, scrapers=[scraper])
+        service = IngestService(_settings(), _llm(), backend, scrapers=[scraper])
 
         report = await service.run(REQUEST_UUID)
 
         self.assertEqual(report.deduplicated, 0)
         self.assertEqual(len(backend.ingest.call_args.args[1]), 2)
 
-    async def test_a_failing_ml_call_aborts_the_run_without_ingesting(self):
+    async def test_a_failing_llm_call_aborts_the_run_without_ingesting(self):
         backend = _backend()
         service = IngestService(
             _settings(),
-            _ml(error=MlError("ollama down")),
+            _llm(error=LlmError("ollama down")),
             backend,
             scrapers=[_scraper(listings=[_listing()])],
         )
@@ -144,11 +144,11 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("bumeran/1", str(raised.exception))
         backend.ingest.assert_not_awaited()
 
-    async def test_an_empty_ml_result_aborts_the_run_without_ingesting(self):
+    async def test_an_empty_llm_result_aborts_the_run_without_ingesting(self):
         backend = _backend()
         service = IngestService(
             _settings(),
-            _ml(SkillEnhanceResult([], [])),
+            _llm(SkillEnhanceResult([], [])),
             backend,
             scrapers=[_scraper(listings=[_listing()])],
         )
@@ -160,28 +160,28 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
         backend.ingest.assert_not_awaited()
 
     async def test_listings_without_a_description_skip_the_llm_and_abort_the_run(self):
-        ml = _ml()
+        llm = _llm()
         backend = _backend()
         service = IngestService(
-            _settings(), ml, backend, scrapers=[_scraper(listings=[_listing(description=None)])]
+            _settings(), llm, backend, scrapers=[_scraper(listings=[_listing(description=None)])]
         )
 
         with self.assertRaises(EnrichmentError) as raised:
             await service.run(REQUEST_UUID)
 
-        ml.skill_enhance.assert_not_awaited()
+        llm.skill_enhance.assert_not_awaited()
         self.assertIn("no description", str(raised.exception))
         backend.ingest.assert_not_awaited()
 
     async def test_one_failing_listing_aborts_the_whole_run(self):
         backend = _backend()
-        ml = MagicMock()
-        ml.skill_enhance = AsyncMock(
-            side_effect=[SkillEnhanceResult(["Python"], ["Backend"]), MlError("ollama down")]
+        llm = MagicMock()
+        llm.skill_enhance = AsyncMock(
+            side_effect=[SkillEnhanceResult(["Python"], ["Backend"]), LlmError("ollama down")]
         )
         service = IngestService(
-            _settings(ml_concurrency=1),
-            ml,
+            _settings(llm_concurrency=1),
+            llm,
             backend,
             scrapers=[_scraper(listings=[_listing("1"), _listing("2")])],
         )
@@ -195,7 +195,7 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_failing_scraper_does_not_abort_the_other_categories(self):
         failing = _scraper("bumeran", error=RuntimeError("cloudflare"))
         working = _scraper("computrabajo", [_listing("2", "computrabajo")])
-        service = IngestService(_settings(), _ml(), _backend(), scrapers=[failing, working])
+        service = IngestService(_settings(), _llm(), _backend(), scrapers=[failing, working])
 
         report = await service.run(REQUEST_UUID)
 
@@ -206,7 +206,7 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_run_that_finds_nothing_does_not_call_the_backend(self):
         backend = _backend()
-        service = IngestService(_settings(), _ml(), backend, scrapers=[_scraper(listings=[])])
+        service = IngestService(_settings(), _llm(), backend, scrapers=[_scraper(listings=[])])
 
         report = await service.run(REQUEST_UUID)
 
@@ -216,7 +216,7 @@ class RunTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_failing_ingest_propagates(self):
         service = IngestService(
             _settings(),
-            _ml(),
+            _llm(),
             _backend(error=BackendError("401")),
             scrapers=[_scraper(listings=[_listing()])],
         )

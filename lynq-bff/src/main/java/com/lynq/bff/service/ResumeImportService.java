@@ -2,7 +2,7 @@ package com.lynq.bff.service;
 
 import com.lynq.bff.client.LynqBackendClient;
 import com.lynq.bff.client.LynqFileStorageClient;
-import com.lynq.bff.client.LynqMlClient;
+import com.lynq.bff.client.LynqLlmClient;
 import com.lynq.bff.client.request.CreateResumeRequest;
 import com.lynq.bff.client.request.LanguageDetectionRequest;
 import com.lynq.bff.client.request.ParseResumeRequest;
@@ -27,14 +27,14 @@ public class ResumeImportService {
 
   private final LynqBackendClient lynqBackendClient;
   private final LynqFileStorageClient lynqFileStorageClient;
-  private final LynqMlClient lynqMlClient;
+  private final LynqLlmClient lynqLlmClient;
 
   public ResumeImportService(LynqBackendClient lynqBackendClient,
                              LynqFileStorageClient lynqFileStorageClient,
-                             LynqMlClient lynqMlClient) {
+                             LynqLlmClient lynqLlmClient) {
     this.lynqBackendClient = lynqBackendClient;
     this.lynqFileStorageClient = lynqFileStorageClient;
-    this.lynqMlClient = lynqMlClient;
+    this.lynqLlmClient = lynqLlmClient;
   }
 
   public Object importUploadedDocument(String fileId, String fallbackLanguage, Caller caller) {
@@ -73,7 +73,7 @@ public class ResumeImportService {
         .preSignedUrl(documentUrl)
         .build();
 
-    return lynqMlClient.parseResume(request, caller.requestUuid(), caller.authorization()).getData();
+    return lynqLlmClient.parseResume(request, caller.requestUuid(), caller.authorization()).getData();
   }
 
   private String language(Object resume, String fallbackLanguage, Caller caller) {
@@ -84,7 +84,7 @@ public class ResumeImportService {
     }
 
     LanguageDetectionRequest request = LanguageDetectionRequest.builder().text(prose).build();
-    LanguageDetectionResponse detected = lynqMlClient
+    LanguageDetectionResponse detected = lynqLlmClient
         .detectLanguage(request, caller.requestUuid(), caller.authorization())
         .getData();
 
@@ -106,7 +106,7 @@ public class ResumeImportService {
    * generalized tags — "Asynchronous Messaging" rather than Kafka or RabbitMQ —
    * have no other source, and without them an imported resume can only be
    * matched on exact skill names, scoring below the same resume typed into the
-   * wizard, which asks lynq-ml for them explicitly.
+   * wizard, which asks lynq-llm for them explicitly.
    *
    * <p>This is a second LLM round-trip on a path that already made one, so a
    * failure here degrades to no tags instead of losing the import: the tags can
@@ -119,7 +119,7 @@ public class ResumeImportService {
   private List<String> similarityTags(Object resume, String language, String fileId,
                                       Caller caller) {
     try {
-      SkillExtractionResponse extracted = lynqMlClient
+      SkillExtractionResponse extracted = lynqLlmClient
           .extractResumeSkills(resume, language, caller.requestUuid(), caller.authorization())
           .getData();
 

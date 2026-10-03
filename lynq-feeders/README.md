@@ -1,6 +1,6 @@
 # lynq-feeders
 
-Job-listing feeder service for the Lynq platform. A FastAPI app that scrapes the Argentine job portals, asks `lynq-ml` to extract skills and similarity tags from each posting, and hands the batch to `lynq-app-backend` for persistence. A daily Kubernetes CronJob calls it; the same endpoint can be invoked on demand from inside the cluster, optionally scoped to a subset of portals and categories.
+Job-listing feeder service for the Lynq platform. A FastAPI app that scrapes the Argentine job portals, asks `lynq-llm` to extract skills and similarity tags from each posting, and hands the batch to `lynq-app-backend` for persistence. A daily Kubernetes CronJob calls it; the same endpoint can be invoked on demand from inside the cluster, optionally scoped to a subset of portals and categories.
 
 It replaces a set of standalone scripts that wrote scraped JSON to disk and then inserted it straight into MySQL. Those are gone: this service is the only thing that feeds external listings into the platform, and it does so through `lynq-app-backend` rather than by touching the database.
 
@@ -52,7 +52,7 @@ It replaces a set of standalone scripts that wrote scraped JSON to disk and then
           ┌────────────────┼─────────────────┐
           ▼                ▼                 ▼
    ┌────────────┐   ┌────────────┐   ┌────────────────┐
-   │  Bumeran   │   │Computrabajo│   │    lynq-ml     │
+   │  Bumeran   │   │Computrabajo│   │    lynq-llm    │
    │  searchV2  │   │ SEO pages  │   │ /skill-enhance │
    └────────────┘   └────────────┘   └────────────────┘
           │                │                 │
@@ -72,7 +72,7 @@ The service never touches the database. `lynq-app-backend` owns `lynq_backend_db
 
 1. For every configured source and category, scrape the latest `FEEDER_JOBS_PER_CATEGORY` postings.
 2. Drop duplicates by `(source, external_id)` — Bumeran merges administración and contabilidad into one area, so the same posting can surface under two categories.
-3. For every posting with a description, call `lynq-ml` `/internal/skill-enhance` to get `skills` and `similarity_tags`, presenting `LYNQ_INTERNAL_TOKEN` — a scheduled scrape has no user token, and lynq-ml's `/dmz` routes want one. Calls are bounded by `ML_CONCURRENCY`.
+3. For every posting with a description, call `lynq-llm` `/internal/skill-enhance` to get `skills` and `similarity_tags`, presenting `LYNQ_INTERNAL_TOKEN` — a scheduled scrape has no user token, and lynq-llm's `/dmz` routes want one. Calls are bounded by `LYNQ_LLM_CONCURRENCY`.
 4. Post the whole batch to `lynq-app-backend` — only if every posting came back enriched.
 
 Steps 1-4 run in the background, after the caller has been answered: nothing downstream
@@ -97,10 +97,10 @@ blocked. Bumeran postings are ingested without salary or currency.
 Skill extraction is not best-effort: a posting stored with no skills and no
 similarity tags scores 0 on the LyNQ score for every candidate, and because the
 backend replaces a job post's skills on every ingest, a degraded run also wipes
-what an earlier one had extracted. So if any posting fails to enrich — `lynq-ml`
+what an earlier one had extracted. So if any posting fails to enrich — `lynq-llm`
 unreachable, an empty completion, or a scraper that brought back no description —
 the run aborts naming every offender in the logs and nothing is ingested. Rerun it
-once `lynq-ml` is healthy.
+once `lynq-llm` is healthy.
 
 A scraper that fails for one category does not abort the others — that failure is logged per source and the run carries on.
 
@@ -201,7 +201,7 @@ message= Feeder ingest run aborted, the job post ingest failed
 
 ### `GET /lynq-feeders/health`
 
-Reports whether `lynq-ml` and `lynq-app-backend` are reachable, but **always answers `200`**. Unlike `lynq-ml`, a down dependency is surfaced rather than fatal: the cron fires once a day, and taking the pod out of rotation because the LLM is briefly unreachable would leave nothing to fire against.
+Reports whether `lynq-llm` and `lynq-app-backend` are reachable, but **always answers `200`**. Unlike `lynq-llm`, a down dependency is surfaced rather than fatal: the cron fires once a day, and taking the pod out of rotation because the LLM is briefly unreachable would leave nothing to fire against.
 
 ---
 
@@ -215,7 +215,7 @@ source ./set_env.sh
 PYTHONPATH=src .venv/bin/python src/main.py
 ```
 
-The service listens on `8089`. It needs `lynq-ml` on `8084` and `lynq-app-backend` on `8082` to do anything useful; `docker compose up lynq-ml lynq-app-backend` brings both up.
+The service listens on `8089`. It needs `lynq-llm` on `8084` and `lynq-app-backend` on `8082` to do anything useful; `docker compose up lynq-llm lynq-app-backend` brings both up.
 
 To exercise one category against one portal without waiting for a full run:
 
@@ -231,7 +231,7 @@ FEEDER_SOURCES=computrabajo FEEDER_CATEGORIES=TECNOLOGIA FEEDER_JOBS_PER_CATEGOR
 ```bash
 docker build -t lynq-feeders:local .
 docker run --rm -p 8089:8089 \
-  -e LYNQ_ML_URL=http://host.docker.internal:8084/lynq-ml \
+  -e LYNQ_LLM_URL=http://host.docker.internal:8084/lynq-llm \
   -e LYNQ_BACKEND_URL=http://host.docker.internal:8082/lynq-backend-app \
   -e LYNQ_INTERNAL_TOKEN=... \
   lynq-feeders:local
@@ -247,15 +247,15 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 
 | Variable                       | Default                                            | Purpose                                                        |
 | ------------------------------ | -------------------------------------------------- | -------------------------------------------------------------- |
-| `LYNQ_ML_URL`                  | `http://localhost:8084/lynq-ml`                    | Base URL of the skill-extraction service.                      |
+| `LYNQ_LLM_URL`                 | `http://localhost:8084/lynq-llm`                   | Base URL of the skill-extraction service.                      |
 | `LYNQ_BACKEND_URL`             | `http://localhost:8082/lynq-backend-app`           | Base URL of the service that owns the database.                |
-| `LYNQ_INTERNAL_TOKEN`          | `local-internal-token-not-a-secret`                | Shared secret for the `/internal/**` routes of lynq-app-backend **and** lynq-ml. |
-| `LYNQ_FEEDERS_SYSTEM_USER_ID`  | `00000000-0000-0000-0000-00000000feed`             | Sent as `user-id` to `lynq-ml`'s internal route; only reaches its logs. |
+| `LYNQ_INTERNAL_TOKEN`          | `local-internal-token-not-a-secret`                | Shared secret for the `/internal/**` routes of lynq-app-backend **and** lynq-llm. |
+| `LYNQ_FEEDERS_SYSTEM_USER_ID`  | `00000000-0000-0000-0000-00000000feed`             | Sent as `user-id` to `lynq-llm`'s internal route; only reaches its logs. |
 | `FEEDER_CATEGORIES`                | `ADMINISTRACION,TECNOLOGIA,CONTABILIDAD,RECURSOS_HUMANOS` | Categories scraped per run.                                 |
 | `FEEDER_SOURCES`               | `bumeran,computrabajo`                             | Portals scraped per run.                                       |
 | `FEEDER_JOBS_PER_CATEGORY`        | `10`                                               | Postings kept per category per portal, newest first.              |
-| `ML_CONCURRENCY`               | `2`                                                | Concurrent skill-enhance calls.                                |
-| `ML_TIMEOUT`                   | `300`                                              | Skill-enhance timeout, in seconds.                             |
+| `LYNQ_LLM_CONCURRENCY`         | `2`                                                | Concurrent skill-enhance calls.                                |
+| `LYNQ_LLM_TIMEOUT`             | `300`                                              | Skill-enhance timeout, in seconds.                             |
 | `HTTP_TIMEOUT`                 | `30`                                               | Timeout for the backend ingest call, in seconds.               |
 | `SCRAPE_TIMEOUT`               | `25`                                               | Per-request scraping timeout, in seconds.                      |
 | `HOST` / `PORT`                | `0.0.0.0` / `8089`                                 | Bind address.                                                  |
@@ -330,7 +330,7 @@ lynq-feeders/
 │   ├── main.py                 app wiring, routers, uvicorn entrypoint
 │   ├── config.py               environment-backed settings
 │   ├── backend_client/         lynq-app-backend internal ingest client
-│   ├── ml_client/              lynq-ml skill-enhance client
+│   ├── llm_client/             lynq-llm skill-enhance client
 │   ├── middleware/             lynq-request-uuid enforcement
 │   ├── model/                  ingest request overrides and run plan
 │   ├── response/               GlobalRestResponse envelopes

@@ -2,7 +2,7 @@ package com.lynq.backend.service;
 
 import com.fasterxml.uuid.Generators;
 import com.lynq.backend.aspect.AuditLog;
-import com.lynq.backend.client.LynqMLClient;
+import com.lynq.backend.client.LynqLlmClient;
 import com.lynq.backend.client.request.CandidateEvaluationRequest;
 import com.lynq.backend.client.request.CandidateSpec;
 import com.lynq.backend.client.request.JobSpec;
@@ -95,14 +95,14 @@ public class JobService {
   private final JobPostSkillRepository jobPostSkillRepository;
   private final JobPostSimilarityTagRepository jobPostSimilarityTagRepository;
   private final FileStorageService fileStorageService;
-  private final LynqMLClient lynqMLClient;
+  private final LynqLlmClient lynqLlmClient;
   private final DomainEventPublisher domainEventPublisher;
 
   public JobService(JobPostRepository jobPostRepository, CompanyRepository companyRepository,
       UserRepository userRepository, UserApplicationJobRepository userApplicationJobRepository,
       UserResumeRepository userResumeRepository,
       JobPostSkillRepository jobPostSkillRepository, JobPostSimilarityTagRepository jobPostSimilarityTagRepository,
-      FileStorageService fileStorageService, LynqMLClient lynqMLClient,
+      FileStorageService fileStorageService, LynqLlmClient lynqLlmClient,
       DomainEventPublisher domainEventPublisher) {
     this.jobPostRepository = jobPostRepository;
     this.companyRepository = companyRepository;
@@ -112,7 +112,7 @@ public class JobService {
     this.jobPostSkillRepository = jobPostSkillRepository;
     this.jobPostSimilarityTagRepository = jobPostSimilarityTagRepository;
     this.fileStorageService = fileStorageService;
-    this.lynqMLClient = lynqMLClient;
+    this.lynqLlmClient = lynqLlmClient;
     this.domainEventPublisher = domainEventPublisher;
   }
 
@@ -370,7 +370,7 @@ public class JobService {
     CompanyEntity company = companyRepository.findByOwner(owner)
         .orElseThrow(() -> new BadRequestException(USER_NOT_LINKED_TO_COMPANY));
 
-    GlobalRestResponse<CandidateExplanationResponse> response = lynqMLClient.candidateExplanation(
+    GlobalRestResponse<CandidateExplanationResponse> response = lynqLlmClient.candidateExplanation(
         toEvaluationRequest(job, candidate), requestUuid, callerAuthorization(), company.getId());
 
     return response.getData();
@@ -387,7 +387,7 @@ public class JobService {
 
     String companyId = job.getCompany() != null ? job.getCompany().getId() : "";
 
-    GlobalRestResponse<UpskillingSuggestionResponse> response = lynqMLClient.upskillingSuggestion(
+    GlobalRestResponse<UpskillingSuggestionResponse> response = lynqLlmClient.upskillingSuggestion(
         toEvaluationRequest(job, user), requestUuid, callerAuthorization(), companyId,
         outputLanguage);
 

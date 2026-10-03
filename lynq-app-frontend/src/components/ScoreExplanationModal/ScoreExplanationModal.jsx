@@ -7,7 +7,7 @@ import Spinner from '../Spinner/Spinner.jsx'
 import './ScoreExplanationModal.css'
 
 // A closable overlay modal explaining the candidate's LYNQ score for one of
-// their applications, plus the courses lynq-ml recommends to close each skill
+// their applications, plus the courses lynq-llm recommends to close each skill
 // gap (GET /user/upskilling-suggestion/{jobId}, see
 // userService.get_upskilling_suggestion). A native modal <dialog> portaled to
 // <body> (like CandidateEvaluationModal) so it isn't clipped by the page's

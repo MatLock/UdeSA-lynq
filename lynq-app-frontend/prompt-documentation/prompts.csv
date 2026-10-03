@@ -195,3 +195,4 @@ date,prompt
 "03-10-2026","add a currency selector ARS/USD, default ARS, to create-job and edit-job"
 "03-10-2026","add expected salary and currency to the ProfilePage, only for candidates"
 "03-10-2026","add a SalaryInsightsCard under the description in JobDetailPage calling GET /analytics/job/{jobId}/salary, with a box plot per block and the empty state when there is not enough data"
+"03-10-2026","the LLM service behind skill-enhance, translation, resume parsing and the candidate explanations is now called lynq-llm: update the comments in the services and components that still call it lynq-ml"

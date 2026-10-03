@@ -4,7 +4,7 @@ import './RichText.css'
 // paragraph. Rendering it into a single <p> is what made a bulleted role read as
 // one run-on sentence, since HTML collapses every run of whitespace.
 //
-// This is the mirror of lynq-ml's `renderer/rich_text.py`, which does the same
+// This is the mirror of lynq-llm's `renderer/rich_text.py`, which does the same
 // split for the generated PDF. The two must agree: the candidate sees this on
 // screen and the PDF is what they send out, so a resume that reads as a list
 // here has to read as a list there.

@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from backend_client import BackendClient
 from config import get_settings
-from ml_client import MlClient
+from llm_client import LlmClient
 
 router = APIRouter()
 
@@ -18,8 +18,8 @@ DOWN = "DOWN"
 @router.get("/health")
 async def health() -> JSONResponse:
     settings = get_settings()
-    ml_client = MlClient(
-        base_url=settings.ml_url,
+    llm_client = LlmClient(
+        base_url=settings.llm_url,
         system_user_id=settings.system_user_id,
         internal_token=settings.internal_token,
         timeout=settings.http_timeout,
@@ -30,13 +30,13 @@ async def health() -> JSONResponse:
         timeout=settings.http_timeout,
     )
 
-    ml_up, backend_up = await asyncio.gather(
-        ml_client.is_reachable(), backend_client.is_reachable()
+    llm_up, backend_up = await asyncio.gather(
+        llm_client.is_reachable(), backend_client.is_reachable()
     )
 
     body = {
         "status": UP,
-        "ml": {"status": UP if ml_up else DOWN},
+        "llm": {"status": UP if llm_up else DOWN},
         "backend": {"status": UP if backend_up else DOWN},
     }
     return JSONResponse(status_code=200, content=body)

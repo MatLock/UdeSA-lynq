@@ -6,7 +6,7 @@ from decimal import Decimal
 from llm.pricing import FREE, prices_for
 
 DEFAULT_DB_URL = "mysql+aiomysql://root:root@localhost:3306/lynq_agent_db"
-DEFAULT_LYNQ_ML_URL = "http://localhost:8084/lynq-ml"
+DEFAULT_LYNQ_LLM_URL = "http://localhost:8084/lynq-llm"
 DEFAULT_LYNQ_IAM_URL = "http://localhost:8080/lynq-iam"
 DEFAULT_OLLAMA_MODEL = "qwen2.5:7b"
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
@@ -98,8 +98,8 @@ class Settings:
             self.judge_model
         )
 
-        self.lynq_ml_url: str = os.getenv("LYNQ_ML_URL", DEFAULT_LYNQ_ML_URL).rstrip("/")
-        self.lynq_ml_timeout_seconds: int = _int("ML_TIMEOUT", 300)
+        self.lynq_llm_url: str = os.getenv("LYNQ_LLM_URL", DEFAULT_LYNQ_LLM_URL).rstrip("/")
+        self.lynq_llm_timeout_seconds: int = _int("LYNQ_LLM_TIMEOUT", 300)
         self.lynq_iam_url: str = os.getenv(
             "LYNQ_IAM_URL", DEFAULT_LYNQ_IAM_URL
         ).rstrip("/")

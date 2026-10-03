@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header
 
-from client.lynq_ml_client import get_lynq_ml_client
+from client.lynq_llm_client import get_lynq_llm_client
 from config import get_settings
 from db.session import get_session_factory
 from logging_context import log_safe
@@ -37,14 +37,14 @@ _ERRORS = {
 def get_conversation_service() -> ConversationService:
     return ConversationService(
         session_factory=get_session_factory(),
-        lynq_ml_client=get_lynq_ml_client(),
+        lynq_llm_client=get_lynq_llm_client(),
         settings=get_settings(),
     )
 
 
 Service = Annotated[ConversationService, Depends(get_conversation_service)]
 RequestUuid = Annotated[str, Header(alias="lynq-request-uuid")]
-# Creating a conversation calls lynq-ml, which resolves the caller for itself:
+# Creating a conversation calls lynq-llm, which resolves the caller for itself:
 # the credential is relayed rather than the id the gateway already verified.
 Authorization = Annotated[str, Header(alias=AUTHORIZATION_HEADER)]
 

@@ -13,7 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.lynq.bff.client.LynqBackendClient;
 import com.lynq.bff.client.LynqFileStorageClient;
-import com.lynq.bff.client.LynqMlClient;
+import com.lynq.bff.client.LynqLlmClient;
 import com.lynq.bff.client.request.CreateFileUploadRequest;
 import com.lynq.bff.client.request.ResumeTemplateCreationRequest;
 import com.lynq.bff.client.response.CreateFileDownloadResponse;
@@ -60,14 +60,14 @@ class ResumePreviewServiceTest {
   private LynqFileStorageClient lynqFileStorageClient;
 
   @Mock
-  private LynqMlClient lynqMlClient;
+  private LynqLlmClient lynqLlmClient;
 
   private ResumePreviewService resumePreviewService;
 
   @BeforeEach
   void setUp() {
     resumePreviewService =
-        new ResumePreviewService(lynqBackendClient, lynqFileStorageClient, lynqMlClient);
+        new ResumePreviewService(lynqBackendClient, lynqFileStorageClient, lynqLlmClient);
   }
 
   @Test
@@ -99,7 +99,7 @@ class ResumePreviewServiceTest {
   }
 
   @Test
-  void previewSendsLynqMlTheSignedUploadUrlTheTemplateAndTheAvatar() {
+  void previewSendsLynqLlmTheSignedUploadUrlTheTemplateAndTheAvatar() {
     givenCandidate(AVATAR_URL);
     givenRegisteredUpload();
     givenReadUrl();
@@ -108,7 +108,7 @@ class ResumePreviewServiceTest {
 
     ArgumentCaptor<ResumeTemplateCreationRequest> captor =
         ArgumentCaptor.forClass(ResumeTemplateCreationRequest.class);
-    verify(lynqMlClient).createResumeTemplate(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    verify(lynqLlmClient).createResumeTemplate(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     ResumeTemplateCreationRequest render = captor.getValue();
     assertThat(render.getPutResumeUrl(), is(UPLOAD_URL));
     assertThat(render.getProfileUrl(), is(AVATAR_URL));
@@ -126,7 +126,7 @@ class ResumePreviewServiceTest {
 
     ArgumentCaptor<ResumeTemplateCreationRequest> captor =
         ArgumentCaptor.forClass(ResumeTemplateCreationRequest.class);
-    verify(lynqMlClient).createResumeTemplate(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    verify(lynqLlmClient).createResumeTemplate(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     assertThat(captor.getValue().getProfileUrl(), is((String) null));
   }
 
@@ -138,9 +138,9 @@ class ResumePreviewServiceTest {
 
     resumePreviewService.preview(request(ResumeTemplate.MODERN), CALLER);
 
-    InOrder order = inOrder(lynqFileStorageClient, lynqMlClient);
+    InOrder order = inOrder(lynqFileStorageClient, lynqLlmClient);
     order.verify(lynqFileStorageClient).createUpload(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
-    order.verify(lynqMlClient).createResumeTemplate(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    order.verify(lynqLlmClient).createResumeTemplate(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     order.verify(lynqFileStorageClient).confirmUpload(FILE_ID, REQUEST_UUID, AUTHORIZATION);
     order.verify(lynqFileStorageClient).createDownloadUrl(FILE_ID, REQUEST_UUID, AUTHORIZATION);
   }
@@ -150,7 +150,7 @@ class ResumePreviewServiceTest {
     givenCandidate(AVATAR_URL);
     givenRegisteredUpload();
     doThrow(new IllegalStateException("render exploded"))
-        .when(lynqMlClient).createResumeTemplate(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+        .when(lynqLlmClient).createResumeTemplate(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
 
     BadGatewayException exception = assertThrows(BadGatewayException.class,
         () -> resumePreviewService.preview(request(ResumeTemplate.MODERN), CALLER));
@@ -178,7 +178,7 @@ class ResumePreviewServiceTest {
     givenCandidate(AVATAR_URL);
     givenRegisteredUpload();
     doThrow(new IllegalStateException("render exploded"))
-        .when(lynqMlClient).createResumeTemplate(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+        .when(lynqLlmClient).createResumeTemplate(any(), eq(REQUEST_UUID), eq(AUTHORIZATION));
     doThrow(new IllegalStateException("delete exploded"))
         .when(lynqFileStorageClient).deleteFile(FILE_ID, REQUEST_UUID, AUTHORIZATION);
 
@@ -198,7 +198,7 @@ class ResumePreviewServiceTest {
 
     assertThat(exception.getMessage(), is(CALLER_UNREADABLE));
     verify(lynqFileStorageClient, never()).createUpload(any(), any(), any());
-    verify(lynqMlClient, never()).createResumeTemplate(any(), any(), any());
+    verify(lynqLlmClient, never()).createResumeTemplate(any(), any(), any());
   }
 
   @Test
@@ -240,7 +240,7 @@ class ResumePreviewServiceTest {
     assertThrows(BadGatewayException.class,
         () -> resumePreviewService.preview(request(ResumeTemplate.MODERN), CALLER));
 
-    verify(lynqMlClient, never()).createResumeTemplate(any(), any(), any());
+    verify(lynqLlmClient, never()).createResumeTemplate(any(), any(), any());
   }
 
   @Test

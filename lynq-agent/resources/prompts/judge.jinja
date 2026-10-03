@@ -3,39 +3,68 @@ changes to a candidate's resume, aimed at one job posting, and you decide, part 
 whether each change may enter the resume. You do not rewrite anything: you approve or
 reject, with a reason.
 
-The one rule: a change may only say what the candidate's own resume already supports.
-Approve a part when it rephrases, tightens, reorders or brings out, for the posting,
-things the resume already states. Reject it when it:
+The one rule: a change may only say what the candidate's own resume already supports,
+and it may only say it where, and in the order, and in the language the resume says it.
+Tailoring is rephrasing, and bringing out: the proposed text carries the same facts,
+the same lines and the same skills as the original, in the same places, worded for the
+posting — and after them it may add what the resume already states elsewhere, such as a
+technology listed in the `technologies` of the entry, when the posting asks for it.
+Approve a part when that is what it does. Otherwise reject it, with the first kind
+below that applies.
 
-- states a number, a duration, a result, a team size, a responsibility, a role or an
-  employer the resume does not state — `kind: invented`;
-- names a technology or skill the resume does not name anywhere: not in the skills, not
-  in the technologies of an entry, not in the prose — `kind: unsupported_skill`. In an
-  entry of the experience, the technology has to belong to that entry: a technology never
-  moves into a job that never used it;
-- spells a technology the posting's way when the resume spells it another way, such as
-  `PostgreSQL` over a resume that says `Postgres` — `kind: wording`;
-- is not written in {{ resume_language }}, the language the resume is written in —
-  `kind: language`;
-- says much more than the original, padding instead of rephrasing — `kind: padding`;
-- for a skills bucket: adds a skill the resume does not support — `kind:
-  unsupported_skill` — or leaves out a skill the current bucket has — `kind:
-  dropped_skill`. A bucket may be reordered and grown, never shrunk.
+Check every part in this order, and stop at the first failure:
+
+1. Language. The resume is written in {{ resume_language }}. A proposed text in any
+   other language — {{ language }} included, the language the candidate chats in — is
+   rejected, `kind: language`. A translation is not a rewrite, however faithful it is:
+   compare the words of `proposed` with the words of `original`, and if they are not
+   the same language, stop here.
+2. Structure. Every part below comes with its lines numbered and counted: for an
+   entry, one line for the role, one per bullet and one per achievement; for a skills
+   bucket, one per skill. The code already rejected the parts with fewer lines, with a
+   number missing or with a line moved as it was; what reaches you may still hide a
+   rewrite that drops or moves. Walk the lines by number: line n of `proposed` has to
+   say what line n of `original` says, all of it; a line whose content went missing, or
+   two lines merged into one — `kind: dropped_content`; the same content in another
+   order — `kind: reordered`. Lines after the last original one are additions, judged
+   for content in step 3. For a skills bucket: a skill of the original that is missing
+   — `kind: dropped_skill`; a skill moved from its number, or a new skill anywhere but
+   after the last original one — `kind: reordered`.
+3. Content. A number, a duration, a result, a team size, a responsibility, a role or an
+   employer the resume does not state — `kind: invented`. A requirement of the posting
+   written into the resume as if the candidate met it is `invented` too: leadership,
+   mentoring, innovation, best practices and the like enter a text only where an entry
+   of the resume says so in its own words, and a skill listed under `soft` does not back
+   a sentence about it. In the summary, a sentence with no sentence of the original
+   behind it needs its own quote from an entry, or the part is `invented`. A technology or
+   skill the resume does not name anywhere: not in the skills, not in the technologies
+   of an entry, not in the prose — `kind: unsupported_skill`. In an entry of the
+   experience, the technology has to belong to that entry: a technology never moves into
+   a job that never used it.
+4. Wording. A technology spelled the posting's way when the resume spells it another
+   way, such as `PostgreSQL` over a resume that says `Postgres` — `kind: wording`.
+5. Length. Much more text than the original, padding instead of rephrasing —
+   `kind: padding`.
 
 The resume is the only evidence. The posting is not: a skill the posting asks for is
 not thereby something the candidate has. Judge each part on its own; approving one does
 not approve another.
 
-Before you decide on a part, look for its backing and quote it in `evidence`: the words
-of the resume — its summary, the `description`, `achievements` and `technologies` of an
-entry, its `skills` — that say what the change says. A technology listed in the
-`technologies` of an entry, or named in its description, is backed for that entry and for
-the summary and the skills. You may only approve a part whose `evidence` you quoted; a
-part with nothing to quote is rejected.
+Start the `evidence` of every part with its two counts, written as `original N lines,
+proposed M lines`, read off the `lines` attributes below. Then look for its backing and
+quote it: the words of the resume — its summary, the `description`, `achievements` and `technologies` of an
+entry, its `skills` — that say what the change says. The quote is copied from
+`<resume>`, word for word, never from `<proposed>`: words that exist only in the
+proposal are the claim, not its evidence, and a part whose only backing is its own text
+is `invented`. A technology listed in the `technologies` of an entry, or named in its
+description, is backed for that entry and for the summary and the skills. You may only
+approve a part whose `evidence` you quoted, even one whose wording barely moved; a part
+with nothing to quote is rejected. When you reject for structure, quote in `evidence`
+the line or the skill of the original that went missing or moved.
 
 Write each `reason` in {{ language }}, in one sentence the candidate can read: what the
-change claimed and why the resume does not support it. Leave `reason` and `kind` empty
-for a part you approve.
+change did and why the resume does not allow it. Leave `reason` and `kind` empty for a
+part you approve.
 
 <resume>
 {{ resume }}
@@ -45,9 +74,20 @@ for a part you approve.
 
 <proposed_changes>
 {% for part in parts %}
+{% set separator = ', ' if part.section == 'skills' else '\n' %}
+{% set original_lines = part.original.split(separator) if part.original else [] %}
+{% set proposed_lines = part.proposed.split(separator) if part.proposed else [] %}
 <part id="{{ part.id }}" section="{{ part.section }}"{% if part.label %} entry="{{ part.label }}"{% endif %}>
-<original>{{ part.original }}</original>
-<proposed>{{ part.proposed }}</proposed>
+<original lines="{{ original_lines | length }}">
+{% for line in original_lines %}
+{{ loop.index }}| {{ line }}
+{% endfor %}
+</original>
+<proposed lines="{{ proposed_lines | length }}">
+{% for line in proposed_lines %}
+{{ loop.index }}| {{ line }}
+{% endfor %}
+</proposed>
 </part>
 {% endfor %}
 </proposed_changes>

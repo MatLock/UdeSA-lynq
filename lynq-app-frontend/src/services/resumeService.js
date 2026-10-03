@@ -219,7 +219,7 @@ const get_supported_languages = async (authFetch) => {
  * Translate one of the candidate's stored resumes into another language.
  *
  * Calls POST /resume/{resumeId}/translate on lynq-bff, which reads the source
- * resume from the app-backend, has lynq-ml translate the structured JSON, and
+ * resume from the app-backend, has lynq-llm translate the structured JSON, and
  * returns that JSON — nothing is rendered or stored. The candidate continues
  * the flow themselves: they pick a template and render a preview through
  * {@link preview_resume}, and confirming stores the resume through
@@ -251,7 +251,7 @@ const translate_resume = async (authFetch, resumeId, language) => {
 /**
  * Ask the backend to AI-extract the skills implied by a resume.
  *
- * Calls POST /resume/skill-extraction, which lynq-bff relays to lynq-ml, which
+ * Calls POST /resume/skill-extraction, which lynq-bff relays to lynq-llm, which
  * reads the structured resume and returns its skills consolidated into three
  * buckets. The model reads the whole resume — experience, education, projects —
  * so the payload is the same JSON shape a resume is stored in, even while it is
@@ -265,9 +265,9 @@ const translate_resume = async (authFetch, resumeId, language) => {
  *   secured fetcher (useApi's authFetch).
  * @param {object} resume - The resume JSON to reason over.
  * @param {string} [language] - The caller's UI language code (e.g. `es`),
- *   forwarded so lynq-ml writes the soft skills in it. Technical skills and tool
+ *   forwarded so lynq-llm writes the soft skills in it. Technical skills and tool
  *   names are never translated. Without it the model infers a language from the
- *   resume text, which need not be the one the candidate is working in; lynq-ml
+ *   resume text, which need not be the one the candidate is working in; lynq-llm
  *   defaults to English when omitted.
  * @returns {Promise<{ skills: string[], tools: string[], soft: string[] }>} The
  *   unwrapped SkillExtractionResponse.

@@ -17,7 +17,7 @@ from db.models import SpanKind
 
 PROPOSAL = EditProposal(
     reply="done",
-    summary="Backend engineer with 12 years on Postgres.",
+    summary="Backend engineer with twelve years on distributed systems and Postgres.",
     entries=[EntryEdit(company="Acme", position="Backend Engineer", description="Ran services on Kubernetes.")],
     skills=SkillsEdit(technical=["Java", "Postgres", "Kubernetes"]),
 )
@@ -82,10 +82,10 @@ class JudgeTest(unittest.IsolatedAsyncioTestCase):
 
         prompt = model.prompts[0][0].content
         self.assertIn('<part id="summary" section="summary">', prompt)
-        self.assertIn("<original>Backend engineer with eight years on distributed systems and Postgres.</original>", prompt)
-        self.assertIn("<proposed>Backend engineer with 12 years on Postgres.</proposed>", prompt)
+        self.assertIn('<original lines="1">\n1| Backend engineer with eight years on distributed systems and Postgres.\n</original>', prompt)
+        self.assertIn('<proposed lines="1">\n1| Backend engineer with twelve years on distributed systems and Postgres.\n</proposed>', prompt)
         self.assertIn('<part id="entry:0" section="work_experience" entry="Backend Engineer at Acme">', prompt)
-        self.assertIn("<original>Java, Postgres</original>", prompt)
+        self.assertIn('<original lines="2">\n1| Java\n2| Postgres\n</original>', prompt)
         self.assertNotIn("Ada Lovelace", prompt)
         self.assertEqual(model.binds[0]["tools"], ["Verdict"])
 

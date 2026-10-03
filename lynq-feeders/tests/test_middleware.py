@@ -47,9 +47,9 @@ class RequireRequestUuidTest(unittest.TestCase):
     def test_the_health_probe_is_exempt(self):
         self.assertIn("/lynq-feeders/health", EXEMPT_PATHS)
 
-        ml = patch("router.health.MlClient.is_reachable", AsyncMock(return_value=True))
+        llm = patch("router.health.LlmClient.is_reachable", AsyncMock(return_value=True))
         backend = patch("router.health.BackendClient.is_reachable", AsyncMock(return_value=True))
-        with ml, backend:
+        with llm, backend:
             self.assertEqual(self.client.get("/lynq-feeders/health").status_code, 200)
 
     def test_the_header_reaches_the_logging_context(self):

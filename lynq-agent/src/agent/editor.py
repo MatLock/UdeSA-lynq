@@ -12,16 +12,18 @@ from prompt.tailor import EDIT, render
 
 log = logging.getLogger(__name__)
 
-# A rejection goes back to the model once: the second pass is the correction, and
-# what it still gets wrong stays out. More passes would be the loop again.
-MAX_PASSES = 2
+# A rejection goes back to the model twice: the second and third passes are the
+# corrections, and what it still gets wrong stays out. With the structure guard
+# rejecting before the judge, one correction was often spent on the shape alone.
+MAX_PASSES = 3
 
 RETRY_NOTE = (
     "The judge rejected these parts of your proposal, and they were not applied:\n"
     "{rejections}\n\nEverything else was applied and stays. Propose again only the "
-    "rejected parts, backed by what the resume already says, or leave them empty and "
-    "tell the candidate, in `warnings`, what could not be done and why. Write `reply` "
-    "again so that it describes what the resume now says."
+    "rejected parts, backed by what the resume already says, in the language of the "
+    "resume, with every line and every skill of the original in its place, or leave "
+    "them empty and tell the candidate, in `warnings`, what could not be done and why. "
+    "Write `reply` again so that it describes what the resume now says."
 )
 
 
