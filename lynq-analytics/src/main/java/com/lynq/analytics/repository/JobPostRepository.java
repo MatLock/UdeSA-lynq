@@ -28,6 +28,8 @@ public interface JobPostRepository extends JpaRepository<JobPostEntity, String> 
 
   List<JobPostEntity> findByCreatedByUserIdOrderByPublishedOnDescIdAsc(String createdByUserId);
 
+  List<JobPostEntity> findByStatusAndClosedOnIsNotNull(JobStatus status);
+
   @Query("""
       select j.publishedOn as publishedOn, count(j) as jobPosts
       from JobPostEntity j

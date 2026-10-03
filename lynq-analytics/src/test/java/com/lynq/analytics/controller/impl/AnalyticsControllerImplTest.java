@@ -21,11 +21,13 @@ import com.lynq.analytics.service.CompanyJobsService;
 import com.lynq.analytics.service.MarketService;
 import com.lynq.analytics.service.SalaryService;
 import com.lynq.analytics.service.StandingService;
+import com.lynq.analytics.service.TimeToFillService;
 import com.lynq.analytics.stats.CandidateBenchmark;
 import com.lynq.analytics.stats.CandidateBenchmark.BenchmarkPoint;
 import com.lynq.analytics.stats.CandidateBenchmark.SkillUnlockCount;
 import com.lynq.analytics.stats.CompanyJobs;
 import com.lynq.analytics.stats.CompanyJobs.CompanyJob;
+import com.lynq.analytics.stats.DaysDistribution;
 import com.lynq.analytics.stats.Market;
 import com.lynq.analytics.stats.Market.CategorySalary;
 import com.lynq.analytics.stats.Market.MarketSalary;
@@ -34,6 +36,7 @@ import com.lynq.analytics.stats.Market.WeeklyCount;
 import com.lynq.analytics.stats.SalaryDistribution;
 import com.lynq.analytics.stats.SalaryInsights;
 import com.lynq.analytics.stats.Standing;
+import com.lynq.analytics.stats.TimeToFill;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -54,6 +57,8 @@ class AnalyticsControllerImplTest {
   private static final String JOB_ID = "77777777-7777-7777-7777-777777777777";
   private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
   private static final String STANDING_PATH = "/dmz/analytics/job/" + JOB_ID + "/standing";
+  private static final String TIME_TO_FILL_PATH =
+      "/dmz/analytics/job/" + JOB_ID + "/time-to-fill";
   private static final String SALARY_PATH = "/dmz/analytics/job/" + JOB_ID + "/salary";
   private static final String BENCHMARK_PATH = "/dmz/analytics/candidate/me/benchmark";
   private static final String MARKET_PATH = "/dmz/analytics/market";
@@ -62,6 +67,9 @@ class AnalyticsControllerImplTest {
 
   @Autowired
   private MockMvc mockMvc;
+
+  @MockitoBean
+  private TimeToFillService timeToFillService;
 
   @MockitoBean
   private StandingService standingService;
@@ -77,6 +85,68 @@ class AnalyticsControllerImplTest {
 
   @MockitoBean
   private CompanyJobsService companyJobsService;
+
+  @Test
+  void answersTheTimeToFillToTheCompanyThatPublishedTheJobPost() throws Exception {
+    when(timeToFillService.timeToFill(JOB_ID, USER_ID)).thenReturn(new TimeToFill(
+        21.0, 14.0, 25.0, 12, false, 10, 3, 25, 9, null));
+
+    mockMvc.perform(as(Role.COMPANY, TIME_TO_FILL_PATH))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.success", is(true)))
+        .andExpect(jsonPath("$.data.median", is(21.0)))
+        .andExpect(jsonPath("$.data.p25", is(14.0)))
+        .andExpect(jsonPath("$.data.p75", is(25.0)))
+        .andExpect(jsonPath("$.data.n", is(12)))
+        .andExpect(jsonPath("$.data.insufficientData", is(false)))
+        .andExpect(jsonPath("$.data.externalJobPosts", is(10)))
+        .andExpect(jsonPath("$.data.expiredByPolicy", is(3)))
+        .andExpect(jsonPath("$.data.expiredAfterDays", is(25)))
+        .andExpect(jsonPath("$.data.daysOpen", is(9)))
+        .andExpect(jsonPath("$.data.overall", is(nullValue())));
+  }
+
+  @Test
+  void sendsTheOverallFiguresWhenTheSimilarOnesAreTooFew() throws Exception {
+    when(timeToFillService.timeToFill(JOB_ID, USER_ID)).thenReturn(new TimeToFill(
+        null, null, null, 2, true, 1, 0, 25, 4, new DaysDistribution(23.0, 15.0, 30.0, 40, false)));
+
+    mockMvc.perform(as(Role.COMPANY, TIME_TO_FILL_PATH))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.median", is(nullValue())))
+        .andExpect(jsonPath("$.data.insufficientData", is(true)))
+        .andExpect(jsonPath("$.data.overall.median", is(23.0)))
+        .andExpect(jsonPath("$.data.overall.n", is(40)))
+        .andExpect(jsonPath("$.data.overall.insufficientData", is(false)));
+  }
+
+  @Test
+  void refusesTheTimeToFillToACandidateWithoutComputingAnything() throws Exception {
+    mockMvc.perform(as(Role.CANDIDATE, TIME_TO_FILL_PATH))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.reason", is("Only users of type COMPANY can perform this action")));
+    verifyNoInteractions(timeToFillService);
+  }
+
+  @Test
+  void passesTheRefusalOfACompanyThatDidNotPublishTheJobPost() throws Exception {
+    when(timeToFillService.timeToFill(JOB_ID, USER_ID)).thenThrow(new ForbiddenException(
+        "Only the company that published the job post can read its time to fill"));
+
+    mockMvc.perform(as(Role.COMPANY, TIME_TO_FILL_PATH))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.reason",
+            is("Only the company that published the job post can read its time to fill")));
+  }
+
+  @Test
+  void answersNotFoundForTheTimeToFillOfAnUnknownJobPost() throws Exception {
+    when(timeToFillService.timeToFill(JOB_ID, USER_ID))
+        .thenThrow(new NotFoundException("Job post '" + JOB_ID + "' not found"));
+
+    mockMvc.perform(as(Role.COMPANY, TIME_TO_FILL_PATH))
+        .andExpect(status().isNotFound());
+  }
 
   @Test
   void answersTheStandingOfTheAuthenticatedCandidate() throws Exception {

@@ -6,6 +6,7 @@ import com.lynq.analytics.stats.CompanyJobs;
 import com.lynq.analytics.stats.Market;
 import com.lynq.analytics.stats.SalaryInsights;
 import com.lynq.analytics.stats.Standing;
+import com.lynq.analytics.stats.TimeToFill;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -14,6 +15,27 @@ import org.springframework.http.ResponseEntity;
 
 @Tag(name = "Analytics", description = "The numbers that sit next to a job post")
 public interface AnalyticsController {
+
+  @Operation(
+      summary = "Read how long job posts similar to this one took to close",
+      description = "Returns the median, p25, p75 and n of the days the closed job posts "
+          + "similar to this one stayed open: from their publication, or their latest reopening, "
+          + "to their close. For a posting scraped from a portal those are days on the market, "
+          + "since it can be taken down without being filled; externalJobPosts says how many of "
+          + "the n are such postings. Posts closed by the expiry policy are censored — they were "
+          + "still open when the policy closed them — so they stay out of the median and are "
+          + "counted in expiredByPolicy, with the days after which the policy closes a post in "
+          + "expiredAfterDays. Below five closed posts the median and quartiles are null, "
+          + "insufficientData is true and overall carries the same figures over every closed "
+          + "post on the platform, marked as such; otherwise overall is null. daysOpen is how "
+          + "long this job post has been open, or stayed open if it is closed. Only the COMPANY "
+          + "user who published the job post may read it: fails with 403 for any other caller "
+          + "and with 404 when the job post is unknown. Cached for an hour per job post and "
+          + "user.",
+      security = @SecurityRequirement(name = "bearerAuth"))
+  ResponseEntity<GlobalRestResponse<TimeToFill>> getTimeToFill(
+      String jobId,
+      @Parameter(hidden = true) String userId);
 
   @Operation(
       summary = "Read the caller's standing among the applicants of a job post",

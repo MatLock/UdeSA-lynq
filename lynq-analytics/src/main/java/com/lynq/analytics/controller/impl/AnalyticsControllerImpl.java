@@ -10,11 +10,13 @@ import com.lynq.analytics.service.CompanyJobsService;
 import com.lynq.analytics.service.MarketService;
 import com.lynq.analytics.service.SalaryService;
 import com.lynq.analytics.service.StandingService;
+import com.lynq.analytics.service.TimeToFillService;
 import com.lynq.analytics.stats.CandidateBenchmark;
 import com.lynq.analytics.stats.CompanyJobs;
 import com.lynq.analytics.stats.Market;
 import com.lynq.analytics.stats.SalaryInsights;
 import com.lynq.analytics.stats.Standing;
+import com.lynq.analytics.stats.TimeToFill;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,20 +30,37 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/dmz/analytics")
 public class AnalyticsControllerImpl implements AnalyticsController {
 
+  private final TimeToFillService timeToFillService;
   private final StandingService standingService;
   private final SalaryService salaryService;
   private final CandidateBenchmarkQueryService candidateBenchmarkQueryService;
   private final MarketService marketService;
   private final CompanyJobsService companyJobsService;
 
-  public AnalyticsControllerImpl(StandingService standingService, SalaryService salaryService,
+  public AnalyticsControllerImpl(TimeToFillService timeToFillService,
+      StandingService standingService, SalaryService salaryService,
       CandidateBenchmarkQueryService candidateBenchmarkQueryService, MarketService marketService,
       CompanyJobsService companyJobsService) {
+    this.timeToFillService = timeToFillService;
     this.standingService = standingService;
     this.salaryService = salaryService;
     this.candidateBenchmarkQueryService = candidateBenchmarkQueryService;
     this.marketService = marketService;
     this.companyJobsService = companyJobsService;
+  }
+
+  @Override
+  @GetMapping("/job/{jobId}/time-to-fill")
+  @HasRole(Role.COMPANY)
+  @AuditLog
+  public ResponseEntity<GlobalRestResponse<TimeToFill>> getTimeToFill(
+      @PathVariable String jobId,
+      @AuthenticationPrincipal(expression = "id") String userId) {
+    TimeToFill timeToFill = timeToFillService.timeToFill(jobId, userId);
+
+    return ResponseEntity
+        .status(HttpStatus.OK)
+        .body(new GlobalRestResponse<>(true, timeToFill));
   }
 
   @Override
