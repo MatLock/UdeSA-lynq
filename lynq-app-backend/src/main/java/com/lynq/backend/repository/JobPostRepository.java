@@ -20,7 +20,7 @@ public interface JobPostRepository extends JpaRepository<JobPostEntity, String> 
   int increaseTotalSeen(@Param("jobId") String jobId);
 
   @Query(value = "SELECT new com.lynq.backend.repository.projection.JobWithDetailsProjection("
-      + "j.id, j.title, j.description, j.workType, j.salaryRangeDown, j.salaryRangeTop, j.jobUrl, "
+      + "j.id, j.title, j.description, j.workType, j.salaryRangeDown, j.salaryRangeTop, j.salaryCurrency, j.jobUrl, "
       + "j.jobPostSource, j.createdOn, j.totalSeen, j.jobStatus, "
       + "c.id, c.name, c.about, c.size, c.lynqFileStorageId, c.logoUrl, "
       + "u.id, u.fullName, u.lynqFileStorageId, u.currentPosition, "
@@ -54,7 +54,7 @@ public interface JobPostRepository extends JpaRepository<JobPostEntity, String> 
   Page<JobWithDetailsProjection> searchAvailableJobs(@Param("filterValue") String filterValue, Pageable pageable);
 
   @Query("SELECT new com.lynq.backend.repository.projection.JobWithDetailsProjection("
-      + "j.id, j.title, j.description, j.workType, j.salaryRangeDown, j.salaryRangeTop, j.jobUrl, "
+      + "j.id, j.title, j.description, j.workType, j.salaryRangeDown, j.salaryRangeTop, j.salaryCurrency, j.jobUrl, "
       + "j.jobPostSource, j.createdOn, j.totalSeen, j.jobStatus, "
       + "c.id, c.name, c.about, c.size, c.lynqFileStorageId, c.logoUrl, "
       + "u.id, u.fullName, u.lynqFileStorageId, u.currentPosition, "
@@ -69,7 +69,7 @@ public interface JobPostRepository extends JpaRepository<JobPostEntity, String> 
   Optional<JobWithDetailsProjection> findJobDetailsById(@Param("jobId") String jobId);
 
   @Query(value = "SELECT new com.lynq.backend.repository.projection.JobWithDetailsProjection("
-      + "j.id, j.title, j.description, j.workType, j.salaryRangeDown, j.salaryRangeTop, j.jobUrl, "
+      + "j.id, j.title, j.description, j.workType, j.salaryRangeDown, j.salaryRangeTop, j.salaryCurrency, j.jobUrl, "
       + "j.jobPostSource, j.createdOn, j.totalSeen, j.jobStatus, "
       + "c.id, c.name, c.about, c.size, c.lynqFileStorageId, c.logoUrl, "
       + "u.id, u.fullName, u.lynqFileStorageId, u.currentPosition, "

@@ -28,6 +28,7 @@ public class GetJobDetailForCandidateRestResponse extends GetJobRestResponse {
         .workType(source.getWorkType())
         .salaryRangeDown(source.getSalaryRangeDown())
         .salaryRangeTop(source.getSalaryRangeTop())
+        .salaryCurrency(source.getSalaryCurrency())
         .jobUrl(source.getJobUrl())
         .jobPostSource(source.getJobPostSource())
         .createdOn(source.getCreatedOn())

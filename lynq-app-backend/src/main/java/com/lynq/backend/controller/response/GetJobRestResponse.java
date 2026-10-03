@@ -24,6 +24,7 @@ public class GetJobRestResponse {
   private WorkType workType;
   private Integer salaryRangeDown;
   private Integer salaryRangeTop;
+  private String salaryCurrency;
   private String jobUrl;
   private JobPostSource jobPostSource;
   private LocalDate createdOn;

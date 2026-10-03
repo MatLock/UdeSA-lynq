@@ -64,6 +64,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class JobService {
 
+  static final String DEFAULT_SALARY_CURRENCY = "ARS";
   private static final String USER_NOT_LINKED_TO_COMPANY = "User is not linked to any company";
   private static final String AUTHENTICATED_USER_NOT_FOUND = "Authenticated user not found";
   private static final String JOB_POST_NOT_FOUND = "Job post not found";
@@ -118,8 +119,8 @@ public class JobService {
   @AuditLog
   @Transactional
   public JobPostEntity createJob(String title, String description, WorkType workType,
-      Integer salaryRangeDown, Integer salaryRangeTop, JobPostSource jobPostSource,
-      List<String> skills, List<String> similarityTags) {
+      Integer salaryRangeDown, Integer salaryRangeTop, String salaryCurrency,
+      JobPostSource jobPostSource, List<String> skills, List<String> similarityTags) {
     UserEntity user = getAuthenticatedUser();
 
     CompanyEntity company = companyRepository.findByOwner(user)
@@ -132,6 +133,7 @@ public class JobService {
         .workType(workType)
         .salaryRangeDown(salaryRangeDown)
         .salaryRangeTop(salaryRangeTop)
+        .salaryCurrency(currencyOf(salaryRangeDown, salaryRangeTop, salaryCurrency))
         .jobPostSource(jobPostSource)
         .createdOn(LocalDate.now(ZoneOffset.UTC))
         .createdByUser(user)
@@ -197,8 +199,8 @@ public class JobService {
   @AuditLog
   @Transactional
   public JobPostEntity updateJob(String jobId, String title, String description, WorkType workType,
-      JobStatus status, Integer salaryRangeDown, Integer salaryRangeTop, List<String> skills,
-      List<String> similarityTags) {
+      JobStatus status, Integer salaryRangeDown, Integer salaryRangeTop, String salaryCurrency,
+      List<String> skills, List<String> similarityTags) {
     UserEntity user = getAuthenticatedUser();
     JobPostEntity job = getOwnedJob(jobId, user, ONLY_JOB_OWNER_CAN_UPDATE);
 
@@ -207,6 +209,7 @@ public class JobService {
     job.setWorkType(workType);
     job.setSalaryRangeDown(salaryRangeDown);
     job.setSalaryRangeTop(salaryRangeTop);
+    job.setSalaryCurrency(currencyOf(salaryRangeDown, salaryRangeTop, salaryCurrency));
     JobStatus previousStatus = job.getJobStatus();
     updateStatus(job, status);
 
@@ -249,6 +252,14 @@ public class JobService {
     domainEventPublisher.publish(DomainEvents.applicationSubmitted(application,
         scoreOf(job, user), Instant.now()));
     return saved;
+  }
+
+  static String currencyOf(Integer salaryRangeDown, Integer salaryRangeTop,
+      String salaryCurrency) {
+    if (salaryRangeDown == null && salaryRangeTop == null) {
+      return null;
+    }
+    return salaryCurrency != null ? salaryCurrency : DEFAULT_SALARY_CURRENCY;
   }
 
   static Integer scoreOf(JobPostEntity job, UserEntity candidate) {
@@ -565,6 +576,7 @@ public class JobService {
         .workType(projection.workType())
         .salaryRangeDown(projection.salaryRangeDown())
         .salaryRangeTop(projection.salaryRangeTop())
+        .salaryCurrency(projection.salaryCurrency())
         .jobUrl(projection.jobUrl())
         .jobPostSource(projection.jobPostSource())
         .createdOn(projection.createdOn())

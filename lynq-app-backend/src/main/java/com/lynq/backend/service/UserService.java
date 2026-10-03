@@ -167,8 +167,33 @@ public class UserService {
     if (request.getBirthDate() != null) {
       user.setBirthDate(request.getBirthDate());
     }
+    boolean expectedSalaryChanged = updateExpectedSalary(user, request);
 
-    return userRepository.save(user);
+    UserEntity saved = userRepository.save(user);
+    if (expectedSalaryChanged) {
+      domainEventPublisher.publish(DomainEvents.candidateExpectedSalaryUpdated(user, Instant.now()));
+    }
+    return saved;
+  }
+
+  private static boolean updateExpectedSalary(UserEntity user, UpdateUserProfileRequest request) {
+    Integer salary = request.getExpectedSalary() != null
+        ? request.getExpectedSalary()
+        : user.getExpectedSalary();
+    if (salary == null) {
+      return false;
+    }
+    String currency = Stream.of(request.getExpectedSalaryCurrency(),
+            user.getExpectedSalaryCurrency(), JobService.DEFAULT_SALARY_CURRENCY)
+        .filter(Objects::nonNull)
+        .findFirst()
+        .orElseThrow();
+    if (salary.equals(user.getExpectedSalary()) && currency.equals(user.getExpectedSalaryCurrency())) {
+      return false;
+    }
+    user.setExpectedSalary(salary);
+    user.setExpectedSalaryCurrency(currency);
+    return true;
   }
 
   @AuditLog

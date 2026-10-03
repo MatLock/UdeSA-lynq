@@ -24,6 +24,7 @@ public class UpdateJobRestResponse {
   private WorkType workType;
   private Integer salaryRangeDown;
   private Integer salaryRangeTop;
+  private String salaryCurrency;
   private JobPostSource jobPostSource;
   private JobStatus jobStatus;
   private LocalDate createdOn;

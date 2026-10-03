@@ -81,6 +81,8 @@ public class UserControllerImpl implements UserController {
         .linkedinUrl(user.getLinkedinUrl())
         .birthDate(user.getBirthDate())
         .createdOn(user.getCreatedOn())
+        .expectedSalary(user.getExpectedSalary())
+        .expectedSalaryCurrency(user.getExpectedSalaryCurrency())
         .companyId(companyId)
         .build();
 
@@ -137,6 +139,8 @@ public class UserControllerImpl implements UserController {
         .linkedinUrl(user.getLinkedinUrl())
         .birthDate(user.getBirthDate())
         .createdOn(user.getCreatedOn())
+        .expectedSalary(user.getExpectedSalary())
+        .expectedSalaryCurrency(user.getExpectedSalaryCurrency())
         .build();
 
     return ResponseEntity

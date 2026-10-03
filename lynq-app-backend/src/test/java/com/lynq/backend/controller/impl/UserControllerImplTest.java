@@ -57,6 +57,8 @@ class UserControllerImplTest {
   private static final String LINKEDIN_URL = "https://linkedin.com/in/janedoe";
   private static final LocalDate BIRTH_DATE = LocalDate.of(1995, Month.APRIL, 12);
   private static final LocalDate CREATED_ON = LocalDate.of(2026, Month.JUNE, 25);
+  private static final Integer EXPECTED_SALARY = 2500;
+  private static final String EXPECTED_SALARY_CURRENCY = "USD";
   private static final String FILE_ID = "0195f2c1-3b1a-7c2d-9f31-3f6a5f2c9d41";
   private static final String FILE_NAME = "avatar.png";
   private static final String PRE_SIGNED_URL =
@@ -144,6 +146,8 @@ class UserControllerImplTest {
     assertThat(data.getLinkedinUrl(), is(LINKEDIN_URL));
     assertThat(data.getBirthDate(), is(BIRTH_DATE));
     assertThat(data.getCreatedOn(), is(CREATED_ON));
+    assertThat(data.getExpectedSalary(), is(EXPECTED_SALARY));
+    assertThat(data.getExpectedSalaryCurrency(), is(EXPECTED_SALARY_CURRENCY));
     assertThat(data.getCompanyId(), is(COMPANY_ID));
   }
 
@@ -548,6 +552,8 @@ class UserControllerImplTest {
         .linkedinUrl(LINKEDIN_URL)
         .birthDate(BIRTH_DATE)
         .createdOn(CREATED_ON)
+        .expectedSalary(EXPECTED_SALARY)
+        .expectedSalaryCurrency(EXPECTED_SALARY_CURRENCY)
         .build();
   }
 }

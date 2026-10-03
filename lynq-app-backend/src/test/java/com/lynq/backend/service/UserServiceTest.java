@@ -8,6 +8,7 @@ import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.Language;
 import com.lynq.backend.event.DomainEvent;
 import com.lynq.backend.event.DomainEventPublisher;
+import com.lynq.backend.event.payload.CandidateExpectedSalaryUpdatedPayload;
 import com.lynq.backend.event.payload.CandidateSkillsUpdatedPayload;
 import com.lynq.backend.exceptions.BadRequestException;
 import com.lynq.backend.exceptions.NotFoundException;
@@ -61,6 +62,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -282,6 +284,107 @@ class UserServiceTest {
     UserEntity result = userService.updateUserProfile(USER_ID, updateRequest);
 
     assertThat(result, is(sameInstance(persisted)));
+  }
+
+  @Test
+  void updateUserProfileSetsTheExpectedSalaryWithItsCurrencyAndPublishesIt() {
+    UserEntity existing = existingUser();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+    when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(updateRequest.getExpectedSalary()).thenReturn(3000);
+    when(updateRequest.getExpectedSalaryCurrency()).thenReturn("USD");
+
+    UserEntity saved = userService.updateUserProfile(USER_ID, updateRequest);
+
+    assertThat(saved.getExpectedSalary(), is(3000));
+    assertThat(saved.getExpectedSalaryCurrency(), is("USD"));
+    InOrder order = inOrder(userRepository, domainEventPublisher);
+    order.verify(userRepository).save(existing);
+    ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+    order.verify(domainEventPublisher).publish(captor.capture());
+    DomainEvent event = captor.getValue();
+    assertThat(event.eventType(), is("CandidateExpectedSalaryUpdated"));
+    assertThat(event.aggregateId(), is(USER_ID));
+    CandidateExpectedSalaryUpdatedPayload payload =
+        (CandidateExpectedSalaryUpdatedPayload) event.payload();
+    assertThat(payload.userId(), is(USER_ID));
+    assertThat(payload.expectedSalary(), is(3000));
+    assertThat(payload.currency(), is("USD"));
+  }
+
+  @Test
+  void updateUserProfileDefaultsTheExpectedSalaryCurrencyToArs() {
+    UserEntity existing = existingUser();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+    when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(updateRequest.getExpectedSalary()).thenReturn(1500000);
+
+    UserEntity saved = userService.updateUserProfile(USER_ID, updateRequest);
+
+    assertThat(saved.getExpectedSalary(), is(1500000));
+    assertThat(saved.getExpectedSalaryCurrency(), is("ARS"));
+  }
+
+  @Test
+  void updateUserProfileKeepsTheStoredCurrencyWhenOnlyTheSalaryChanges() {
+    UserEntity existing = existingUser();
+    existing.setExpectedSalary(2000);
+    existing.setExpectedSalaryCurrency("USD");
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+    when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(updateRequest.getExpectedSalary()).thenReturn(2500);
+
+    UserEntity saved = userService.updateUserProfile(USER_ID, updateRequest);
+
+    assertThat(saved.getExpectedSalary(), is(2500));
+    assertThat(saved.getExpectedSalaryCurrency(), is("USD"));
+  }
+
+  @Test
+  void updateUserProfileChangesOnlyTheCurrencyOfTheStoredExpectedSalary() {
+    UserEntity existing = existingUser();
+    existing.setExpectedSalary(2000);
+    existing.setExpectedSalaryCurrency("ARS");
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+    when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(updateRequest.getExpectedSalary()).thenReturn(null);
+    when(updateRequest.getExpectedSalaryCurrency()).thenReturn("USD");
+
+    UserEntity saved = userService.updateUserProfile(USER_ID, updateRequest);
+
+    assertThat(saved.getExpectedSalary(), is(2000));
+    assertThat(saved.getExpectedSalaryCurrency(), is("USD"));
+    verify(domainEventPublisher).publish(any(DomainEvent.class));
+  }
+
+  @Test
+  void updateUserProfileIgnoresACurrencyWithoutAnExpectedSalary() {
+    UserEntity existing = existingUser();
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+    when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(updateRequest.getExpectedSalary()).thenReturn(null);
+    lenient().when(updateRequest.getExpectedSalaryCurrency()).thenReturn("USD");
+
+    UserEntity saved = userService.updateUserProfile(USER_ID, updateRequest);
+
+    assertThat(saved.getExpectedSalary(), is(nullValue()));
+    assertThat(saved.getExpectedSalaryCurrency(), is(nullValue()));
+    verify(domainEventPublisher, never()).publish(any());
+  }
+
+  @Test
+  void updateUserProfilePublishesNothingWhenTheExpectedSalaryIsUnchanged() {
+    UserEntity existing = existingUser();
+    existing.setExpectedSalary(2000);
+    existing.setExpectedSalaryCurrency("USD");
+    when(userRepository.findById(USER_ID)).thenReturn(Optional.of(existing));
+    when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(updateRequest.getExpectedSalary()).thenReturn(2000);
+    when(updateRequest.getFullName()).thenReturn(UPDATED_FULL_NAME);
+
+    userService.updateUserProfile(USER_ID, updateRequest);
+
+    verify(domainEventPublisher, never()).publish(any());
   }
 
   @Test

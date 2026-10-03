@@ -61,6 +61,7 @@ class JobControllerImplTest {
   private static final JobStatus STATUS = JobStatus.OPEN;
   private static final Integer SALARY_RANGE_DOWN = 80000;
   private static final Integer SALARY_RANGE_TOP = 120000;
+  private static final String SALARY_CURRENCY = "USD";
   private static final JobPostSource JOB_POST_TYPE = JobPostSource.LYNQ;
   private static final String SKILL_JAVA = "Java";
   private static final String SKILL_SPRING = "Spring";
@@ -96,21 +97,23 @@ class JobControllerImplTest {
     lenient().when(request.getWorkType()).thenReturn(WORK_TYPE);
     lenient().when(request.getSalaryRangeDown()).thenReturn(SALARY_RANGE_DOWN);
     lenient().when(request.getSalaryRangeTop()).thenReturn(SALARY_RANGE_TOP);
+    lenient().when(request.getSalaryCurrency()).thenReturn(SALARY_CURRENCY);
     lenient().when(request.getJobPostSource()).thenReturn(JOB_POST_TYPE);
     lenient().when(request.getSkills()).thenReturn(SKILLS);
     lenient().when(request.getSimilarityTags()).thenReturn(TAGS);
     lenient().when(jobService.createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN,
-        SALARY_RANGE_TOP, JOB_POST_TYPE, SKILLS, TAGS)).thenReturn(savedJob());
+        SALARY_RANGE_TOP, SALARY_CURRENCY, JOB_POST_TYPE, SKILLS, TAGS)).thenReturn(savedJob());
     lenient().when(updateRequest.getTitle()).thenReturn(TITLE);
     lenient().when(updateRequest.getDescription()).thenReturn(DESCRIPTION);
     lenient().when(updateRequest.getWorkType()).thenReturn(WORK_TYPE);
     lenient().when(updateRequest.getStatus()).thenReturn(STATUS);
     lenient().when(updateRequest.getSalaryRangeDown()).thenReturn(SALARY_RANGE_DOWN);
     lenient().when(updateRequest.getSalaryRangeTop()).thenReturn(SALARY_RANGE_TOP);
+    lenient().when(updateRequest.getSalaryCurrency()).thenReturn(SALARY_CURRENCY);
     lenient().when(updateRequest.getSkills()).thenReturn(SKILLS);
     lenient().when(updateRequest.getSimilarityTags()).thenReturn(TAGS);
     lenient().when(jobService.updateJob(JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, STATUS,
-        SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SKILLS, TAGS)).thenReturn(savedJob());
+        SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY, SKILLS, TAGS)).thenReturn(savedJob());
   }
 
   @Test
@@ -118,7 +121,7 @@ class JobControllerImplTest {
     jobController.updateJob(JOB_ID, updateRequest);
 
     verify(jobService).updateJob(JOB_ID, TITLE, DESCRIPTION, WORK_TYPE, STATUS, SALARY_RANGE_DOWN,
-        SALARY_RANGE_TOP, SKILLS, TAGS);
+        SALARY_RANGE_TOP, SALARY_CURRENCY, SKILLS, TAGS);
   }
 
   @Test
@@ -144,6 +147,7 @@ class JobControllerImplTest {
     assertThat(data.getWorkType(), is(WORK_TYPE));
     assertThat(data.getSalaryRangeDown(), is(SALARY_RANGE_DOWN));
     assertThat(data.getSalaryRangeTop(), is(SALARY_RANGE_TOP));
+    assertThat(data.getSalaryCurrency(), is(SALARY_CURRENCY));
     assertThat(data.getJobPostSource(), is(JOB_POST_TYPE));
     assertThat(data.getCreatedOn(), is(CREATED_ON));
     assertThat(data.getCompanyId(), is(COMPANY_ID));
@@ -156,7 +160,7 @@ class JobControllerImplTest {
   void createJobDelegatesToServiceWithRequestFields() {
     jobController.createJob(request);
 
-    verify(jobService).createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP,
+    verify(jobService).createJob(TITLE, DESCRIPTION, WORK_TYPE, SALARY_RANGE_DOWN, SALARY_RANGE_TOP, SALARY_CURRENCY,
         JOB_POST_TYPE, SKILLS, TAGS);
   }
 
@@ -190,6 +194,7 @@ class JobControllerImplTest {
     assertThat(data.getWorkType(), is(WORK_TYPE));
     assertThat(data.getSalaryRangeDown(), is(SALARY_RANGE_DOWN));
     assertThat(data.getSalaryRangeTop(), is(SALARY_RANGE_TOP));
+    assertThat(data.getSalaryCurrency(), is(SALARY_CURRENCY));
     assertThat(data.getJobPostSource(), is(JOB_POST_TYPE));
     assertThat(data.getCreatedOn(), is(CREATED_ON));
     assertThat(data.getCompanyId(), is(COMPANY_ID));
@@ -563,6 +568,7 @@ class JobControllerImplTest {
         .workType(WORK_TYPE)
         .salaryRangeDown(SALARY_RANGE_DOWN)
         .salaryRangeTop(SALARY_RANGE_TOP)
+        .salaryCurrency(SALARY_CURRENCY)
         .jobPostSource(JOB_POST_TYPE)
         .createdOn(CREATED_ON)
         .createdByUser(UserEntity.builder().id(USER_ID).build())
