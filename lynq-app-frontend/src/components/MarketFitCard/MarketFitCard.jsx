@@ -51,7 +51,6 @@ const MarketFitCard = ({ benchmark }) => {
     return (
       <EmptyState
         title={numbers.marketFit.name}
-        sampleSize={jobsScored}
         whatIsMissing={t.fitMissing(MIN_RELEVANT_JOBS)}
       />
     );
@@ -66,7 +65,7 @@ const MarketFitCard = ({ benchmark }) => {
       takeaway={`${numbers.marketFit.set(jobsScored)} · ${analyticsFormat.asOfLabel(snapshotOn)}`}
     >
       <p className="ds-figure">{numbers.marketFit.value(marketFit)}</p>
-      <p className="market-fit-reach">{reach}</p>
+      <p className="ds-figure-note">{reach}</p>
       {trend.length >= 2 ? (
         <FitTrend
           points={trend}

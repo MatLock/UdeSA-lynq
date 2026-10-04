@@ -145,7 +145,6 @@ const JobHeroSide = ({
   tailorDisabled,
   onApply,
   onTailor,
-  standingCard,
   t,
 }) => {
   if (isOwner) {
@@ -209,7 +208,6 @@ const JobHeroSide = ({
             }}
           />
         )}
-        {standingCard}
         {/* Apply action, vertically centered on the hero's right edge. */}
         <div className="job-detail-hero-actions">
           <div className="job-detail-apply-row">
@@ -769,11 +767,6 @@ const JobDetailPage = () => {
               tailorDisabled={tailorDisabled}
               onApply={handleApply}
               onTailor={handleTailor}
-              standingCard={
-                hasApplied && (
-                  <CandidateStandingCard authFetch={authFetch} jobId={jobId} />
-                )
-              }
               t={t}
             />
           }
@@ -811,6 +804,8 @@ const JobDetailPage = () => {
               appliedCount={appliedCount}
               hasScore={hasScore}
             />
+
+            {hasApplied && <CandidateStandingCard authFetch={authFetch} jobId={jobId} />}
 
             <JobCompanyCard t={t} company={company} companyLogo={companyLogo} />
 

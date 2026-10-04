@@ -30,7 +30,7 @@ const SalaryRange = ({ row, scale, currency }) => {
         height="10"
         className="market-salary-middle"
       >
-        <title>{`${median} · ${middle} · N = ${row.n}`}</title>
+        <title>{`${median} · ${middle}`}</title>
       </rect>
       <rect x={scale.x(row.median) - 0.4} y="0" width="0.8" height="14" className="market-salary-median" />
     </svg>
@@ -49,7 +49,6 @@ const MarketSalaryCard = ({ market }) => {
     return (
       <EmptyState
         title={numbers.marketSalary.name}
-        sampleSize={total}
         whatIsMissing={t.salaryEmpty(salary.currency)}
       />
     );
@@ -60,7 +59,7 @@ const MarketSalaryCard = ({ market }) => {
       title={numbers.marketSalary.name}
       takeaway={`${numbers.marketSalary.set(total, salary.currency)} · ${analyticsFormat.asOfLabel(snapshotOn)}`}
     >
-      <ul className="market-salary" aria-label={numbers.marketSalary.name}>
+      <ul className="market-salary" aria-label={numbers.marketSalary.name} tabIndex={0}>
         {salary.rows.map((row) => (
           <li key={`${row.category}-${row.workType}`} className="market-salary-row">
             <span className="market-salary-label">
@@ -73,7 +72,7 @@ const MarketSalaryCard = ({ market }) => {
               {scale && !row.insufficientData && row.median != null ? (
                 <SalaryRange row={row} scale={scale} currency={salary.currency} />
               ) : (
-                <span className="market-salary-withheld">{t.withheld(row.n, MIN_SAMPLE)}</span>
+                <span className="market-salary-withheld">{t.withheld}</span>
               )}
             </span>
             <span className="market-salary-value">

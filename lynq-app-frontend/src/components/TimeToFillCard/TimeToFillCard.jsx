@@ -5,7 +5,6 @@ import ChartCard from "../ds/ChartCard/ChartCard";
 import EmptyState from "../ds/EmptyState/EmptyState";
 import "./TimeToFillCard.css";
 
-const MIN_SAMPLE = 5;
 const PLOT_LEFT = 8;
 const PLOT_WIDTH = 284;
 
@@ -36,7 +35,7 @@ const useTimeToFill = (authFetch, jobId) => {
       }
     };
 
-    load();
+    void load();
     return () => {
       cancelled = true;
     };
@@ -167,12 +166,7 @@ const CompactTimeToFill = ({ timeToFill, isClosed }) => {
     <p className="ttf-compact">
       <span className="ttf-compact-name">{numbers.name}</span>
       {insufficientData || median == null ? (
-        <span>
-          <strong className="ttf-compact-figure">
-            {strings.ds.emptyState.sample(n)}
-          </strong>
-          {` · ${t.missing} ${overallText(timeToFill.overall)}`}
-        </span>
+        <span>{`${t.missing} ${overallText(timeToFill.overall)}`}</span>
       ) : (
         <span>
           <strong className="ttf-compact-figure">
@@ -211,10 +205,8 @@ const TimeToFillCard = ({
       <div className="ttf-card">
         <EmptyState
           title={numbers.name}
-          sampleSize={n}
           whatIsMissing={t.missing}
           fallbackShown={overallText(timeToFill.overall)}
-          thresholdReason={t.thresholdReason(MIN_SAMPLE)}
         />
       </div>
     );

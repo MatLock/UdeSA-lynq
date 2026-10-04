@@ -16,7 +16,7 @@ const useAnalyticsQuery = (query) => {
       }
     }
 
-    load()
+    void load()
     return () => {
       cancelled = true
     }

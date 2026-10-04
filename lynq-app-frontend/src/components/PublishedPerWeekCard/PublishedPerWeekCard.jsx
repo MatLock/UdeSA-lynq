@@ -17,7 +17,7 @@ const PublishedPerWeekCard = ({ market }) => {
   const slot = (PLOT.right - PLOT.left) / Math.max(weeks.length, 1);
   const heightOf = (count) => (count / max) * (PLOT.bottom - PLOT.top);
   if (total < MIN_SAMPLE) {
-    return <EmptyState title={numbers.publishedPerWeek.name} sampleSize={total} />;
+    return <EmptyState title={numbers.publishedPerWeek.name} />;
   }
 
   const label = weeks

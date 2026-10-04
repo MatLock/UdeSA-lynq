@@ -11,7 +11,7 @@ const SkillDemandCard = ({ market }) => {
   const { skillDemand, openJobPosts, snapshotOn } = market;
 
   if (openJobPosts < MIN_SAMPLE) {
-    return <EmptyState title={numbers.skillDemand.name} sampleSize={openJobPosts} />;
+    return <EmptyState title={numbers.skillDemand.name} />;
   }
 
   return (

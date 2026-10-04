@@ -16,7 +16,6 @@ const SkillCoverageCard = ({ benchmark }) => {
     return (
       <EmptyState
         title={numbers.skillCoverage.name}
-        sampleSize={jobsScored}
         whatIsMissing={t.fitMissing(MIN_RELEVANT_JOBS)}
       />
     );
