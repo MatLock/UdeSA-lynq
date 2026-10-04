@@ -644,14 +644,16 @@ class UserServiceTest {
   }
 
   @Test
-  void deleteResumeRemovesItAndHandsBackThePdfForTheGatewayToDrop() {
+  void deleteResumeMarksItDeletedAndKeepsTheRowForTheApplicationsMadeWithIt() {
     UserResumeEntity resume = resume(RESUME_JSON, RESUME_FILE_ID);
     when(userRepository.findById(USER_ID)).thenReturn(Optional.of(candidate()));
     when(userResumeRepository.findByUserId(USER_ID)).thenReturn(List.of(resume));
 
     DeleteResumeRestResponse deleted = userService.deleteResume(USER_ID, resume.getId());
 
-    verify(userResumeRepository).delete(resume);
+    verify(userResumeRepository).save(resume);
+    verify(userResumeRepository, never()).delete(any());
+    assertThat(resume.getDeletedOn(), is(LocalDate.now(ZoneOffset.UTC)));
     assertThat(deleted.getId(), is(resume.getId()));
     assertThat(deleted.getFileId(), is(RESUME_FILE_ID));
   }

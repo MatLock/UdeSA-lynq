@@ -335,7 +335,8 @@ public class UserService {
         .findFirst()
         .orElseThrow(() -> new NotFoundException(String.format(RESUME_NOT_FOUND, resumeId)));
 
-    userResumeRepository.delete(resume);
+    resume.setDeletedOn(LocalDate.now(ZoneOffset.UTC));
+    userResumeRepository.save(resume);
 
     return DeleteResumeRestResponse.builder()
         .id(resume.getId())

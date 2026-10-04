@@ -1101,6 +1101,30 @@ class BackendAppApplicationTests extends AbstractE2ETest {
   }
 
   @Test
+  void deleteResumeUsedInAnApplicationHidesItAndLeavesTheApplicationUntouched() throws Exception {
+    stubIamUserInfo();
+    seedUser();
+    seedSingleJob(INITIAL_SEEN);
+    seedResume();
+    assertThat(postApply(JOB_ID).statusCode(), is(201));
+    UserApplicationJobEntity before = userApplicationJobRepository
+        .findByJobIdAndUserId(JOB_ID, USER_ID).orElseThrow();
+
+    HttpResponse<String> response = deleteResume(RESUME_ID);
+
+    assertThat(response.statusCode(), is(200));
+    assertThat(parse(getResumes().body()).get("data"), is(List.of()));
+    assertThat(userResumeRepository.findByIdAndUserId(RESUME_ID, USER_ID).isPresent(), is(false));
+    assertThat(userResumeRepository.findById(RESUME_ID).orElseThrow().getDeletedOn(),
+        is(notNullValue()));
+    UserApplicationJobEntity after = userApplicationJobRepository
+        .findByJobIdAndUserId(JOB_ID, USER_ID).orElseThrow();
+    assertThat(after.getUserResume().getId(), is(RESUME_ID));
+    assertThat(after.getResumeFileStorageId(), is(before.getResumeFileStorageId()));
+    assertThat(after.getResumeName(), is(before.getResumeName()));
+  }
+
+  @Test
   void applyToJobReturnsNotFoundWhenTheResumeIsNotTheCandidatesOwn() throws Exception {
     stubIamUserInfo();
     seedUser();
@@ -1923,6 +1947,16 @@ class BackendAppApplicationTests extends AbstractE2ETest {
         .header(REQUEST_UUID_HEADER, REQUEST_UUID)
         .method("PUT", HttpRequest.BodyPublishers.ofString(
             "{\"alias\": \"%s\"}".formatted(alias)))
+        .build();
+    return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> deleteResume(String resumeId) throws Exception {
+    HttpRequest httpRequest = HttpRequest.newBuilder()
+        .uri(URI.create("http://localhost:" + port + CONTEXT_PATH + RESUME_PATH + "/" + resumeId))
+        .header(AUTHORIZATION_HEADER, BEARER_TOKEN)
+        .header(REQUEST_UUID_HEADER, REQUEST_UUID)
+        .DELETE()
         .build();
     return httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
   }
