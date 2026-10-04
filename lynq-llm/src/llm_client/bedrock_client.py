@@ -105,15 +105,19 @@ def _completion_text(response: dict[str, Any]) -> str:
 
 
 def _strip_fence(text: str) -> str:
-    """Unwrap a ```json ... ``` block; Converse has no JSON-only output mode."""
-    if not text.startswith(_FENCE):
+    """Unwrap the first ```json ... ``` block, even with prose around it; Converse has no JSON-only output mode."""
+    if text.startswith(("{", "[")):
         return text
 
-    body = text[len(_FENCE) :]
+    opening = text.find(_FENCE)
+    if opening == -1:
+        return text
+
+    body = text[opening + len(_FENCE) :]
     if body.lower().startswith("json"):
         body = body[len("json") :]
 
-    closing = body.rfind(_FENCE)
+    closing = body.find(_FENCE)
     if closing != -1:
         body = body[:closing]
     return body.strip()

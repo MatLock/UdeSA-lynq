@@ -166,6 +166,24 @@ class BedrockClientTests(unittest.IsolatedAsyncioTestCase):
                 await self._client().generate("P"), '{"skills": ["Java"]}'
             )
 
+    async def test_generate_unwraps_a_fence_surrounded_by_prose(self) -> None:
+        chatty = (
+            "Here's the processed JSON output:\n\n"
+            '```json\n{"skills": ["Java"]}\n```\n\n'
+            "Notes:\n- Kept `Java` as written.\n\n```text\nnot this one\n```"
+        )
+        patcher, _ = _fake_boto(converse=_converse_response(chatty))
+        with patcher:
+            self.assertEqual(
+                await self._client().generate("P"), '{"skills": ["Java"]}'
+            )
+
+    async def test_generate_keeps_bare_json_that_mentions_a_fence(self) -> None:
+        bare = '{"summary": "wrote ```code``` blocks"}'
+        patcher, _ = _fake_boto(converse=_converse_response(bare))
+        with patcher:
+            self.assertEqual(await self._client().generate("P"), bare)
+
     async def test_generate_raises_llm_error_on_client_error(self) -> None:
         patcher, _ = _fake_boto(converse_raises=_client_error("ThrottlingException"))
         with patcher:
