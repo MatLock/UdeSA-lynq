@@ -1,5 +1,6 @@
 resource "aws_sns_topic" "domain_events" {
-  name = "lynq-domain-events"
+  name              = "lynq-domain-events"
+  kms_master_key_id = "alias/aws/sns"
 }
 
 resource "aws_iam_user" "backend_sns" {
