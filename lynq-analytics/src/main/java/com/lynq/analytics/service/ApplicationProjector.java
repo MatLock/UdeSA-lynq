@@ -6,6 +6,7 @@ import static com.lynq.analytics.service.ProjectionSupport.requireAggregateId;
 import static com.lynq.analytics.service.ProjectionSupport.requirePresent;
 import static com.lynq.analytics.service.ProjectionSupport.requireText;
 
+import com.lynq.analytics.cache.CompanyJobsCacheEvictor;
 import com.lynq.analytics.exceptions.UnknownJobPostException;
 import com.lynq.analytics.listener.message.ApplicationSubmittedPayload;
 import com.lynq.analytics.listener.message.DomainEventMessage;
@@ -28,12 +29,15 @@ public class ApplicationProjector implements DomainEventProjector {
   private final ApplicationRepository applicationRepository;
   private final JobPostRepository jobPostRepository;
   private final ObjectMapper objectMapper;
+  private final CompanyJobsCacheEvictor companyJobsCacheEvictor;
 
   public ApplicationProjector(ApplicationRepository applicationRepository,
-      JobPostRepository jobPostRepository, ObjectMapper objectMapper) {
+      JobPostRepository jobPostRepository, ObjectMapper objectMapper,
+      CompanyJobsCacheEvictor companyJobsCacheEvictor) {
     this.applicationRepository = applicationRepository;
     this.jobPostRepository = jobPostRepository;
     this.objectMapper = objectMapper;
+    this.companyJobsCacheEvictor = companyJobsCacheEvictor;
   }
 
   @Override
@@ -82,6 +86,8 @@ public class ApplicationProjector implements DomainEventProjector {
     application.setLynqScore(payload.lynqScore());
     application.setOccurredOn(message.occurredOn());
     applicationRepository.save(application);
+    jobPostRepository.findCreatedByUserIdById(payload.jobId())
+        .ifPresent(companyJobsCacheEvictor::evictAfterCommit);
     log.info("message= Projected {} '{}' onto application '{}' of candidate '{}' for job post '{}'",
         message.eventType(), message.eventId(), application.getId(), application.getCandidateId(),
         application.getJobId());

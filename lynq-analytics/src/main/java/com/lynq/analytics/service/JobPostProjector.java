@@ -6,6 +6,7 @@ import static com.lynq.analytics.service.ProjectionSupport.requireAggregateId;
 import static com.lynq.analytics.service.ProjectionSupport.requirePresent;
 import static com.lynq.analytics.service.ProjectionSupport.requireText;
 
+import com.lynq.analytics.cache.CompanyJobsCacheEvictor;
 import com.lynq.analytics.enums.JobStatus;
 import com.lynq.analytics.exceptions.UnknownJobPostException;
 import com.lynq.analytics.listener.message.DomainEventMessage;
@@ -35,10 +36,13 @@ public class JobPostProjector implements DomainEventProjector {
 
   private final JobPostRepository jobPostRepository;
   private final ObjectMapper objectMapper;
+  private final CompanyJobsCacheEvictor companyJobsCacheEvictor;
 
-  public JobPostProjector(JobPostRepository jobPostRepository, ObjectMapper objectMapper) {
+  public JobPostProjector(JobPostRepository jobPostRepository, ObjectMapper objectMapper,
+      CompanyJobsCacheEvictor companyJobsCacheEvictor) {
     this.jobPostRepository = jobPostRepository;
     this.objectMapper = objectMapper;
+    this.companyJobsCacheEvictor = companyJobsCacheEvictor;
   }
 
   @Override
@@ -167,6 +171,7 @@ public class JobPostProjector implements DomainEventProjector {
 
   private void save(DomainEventMessage message, JobPostEntity job) {
     jobPostRepository.save(job);
+    companyJobsCacheEvictor.evictAfterCommit(job.getCreatedByUserId());
     log.info("message= Projected {} '{}' onto job post '{}'", message.eventType(),
         message.eventId(), job.getId());
   }
