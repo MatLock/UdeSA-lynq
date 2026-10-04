@@ -75,7 +75,7 @@ ingress:
 #     --set lynq_app_frontend.image=lynq-app-frontend:local
 lynq_app_frontend:
   replicas: 1
-  image: matlock0o/lynq:lynq-app-frontend-3.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-app-frontend-3.1.1
   resources:
     requests:
       cpu: 10m
@@ -85,7 +85,7 @@ lynq_app_frontend:
 
 lynq_llm:
   replicas: 1
-  image: matlock0o/lynq:lynq-llm-3.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-llm-3.1.1
   resources:
     requests:
       cpu: 100m
@@ -117,7 +117,7 @@ lynq_llm:
 
 lynq_agent:
   replicas: 1
-  image: matlock0o/lynq:lynq-agent-3.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-agent-3.1.1
   # Host of the database the agent migrates and writes to. It is interpolated
   # into DB_URL in the Secret and not in the ConfigMap, because that URL carries
   # the password. Local: the in-cluster MySQL.
@@ -174,7 +174,7 @@ lynq_agent:
 
 lynq_feeders:
   replicas: 1
-  image: matlock0o/lynq:lynq-feeders-3.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-feeders-3.1.1
   resources:
     requests:
       cpu: 50m
@@ -215,7 +215,7 @@ lynq_feeders:
 lynq_analytics:
   replicas: 1
   # Published from the next release on, like every other service's image.
-  image: matlock0o/lynq:lynq-analytics-3.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-analytics-3.1.1
   resources:
     requests:
       cpu: 100m
@@ -253,7 +253,7 @@ lynq_analytics:
 
 lynq_bff:
   replicas: 1
-  image: matlock0o/lynq:lynq-bff-3.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-bff-3.1.1
   resources:
     requests:
       cpu: 100m
@@ -272,7 +272,7 @@ lynq_bff:
 
 lynq_app_backend:
   replicas: 1
-  image: matlock0o/lynq:lynq-app-backend-3.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-app-backend-3.1.1
   resources:
     requests:
       cpu: 100m
@@ -296,7 +296,7 @@ lynq_app_backend:
 # file metadata all live here.
 lynq_file_storage:
   replicas: 1
-  image: matlock0o/lynq:lynq-file-storage-3.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-file-storage-3.1.1
   resources:
     requests:
       cpu: 100m
@@ -314,7 +314,7 @@ lynq_file_storage:
 
 lynq_iam:
   replicas: 1
-  image: matlock0o/lynq:lynq-iam-3.0.2-SNAPSHOT
+  image: matlock0o/lynq:lynq-iam-3.1.1
   resources:
     requests:
       cpu: 100m
