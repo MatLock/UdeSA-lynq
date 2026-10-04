@@ -186,7 +186,8 @@ class ComputrabajoLivenessCheckerTest(unittest.TestCase):
 
     def test_the_session_is_created_once(self):
         checker = ComputrabajoLivenessChecker(timeout=1.0)
-        self.assertIs(checker._ensure_session(), checker._ensure_session())
+        first = checker._ensure_session()
+        self.assertIs(checker._ensure_session(), first)
 
 
 class BumeranLivenessCheckerTest(unittest.TestCase):
