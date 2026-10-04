@@ -3,10 +3,8 @@ import strings from "../../../i18n";
 const EmptyState = ({
   title,
   where,
-  sampleSize,
   whatIsMissing,
   fallbackShown,
-  thresholdReason,
 }) => {
   const t = strings.ds.emptyState;
 
@@ -18,12 +16,8 @@ const EmptyState = ({
           {where ? <span className="ds-card-where">{where}</span> : null}
         </div>
       </div>
-      <p className="ds-figure">{t.sample(sampleSize ?? 0)}</p>
-      {whatIsMissing ? <p className="ds-takeaway">{whatIsMissing}</p> : null}
+      <p className="ds-takeaway">{whatIsMissing ?? t.noData}</p>
       {fallbackShown ? <p className="ds-takeaway">{fallbackShown}</p> : null}
-      {thresholdReason ? (
-        <p className="ds-takeaway">{thresholdReason}</p>
-      ) : null}
     </section>
   );
 };

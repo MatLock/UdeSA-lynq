@@ -11,7 +11,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserResumeRepository extends JpaRepository<UserResumeEntity, String> {
 
-  @Query("SELECT r FROM UserResumeEntity r WHERE r.user.id = :userId ORDER BY r.createdOn DESC")
+  @Query("SELECT r FROM UserResumeEntity r WHERE r.user.id = :userId AND r.deletedOn IS NULL "
+      + "ORDER BY r.createdOn DESC")
   List<UserResumeEntity> findByUserId(@Param("userId") String userId);
 
   /**
@@ -19,7 +20,8 @@ public interface UserResumeRepository extends JpaRepository<UserResumeEntity, St
    * and checked afterwards, so a resume belonging to somebody else is simply
    * absent — never acknowledged as existing.
    */
-  @Query("SELECT r FROM UserResumeEntity r WHERE r.id = :resumeId AND r.user.id = :userId")
+  @Query("SELECT r FROM UserResumeEntity r WHERE r.id = :resumeId AND r.user.id = :userId "
+      + "AND r.deletedOn IS NULL")
   Optional<UserResumeEntity> findByIdAndUserId(@Param("resumeId") String resumeId,
       @Param("userId") String userId);
 }

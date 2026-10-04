@@ -1,5 +1,6 @@
 package com.lynq.analytics.service;
 
+import com.lynq.analytics.cache.CompanyJobsCacheEvictor;
 import com.lynq.analytics.exceptions.InvalidDomainEventException;
 import com.lynq.analytics.exceptions.UnknownJobPostException;
 import com.lynq.analytics.listener.message.DomainEventMessage;
@@ -38,6 +39,7 @@ class ApplicationProjectorTest {
   private static final UUID EVENT_ID = UUID.fromString("5c8f3a3e-0b7e-5d61-9c1a-2f4b8e6d7a10");
   private static final String APPLICATION_ID = "33333333-3333-3333-3333-333333333333";
   private static final String JOB_ID = "77777777-7777-7777-7777-777777777777";
+  private static final String CREATOR_ID = "33333333-3333-3333-3333-333333333333";
   private static final String USER_ID = "11111111-1111-1111-1111-111111111111";
   private static final Instant T1 = Instant.parse("2026-09-20T10:00:00Z");
   private static final Instant T2 = Instant.parse("2026-09-22T10:00:00Z");
@@ -53,11 +55,26 @@ class ApplicationProjectorTest {
   @Mock
   private JobPostRepository jobPostRepository;
 
+  @Mock
+  private CompanyJobsCacheEvictor companyJobsCacheEvictor;
+
   private ApplicationProjector applicationProjector;
 
   @BeforeEach
   void setUp() {
-    applicationProjector = new ApplicationProjector(applicationRepository, jobPostRepository, JSON);
+    applicationProjector = new ApplicationProjector(applicationRepository, jobPostRepository, JSON,
+        companyJobsCacheEvictor);
+  }
+
+  @Test
+  void submittedEvictsTheCachedJobPostsOfTheJobPostCreator() {
+    when(jobPostRepository.existsById(JOB_ID)).thenReturn(true);
+    when(applicationRepository.findById(APPLICATION_ID)).thenReturn(Optional.empty());
+    when(jobPostRepository.findCreatedByUserIdById(JOB_ID)).thenReturn(Optional.of(CREATOR_ID));
+
+    applicationProjector.project(message(APPLICATION_SUBMITTED, T2, SUBMITTED));
+
+    verify(companyJobsCacheEvictor).evictAfterCommit(CREATOR_ID);
   }
 
   @Test
@@ -104,6 +121,7 @@ class ApplicationProjectorTest {
     applicationProjector.project(message(APPLICATION_SUBMITTED, T1, SUBMITTED));
 
     verify(applicationRepository, never()).save(any());
+    verifyNoInteractions(companyJobsCacheEvictor);
     assertThat(application.getLynqScore(), is(40));
   }
 

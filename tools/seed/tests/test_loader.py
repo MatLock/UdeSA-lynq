@@ -119,6 +119,18 @@ class LoaderTests(unittest.TestCase):
         api.enhance_external_job.assert_not_called()
         api.ingest_jobs.assert_not_called()
 
+    def test_externals_are_all_ingested_while_the_viewer_has_no_profile_yet(self):
+        api = fresh_api()
+        api.get_user.return_value = None
+        api.enhance_external_job.return_value = {"skills": ["Balances"], "similarity_tags": []}
+        api.my_jobs.return_value = []
+
+        report = self.loader(api).run((EXTERNALS_STEP,))
+
+        api.job_exists.assert_not_called()
+        api.ingest_jobs.assert_called_once()
+        self.assertEqual([], report.errors)
+
     def test_externals_without_any_skill_or_tag_are_reported_and_skipped(self):
         api = fresh_api()
         api.job_exists.return_value = False

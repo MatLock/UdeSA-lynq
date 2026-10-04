@@ -1,15 +1,11 @@
 const numbers = {
-  jobAffinity: {
-    name: 'Tu afinidad con este aviso',
-    value: (score) => `${score} de 100`,
-  },
   standing: {
     name: 'Tu posición entre los postulantes',
-    value: (rank, total) => `puesto ${rank} de ${total}`,
   },
   peerPercentile: {
     name: 'Tu posición entre perfiles parecidos al tuyo',
-    value: (percentile, peers) => `percentil ${percentile} de ${peers} pares`,
+    value: (percentile) => `percentil ${percentile}`,
+    set: (peers) => `entre ${peers} perfiles parecidos al tuyo`,
   },
   marketFit: {
     name: 'Tu fit de mercado',
@@ -20,10 +16,6 @@ const numbers = {
     name: 'Tu alcance',
     value: (percent, threshold) => `supera ${threshold} en el ${percent} % de los avisos`,
     set: (jobs) => `sobre ${jobs} avisos abiertos relevantes`,
-  },
-  jobMedian: {
-    name: 'Mediana del aviso',
-    set: (applicants) => `entre ${applicants} postulantes`,
   },
   timeToFill: {
     name: 'Cuánto tarda en cubrirse un aviso como el tuyo',
@@ -45,11 +37,11 @@ const numbers = {
   asOfToday: 'al día de hoy',
   skillCoverage: {
     name: 'Tu cobertura de skills',
-    value: (percent) => `${percent} % de lo que piden`,
+    value: (percent) => `${percent} %`,
     set: (jobs) => `sobre las skills de ${jobs} avisos abiertos relevantes`,
   },
   skillUnlocks: {
-    name: 'Las skills que más avisos te abren',
+    name: 'Skills que mejorarían tu alcance',
     value: (jobs) => (jobs === 1 ? '1 aviso' : `${jobs} avisos`),
     set: (threshold) => `avisos relevantes que pasarían de ${threshold} si la sumaras`,
   },
@@ -195,14 +187,12 @@ const es = {
     thisJob: 'Este aviso',
     thisJobOpen: (days) => `este aviso lleva ${days} días publicado`,
     thisJobClosed: (days) => `este aviso estuvo ${days} días publicado`,
-    middleHalf: (p25, p75) => `la mitad central cerró entre ${p25} y ${p75} días`,
+    middleHalf: (p25, p75) => `El 50% de los avisos se cubrió en ${p25} a ${p75} días`,
     external: (external, total) =>
       `${external} de ${total} son de portales externos: ahí se mide cuánto siguieron publicados, no si se cubrieron`,
     missing: 'Todavía no hay suficientes avisos parecidos cerrados para dar una mediana propia.',
     overall: (days, jobs) => `Mediana de todos los avisos cerrados: ${days} días, sobre ${jobs}`,
     overallMissing: 'Tampoco hay todavía suficientes avisos cerrados en toda la plataforma.',
-    thresholdReason: (min) =>
-      `Se muestra desde ${min}: con menos, la mediana es la de un par de avisos.`,
     days: (days) => `${days} días`,
   },
   jobCard: {
@@ -264,19 +254,22 @@ const es = {
     standing: {
       pending: 'Estamos registrando tu postulación: tu posición aparece en unos segundos.',
       late: 'Tu posición todavía no está lista. Volvé a abrir el aviso en un rato.',
-      medianWithheld: (min) => `se muestra desde ${min} postulantes`,
+      rank: (rank) => `${rank}º`,
+      total: (total) => `de ${total}`,
+      above: (score, gap, median) => `Tu afinidad es ${score}, ${gap} puntos sobre la mediana de los postulantes (${median}).`,
+      below: (score, gap, median) => `Tu afinidad es ${score}, ${gap} puntos debajo de la mediana de los postulantes (${median}).`,
+      even: (score) => `Tu afinidad es ${score}, igual a la mediana de los postulantes.`,
+      alone: (score) => `Tu afinidad con este aviso es ${score}.`,
     },
     salaryInsights: {
       heading: 'Salarios',
       thisJob: 'Este aviso',
       yourExpectedSalary: 'Tu salario esperado',
-      middleHalf: (p25, p75) => `la mitad central está entre ${p25} y ${p75}`,
+      middleHalf: (p25, p75) => `El 50% de los salarios está entre ${p25} y ${p75}`,
       positionMissing: (currency) =>
         `Todavía no hay suficientes avisos parecidos que publiquen su salario en ${currency}.`,
       peersMissing: (currency) =>
         `Todavía no hay suficientes candidatos parecidos con salario esperado en ${currency}.`,
-      thresholdReason: (min) =>
-        `Se muestra desde ${min}: con menos, la mediana deja ver el salario de cada uno.`,
     },
     applyError: 'No se pudo postular. Intentá de nuevo.',
     applyExternal: 'Postularme en {source}',
@@ -518,22 +511,23 @@ const es = {
       marketLead: 'Lo que piden los avisos abiertos que ve Lynq, de todas las fuentes.',
       unavailable: 'No pudimos cargar esta sección. Probá de nuevo en un rato.',
       benchmark: {
-        noSnapshot: 'Todavía no hay una foto de tu perfil. La saca el proceso diario de las 05:00 si tu perfil tiene skills: cargá un CV y volvé mañana.',
+        noSnapshot: 'Aún no hay data disponible.',
         fitMissing: (min) => `Hacen falta al menos ${min} avisos abiertos parecidos a tu perfil para medir tu fit.`,
         peersMissing: (min) => `Con menos de ${min} pares el percentil queda vacío: es un umbral de privacidad, no estadístico.`,
-        peersMiddle: 'mitad central de tus pares',
+        peersMiddle: 'rango del 50% de tus pares',
         peersMedian: 'mediana de tus pares',
         you: 'Tu fit de mercado',
         trend: 'tu fit de mercado, día por día',
         coverageYou: 'Vos',
         coveragePeers: 'Mediana de tus pares',
         coveragePeersMissing: (min) => `La mediana de tus pares aparece desde ${min} pares.`,
-        unlocksEmpty: (threshold) => `Ninguna skill sola lleva un aviso relevante por encima de ${threshold}.`,
+        unlocksEmpty: (threshold) =>
+          `Todavía no hay una skill que, sumada a tu perfil, te lleve por encima de ${threshold} de fit en algún aviso.`,
       },
       market: {
         currencyLabel: 'Moneda',
-        noSnapshot: 'Todavía no hay una foto del mercado: la saca el proceso diario de las 05:00.',
-        withheld: (n, min) => `N = ${n}, se muestra desde ${min}`,
+        noSnapshot: 'Aún no hay data disponible.',
+        withheld: 'Sin datos suficientes',
         uncategorized: 'Sin categoría',
         categories: {
           ADMINISTRACION: 'Administración',
@@ -543,7 +537,7 @@ const es = {
         },
         workType: { REMOTE: 'Remoto', IN_OFFICE: 'Presencial' },
         salaryEmpty: (currency) => `Ningún aviso abierto publica su salario en ${currency}.`,
-        middleHalf: 'mitad central',
+        middleHalf: 'rango del 50%',
         weekOf: (date) => `semana del ${date}`,
       },
       company: {
@@ -1049,8 +1043,7 @@ const es = {
     nextMonth: 'Mes siguiente',
   },
   ds: {
-    chartCard: { sample: (n) => `N = ${n}` },
-    emptyState: { sample: (n) => `N = ${n}` },
+    emptyState: { noData: 'Aún no hay data disponible.' },
     levels: { ingest: 'nivel 1', query: 'nivel 2', snapshot: 'nivel 3' },
     numbers,
   },

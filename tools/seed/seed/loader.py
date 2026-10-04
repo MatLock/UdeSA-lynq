@@ -225,9 +225,9 @@ class Loader:
 
     def load_externals(self) -> None:
         externals = [job for job in self.corpus["job_posts"] if job["kind"] != LYNQ]
-        viewer = self.viewer()
+        viewer = None if self.refresh_externals else self.viewer()
         pending = externals
-        if viewer is not None and not self.refresh_externals:
+        if viewer is not None and viewer.run(self.api.get_user) is not None:
             pending = [job for job in externals
                        if not viewer.run(lambda token: self.api.job_exists(token, self.job_ids[job["key"]]))]
         self.log(f"external job posts: {len(externals)}, {len(pending)} to enhance and ingest like the feeder")

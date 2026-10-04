@@ -43,6 +43,9 @@ public class UserResumeEntity {
   @Column(name = "created_on", nullable = false)
   private LocalDate createdOn;
 
+  @Column(name = "deleted_on")
+  private LocalDate deletedOn;
+
   @Column(name = "name", length = 255)
   private String name;
 

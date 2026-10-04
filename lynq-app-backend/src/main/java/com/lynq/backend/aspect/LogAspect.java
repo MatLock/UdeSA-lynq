@@ -27,6 +27,7 @@ public class LogAspect {
   private static final String NEW_PASSWORD_PARAM = "newPassword";
   private static final String REFRESH_TOKEN_PARAM = "refreshToken";
   private static final String ACCESS_TOKEN_PARAM = "accessToken";
+  private static final String AUTHORIZATION_PARAM = "authorization";
   private static final String MASK = "********";
 
   private final ObjectMapper objectMapper;
@@ -113,7 +114,8 @@ public class LogAspect {
     return PASSWORD_PARAM.equalsIgnoreCase(fieldName)
         || NEW_PASSWORD_PARAM.equalsIgnoreCase(fieldName)
         || REFRESH_TOKEN_PARAM.equalsIgnoreCase(fieldName)
-        || ACCESS_TOKEN_PARAM.equalsIgnoreCase(fieldName);
+        || ACCESS_TOKEN_PARAM.equalsIgnoreCase(fieldName)
+        || AUTHORIZATION_PARAM.equalsIgnoreCase(fieldName);
   }
 
 

@@ -30,3 +30,4 @@ date,prompt
 
 "03-10-2026","knowing what lynq-ml does, it has nothing of ML in it — what would be a more fitting name for the project?"
 "03-10-2026","rename the project from lynq-ml to lynq-llm: the folder, the /lynq-llm context path of every router, the lynq-llm docker image tag, the CI workflow and its coverage badge, and the docs, since it trains or serves no model of its own and only runs prompts against an LLM provider"
+"04-10-2026","the skill-extraction route answers 502 'LLM returned malformed output' with Nova Micro on Bedrock: the model wraps the JSON in prose before and after the ```json fence, so make the Bedrock client take the first fenced block wherever it sits in the completion, leave bare JSON untouched, and test both cases"

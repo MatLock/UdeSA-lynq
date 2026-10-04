@@ -1,5 +1,6 @@
 package com.lynq.analytics.service;
 
+import com.lynq.analytics.cache.CompanyJobsCacheEvictor;
 import com.lynq.analytics.enums.JobStatus;
 import com.lynq.analytics.exceptions.InvalidDomainEventException;
 import com.lynq.analytics.exceptions.UnknownJobPostException;
@@ -73,11 +74,34 @@ class JobPostProjectorTest {
   @Mock
   private JobPostRepository jobPostRepository;
 
+  @Mock
+  private CompanyJobsCacheEvictor companyJobsCacheEvictor;
+
   private JobPostProjector jobPostProjector;
 
   @BeforeEach
   void setUp() {
-    jobPostProjector = new JobPostProjector(jobPostRepository, JSON);
+    jobPostProjector = new JobPostProjector(jobPostRepository, JSON, companyJobsCacheEvictor);
+  }
+
+  @Test
+  void publishedEvictsTheCachedJobPostsOfItsCreator() {
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.empty());
+
+    jobPostProjector.project(message(JOB_POST_PUBLISHED, T1, PUBLISHED));
+
+    verify(companyJobsCacheEvictor).evictAfterCommit(USER_ID);
+  }
+
+  @Test
+  void closedEvictsTheCachedJobPostsOfItsCreator() {
+    JobPostEntity job = openJob(T1, T1);
+    job.setCreatedByUserId(USER_ID);
+    when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+
+    jobPostProjector.project(message(JOB_POST_CLOSED, T3, CLOSED));
+
+    verify(companyJobsCacheEvictor).evictAfterCommit(USER_ID);
   }
 
   @Test
@@ -150,6 +174,7 @@ class JobPostProjectorTest {
     jobPostProjector.project(message(JOB_POST_PUBLISHED, T1, PUBLISHED));
 
     verify(jobPostRepository, never()).save(any());
+    verifyNoInteractions(companyJobsCacheEvictor);
     assertThat(job.getTitle(), is("Stored title"));
   }
 

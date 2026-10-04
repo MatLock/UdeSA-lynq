@@ -5,7 +5,6 @@ import ChartCard from "../ds/ChartCard/ChartCard";
 import EmptyState from "../ds/EmptyState/EmptyState";
 import "./SalaryInsightsCard.css";
 
-const MIN_SAMPLE = 5;
 const PLOT_LEFT = 8;
 const PLOT_WIDTH = 284;
 
@@ -38,7 +37,7 @@ const useSalaryInsights = (authFetch, jobId) => {
       }
     };
 
-    load();
+    void load();
     return () => {
       cancelled = true;
     };
@@ -98,9 +97,7 @@ const SalaryBlock = ({ title, set, block, markers, scale, whatIsMissing }) => {
     return (
       <EmptyState
         title={title}
-        sampleSize={block.n}
         whatIsMissing={whatIsMissing}
-        thresholdReason={t.thresholdReason(MIN_SAMPLE)}
       />
     );
   }

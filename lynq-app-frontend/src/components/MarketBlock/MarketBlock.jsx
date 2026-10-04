@@ -42,9 +42,17 @@ const MarketBlock = ({ authFetch }) => {
         <CalloutNote variant="gap">{t.market.noSnapshot}</CalloutNote>
       ) : null}
       <div className="analytics-grid">
-        {data.snapshotOn != null ? <SkillDemandCard market={data} /> : null}
-        {data.snapshotOn != null ? <MarketSalaryCard market={data} /> : null}
+        {data.snapshotOn != null ? (
+          <div className="analytics-grid-wide">
+            <SkillDemandCard market={data} />
+          </div>
+        ) : null}
         <PublishedPerWeekCard market={data} />
+        {data.snapshotOn != null ? (
+          <div className="analytics-grid-full">
+            <MarketSalaryCard market={data} />
+          </div>
+        ) : null}
       </div>
     </>
   );

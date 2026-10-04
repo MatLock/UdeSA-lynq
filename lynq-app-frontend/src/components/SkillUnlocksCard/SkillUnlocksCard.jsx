@@ -16,13 +16,11 @@ const SkillUnlocksCard = ({ benchmark }) => {
   return (
     <ChartCard
       title={numbers.skillUnlocks.name}
-      takeaway={
-        skillUnlocks.length === 0
-          ? `${t.unlocksEmpty(reachThreshold)} ${numbers.marketFit.set(jobsScored)} · ${asOf}`
-          : set
-      }
+      takeaway={skillUnlocks.length === 0 ? `${numbers.marketFit.set(jobsScored)} · ${asOf}` : set}
     >
-      {skillUnlocks.length > 0 ? (
+      {skillUnlocks.length === 0 ? (
+        <p className="ds-figure-note">{t.unlocksEmpty(reachThreshold)}</p>
+      ) : (
         <HorizontalBars
           label={numbers.skillUnlocks.name}
           rows={skillUnlocks.map((unlock) => ({
@@ -32,7 +30,7 @@ const SkillUnlocksCard = ({ benchmark }) => {
             display: numbers.skillUnlocks.value(unlock.jobsUnlocked),
           }))}
         />
-      ) : null}
+      )}
     </ChartCard>
   );
 };

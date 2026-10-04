@@ -1,6 +1,5 @@
 import LevelChip from "../LevelChip/LevelChip";
 import EmptyState from "../EmptyState/EmptyState";
-import strings from "../../../i18n";
 
 const MINIMUM_SAMPLE = 5;
 
@@ -14,17 +13,13 @@ const ChartCard = ({
   emptyState,
   children,
 }) => {
-  const t = strings.ds.chartCard;
-
   if (typeof sampleSize === "number" && sampleSize < MINIMUM_SAMPLE) {
     return (
       <EmptyState
         title={title}
         where={where}
-        sampleSize={sampleSize}
         whatIsMissing={emptyState?.whatIsMissing}
         fallbackShown={emptyState?.fallbackShown}
-        thresholdReason={emptyState?.thresholdReason}
       />
     );
   }
@@ -41,7 +36,6 @@ const ChartCard = ({
       <div className="ds-card-chart">{children}</div>
       <p className="ds-takeaway">
         {takeaway}
-        {typeof sampleSize === "number" ? ` · ${t.sample(sampleSize)}` : ""}
       </p>
     </article>
   );

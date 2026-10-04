@@ -24,7 +24,11 @@ const CandidateBenchmarkBlock = ({ authFetch }) => {
       <MarketFitCard benchmark={data} />
       <PeerBenchmarkCard benchmark={data} />
       <SkillCoverageCard benchmark={data} />
-      <SkillUnlocksCard benchmark={data} />
+      {data.marketFit != null ? (
+        <div className="analytics-grid-full">
+          <SkillUnlocksCard benchmark={data} />
+        </div>
+      ) : null}
     </div>
   );
 };

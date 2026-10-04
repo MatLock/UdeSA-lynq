@@ -25,7 +25,6 @@ const PeerBenchmarkCard = ({ benchmark }) => {
   const t = strings.pages.analytics.benchmark;
   const {
     marketFit,
-    jobsScored,
     peerPercentile,
     peerGroupSize,
     peerFitP25,
@@ -38,7 +37,6 @@ const PeerBenchmarkCard = ({ benchmark }) => {
     return (
       <EmptyState
         title={numbers.peerPercentile.name}
-        sampleSize={jobsScored}
         whatIsMissing={t.fitMissing(MIN_RELEVANT_JOBS)}
       />
     );
@@ -48,7 +46,6 @@ const PeerBenchmarkCard = ({ benchmark }) => {
     return (
       <EmptyState
         title={numbers.peerPercentile.name}
-        sampleSize={peerGroupSize}
         whatIsMissing={t.peersMissing(MIN_PEERS)}
       />
     );
@@ -70,13 +67,14 @@ const PeerBenchmarkCard = ({ benchmark }) => {
         </>
       }
     >
-      <p className="ds-figure">{numbers.peerPercentile.value(peerPercentile, peerGroupSize)}</p>
+      <p className="ds-figure">{numbers.peerPercentile.value(peerPercentile)}</p>
+      <p className="ds-figure-note">{numbers.peerPercentile.set(peerGroupSize)}</p>
       <PeerStrip
         fit={marketFit}
         p25={peerFitP25}
         median={peerFitMedian}
         p75={peerFitP75}
-        label={`${numbers.peerPercentile.value(peerPercentile, peerGroupSize)}. ${you}. ${median}. ${middle}`}
+        label={`${numbers.peerPercentile.value(peerPercentile)} ${numbers.peerPercentile.set(peerGroupSize)}. ${you}. ${median}. ${middle}`}
       />
     </ChartCard>
   );

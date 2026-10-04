@@ -1,15 +1,11 @@
 const numbers = {
-  jobAffinity: {
-    name: 'Your affinity with this posting',
-    value: (score) => `${score} out of 100`,
-  },
   standing: {
     name: 'Your position among the applicants',
-    value: (rank, total) => `rank ${rank} of ${total}`,
   },
   peerPercentile: {
     name: 'Your position among profiles like yours',
-    value: (percentile, peers) => `percentile ${percentile} among ${peers} peers`,
+    value: (percentile) => `percentile ${percentile}`,
+    set: (peers) => `among ${peers} profiles like yours`,
   },
   marketFit: {
     name: 'Your market fit',
@@ -20,10 +16,6 @@ const numbers = {
     name: 'Your reach',
     value: (percent, threshold) => `above ${threshold} in ${percent}% of postings`,
     set: (jobs) => `across ${jobs} relevant open postings`,
-  },
-  jobMedian: {
-    name: 'Median for this posting',
-    set: (applicants) => `across ${applicants} applicants`,
   },
   timeToFill: {
     name: 'How long a posting like yours takes to fill',
@@ -45,11 +37,11 @@ const numbers = {
   asOfToday: 'as of today',
   skillCoverage: {
     name: 'Your skill coverage',
-    value: (percent) => `${percent}% of what they ask for`,
+    value: (percent) => `${percent}%`,
     set: (jobs) => `over the skills of ${jobs} relevant open postings`,
   },
   skillUnlocks: {
-    name: 'The skills that open the most postings',
+    name: 'Skills that would improve your reach',
     value: (jobs) => (jobs === 1 ? '1 posting' : `${jobs} postings`),
     set: (threshold) => `relevant postings that would go above ${threshold} if you added it`,
   },
@@ -195,14 +187,12 @@ const en = {
     thisJob: 'This posting',
     thisJobOpen: (days) => `this posting has been up for ${days} days`,
     thisJobClosed: (days) => `this posting was up for ${days} days`,
-    middleHalf: (p25, p75) => `the middle half closed between ${p25} and ${p75} days`,
+    middleHalf: (p25, p75) => `50% of postings were filled in ${p25} to ${p75} days`,
     external: (external, total) =>
       `${external} of ${total} come from external job boards: there it measures how long they stayed up, not whether they were filled`,
     missing: 'There are not enough similar closed postings yet for a median of their own.',
     overall: (days, jobs) => `Median of every closed posting: ${days} days, across ${jobs}`,
     overallMissing: 'There are not enough closed postings on the whole platform yet either.',
-    thresholdReason: (min) =>
-      `Shown from ${min} on: with fewer, the median is that of a couple of postings.`,
     days: (days) => `${days} days`,
   },
   jobCard: {
@@ -264,19 +254,22 @@ const en = {
     standing: {
       pending: 'We are recording your application: your position shows up in a few seconds.',
       late: 'Your position is not ready yet. Open the posting again in a while.',
-      medianWithheld: (min) => `shown from ${min} applicants`,
+      rank: (rank) => `#${rank}`,
+      total: (total) => `of ${total}`,
+      above: (score, gap, median) => `Your affinity is ${score}, ${gap} points above the applicants' median (${median}).`,
+      below: (score, gap, median) => `Your affinity is ${score}, ${gap} points below the applicants' median (${median}).`,
+      even: (score) => `Your affinity is ${score}, the same as the applicants' median.`,
+      alone: (score) => `Your affinity with this posting is ${score}.`,
     },
     salaryInsights: {
       heading: 'Salaries',
       thisJob: 'This posting',
       yourExpectedSalary: 'Your expected salary',
-      middleHalf: (p25, p75) => `the middle half sits between ${p25} and ${p75}`,
+      middleHalf: (p25, p75) => `50% of salaries fall between ${p25} and ${p75}`,
       positionMissing: (currency) =>
         `There are not enough similar postings with a salary in ${currency} yet.`,
       peersMissing: (currency) =>
         `There are not enough similar candidates with an expected salary in ${currency} yet.`,
-      thresholdReason: (min) =>
-        `Shown from ${min}: with fewer, the median gives away each person's salary.`,
     },
     applyError: 'Could not apply. Please try again.',
     applyExternal: 'Apply on {source}',
@@ -518,22 +511,23 @@ const en = {
       marketLead: 'What the open postings Lynq sees ask for, from every source.',
       unavailable: 'We could not load this section. Try again in a while.',
       benchmark: {
-        noSnapshot: 'There is no snapshot of your profile yet. The daily 05:00 run takes it if your profile has skills: upload a resume and come back tomorrow.',
+        noSnapshot: 'No data available yet.',
         fitMissing: (min) => `At least ${min} open postings similar to your profile are needed to measure your fit.`,
         peersMissing: (min) => `With fewer than ${min} peers the percentile stays empty: it is a privacy threshold, not a statistical one.`,
-        peersMiddle: 'middle half of your peers',
+        peersMiddle: '50% range of your peers',
         peersMedian: 'median of your peers',
         you: 'Your market fit',
         trend: 'your market fit, day by day',
         coverageYou: 'You',
         coveragePeers: 'Median of your peers',
         coveragePeersMissing: (min) => `The median of your peers shows from ${min} peers.`,
-        unlocksEmpty: (threshold) => `No single skill takes a relevant posting above ${threshold}.`,
+        unlocksEmpty: (threshold) =>
+          `No single skill, added to your profile, would take your fit above ${threshold} on any posting yet.`,
       },
       market: {
         currencyLabel: 'Currency',
-        noSnapshot: 'There is no snapshot of the market yet: the daily 05:00 run takes it.',
-        withheld: (n, min) => `N = ${n}, shown from ${min}`,
+        noSnapshot: 'No data available yet.',
+        withheld: 'Not enough data',
         uncategorized: 'No category',
         categories: {
           ADMINISTRACION: 'Administration',
@@ -543,7 +537,7 @@ const en = {
         },
         workType: { REMOTE: 'Remote', IN_OFFICE: 'On-site' },
         salaryEmpty: (currency) => `No open posting publishes its salary in ${currency}.`,
-        middleHalf: 'middle half',
+        middleHalf: '50% range',
         weekOf: (date) => `week of ${date}`,
       },
       company: {
@@ -1049,8 +1043,7 @@ const en = {
     nextMonth: 'Next month',
   },
   ds: {
-    chartCard: { sample: (n) => `N = ${n}` },
-    emptyState: { sample: (n) => `N = ${n}` },
+    emptyState: { noData: 'No data available yet.' },
     levels: { ingest: 'level 1', query: 'level 2', snapshot: 'level 3' },
     numbers,
   },
