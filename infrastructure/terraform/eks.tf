@@ -1,12 +1,7 @@
 # ---------------------------------------------------------------------------
-# EKS cluster and its EC2 worker nodes.
+# EKS cluster and its EC2 worker nodes, in the private subnets of vpc.tf.
 #
-# The cluster is placed in the SAME VPC as the MySQL + Redis EC2 (ec2.tf), so
-# pods reach it over the internal network via the security groups there.
-# Bring-your-own-VPC, matching the rest of this module: pass eks_subnet_ids
-# (>= 2 subnets in different AZs — an EKS requirement).
-#
-# NOTE: the kubernetes/helm providers still authenticate through the kubeconfig
+# NOTE: the kubernetes/helm providers are configured from this cluster
 # (providers.tf), so the FIRST apply is two-phase. See infrastructure/README.md.
 # ---------------------------------------------------------------------------
 data "aws_iam_policy_document" "eks_cluster_assume" {
@@ -37,7 +32,7 @@ resource "aws_eks_cluster" "lynq" {
   version  = var.eks_kubernetes_version
 
   vpc_config {
-    subnet_ids              = var.eks_subnet_ids
+    subnet_ids              = aws_subnet.private[*].id
     endpoint_private_access = true
     endpoint_public_access  = true
     public_access_cidrs     = var.eks_public_access_cidrs
@@ -95,7 +90,7 @@ resource "aws_eks_node_group" "lynq" {
   cluster_name    = aws_eks_cluster.lynq.name
   node_group_name = "${var.eks_cluster_name}-nodes"
   node_role_arn   = aws_iam_role.eks_node.arn
-  subnet_ids      = var.eks_subnet_ids
+  subnet_ids      = aws_subnet.private[*].id
 
   instance_types = [var.eks_node_instance_type]
   capacity_type  = var.eks_node_capacity_type
@@ -111,7 +106,11 @@ resource "aws_eks_node_group" "lynq" {
     max_unavailable = 1
   }
 
-  depends_on = [aws_iam_role_policy_attachment.eks_node]
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_node,
+    aws_route_table_association.public,
+    aws_route_table_association.private,
+  ]
 
   lifecycle {
     ignore_changes = [scaling_config[0].desired_size]

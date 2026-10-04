@@ -22,20 +22,34 @@ terraform {
       source  = "hashicorp/tls"
       version = "~> 4.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 }
 
-# The kubernetes/helm providers target the EKS cluster via the kubeconfig
-# context (set it with `aws eks update-kubeconfig` first).
 provider "kubernetes" {
-  config_path    = var.kubeconfig_path
-  config_context = var.kube_context
+  host                   = aws_eks_cluster.lynq.endpoint
+  cluster_ca_certificate = base64decode(aws_eks_cluster.lynq.certificate_authority[0].data)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.lynq.name, "--region", var.aws_region]
+  }
 }
 
 provider "helm" {
   kubernetes {
-    config_path    = var.kubeconfig_path
-    config_context = var.kube_context
+    host                   = aws_eks_cluster.lynq.endpoint
+    cluster_ca_certificate = base64decode(aws_eks_cluster.lynq.certificate_authority[0].data)
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", aws_eks_cluster.lynq.name, "--region", var.aws_region]
+    }
   }
 }
 

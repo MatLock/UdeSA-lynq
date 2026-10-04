@@ -2,7 +2,7 @@
 
 Kubernetes deployment for the Lynq platform, packaged as a Helm chart. The same chart runs both a self-contained local cluster (minikube) and the production cluster (AWS EKS); a small set of flags in the values files is what tells the two environments apart. In production the chart is not installed by hand — Terraform coordinates it — while locally you install it directly with Helm.
 
-The chart deploys the application modules (`lynq-iam`, `lynq-bff`, `lynq-app-backend`, `lynq-file-storage`, `lynq-llm`, `lynq-analytics`, and the frontend) together with their configuration, and — locally only — their infrastructure dependencies (MySQL, Redis, LocalStack). In production those dependencies come from managed services (RDS, ElastiCache, S3), the frontend is served from Cloudflare, and secrets are created outside the chart.
+The chart deploys the application modules (`lynq-iam`, `lynq-bff`, `lynq-app-backend`, `lynq-file-storage`, `lynq-llm`, `lynq-agent`, `lynq-feeders`, `lynq-analytics`, and the frontend) together with their configuration, and — locally only — their infrastructure dependencies (MySQL, Redis, LocalStack). In production MySQL and Redis are external hosts, S3/SNS/SQS are the real AWS services, the frontend is served from Cloudflare, and secrets are created outside the chart.
 
 
 ## Layout
@@ -26,10 +26,17 @@ infrastructure/
 └── terraform/                # Orchestrates the chart in PROD only
     ├── providers.tf
     ├── variables.tf
-    ├── main.tf
+    ├── main.tf               # Namespace, external Secrets and the helm_release
+    ├── vpc.tf                # VPC, public/private subnets, NAT
+    ├── eks.tf                # Cluster, node group, OIDC provider
+    ├── lbc.tf                # AWS Load Balancer Controller and its IRSA role
+    ├── dns.tf                # ACM certificate and Cloudflare records
     ├── s3.tf
+    ├── sns.tf                # Domain events topic lynq-app-backend publishes to
     ├── sqs.tf                # lynq-analytics' queue, subscribed to the domain events topic
+    ├── bedrock.tf            # Bedrock-only IAM users for lynq-llm and lynq-agent
     ├── outputs.tf
+    ├── policies/             # Vendored IAM policy of the load balancer controller
     └── environments/
         └── prod.tfvars
 ```
@@ -104,12 +111,12 @@ kubectl -n lynq-local-namespace logs -l app=lynq-analytics -f | grep "<request-u
 
 `lynq-app-backend` exposes `/internal/job-posts/ingest` for the feeder. That route is exempt from the bearer-token filters — a cron has no user behind it — and is guarded instead by a shared secret in the `lynq-internal-token` header.
 
-**The same value must be in two Secrets**: `lynq-feeders-secret` (the caller presents it) and `lynq-app-backend-secret` (the callee checks it). Locally both come from `credentials.internal.token` in `k8s_values-local.yaml`, so they cannot drift. In prod both Secrets are created outside the chart and it is on whoever provisions them to keep them equal.
+**The same value must be in every Secret that carries it**: `lynq-feeders-secret` (the caller presents it), `lynq-app-backend-secret` and `lynq-llm-secret` (the callees check it). Locally they all come from `credentials.internal.token` in `k8s_values-local.yaml`, so they cannot drift. In prod Terraform generates one value (`random_password.internal_token`) and writes it into all of them; `terraform output -raw internal_token` prints it when you need to call an internal route by hand.
 
 `lynq-analytics` uses the same token both ways: its own `/internal/**` routes check it (the snapshot
 trigger presents it), and it presents it to `lynq-app-backend`'s `/internal/score/batch` while it
-takes the snapshot. So `lynq-analytics-secret` carries the same `LYNQ_INTERNAL_TOKEN` too. In prod
-Terraform writes `TF_VAR_internal_token` into both `lynq-app-backend-secret` and `lynq-analytics-secret`.
+takes the snapshot. So `lynq-analytics-secret` carries the same `LYNQ_INTERNAL_TOKEN` too, written by
+Terraform from the same generated value.
 
 If the values differ, the ingest fails closed: the backend answers `401` and the feeder's run ends with an error logged in its pod — the trigger already got its `202`, so the CronJob is green and the failure is only visible there. The same happens when the token is missing entirely — a deploy that forgets it fails loudly rather than accepting unauthenticated writes.
 
@@ -176,19 +183,27 @@ helm template lynq ./infrastructure/helm -f infrastructure/helm/values/k8s_value
 
 Production runs on AWS EKS and is applied **only with Terraform** (local uses Helm directly). Terraform creates everything the chart needs and then runs the `helm_release`:
 
-- **The EKS cluster itself and its EC2 worker nodes** (`eks.tf`). The control plane is AWS-managed; the workers are a managed node group of `t3.medium` on-demand instances (2 by default, max 3). Both live in the VPC you pass in, so pods reach the MySQL/Redis EC2 over the internal network. The cluster's OIDC provider is created too, which is what makes IRSA possible later.
-- **MySQL + Redis on an EC2 instance** (`ec2-lynq-redis-db`), reachable from EKS over the internal network. Two security groups open `3306` and `6379` to the VPC CIDR, and a third opens `22` to a single admin IP. The apps' `DB_URL` / `REDIS_ADDRESS` are derived automatically from the instance's private DNS.
+- **The network** (`vpc.tf`). A VPC with two public and two private subnets in two AZs, an internet gateway, and a single NAT gateway. The public subnets hold the ALB and the NAT and are tagged `kubernetes.io/role/elb`; the private ones hold the cluster. Every pod leaves the VPC through the NAT's Elastic IP (`terraform output nat_public_ip`).
+- **The EKS cluster itself and its EC2 worker nodes** (`eks.tf`), in the private subnets. The control plane is AWS-managed; the workers are a managed node group of `t3.medium` on-demand instances (2 by default, max 3). The cluster's OIDC provider is created too, which is what the load balancer controller's IRSA role trusts.
+- **The AWS Load Balancer Controller** (`lbc.tf`), installed with Helm into `kube-system`. Its IAM role is assumed through IRSA, with the official policy vendored under `policies/` for the pinned chart version.
+- **MySQL and Redis are external.** Terraform does not create them: `db_host` / `redis_host` point at them, and the apps' `DB_URL` / `REDIS_ADDRESS` are derived from those. They must accept connections from the NAT's IP.
 - **S3 bucket** (private, with CORS for pre-signed uploads) for `lynq-file-storage`, the only service that talks to S3.
-- **SQS queue for `lynq-analytics`** (`sqs.tf`): `lynq-analytics-events`, subscribed to the `lynq-domain-events` topic with raw message delivery, and its dead-letter queue after five receives. Same shape as the LocalStack init hook used locally.
-- **External Secrets.** `manageSecrets: false` — Helm renders no Secrets; Terraform creates `dockerhub-secret`, `lynq-iam-secret`, `lynq-bff-secret`, `lynq-app-backend-secret`, `lynq-file-storage-secret`, `lynq-llm-secret`, and `lynq-analytics-secret`, and the deployments consume them by reference. Sensitive values are supplied at apply time via `TF_VAR_*` (never committed).
-- **Internet exposure via a shared ALB.** Only `lynq-bff` is exposed: it sits behind a single AWS ALB (AWS Load Balancer Controller) with a `group.name`, path-based routing on one domain, and TLS terminated at the ALB. It is the entry point for everything, identity included — it relays the auth calls to `lynq-iam`, which like the DMZ services (`lynq-app-backend`, `lynq-llm`, `lynq-file-storage`) has no Ingress and can only be reached from inside the cluster. The public DNS record is a CNAME to the ALB hostname read off `lynq-bff-ingress`.
+- **SNS + SQS** (`sns.tf`, `sqs.tf`): the `lynq-domain-events` topic `lynq-app-backend` publishes to, and `lynq-analytics-events`, subscribed to it with raw message delivery and a dead-letter queue after five receives. Same shape as the LocalStack init hook used locally.
+- **External Secrets.** `manageSecrets: false` — Helm renders no Secrets; Terraform creates `dockerhub-secret`, `lynq-iam-secret`, `lynq-bff-secret`, `lynq-app-backend-secret`, `lynq-file-storage-secret`, `lynq-llm-secret`, `lynq-agent-secret`, `lynq-feeders-secret`, and `lynq-analytics-secret`, and the deployments consume them by reference. The JWT secret and the internal token are generated by Terraform; the DB/Redis credentials and the Cloudflare and Docker Hub tokens are supplied at apply time via `TF_VAR_*` (never committed).
+- **Internet exposure via a shared ALB.** Only `lynq-bff` is exposed: it sits behind a single AWS ALB with a `group.name`, path-based routing on one domain, and TLS terminated at the ALB. It is the entry point for everything, identity included — it relays the auth calls to `lynq-iam`, which like the DMZ services (`lynq-app-backend`, `lynq-llm`, `lynq-file-storage`, `lynq-agent`, `lynq-analytics`) has no Ingress and can only be reached from inside the cluster. The public DNS record is a CNAME to the ALB hostname read off `lynq-bff-ingress`.
 - **Certificate + DNS.** Terraform creates the ACM certificate for `api.lynqoficial.com`, validates it via a Cloudflare DNS record, feeds the ARN into the Ingress, and points `api.lynqoficial.com` at the ALB (Cloudflare CNAME, DNS-only). DNS for `lynqoficial.com` lives in Cloudflare.
-- **Frontend on Cloudflare.** `localFrontend: false` — the frontend is deployed separately with Wrangler, outside this chart.
+- **Frontend on Cloudflare.** `localFrontend: false` — the frontend is deployed separately with Wrangler, outside this chart: `npm run deploy` in `lynq-app-frontend` publishes it at `https://app.lynqoficial.com`, the only origin the S3 bucket's CORS allows.
 
 
 ## Production — step by step
 
-Prerequisites: a VPC (note its id, its CIDR, a subnet id for the DB host, and **two subnet ids in different AZs** for EKS), a Cloudflare zone for `lynqoficial.com` (note its zone id) plus an API token with DNS edit permission, `terraform`, and AWS credentials for the provider (`aws configure` or `AWS_*` env vars). Fill in the `REPLACE_*` values in `environments/prod.tfvars` first. The ACM certificate and the `api.lynqoficial.com` DNS record are created by Terraform.
+Prerequisites on the machine that runs Terraform:
+
+- `terraform` (>= 1.5) and the **AWS CLI v2**. The `kubernetes` and `helm` providers authenticate against the cluster by running `aws eks get-token`, so the CLI must be on the `PATH`.
+- AWS credentials allowed to create everything above (VPC, EKS, IAM users/roles/policies, S3, SNS, SQS, ACM). Configure them with `aws configure` or the `AWS_*` env vars; Terraform and the AWS CLI both read them from there. The identity that creates the cluster becomes its admin.
+- In the Bedrock console, check that the account can invoke every model in `bedrock_invocable_model_ids` (Nova Lite and Nova Pro) in `bedrock_region`.
+
+Fill in the `REPLACE_*` values in `environments/prod.tfvars` first: `db_host`, `redis_host`, `cloudflare_zone_id` and `s3_bucket_name` (bucket names are global, pick a unique one).
 
 ### 0. Cloudflare token and zone id
 
@@ -202,130 +217,98 @@ Terraform needs a Cloudflare API token (to manage DNS) and the zone id of `lynqo
 
 **Zone id** — open the domain in the dashboard (Websites → `lynqoficial.com`) → **Overview** → bottom-right **API → Zone ID**.
 
-```bash
-export TF_VAR_cloudflare_api_token=<token>   # used at apply time
-# and set in environments/prod.tfvars:
-#   cloudflare_zone_id = "<zone-id>"
+### 1. Prepare MySQL and Redis
 
-# optional — verify the token works:
-curl -s -H "Authorization: Bearer <token>" \
-  https://api.cloudflare.com/client/v4/user/tokens/verify
+Terraform does not create the schemas. On the external MySQL, create the five databases and one user with access to all of them:
+
+```sql
+CREATE DATABASE IF NOT EXISTS lynq_iam_db;
+CREATE DATABASE IF NOT EXISTS lynq_backend_db;
+CREATE DATABASE IF NOT EXISTS lynq_file_storage_db;
+CREATE DATABASE IF NOT EXISTS lynq_analytics_db;
+CREATE DATABASE IF NOT EXISTS lynq_agent_db;
+CREATE USER '<DB_USER>'@'%' IDENTIFIED BY '<DB_PASSWORD>';
+GRANT ALL PRIVILEGES ON lynq_iam_db.*          TO '<DB_USER>'@'%';
+GRANT ALL PRIVILEGES ON lynq_backend_db.*      TO '<DB_USER>'@'%';
+GRANT ALL PRIVILEGES ON lynq_file_storage_db.* TO '<DB_USER>'@'%';
+GRANT ALL PRIVILEGES ON lynq_analytics_db.*    TO '<DB_USER>'@'%';
+GRANT ALL PRIVILEGES ON lynq_agent_db.*        TO '<DB_USER>'@'%';
+FLUSH PRIVILEGES;
 ```
 
-### 1. Create the EC2 instance (MySQL + Redis host)
+Each service creates its own tables on first start (Liquibase). Redis is reached over plain TCP — the services do not speak TLS to it — with an optional ACL user.
 
-The apps depend on the database, so the VM is created first, on its own:
+### 2. Export the secrets
+
+```bash
+export TF_VAR_db_username=<DB_USER>
+export TF_VAR_db_password=<DB_PASSWORD>
+export TF_VAR_redis_username=<REDIS_USER>       # only if Redis requires auth
+export TF_VAR_redis_password=<REDIS_PASSWORD>   # only if Redis requires auth
+export TF_VAR_cloudflare_api_token=<cloudflare-dns-token>
+export TF_VAR_dockerhub_token=<dockerhub-access-token>
+```
+
+The Docker Hub token is optional: without it `dockerhub-secret` is not created and the images are pulled anonymously. All the nodes share the NAT's IP, so they also share Docker Hub's anonymous rate limit — keep the token.
+
+Everything else is generated. The JWT secret and the internal token come from `random_password`, and Terraform creates least-privilege IAM users and writes each access key straight into the Secret of the one service that needs it:
+
+| IAM identity | Permissions | Secret |
+| --- | --- | --- |
+| `lynq-backend-s3` (`s3.tf`) | `s3:GetObject/PutObject/DeleteObject` + `ListBucket`, scoped to the bucket | `lynq-file-storage-secret` |
+| `lynq-llm-bedrock` (`bedrock.tf`) | `bedrock:InvokeModel` on the allowed models (below), `ListFoundationModels` for the health probe | `lynq-llm-secret` |
+| `lynq-agent-bedrock` (`bedrock.tf`) | `bedrock:InvokeModel` on the allowed models (below) | `lynq-agent-secret` |
+| `lynq-app-backend-sns` (`sns.tf`) | `sns:Publish` on `lynq-domain-events` | `lynq-app-backend-secret` |
+| `lynq-analytics-sqs` (`sqs.tf`) | `sqs:ReceiveMessage/DeleteMessage/ChangeMessageVisibility/GetQueueAttributes/GetQueueUrl` on `lynq-analytics-events` | `lynq-analytics-secret` |
+| `lynq-eks-aws-load-balancer-controller` role (`lbc.tf`) | the controller's official policy, assumed through IRSA | — (ServiceAccount annotation) |
+
+`lynq-agent` calls Bedrock itself (it does not go through `lynq-llm`), which is why it has its own user. Both Bedrock users may invoke the same models: everything in `bedrock_invocable_model_ids` (Nova Lite and Nova Pro by default) plus `bedrock_model_id` and `agent_bedrock_model_id`, either directly or through a cross-region inference profile (`us.amazon.nova-pro-v1:0`). Switching a service between them — or pointing the agent's `BEDROCK_INTENT_MODEL_ID` / `BEDROCK_JUDGE_MODEL_ID` at Nova Lite — needs no IAM change. A model outside that list, or a guardrail (`bedrock:ApplyGuardrail`), does.
+
+### 3. Create the network and the cluster
+
+The first apply is **two-phase**: the `kubernetes` and `helm` providers are configured from the cluster (`providers.tf`), which does not exist yet.
 
 ```bash
 cd infrastructure/terraform
 terraform init
 
 terraform apply \
-  -target=aws_instance.redis_db \
   -var-file=environments/prod.tfvars \
-  -var="ssh_allowed_cidr=$(curl -s ifconfig.me)/32"
+  -target=aws_eks_addon.core
 
-terraform output redis_db_public_ip   # for SSH
+terraform output nat_public_ip
 ```
 
-### 2. Install MySQL and Redis on the instance
-
-SSH in and install both, **defining the user and password** you will feed to Terraform in step 3 (Amazon Linux 2023):
-
-```bash
-ssh -i <your-key.pem> ec2-user@<redis_db_public_ip>
-
-# ---- MySQL ----
-sudo dnf install -y https://dev.mysql.com/get/mysql80-community-release-el9-1.noarch.rpm
-sudo dnf install -y mysql-community-server
-sudo systemctl enable --now mysqld
-sudo grep 'temporary password' /var/log/mysqld.log   # initial root password
-
-# create databases + app user (choose <DB_USER> / <DB_PASSWORD>)
-mysql -u root -p <<'SQL'
-CREATE DATABASE IF NOT EXISTS lynq_iam_db;
-CREATE DATABASE IF NOT EXISTS lynq_backend_db;
-CREATE DATABASE IF NOT EXISTS lynq_file_storage_db;
-CREATE DATABASE IF NOT EXISTS lynq_analytics_db;
-CREATE USER '<DB_USER>'@'%' IDENTIFIED BY '<DB_PASSWORD>';
-GRANT ALL PRIVILEGES ON lynq_iam_db.*          TO '<DB_USER>'@'%';
-GRANT ALL PRIVILEGES ON lynq_backend_db.*      TO '<DB_USER>'@'%';
-GRANT ALL PRIVILEGES ON lynq_file_storage_db.* TO '<DB_USER>'@'%';
-GRANT ALL PRIVILEGES ON lynq_analytics_db.*    TO '<DB_USER>'@'%';
-FLUSH PRIVILEGES;
-SQL
-
-# allow remote connections: set `bind-address = 0.0.0.0` in /etc/my.cnf, then
-sudo systemctl restart mysqld
-
-# ---- Redis ----
-sudo dnf install -y redis6
-# in /etc/redis6/redis.conf: set `bind 0.0.0.0` and add an ACL user matching the app:
-#   user <REDIS_USER> on ><REDIS_PASSWORD> ~* &* +@all
-#   user default off
-sudo systemctl enable --now redis6
-```
-
-### 3. Define the AWS keys and passwords
-
-Export the secrets as `TF_VAR_*` so Terraform writes them into the Kubernetes Secrets — the DB/Redis values **must match** what you set on the VM in step 2:
-
-```bash
-export TF_VAR_db_username=<DB_USER>
-export TF_VAR_db_password=<DB_PASSWORD>
-export TF_VAR_redis_username=<REDIS_USER>
-export TF_VAR_redis_password=<REDIS_PASSWORD>
-export TF_VAR_jwt_secret=<jwt-signing-secret>
-export TF_VAR_internal_token=<shared-secret-of-the-internal-routes>
-export TF_VAR_dockerhub_token=<dockerhub-access-token>
-export TF_VAR_cloudflare_api_token=<cloudflare-dns-token>
-```
-
-`lynq-llm`'s LLM backend is plain (non-secret) config, so it stays in `prod.tfvars` rather than the environment — `bedrock_model_id` (any Converse-capable model: `anthropic.*`, `amazon.nova-*`, `meta.llama*`, `mistral.*`) and `bedrock_region`.
-
-No AWS credentials are set here either. Terraform creates least-privilege IAM users and writes each access key straight into the Secret of the one service that needs it:
-
-| IAM user | Permissions | Secret |
-| --- | --- | --- |
-| `lynq-backend-s3` (`s3.tf`) | `s3:GetObject/PutObject/DeleteObject` + `ListBucket`, scoped to the bucket | `lynq-file-storage-secret` |
-| `lynq-llm-bedrock` (`bedrock.tf`) | `bedrock:InvokeModel` on the configured model, `ListFoundationModels` for the health probe | `lynq-llm-secret` |
-| `lynq-app-backend-sns` (`sns.tf`) | `sns:Publish` on `lynq-domain-events` | `lynq-app-backend-secret` |
-| `lynq-analytics-sqs` (`sqs.tf`) | `sqs:ReceiveMessage/DeleteMessage/ChangeMessageVisibility/GetQueueAttributes/GetQueueUrl` on `lynq-analytics-events` | `lynq-analytics-secret` |
-
-`lynq-app-backend` gets no bucket credentials; it delegates every file operation to `lynq-file-storage` over HTTP. Both users can be replaced by IRSA roles once the cluster has an OIDC provider — the services read the standard AWS credential chain, so no code changes.
+Allow that IP on the MySQL and Redis firewalls before the next step — it is where every pod connects from.
 
 ### 4. Deploy everything else
 
-The first apply is **two-phase**, because the `kubernetes` and `helm` providers authenticate through the kubeconfig (`providers.tf`) and the cluster does not exist yet.
-
-**4a — create the cluster and its nodes**, then point the kubeconfig at it:
-
 ```bash
-terraform apply \
-  -var-file=environments/prod.tfvars \
-  -target=aws_eks_node_group.lynq \
-  -target=aws_eks_addon.core
-
-aws eks update-kubeconfig \
-  --name "$(terraform output -raw eks_cluster_name)" \
-  --region us-east-1
+terraform apply -var-file=environments/prod.tfvars
 ```
 
-**4b — install the AWS Load Balancer Controller** in the fresh cluster (the Ingresses need it to provision the ALB). Follow the [AWS guide](https://docs.aws.amazon.com/eks/latest/userguide/lbc-helm.html); its IAM role uses the OIDC provider Terraform just created (`terraform output eks_oidc_provider_arn`).
+This installs the load balancer controller, the namespace, the Secrets, S3, SNS, SQS, the IAM users, and the Helm release, then points the DNS at the ALB. Later applies are this single command — the two-phase split is only needed while the cluster does not exist.
 
-**4c — apply everything else** (namespace, Secrets, S3 bucket, Bedrock user, and the Helm release):
+To inspect the cluster with `kubectl`:
 
 ```bash
-terraform apply \
-  -var-file=environments/prod.tfvars \
-  -var="ssh_allowed_cidr=$(curl -s ifconfig.me)/32"
+aws eks update-kubeconfig --name "$(terraform output -raw eks_cluster_name)" --region us-east-1
+kubectl -n lynq-prod-namespace get pods
 ```
-
-Later applies are a single `terraform apply` — the two-phase split is only needed while the cluster does not exist.
 
 ### 5. DNS
 
 Terraform creates the `api.lynqoficial.com` CNAME pointing at the ALB automatically (Cloudflare, DNS-only). Because the ALB is provisioned asynchronously by the controller, its hostname may not be ready during the first apply — if the `cloudflare_record.api` step errors on an empty hostname, just **re-run the same `terraform apply`** once the release is up (`kubectl -n lynq-prod-namespace get ingress` shows the ALB address).
+
+### Tearing it down
+
+The ALB and its security groups are created by the controller, not by Terraform, so remove the release first and let the controller delete them before the VPC goes:
+
+```bash
+terraform destroy -var-file=environments/prod.tfvars -target=helm_release.lynq
+# wait until the ALB is gone from the EC2 console (Load Balancers)
+terraform destroy -var-file=environments/prod.tfvars
+```
 
 
 ## Validating

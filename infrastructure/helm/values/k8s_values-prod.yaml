@@ -59,8 +59,8 @@ manageSecrets: false
 # before the release), so the chart must not create it here.
 createNamespace: false
 
-# No in-cluster infra in prod: MySQL/Redis come from managed services (RDS,
-# ElastiCache), S3 is real S3 (AWS_ENDPOINT=""), and Ollama is an external
+# No in-cluster infra in prod: MySQL/Redis are external hosts set in Terraform
+# (db_host, redis_host), S3 is real S3 (AWS_ENDPOINT=""), and Ollama is an external
 # OLLAMA_BASE_URL. The apps reach them via the config below.
 localInfra: false
 ollamaInCluster: false

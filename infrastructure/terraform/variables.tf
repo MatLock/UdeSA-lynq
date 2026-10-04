@@ -2,17 +2,6 @@
 # Cluster / release targeting (prod EKS only — local is handled by Helm directly)
 # ---------------------------------------------------------------------------
 
-variable "kubeconfig_path" {
-  description = "Path to the kubeconfig file."
-  type        = string
-  default     = "~/.kube/config"
-}
-
-variable "kube_context" {
-  description = "kubeconfig context for the EKS cluster (after `aws eks update-kubeconfig`)."
-  type        = string
-}
-
 variable "aws_region" {
   description = "AWS region for the cluster and managed services."
   type        = string
@@ -32,46 +21,35 @@ variable "namespace" {
 }
 
 # ---------------------------------------------------------------------------
-# Networking / EC2 (self-managed MySQL + Redis host reachable from EKS)
+# Networking (vpc.tf) and the external MySQL + Redis the services connect to.
 # ---------------------------------------------------------------------------
 
-variable "vpc_id" {
-  description = "VPC id where the EC2 lives (same VPC as the EKS cluster for internal reachability)."
-  type        = string
-}
-
-variable "subnet_id" {
-  description = "Subnet id for the EC2 instance (a private subnet in the VPC above)."
-  type        = string
-}
-
-variable "internal_cidr" {
-  description = "Internal network CIDR allowed to reach the DB/Redis ports (typically the VPC CIDR)."
+variable "vpc_cidr" {
+  description = "CIDR of the VPC Terraform creates. Split into two public and two private /20 subnets."
   type        = string
   default     = "10.0.0.0/16"
 }
 
-variable "ssh_allowed_cidr" {
-  description = "CIDR allowed to SSH (port 22) into the EC2. Set at apply time, e.g. -var=\"ssh_allowed_cidr=1.2.3.4/32\"."
+variable "db_host" {
+  description = "Host or IP of the external MySQL. It must already have lynq_iam_db, lynq_backend_db, lynq_file_storage_db, lynq_analytics_db and lynq_agent_db, and accept connections from the nat_public_ip output."
   type        = string
 }
 
-variable "ec2_instance_type" {
-  description = "EC2 instance type for the MySQL + Redis host."
-  type        = string
-  default     = "t3.small"
+variable "db_port" {
+  description = "Port of the external MySQL."
+  type        = number
+  default     = 3306
 }
 
-variable "ec2_ami_id" {
-  description = "AMI id for the EC2 instance. Empty = latest Amazon Linux 2023."
+variable "redis_host" {
+  description = "Host or IP of the external Redis (plain TCP, no TLS). It must accept connections from the nat_public_ip output."
   type        = string
-  default     = ""
 }
 
-variable "ec2_key_name" {
-  description = "EC2 key pair name for SSH access (optional)."
-  type        = string
-  default     = ""
+variable "redis_port" {
+  description = "Port of the external Redis."
+  type        = number
+  default     = 6379
 }
 
 # ---------------------------------------------------------------------------
@@ -107,8 +85,9 @@ variable "s3_cors_allowed_origins" {
 }
 
 variable "ollama_base_url" {
-  description = "External Ollama base URL for lynq-llm."
+  description = "External Ollama base URL for lynq-llm and lynq-agent. Unused while both run with LLM_PROVIDER=bedrock."
   type        = string
+  default     = ""
 }
 
 # ---------------------------------------------------------------------------
@@ -129,7 +108,7 @@ variable "dockerhub_username" {
 }
 
 variable "dockerhub_token" {
-  description = "Docker Hub access token."
+  description = "Docker Hub access token. Empty skips dockerhub-secret and the images are pulled anonymously, which shares Docker Hub's per-IP rate limit across the whole cluster through the NAT."
   type        = string
   sensitive   = true
   default     = ""
@@ -142,42 +121,26 @@ variable "dockerhub_email" {
 }
 
 variable "db_username" {
-  description = "Managed DB username (shared by iam + backend)."
+  description = "Username of the external MySQL, shared by every service. Needs all privileges on the five lynq_*_db schemas."
   type        = string
   sensitive   = true
-  default     = ""
 }
 
 variable "db_password" {
-  description = "Managed DB password (shared by iam + backend)."
+  description = "Password of the external MySQL user."
   type        = string
   sensitive   = true
-  default     = ""
 }
 
 variable "redis_username" {
-  description = "Managed Redis username (optional)."
+  description = "Username of the external Redis (optional)."
   type        = string
   sensitive   = true
   default     = ""
 }
 
 variable "redis_password" {
-  description = "Managed Redis password (optional)."
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
-variable "jwt_secret" {
-  description = "JWT signing secret for lynq-iam."
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
-variable "internal_token" {
-  description = "Shared secret of the /internal/** routes: lynq-analytics presents it to lynq-app-backend, and its snapshot CronJob presents it to lynq-analytics."
+  description = "Password of the external Redis (optional)."
   type        = string
   sensitive   = true
   default     = ""
@@ -194,8 +157,20 @@ variable "bedrock_model_id" {
   default     = "amazon.nova-pro-v1:0"
 }
 
+variable "bedrock_invocable_model_ids" {
+  description = "Bedrock models both lynq-llm's and lynq-agent's IAM users may invoke, besides bedrock_model_id and agent_bedrock_model_id, which are always allowed. Lets either service switch between them, or run the agent's intent and judge steps on a cheaper one, without touching IAM."
+  type        = list(string)
+  default     = ["amazon.nova-lite-v1:0", "amazon.nova-pro-v1:0"]
+}
+
+variable "agent_bedrock_model_id" {
+  description = "Bedrock model lynq-agent runs its tool-calling loop on. Nova Lite loses the thread on multi-step tool use, so Nova Pro is the default."
+  type        = string
+  default     = "amazon.nova-pro-v1:0"
+}
+
 variable "bedrock_region" {
-  description = "Region whose Bedrock endpoint lynq-llm calls (the model must be enabled there)."
+  description = "Region whose Bedrock endpoint lynq-llm and lynq-agent call (both models must be enabled there)."
   type        = string
   default     = "us-east-1"
 }
@@ -210,14 +185,9 @@ variable "eks_cluster_name" {
 }
 
 variable "eks_kubernetes_version" {
-  description = "Kubernetes minor version for the control plane. Check it is still supported before applying."
+  description = "Kubernetes minor version for the control plane. Out of standard support EKS bills extended support, six times the hourly price: check it before applying."
   type        = string
-  default     = "1.32"
-}
-
-variable "eks_subnet_ids" {
-  description = "Subnets for the control plane ENIs and the worker nodes. At least two, in different AZs, in the same VPC as vpc_id."
-  type        = list(string)
+  default     = "1.35"
 }
 
 variable "eks_public_access_cidrs" {
@@ -227,7 +197,7 @@ variable "eks_public_access_cidrs" {
 }
 
 variable "eks_node_instance_type" {
-  description = "EC2 instance type for the worker nodes. t3.medium fits the 6 services plus the system pods (17-pod ENI ceiling)."
+  description = "EC2 instance type for the worker nodes. Two t3.medium fit the 8 services plus the system pods and the load balancer controller (17-pod ENI ceiling each)."
   type        = string
   default     = "t3.medium"
 }
@@ -265,4 +235,10 @@ variable "eks_node_max_size" {
   description = "Maximum worker nodes the group may scale to."
   type        = number
   default     = 3
+}
+
+variable "lbc_version" {
+  description = "AWS Load Balancer Controller chart version. Its IAM policy is read from policies/aws-load-balancer-controller-v<version>.json, so bumping it means adding that file."
+  type        = string
+  default     = "3.5.0"
 }
