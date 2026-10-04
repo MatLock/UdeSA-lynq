@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lynq-analytics-config
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-analytics
+data:
+{{- range $key, $value := .Values.lynq_analytics.config }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}

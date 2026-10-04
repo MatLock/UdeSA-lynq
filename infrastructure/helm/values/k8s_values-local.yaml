@@ -210,12 +210,34 @@ lynq_feeders:
     activeDeadlineSeconds: 120
     requestTimeoutSeconds: 30
 
+# Reached only from inside the cluster: lynq-bff relays the dashboards, the
+# snapshot CronJob triggers the daily run. No `path` and no Ingress.
 lynq_analytics:
+  replicas: 1
+  # Published from the next release on, like every other service's image.
+  image: matlock0o/lynq:lynq-analytics-3.0.2-SNAPSHOT
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+  config:
+    SPRING_PROFILES_ACTIVE: production
+    DB_URL: jdbc:mysql://mysql:3306/lynq_analytics_db
+    LYNQ_IAM_URL: http://lynq-iam-service:8080/lynq-iam
+    LYNQ_BACKEND_URL: http://lynq-app-backend-service:8080/lynq-backend-app
+    REDIS_ADDRESS: redis
+    REDIS_PORT: "6379"
+    AWS_REGION: us-east-1
+    # LocalStack's dummy credentials, not a secret.
+    AWS_ACCESS_KEY_ID: test
+    AWS_SECRET_ACCESS_KEY: test
+    SPRING_CLOUD_AWS_SQS_ENDPOINT: http://localstack:4566
+    # Subscribed to lynq-domain-events by the LocalStack init hook.
+    LYNQ_ANALYTICS_EVENTS_QUEUE: lynq-analytics-events
   cron:
-    # Off until lynq-analytics is deployed by the chart: the trigger calls
-    # lynq-analytics-service and reads lynq-analytics-secret, neither of which
-    # exists yet.
-    enabled: false
+    enabled: true
     # 08:00 UTC is 05:00 in Buenos Aires, two hours after the feeders' run, so
     # the day's snapshot includes what they ingested and closed.
     schedule: "0 8 * * *"
@@ -246,6 +268,7 @@ lynq_bff:
     LYNQ_LLM_URL: http://lynq-llm-service:8084/lynq-llm
     LYNQ_FILE_STORAGE_URL: http://lynq-file-storage-service:8080/lynq-file-storage
     LYNQ_AGENT_URL: http://lynq-agent-service:8090/lynq-agent
+    LYNQ_ANALYTICS_URL: http://lynq-analytics-service:8080/lynq-analytics
 
 lynq_app_backend:
   replicas: 1

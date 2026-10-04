@@ -68,6 +68,16 @@ output "llm_bedrock_access_key_id" {
   value       = aws_iam_access_key.llm_bedrock.id
 }
 
+output "analytics_events_queue_url" {
+  description = "URL of the SQS queue lynq-analytics consumes, subscribed to the domain events topic."
+  value       = aws_sqs_queue.analytics_events.url
+}
+
+output "analytics_sqs_access_key_id" {
+  description = "Access key id of the consume-only IAM user used by lynq-analytics (the secret lives only in state / the k8s Secret)."
+  value       = aws_iam_access_key.analytics_sqs.id
+}
+
 output "eks_cluster_name" {
   description = "EKS cluster name. Feed it to: aws eks update-kubeconfig --name <this> --region <aws_region>."
   value       = aws_eks_cluster.lynq.name

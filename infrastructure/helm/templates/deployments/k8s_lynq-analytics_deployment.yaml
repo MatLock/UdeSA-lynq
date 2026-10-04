@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lynq-analytics-deployment
+  namespace: lynq-{{ .Values.k8s_namespace }}-namespace
+  labels:
+    app: lynq-analytics
+spec:
+  replicas: {{ .Values.lynq_analytics.replicas }}
+  selector:
+    matchLabels:
+      app: lynq-analytics
+  template:
+    metadata:
+      labels:
+        app: lynq-analytics
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-secret
+      {{- if .Values.localInfra }}
+      # Local only: wait for the in-cluster dependencies before starting.
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -w 2 mysql 3306 </dev/null; do echo "waiting for mysql:3306"; sleep 2; done']
+        - name: wait-for-redis
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -w 2 redis 6379 </dev/null; do echo "waiting for redis:6379"; sleep 2; done']
+        # lynq-analytics fails to start when its queue does not exist, and LocalStack
+        # creates it in an init hook that runs after the port is already open, so
+        # this waits for the hooks to finish rather than for the port.
+        - name: wait-for-localstack-queue
+          image: busybox:1.36
+          command: ['sh', '-c', 'until wget -qO- http://localstack:4566/_localstack/init/ready 2>/dev/null | grep -Eq "\"completed\": ?true"; do echo "waiting for the localstack init hooks"; sleep 2; done']
+        - name: wait-for-iam
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -w 2 lynq-iam-service 8080 </dev/null; do echo "waiting for lynq-iam-service:8080"; sleep 2; done']
+      {{- end }}
+      containers:
+        - name: lynq-analytics
+          image: {{ .Values.lynq_analytics.image }}
+          {{- with .Values.lynq_analytics.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: lynq-analytics-config
+            - secretRef:
+                name: lynq-analytics-secret
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
