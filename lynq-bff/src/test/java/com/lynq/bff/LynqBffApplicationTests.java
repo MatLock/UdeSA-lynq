@@ -68,6 +68,10 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 "skillDemand": [{"skill": "Java", "openJobPosts": 14, "weeklyChange": 4}], \
 "salary": {"currency": "USD", "rows": []}, \
 "publishedPerWeek": [{"weekStart": "2026-09-21", "jobPosts": 4}]}}""";
+  private static final String COMPANY_DETAIL_BODY = """
+      {"success": true, "data": {"id": "22222222-2222-2222-2222-222222222222", "name": "Nimbus", \
+"jobs": [{"id": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a70", "title": "Backend", \
+"description": "Java y Spring.", "jobStatus": "OPEN"}]}}""";
   private static final String COMPANY_JOBS_BODY = """
       {"success": true, "data": {"jobs": [{"jobId": "018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a70", \
 "title": "Backend", "status": "OPEN", "publishedOn": "2026-09-20", "applications": 6, \
@@ -870,6 +874,24 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     assertThat(data.path("skillDemand").path(0).path("weeklyChange").asInt(), is(4));
     assertThat(data.path("publishedPerWeek").path(0).path("weekStart").asText(),
         is("2026-09-21"));
+  }
+
+  @Test
+  void readsTheCompanyDetailWithItsJobPosts() throws Exception {
+    lynqBackendMock.when(request().withMethod("GET")
+            .withPath("/dmz/company/22222222-2222-2222-2222-222222222222"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(COMPANY_DETAIL_BODY));
+
+    HttpResponse<String> response =
+        send("GET", CONTEXT_PATH + "/company/22222222-2222-2222-2222-222222222222", null);
+
+    assertThat(response.statusCode(), is(200));
+    JsonNode job = payloadOf(response).path("data").path("jobs").path(0);
+    assertThat(job.path("id").asText(), is("018f9c3a-2b1d-7c4e-9a6f-1e2d3c4b5a70"));
+    assertThat(job.path("description").asText(), is("Java y Spring."));
+    assertThat(job.path("jobStatus").asText(), is("OPEN"));
   }
 
   @Test
