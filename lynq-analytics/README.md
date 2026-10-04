@@ -4,7 +4,7 @@ Analytics service for the Lynq platform. It serves the numbers that sit next to 
 
 It does not read `lynq_backend_db`. Its data will arrive as domain events published by `lynq-app-backend` (SNS topic `lynq-domain-events` → SQS queue `lynq-analytics-events`) and be projected into its own schema, `lynq_analytics_db`.
 
-Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. Job post, candidate and application events are also projected into a read model, over which the service resolves similar job posts and similar candidates. Served today: a candidate's **standing** among the applicants of a job post, the **salary** medians of the position and of similar candidates, the candidate's **market fit** against the open job posts and their percentile among similar candidates, the **market** (skill demand, salaries by category and work type, job posts published per week) and the **company job posts** comparison. The first two are computed on request; market fit and market read a **daily snapshot** that a Kubernetes CronJob triggers. Time to fill comes next.
+Today the service boots, authenticates every request against [`lynq-iam`](../lynq-iam), answers with the platform's response envelope, and records every domain event it receives in an append-only `domain_events` table. Job post, candidate and application events are also projected into a read model, over which the service resolves similar job posts and similar candidates. Served today: the **time to fill** of the job posts similar to a company's own, a candidate's **standing** among the applicants of a job post, the **salary** medians of the position and of similar candidates, the candidate's **market fit** against the open job posts and their percentile among similar candidates, the **market** (skill demand, salaries by category and work type, job posts published per week) and the **company job posts** comparison. The first three are computed on request; market fit and market read a **daily snapshot** that a Kubernetes CronJob triggers.
 
 ---
 
@@ -206,6 +206,53 @@ Matches are ordered by score and then by skills in common. `Distribution.of(valu
 
 ---
 
+## Time to fill
+
+`GET /dmz/analytics/job/{jobId}/time-to-fill` — how long job posts like this one stayed open
+before they closed. Only the `COMPANY` user who published the job post: another company gets
+`403`, and so does everyone for a scraped post, which has no author.
+
+```json
+{
+  "success": true,
+  "data": {
+    "median": 21.0, "p25": 14.0, "p75": 25.0, "n": 12, "insufficientData": false,
+    "externalJobPosts": 10,
+    "expiredByPolicy": 3, "expiredAfterDays": 25,
+    "daysOpen": 9,
+    "overall": null
+  }
+}
+```
+
+- **Sample** — the [similar job posts](#similarity) that are `CLOSE` with a `closed_on`. Each
+  counts the days from when it opened to `closed_on`: from `published_on`, or from
+  `reopened_on` when it was reopened later, so a reopened post measures its last open period.
+  A post that closed before it opened is bad data and is left out.
+- **Censored closes** — a post closed as `EXPIRED_BY_POLICY` was still open when the policy
+  closed it: its real time to fill is unknown and longer than what it shows. It stays out of the
+  median and is counted in `expiredByPolicy`; `expiredAfterDays`
+  (`lynq.analytics.time-to-fill.expired-after-days`, 25, the same window as the backend's
+  `lynq.verification.expire-after-days`) says after how long the policy closes a post.
+- **Days on the market** — a scraped posting can be taken down without being filled, so for
+  those the days measure how long it stayed up. `externalJobPosts` says how many of the `n`
+  are such postings, so the screen can say so.
+- **Short samples** — below `lynq.analytics.time-to-fill.min-sample` (5) closes, `median`,
+  `p25` and `p75` are null and `insufficientData` is `true`, and `overall` carries the same
+  figures over every closed post of the platform (the post itself and the censored ones
+  excluded), with its own `insufficientData`. It is the platform's median, not that of similar
+  posts, and the screen labels it so. With enough similar closes `overall` is `null`.
+- **This post** — `daysOpen` counts from when the post opened until today, or until its
+  `closed_on` if it is closed, in the service clock's zone.
+- **Cache** — an hour per job post and caller; see [Cache](#cache).
+
+| Property                                         | Default | |
+| ------------------------------------------------ | ------- | - |
+| `lynq.analytics.time-to-fill.min-sample`         | `5`     | below it, the similar posts' statistics are withheld and `overall` is sent |
+| `lynq.analytics.time-to-fill.expired-after-days` | `25`    | the days after which the backend's policy closes an external post |
+
+---
+
 ## Standing
 
 `GET /dmz/analytics/job/{jobId}/standing` — where the caller stands among the applicants of a job post. Only `CANDIDATE` users, and only for a job post they applied to.
@@ -384,14 +431,14 @@ The analytics are computed on request over the read model, and Redis keeps each 
 
 | Cache          | Endpoint                                  | Key                |
 | -------------- | ----------------------------------------- | ------------------ |
-| `time-to-fill` | `GET /dmz/analytics/job/{jobId}/time-to-fill` | `jobId`        |
+| `time-to-fill` | `GET /dmz/analytics/job/{jobId}/time-to-fill` | `jobId:userId` |
 | `salary`       | `GET /dmz/analytics/job/{jobId}/salary`   | `jobId`            |
 | `standing`     | `GET /dmz/analytics/job/{jobId}/standing` | `jobId:userId`     |
 | `benchmark`    | `GET /dmz/analytics/candidate/me/benchmark` | `userId`         |
 | `market`       | `GET /dmz/analytics/market`               | `currency`         |
 | `company-jobs` | `GET /dmz/analytics/company/me/jobs`      | `userId`           |
 
-The standing is keyed by the candidate too: it holds the caller's own rank and score, and one candidate must never be served another's. The benchmark and the company job posts are keyed by the caller for the same reason. The salary and the time to fill are the same for every caller of a job post.
+The standing is keyed by the candidate too: it holds the caller's own rank and score, and one candidate must never be served another's. The benchmark and the company job posts are keyed by the caller for the same reason. The time to fill is keyed by the caller because its ownership check runs inside the cached method: keyed by the job post alone, the owner's answer would be served to any company that asked after. The salary is the same for every caller of a job post.
 
 - **Keys** — `lynq-analytics::<cache>::<key>` in Redis, e.g. `lynq-analytics::standing::7777…:1111…`.
 - **TTL** — `lynq.analytics.cache.ttl`, default `PT1H`, the same for every cache. Nothing is evicted when an event arrives: an answer can be up to an hour behind the read model.
@@ -401,7 +448,7 @@ The standing is keyed by the candidate too: it holds the caller's own rank and s
 - **Writes** — immediate: a request waits for Redis to confirm the entry. Spring Data Redis 4 writes in the background by default with Lettuce, which lets an eviction overtake the write it follows and hides write failures from the error handler; waiting costs under a millisecond next to computing a median.
 - **Metrics** — hits, misses, puts and evictions per cache, as `cache.gets{cache,result}`, `cache.puts` and `cache.evictions` on `/actuator/prometheus`. They are what tells whether the hour is right.
 
-Each endpoint's service method declares `@Cacheable(cacheNames = AnalyticsCaches.…, key = …)` with the key above; the standing (`StandingService`) and the salary (`SalaryService`) do, time to fill will with F8.
+Each endpoint's service method declares `@Cacheable(cacheNames = AnalyticsCaches.…, key = …)` with the key above; the time to fill (`TimeToFillService`), the standing (`StandingService`) and the salary (`SalaryService`) do.
 
 ---
 

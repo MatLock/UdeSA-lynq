@@ -2,6 +2,7 @@ package com.lynq.backend.repository;
 
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.repository.projection.JobWithDetailsProjection;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -93,4 +94,29 @@ public interface JobPostRepository extends JpaRepository<JobPostEntity, String> 
   @Query("SELECT j FROM JobPostEntity j WHERE j.company.id = :companyId ORDER BY j.createdOn DESC")
   List<JobPostEntity> findByCompanyId(@Param("companyId") String companyId);
 
+  @Query(value = """
+      SELECT ranked.id FROM (
+        SELECT j.id, j.category,
+          ROW_NUMBER() OVER (
+            PARTITION BY j.category
+            ORDER BY CASE WHEN j.last_checked_on IS NULL THEN 0 ELSE 1 END,
+              j.last_checked_on, j.id) AS position
+        FROM job_posts j
+        WHERE j.job_post_source <> 'LYNQ'
+          AND j.job_status = 'OPEN'
+          AND j.job_url IS NOT NULL
+          AND COALESCE(j.last_seen_on, j.created_on) < :seenBefore
+          AND (j.last_checked_on IS NULL OR j.last_checked_on < :checkedBefore)
+      ) ranked
+      WHERE ranked.position <= :quota
+      ORDER BY ranked.position, ranked.category, ranked.id""", nativeQuery = true)
+  List<String> findVerificationCandidateIds(@Param("seenBefore") LocalDate seenBefore,
+      @Param("checkedBefore") LocalDate checkedBefore, @Param("quota") int quota);
+
+  @Query("""
+      SELECT j FROM JobPostEntity j
+      WHERE j.jobPostSource <> com.lynq.backend.enums.JobPostSource.LYNQ
+        AND j.jobStatus = com.lynq.backend.enums.JobStatus.OPEN
+        AND COALESCE(j.lastSeenOn, j.createdOn) < :seenBefore""")
+  List<JobPostEntity> findOpenExternalNotSeenSince(@Param("seenBefore") LocalDate seenBefore);
 }

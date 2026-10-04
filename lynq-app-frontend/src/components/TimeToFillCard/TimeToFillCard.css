@@ -1,0 +1,113 @@
+.ttf-card .ds-card,
+.ttf-card .ds-empty {
+  padding: var(--space-2);
+}
+
+.ttf-card .ds-card-title {
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.ttf-card .ds-figure {
+  font-size: 28px;
+  line-height: 30px;
+}
+
+.ttf-card .ds-takeaway {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.ttf-box-track {
+  stroke: var(--rule-hairline);
+  stroke-width: 2;
+}
+
+.ttf-box-censored line {
+  stroke: var(--signal-gap);
+  stroke-width: 2;
+}
+
+.ttf-box-censored-tail {
+  stroke-dasharray: 4 3;
+}
+
+.ttf-box-iqr {
+  fill: var(--level-query-wash);
+  stroke: var(--level-query);
+  stroke-width: 1.5;
+}
+
+.ttf-box-median {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.ttf-box-marker {
+  fill: var(--level-ingest);
+  stroke: var(--surface-raised);
+  stroke-width: 2;
+}
+
+.ttf-box-axis {
+  fill: var(--ink-muted);
+}
+
+.ttf-middle-half {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+
+.ttf-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ttf-legend::before {
+  content: "";
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+}
+
+.ttf-legend--job::before {
+  background: var(--level-ingest);
+}
+
+.ttf-legend--censored::before {
+  border-radius: 0;
+  height: 2px;
+  background: var(--signal-gap);
+}
+
+.ttf-compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-hairline) solid var(--rule-hairline);
+  border-top: none;
+  background: var(--surface-raised);
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
+
+.ttf-compact-name {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.ttf-compact-figure {
+  color: var(--ink);
+  font-weight: 600;
+}

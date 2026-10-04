@@ -4,6 +4,7 @@ import random
 import re
 import time
 import unicodedata
+from enum import Enum
 from typing import Optional, Protocol
 
 import requests
@@ -48,6 +49,56 @@ class Scraper(Protocol):
 
     def fetch(self, category: str, limit: int) -> list[Listing]:
         ...
+
+
+class LivenessOutcome(str, Enum):
+    ALIVE = "ALIVE"
+    CLOSED = "CLOSED"
+    GONE = "GONE"
+    UNKNOWN = "UNKNOWN"
+
+
+class LivenessCheck(BaseModel):
+    outcome: LivenessOutcome
+    blocked: bool = False
+    failed: bool = False
+    reason: Optional[str] = None
+
+
+class LivenessChecker(Protocol):
+    source: str
+
+    def check(self, url: str) -> LivenessCheck:
+        ...
+
+
+BLOCKING_STATUSES = frozenset({403, 429})
+GONE_STATUSES = frozenset({404, 410})
+REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+
+
+def liveness_by_status(status_code: int) -> Optional[LivenessCheck]:
+    if status_code in BLOCKING_STATUSES:
+        return LivenessCheck(
+            outcome=LivenessOutcome.UNKNOWN, blocked=True, reason=f"HTTP {status_code}"
+        )
+    if status_code in GONE_STATUSES:
+        return LivenessCheck(outcome=LivenessOutcome.GONE, reason=f"HTTP {status_code}")
+    if status_code >= 500:
+        return LivenessCheck(
+            outcome=LivenessOutcome.UNKNOWN, failed=True, reason=f"HTTP {status_code}"
+        )
+    return None
+
+
+def unreachable(exc: Exception) -> LivenessCheck:
+    return LivenessCheck(
+        outcome=LivenessOutcome.UNKNOWN, failed=True, reason=f"{type(exc).__name__}: {exc}"
+    )
+
+
+def unrecognised(reason: str) -> LivenessCheck:
+    return LivenessCheck(outcome=LivenessOutcome.UNKNOWN, reason=reason)
 
 
 def pick_user_agent() -> str:

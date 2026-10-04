@@ -6,17 +6,24 @@ import re
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
 from scraper.base import (
+    REDIRECT_STATUSES,
     Listing,
+    LivenessCheck,
+    LivenessOutcome,
     backoff_seconds,
+    liveness_by_status,
     new_session,
     pick_user_agent,
     sort_latest_first,
     strip_accents,
+    unreachable,
+    unrecognised,
 )
 from scraper.categories import computrabajo_category
 
@@ -28,6 +35,15 @@ MAX_RETRIES = 4
 SKILLS_SECTION_MARKER = "Aptitudes asociadas"
 DESCRIPTION_HEADING = "Descripción de la oferta"
 COMPANY_LOGO_SELECTOR = "div.logo_company img"
+OFFER_PATH_PREFIX = "/ofertas-de-trabajo/"
+OFFER_MARKER = "description-offer"
+APPLY_MARKER = "data-href-offer-apply"
+MAX_LIVENESS_REDIRECTS = 2
+
+SESSION_HEADERS = {
+    "Accept-Language": "es-AR,es;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
 
 _DIGIT_RE = re.compile(r"(\d+)")
 _HOURS_RE = re.compile(r"(\d{1,3})\s{0,3}hora")
@@ -151,6 +167,28 @@ def parse_card(card, category: str, now: datetime) -> Optional[Listing]:
     )
 
 
+def is_offer_url(url: str) -> bool:
+    return urlparse(url).path.startswith(OFFER_PATH_PREFIX)
+
+
+def classify_offer_page(html: str) -> LivenessCheck:
+    soup = BeautifulSoup(html, "lxml")
+    if soup.find(attrs={OFFER_MARKER: True}) is None:
+        return unrecognised("the page is not a Computrabajo posting")
+    if soup.find(attrs={APPLY_MARKER: True}) is None:
+        return unrecognised("the posting shows no apply button")
+    return LivenessCheck(outcome=LivenessOutcome.ALIVE)
+
+
+def classify_offer_response(status_code: int, html: str) -> LivenessCheck:
+    by_status = liveness_by_status(status_code)
+    if by_status is not None:
+        return by_status
+    if status_code != 200:
+        return unrecognised(f"unexpected HTTP {status_code}")
+    return classify_offer_page(html)
+
+
 class ComputrabajoScraper:
     source = SOURCE
 
@@ -182,12 +220,7 @@ class ComputrabajoScraper:
 
     def _ensure_session(self) -> requests.Session:
         if self._session is None:
-            self._session = new_session(
-                {
-                    "Accept-Language": "es-AR,es;q=0.9",
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                }
-            )
+            self._session = new_session(SESSION_HEADERS)
         return self._session
 
     def _get(self, url: str) -> str:
@@ -245,3 +278,38 @@ class ComputrabajoScraper:
         match = _EXPERIENCE_RE.search(block.get_text(" ", strip=True))
         if match:
             listing.experience_level = f"{match.group(1)} años de experiencia"
+
+
+class ComputrabajoLivenessChecker:
+    source = SOURCE
+
+    def __init__(self, timeout: float = 25.0) -> None:
+        self.timeout = timeout
+        self._session: Optional[requests.Session] = None
+
+    def check(self, url: str) -> LivenessCheck:
+        target = url
+        try:
+            for _ in range(MAX_LIVENESS_REDIRECTS + 1):
+                response = self._ensure_session().get(
+                    target,
+                    headers={"User-Agent": pick_user_agent()},
+                    timeout=self.timeout,
+                    allow_redirects=False,
+                )
+                if response.status_code not in REDIRECT_STATUSES:
+                    return classify_offer_response(response.status_code, response.text)
+                target = urljoin(target, response.headers.get("Location", ""))
+                if not is_offer_url(target):
+                    return LivenessCheck(
+                        outcome=LivenessOutcome.GONE,
+                        reason=f"redirected to {urlparse(target).path or '/'}",
+                    )
+        except requests.RequestException as exc:
+            return unreachable(exc)
+        return unrecognised("the posting kept redirecting to other postings")
+
+    def _ensure_session(self) -> requests.Session:
+        if self._session is None:
+            self._session = new_session(SESSION_HEADERS)
+        return self._session

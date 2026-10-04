@@ -1,5 +1,5 @@
 {{- if .Values.localInfra }}
-# Local-only LocalStack S3 (in prod the app uses real S3 with AWS_ENDPOINT="").
+# Local-only LocalStack S3, SNS and SQS (in prod the apps use the real services with AWS_ENDPOINT="").
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -34,13 +34,39 @@ data:
     echo "LocalStack S3 ready: bucket '${BUCKET}' created with CORS enabled."
   02-init-domain-events.sh: |
     #!/bin/bash
+    # Same hook as localstack-init/02-init-domain-events.sh in the compose setup.
+    # Creates the lynq-domain-events topic lynq-app-backend publishes to, and the
+    # lynq-analytics-events queue lynq-analytics consumes, with its dead-letter queue.
+    # The subscription uses raw message delivery: the queue receives the event
+    # envelope as published, not wrapped in an SNS notification.
     set -euo pipefail
 
     TOPIC="${DOMAIN_EVENTS_TOPIC:-lynq-domain-events}"
+    QUEUE="${ANALYTICS_EVENTS_QUEUE:-lynq-analytics-events}"
+    DLQ="${QUEUE}-dlq"
+    MAX_RECEIVE_COUNT="${ANALYTICS_EVENTS_MAX_RECEIVE_COUNT:-5}"
 
-    awslocal sns create-topic --name "${TOPIC}"
+    TOPIC_ARN=$(awslocal sns create-topic --name "${TOPIC}" --query TopicArn --output text)
 
-    echo "LocalStack SNS ready: topic '${TOPIC}' created."
+    DLQ_URL=$(awslocal sqs create-queue --queue-name "${DLQ}" \
+      --attributes MessageRetentionPeriod=1209600 --query QueueUrl --output text)
+    DLQ_ARN=$(awslocal sqs get-queue-attributes --queue-url "${DLQ_URL}" \
+      --attribute-names QueueArn --query Attributes.QueueArn --output text)
+
+    QUEUE_URL=$(awslocal sqs create-queue --queue-name "${QUEUE}" --query QueueUrl --output text)
+    awslocal sqs set-queue-attributes --queue-url "${QUEUE_URL}" --attributes "{
+      \"RedrivePolicy\": \"{\\\"deadLetterTargetArn\\\":\\\"${DLQ_ARN}\\\",\\\"maxReceiveCount\\\":\\\"${MAX_RECEIVE_COUNT}\\\"}\"
+    }"
+    QUEUE_ARN=$(awslocal sqs get-queue-attributes --queue-url "${QUEUE_URL}" \
+      --attribute-names QueueArn --query Attributes.QueueArn --output text)
+
+    if ! awslocal sns list-subscriptions-by-topic --topic-arn "${TOPIC_ARN}" \
+        --query "Subscriptions[?Endpoint=='${QUEUE_ARN}'].SubscriptionArn" --output text | grep -q .; then
+      awslocal sns subscribe --topic-arn "${TOPIC_ARN}" --protocol sqs \
+        --notification-endpoint "${QUEUE_ARN}" --attributes RawMessageDelivery=true
+    fi
+
+    echo "LocalStack SNS/SQS ready: topic '${TOPIC}' delivers raw to '${QUEUE}', dead letters in '${DLQ}' after ${MAX_RECEIVE_COUNT} receives."
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -64,7 +90,9 @@ spec:
           image: gresau/localstack-persist:4.5
           env:
             - name: SERVICES
-              value: s3,sns
+              value: s3,sns,sqs
+            - name: ANALYTICS_EVENTS_QUEUE
+              value: {{ .Values.lynq_analytics.config.LYNQ_ANALYTICS_EVENTS_QUEUE | quote }}
             - name: AWS_DEFAULT_REGION
               value: {{ .Values.lynq_app_backend.config.AWS_REGION | quote }}
             - name: AWS_BUCKET_NAME

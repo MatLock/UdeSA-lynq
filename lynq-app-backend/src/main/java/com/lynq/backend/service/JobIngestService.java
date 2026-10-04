@@ -41,6 +41,7 @@ public class JobIngestService {
   private static final int MAX_JOB_URL_LENGTH = 2048;
   private static final int MAX_LOGO_URL_LENGTH = 2048;
   private static final int MAX_TAG_LENGTH = 255;
+  private static final int MAX_CATEGORY_LENGTH = 64;
 
   private final JobPostRepository jobPostRepository;
   private final CompanyRepository companyRepository;
@@ -66,7 +67,9 @@ public class JobIngestService {
     int skills = 0;
     int similarityTags = 0;
     int skipped = 0;
+    int reopened = 0;
     Instant ingestedOn = Instant.now();
+    LocalDate seenOn = LocalDate.now(ZoneOffset.UTC);
 
     for (IngestJobPostRequest request : jobPosts) {
       String title = truncate(request.getTitle(), MAX_TITLE_LENGTH);
@@ -80,13 +83,18 @@ public class JobIngestService {
         companies++;
       }
 
-      JobPostEntity job = upsertJob(request, title, company.entity());
+      UpsertedJob upserted = upsertJob(request, title, company.entity(), seenOn);
+      JobPostEntity job = upserted.entity();
       jobs++;
       Set<String> jobSkills = normalize(request.getSkills());
       Set<String> jobSimilarityTags = normalize(request.getSimilarityTags());
       skills += replaceSkills(job, jobSkills);
       similarityTags += replaceSimilarityTags(job, jobSimilarityTags);
       publishIngested(job, jobSkills, jobSimilarityTags, ingestedOn);
+      if (upserted.reopened()) {
+        reopened++;
+        domainEventPublisher.publish(DomainEvents.jobPostReopened(job, seenOn, ingestedOn));
+      }
     }
 
     return IngestJobPostsRestResponse.builder()
@@ -95,6 +103,7 @@ public class JobIngestService {
         .skills(skills)
         .similarityTags(similarityTags)
         .skipped(skipped)
+        .reopened(reopened)
         .build();
   }
 
@@ -128,7 +137,8 @@ public class JobIngestService {
     return companyRepository.save(company);
   }
 
-  private JobPostEntity upsertJob(IngestJobPostRequest request, String title, CompanyEntity company) {
+  private UpsertedJob upsertJob(IngestJobPostRequest request, String title, CompanyEntity company,
+      LocalDate seenOn) {
     String source = request.getJobPostSource().name().toLowerCase(Locale.ROOT);
     String id = deterministicId(source + KEY_SEPARATOR + request.getExternalId());
 
@@ -143,19 +153,39 @@ public class JobIngestService {
     job.setWorkType(request.getWorkType());
     job.setSalaryRangeDown(request.getSalaryRangeDown());
     job.setSalaryRangeTop(request.getSalaryRangeTop());
+    job.setSalaryCurrency(JobService.currencyOf(request.getSalaryRangeDown(),
+        request.getSalaryRangeTop(), request.getSalaryCurrency()));
+    refreshCategory(job, request.getCategory());
     job.setJobUrl(truncate(request.getJobUrl(), MAX_JOB_URL_LENGTH));
     job.setJobPostSource(request.getJobPostSource());
     job.setCompany(company);
     job.setCreatedOn(postedOn(request.getPostedAt()));
+    job.setLastSeenOn(seenOn);
+    boolean reopened = reopenIfClosed(job);
 
-    return jobPostRepository.save(job);
+    return new UpsertedJob(jobPostRepository.save(job), reopened);
+  }
+
+  private void refreshCategory(JobPostEntity job, String category) {
+    String trimmed = category == null ? null : truncate(category.trim(), MAX_CATEGORY_LENGTH);
+    if (trimmed == null || trimmed.isEmpty()) {
+      return;
+    }
+    job.setCategory(trimmed);
+  }
+
+  private boolean reopenIfClosed(JobPostEntity job) {
+    if (job.getJobStatus() != JobStatus.CLOSE) {
+      return false;
+    }
+    job.setJobStatus(JobStatus.OPEN);
+    job.setClosedOn(null);
+    job.setCloseReason(null);
+    return true;
   }
 
   private void publishIngested(JobPostEntity job, Set<String> skills, Set<String> similarityTags,
       Instant ingestedOn) {
-    if (job.getJobStatus() != JobStatus.OPEN) {
-      return;
-    }
     domainEventPublisher.publish(
         DomainEvents.jobPostPublished(job, skills, similarityTags, ingestedOn));
   }
@@ -231,5 +261,8 @@ public class JobIngestService {
   }
 
   private record CompanyResult(CompanyEntity entity, boolean created) {
+  }
+
+  private record UpsertedJob(JobPostEntity entity, boolean reopened) {
   }
 }

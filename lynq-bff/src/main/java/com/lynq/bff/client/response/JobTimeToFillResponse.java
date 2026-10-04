@@ -20,5 +20,9 @@ public class JobTimeToFillResponse {
   private Double p25;
   private Double p75;
   private boolean insufficientData;
+  private Integer externalJobPosts;
   private Integer expiredByPolicy;
+  private Integer expiredAfterDays;
+  private Long daysOpen;
+  private DaysDistributionResponse overall;
 }

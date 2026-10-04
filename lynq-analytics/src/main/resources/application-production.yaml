@@ -59,6 +59,9 @@ lynq:
     salary:
       min-sample: 5
       default-currency: ARS
+    time-to-fill:
+      min-sample: 5
+      expired-after-days: 25
     cache:
       ttl: PT1H
     snapshot:

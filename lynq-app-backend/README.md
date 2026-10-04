@@ -21,6 +21,7 @@ Authentication is **not** handled here. Every protected request is validated aga
   - [Candidate evaluations via lynq-llm](#3-candidate-evaluations-via-lynq-llm)
   - [Image upload](#4-image-upload-pre-signed-urls)
   - [Domain events](#5-domain-events)
+  - [Closing job posts and verifying the external ones](#6-closing-job-posts-and-verifying-the-external-ones)
 - [Data model](#data-model)
 - [API reference](#api-reference)
 - [Sample requests](#sample-requests)
@@ -320,10 +321,10 @@ Every change analytics needs is published to the SNS topic `lynq-domain-events`,
 
 | Event                            | Aggregate     | Emitted by                                                  | Payload |
 | -------------------------------- | ------------- | ----------------------------------------------------------- | ------- |
-| `JobPostPublished`               | `JOB_POST`    | `createJob`, and the feeder ingest once per open post        | `jobId`, `title`, `category`, `workType`, `source`, `companyId`, `createdByUserId`, `salaryRangeDown`, `salaryRangeTop`, `salaryCurrency`, `skills`, `similarityTags`, `publishedOn` |
+| `JobPostPublished`               | `JOB_POST`    | `createJob`, and the feeder ingest once per ingested post    | `jobId`, `title`, `category`, `workType`, `source`, `companyId`, `createdByUserId`, `salaryRangeDown`, `salaryRangeTop`, `salaryCurrency`, `skills`, `similarityTags`, `publishedOn` |
 | `JobPostUpdated`                 | `JOB_POST`    | `updateJob`                                                 | `jobId`, `title`, `workType`, `salaryRangeDown`, `salaryRangeTop`, `salaryCurrency`, `skills`, `similarityTags` |
-| `JobPostClosed`                  | `JOB_POST`    | `closeJob`, and `updateJob` when it closes the post          | `jobId`, `closedOn`, `closeReason` |
-| `JobPostReopened`                | `JOB_POST`    | `refreshJob`, and `updateJob` when it reopens the post       | `jobId`, `reopenedOn` |
+| `JobPostClosed`                  | `JOB_POST`    | `closeJob`, `updateJob` when it closes the post, a `CLOSED` or `GONE` liveness report, and the expiry | `jobId`, `closedOn`, `closeReason` |
+| `JobPostReopened`                | `JOB_POST`    | `refreshJob`, `updateJob` when it reopens the post, and the feeder ingest when a closed post shows up again | `jobId`, `reopenedOn` |
 | `ApplicationSubmitted`           | `APPLICATION` | `applyToJob`                                                | `applicationId`, `jobId`, `userId`, `appliedOn`, `lynqScore` computed when the candidate applied |
 | `CandidateSkillsUpdated`         | `CANDIDATE`   | `createResume`                                              | `userId`, every `skills` and `similarityTags` the candidate has |
 | `CandidateExpectedSalaryUpdated` | `CANDIDATE`   | `updateUserProfile` when the expected salary or its currency changes, and the replay | `userId`, `expectedSalary`, `currency` |
@@ -333,6 +334,54 @@ Skills and tags travel sorted, so the same state always serializes the same way.
 - **At most once** — the services hand each event to `DomainEventPublisher` inside their transaction, and `DomainEventRelay` sends it with `@TransactionalEventListener(AFTER_COMMIT)`: a rolled-back change publishes nothing. `SnsDomainEventSender` retries a failed publish (`lynq.events.publish-attempts`, 3, with a linear `retry-backoff` of 200 ms) and then logs the event as lost at `ERROR`; it never fails the request that already committed. There is no outbox: what is lost is recovered by the replay.
 - **Deterministic ids** — `eventId` is a UUIDv5 of the event type, the aggregate id and the fact the event states. A fact the database keeps is identified by its content: a publish by the whole payload, a close by the opening and closing dates, a reopening by its date, an application by its id, a candidate's skills by the full set. A change the database does not keep, an update or a salary change, is identified by its instant, so two updates are always two events. The consumer is idempotent by `eventId`, so publishing the same fact twice stores it once.
 - **Replay** — `POST /internal/events/replay`, behind the internal token, walks `job_posts`, `users` and `user_application_job` in pages of 200 and publishes what they hold now, in batches of ten: every post published on the start of its `created_on`, and closed at the end of its `closed_on` if it is; every candidate's skills on the day of their latest resume and their salary if they have one; every application on its `applied_on` with the score its candidate has today. Running it twice repeats every id. A fact that has not changed since its live event repeats that event's id too; one that has carries an older `occurredOn` than what the consumer holds, so it does not overwrite it. A closed post without `closed_on` is skipped and counted. The response gives `published`, `failed`, `skippedJobPosts` and `publishedByEventType`.
+
+### 6. Closing job posts and verifying the external ones
+
+Every close stamps `closed_on` and a `close_reason`, which is what lets analytics tell a
+filled or withdrawn posting from one that simply stopped being watched:
+
+| `close_reason` | Who closes | Analytics |
+| --- | --- | --- |
+| `OWNER` | the company, through `closeJob` or `updateJob` with `CLOSE` | an observed close |
+| `VERIFIED_CLOSED` | a liveness report: the portal shows the posting as finished | an observed close |
+| `VERIFIED_GONE` | a liveness report: the posting is no longer on the portal | an observed close |
+| `EXPIRED_BY_POLICY` | the expiry, for an external post nobody has seen for too long | **censored**: it was still open when it was closed, so it stays out of the time-to-fill median |
+
+A reopening — `refreshJob`, `updateJob` back to `OPEN`, or the ingest — clears both
+`closed_on` and `close_reason`.
+
+**`refreshJob` is not touched on purpose.** It stamps `created_on` with today when it
+reopens a post, which overwrites the original publication date. That is what the time to
+fill wants: `closed_on - created_on` then measures the last period the post was open, not
+the time since it was first published plus the weeks it spent closed.
+
+**The ingest keeps external posts honest.** `upsertJob` stamps `last_seen_on = today` on
+every post the feeder sends and stores its `category` and `salaryCurrency` (`ARS` when a
+salary comes without one; dropped without a salary). A post that was closed and shows up
+again on its portal is reopened with the same semantics as `refreshJob`, and publishes
+`JobPostReopened` next to its `JobPostPublished`; the response counts them in `reopened`.
+
+**The verification closes what the ingest no longer sees.** The feeder only reads the
+newest postings of each category, so a posting that left its portal would stay open
+forever. Three internal routes, behind the internal token, let
+[`lynq-feeders`](../lynq-feeders) check them:
+
+- `GET /internal/job-posts/verification-candidates` — open external posts with a `job_url`
+  whose `last_seen_on` (or `created_on`, if never seen) is older than
+  `lynq.verification.window-days` (20) and that were not checked today. At most
+  `lynq.verification.quota-per-category` (10) per `category`, numbered with `ROW_NUMBER()`
+  partitioned by category, never-checked first and then by `last_checked_on`. The list is
+  ordered by that number, so it interleaves the categories.
+- `POST /internal/job-posts/liveness` — a batch of up to 500 `{id, outcome}`. `ALIVE`
+  renews `last_seen_on` and `last_checked_on`; `CLOSED` and `GONE` close the post today as
+  `VERIFIED_CLOSED` or `VERIFIED_GONE`; `UNKNOWN` only stamps `last_checked_on`, which puts
+  the post at the back of the next queue. A report for an unknown id, a LYNQ post or a post
+  that is no longer open is skipped. Answers `{alive, closed, gone, unknown, skipped}`.
+- `POST /internal/job-posts/expire` — closes as `EXPIRED_BY_POLICY` every open external post
+  whose `last_seen_on` is older than `lynq.verification.expire-after-days` (25), with or
+  without a `job_url`. Answers `{expired}`.
+
+The three numbers are properties under `lynq.verification` in both profiles.
 
 ---
 

@@ -27,9 +27,13 @@ public interface AnalyticsController {
 
   @Operation(
       summary = "Read the days similar job posts took to close",
-      description = "Median, p25, p75 and N of similar closed job posts. Posts closed by the "
-          + "25-day policy are censored: they stay out of the median and are counted apart in "
-          + "`expiredByPolicy`. Only the company that owns the job post may read it.")
+      description = "Median, p25, p75 and N of similar closed job posts, with how many of them "
+          + "are scraped postings (`externalJobPosts`, days on the market rather than days to "
+          + "fill). Posts closed by the expiry policy are censored: they stay out of the median "
+          + "and are counted apart in `expiredByPolicy`, closed after `expiredAfterDays`. Below "
+          + "five, `insufficientData` is true and `overall` carries the same figures over every "
+          + "closed post. `daysOpen` is how long this post has been open. Only the company that "
+          + "owns the job post may read it.")
   ResponseEntity<GlobalRestResponse<JobTimeToFillResponse>> getTimeToFill(
       String jobId,
       @Parameter(hidden = true) String requestUuid,

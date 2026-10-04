@@ -4,6 +4,7 @@ import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.WorkType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
 import lombok.AllArgsConstructor;
@@ -30,6 +31,9 @@ public class IngestJobPostRequest {
   private Integer salaryRangeDown;
   @Positive
   private Integer salaryRangeTop;
+  @Pattern(regexp = "ARS|USD")
+  private String salaryCurrency;
+  private String category;
   private String jobUrl;
   @NotNull
   private JobPostSource jobPostSource;

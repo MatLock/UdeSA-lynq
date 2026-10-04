@@ -2,7 +2,7 @@
 
 Kubernetes deployment for the Lynq platform, packaged as a Helm chart. The same chart runs both a self-contained local cluster (minikube) and the production cluster (AWS EKS); a small set of flags in the values files is what tells the two environments apart. In production the chart is not installed by hand — Terraform coordinates it — while locally you install it directly with Helm.
 
-The chart deploys the application modules (`lynq-iam`, `lynq-bff`, `lynq-app-backend`, `lynq-file-storage`, `lynq-llm`, and the frontend) together with their configuration, and — locally only — their infrastructure dependencies (MySQL, Redis, LocalStack). In production those dependencies come from managed services (RDS, ElastiCache, S3), the frontend is served from Cloudflare, and secrets are created outside the chart.
+The chart deploys the application modules (`lynq-iam`, `lynq-bff`, `lynq-app-backend`, `lynq-file-storage`, `lynq-llm`, `lynq-analytics`, and the frontend) together with their configuration, and — locally only — their infrastructure dependencies (MySQL, Redis, LocalStack). In production those dependencies come from managed services (RDS, ElastiCache, S3), the frontend is served from Cloudflare, and secrets are created outside the chart.
 
 
 ## Layout
@@ -28,6 +28,7 @@ infrastructure/
     ├── variables.tf
     ├── main.tf
     ├── s3.tf
+    ├── sqs.tf                # lynq-analytics' queue, subscribed to the domain events topic
     ├── outputs.tf
     └── environments/
         └── prod.tfvars
@@ -88,7 +89,7 @@ a second trigger while a snapshot is running gets a `409`.
 
 | Setting | Value | Why |
 |---------|-------|-----|
-| `lynq_analytics.cron.enabled` | `false` | The trigger calls `lynq-analytics-service` and reads `lynq-analytics-secret`; turn it on with the chart that deploys `lynq-analytics`. |
+| `lynq_analytics.cron.enabled` | `true` | The trigger calls `lynq-analytics-service` and reads `lynq-analytics-secret`, both deployed by this chart. |
 | `lynq_analytics.cron.schedule` | `0 8 * * *` | 05:00 in Buenos Aires, two hours after the feeders, so the day's snapshot includes what they ingested. |
 | `lynq_analytics.cron.timeZone` | `Etc/UTC` | Pinned, as the feeders'. |
 | `backoffLimit` | `1` | A missed day is a hole in the daily series, which the charts show as one. |
@@ -107,7 +108,8 @@ kubectl -n lynq-local-namespace logs -l app=lynq-analytics -f | grep "<request-u
 
 `lynq-analytics` uses the same token both ways: its own `/internal/**` routes check it (the snapshot
 trigger presents it), and it presents it to `lynq-app-backend`'s `/internal/score/batch` while it
-takes the snapshot. So `lynq-analytics-secret` carries the same `LYNQ_INTERNAL_TOKEN` too.
+takes the snapshot. So `lynq-analytics-secret` carries the same `LYNQ_INTERNAL_TOKEN` too. In prod
+Terraform writes `TF_VAR_internal_token` into both `lynq-app-backend-secret` and `lynq-analytics-secret`.
 
 If the values differ, the ingest fails closed: the backend answers `401` and the feeder's run ends with an error logged in its pod — the trigger already got its `202`, so the CronJob is green and the failure is only visible there. The same happens when the token is missing entirely — a deploy that forgets it fails loudly rather than accepting unauthenticated writes.
 
@@ -177,7 +179,8 @@ Production runs on AWS EKS and is applied **only with Terraform** (local uses He
 - **The EKS cluster itself and its EC2 worker nodes** (`eks.tf`). The control plane is AWS-managed; the workers are a managed node group of `t3.medium` on-demand instances (2 by default, max 3). Both live in the VPC you pass in, so pods reach the MySQL/Redis EC2 over the internal network. The cluster's OIDC provider is created too, which is what makes IRSA possible later.
 - **MySQL + Redis on an EC2 instance** (`ec2-lynq-redis-db`), reachable from EKS over the internal network. Two security groups open `3306` and `6379` to the VPC CIDR, and a third opens `22` to a single admin IP. The apps' `DB_URL` / `REDIS_ADDRESS` are derived automatically from the instance's private DNS.
 - **S3 bucket** (private, with CORS for pre-signed uploads) for `lynq-file-storage`, the only service that talks to S3.
-- **External Secrets.** `manageSecrets: false` — Helm renders no Secrets; Terraform creates `dockerhub-secret`, `lynq-iam-secret`, `lynq-bff-secret`, `lynq-app-backend-secret`, `lynq-file-storage-secret`, and `lynq-llm-secret`, and the deployments consume them by reference. Sensitive values are supplied at apply time via `TF_VAR_*` (never committed).
+- **SQS queue for `lynq-analytics`** (`sqs.tf`): `lynq-analytics-events`, subscribed to the `lynq-domain-events` topic with raw message delivery, and its dead-letter queue after five receives. Same shape as the LocalStack init hook used locally.
+- **External Secrets.** `manageSecrets: false` — Helm renders no Secrets; Terraform creates `dockerhub-secret`, `lynq-iam-secret`, `lynq-bff-secret`, `lynq-app-backend-secret`, `lynq-file-storage-secret`, `lynq-llm-secret`, and `lynq-analytics-secret`, and the deployments consume them by reference. Sensitive values are supplied at apply time via `TF_VAR_*` (never committed).
 - **Internet exposure via a shared ALB.** Only `lynq-bff` is exposed: it sits behind a single AWS ALB (AWS Load Balancer Controller) with a `group.name`, path-based routing on one domain, and TLS terminated at the ALB. It is the entry point for everything, identity included — it relays the auth calls to `lynq-iam`, which like the DMZ services (`lynq-app-backend`, `lynq-llm`, `lynq-file-storage`) has no Ingress and can only be reached from inside the cluster. The public DNS record is a CNAME to the ALB hostname read off `lynq-bff-ingress`.
 - **Certificate + DNS.** Terraform creates the ACM certificate for `api.lynqoficial.com`, validates it via a Cloudflare DNS record, feeds the ARN into the Ingress, and points `api.lynqoficial.com` at the ALB (Cloudflare CNAME, DNS-only). DNS for `lynqoficial.com` lives in Cloudflare.
 - **Frontend on Cloudflare.** `localFrontend: false` — the frontend is deployed separately with Wrangler, outside this chart.
@@ -243,10 +246,12 @@ mysql -u root -p <<'SQL'
 CREATE DATABASE IF NOT EXISTS lynq_iam_db;
 CREATE DATABASE IF NOT EXISTS lynq_backend_db;
 CREATE DATABASE IF NOT EXISTS lynq_file_storage_db;
+CREATE DATABASE IF NOT EXISTS lynq_analytics_db;
 CREATE USER '<DB_USER>'@'%' IDENTIFIED BY '<DB_PASSWORD>';
 GRANT ALL PRIVILEGES ON lynq_iam_db.*          TO '<DB_USER>'@'%';
 GRANT ALL PRIVILEGES ON lynq_backend_db.*      TO '<DB_USER>'@'%';
 GRANT ALL PRIVILEGES ON lynq_file_storage_db.* TO '<DB_USER>'@'%';
+GRANT ALL PRIVILEGES ON lynq_analytics_db.*    TO '<DB_USER>'@'%';
 FLUSH PRIVILEGES;
 SQL
 
@@ -271,18 +276,21 @@ export TF_VAR_db_password=<DB_PASSWORD>
 export TF_VAR_redis_username=<REDIS_USER>
 export TF_VAR_redis_password=<REDIS_PASSWORD>
 export TF_VAR_jwt_secret=<jwt-signing-secret>
+export TF_VAR_internal_token=<shared-secret-of-the-internal-routes>
 export TF_VAR_dockerhub_token=<dockerhub-access-token>
 export TF_VAR_cloudflare_api_token=<cloudflare-dns-token>
 ```
 
 `lynq-llm`'s LLM backend is plain (non-secret) config, so it stays in `prod.tfvars` rather than the environment — `bedrock_model_id` (any Converse-capable model: `anthropic.*`, `amazon.nova-*`, `meta.llama*`, `mistral.*`) and `bedrock_region`.
 
-No AWS credentials are set here either. Terraform creates two least-privilege IAM users and writes each access key straight into the Secret of the one service that needs it:
+No AWS credentials are set here either. Terraform creates least-privilege IAM users and writes each access key straight into the Secret of the one service that needs it:
 
 | IAM user | Permissions | Secret |
 | --- | --- | --- |
 | `lynq-backend-s3` (`s3.tf`) | `s3:GetObject/PutObject/DeleteObject` + `ListBucket`, scoped to the bucket | `lynq-file-storage-secret` |
 | `lynq-llm-bedrock` (`bedrock.tf`) | `bedrock:InvokeModel` on the configured model, `ListFoundationModels` for the health probe | `lynq-llm-secret` |
+| `lynq-app-backend-sns` (`sns.tf`) | `sns:Publish` on `lynq-domain-events` | `lynq-app-backend-secret` |
+| `lynq-analytics-sqs` (`sqs.tf`) | `sqs:ReceiveMessage/DeleteMessage/ChangeMessageVisibility/GetQueueAttributes/GetQueueUrl` on `lynq-analytics-events` | `lynq-analytics-secret` |
 
 `lynq-app-backend` gets no bucket credentials; it delegates every file operation to `lynq-file-storage` over HTTP. Both users can be replaced by IRSA roles once the cluster has an OIDC provider — the services read the standard AWS credential chain, so no code changes.
 

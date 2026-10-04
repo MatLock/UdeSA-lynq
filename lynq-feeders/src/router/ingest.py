@@ -10,27 +10,13 @@ from config import get_settings
 from logging_context import request_uuid_ctx
 from llm_client import LlmClient
 from model import IngestOverrides
+from router import run_control
+from router.run_control import RunGuard
 from service import EnrichmentError, IngestService
 
 log = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-class RunGuard:
-
-    def __init__(self) -> None:
-        self._running = False
-
-    def start(self) -> bool:
-        if self._running:
-            return False
-        self._running = True
-        return True
-
-    def finish(self) -> None:
-        self._running = False
-
 
 run_guard = RunGuard()
 
@@ -58,9 +44,12 @@ async def run_ingest(
 ) -> None:
     token = request_uuid_ctx.set(request_uuid)
     try:
-        report = await service.run(request_uuid, overrides)
+        async with run_control.feeder_runs:
+            report = await service.run(request_uuid, overrides)
         log.info(
-            "message= Finished feeder ingest run, ingested_jobs=%s", report.ingested.jobs
+            "message= Finished feeder ingest run, ingested_jobs=%s, reopened_jobs=%s",
+            report.ingested.jobs,
+            report.ingested.reopened,
         )
     except EnrichmentError as exc:
         log.error("message= Feeder ingest run aborted, skill extraction failed", exc_info=exc)

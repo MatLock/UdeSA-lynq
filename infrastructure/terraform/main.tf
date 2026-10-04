@@ -7,6 +7,7 @@ locals {
   db_url_iam          = "jdbc:mysql://${local.db_host}:3306/lynq_iam_db"
   db_url_backend      = "jdbc:mysql://${local.db_host}:3306/lynq_backend_db"
   db_url_file_storage = "jdbc:mysql://${local.db_host}:3306/lynq_file_storage_db"
+  db_url_analytics    = "jdbc:mysql://${local.db_host}:3306/lynq_analytics_db"
 
   # Chart value overrides that fill the REPLACE_* placeholders in k8s_values-prod.yaml.
   # The bucket name goes to lynq-file-storage: it is the only service that talks to
@@ -24,6 +25,10 @@ locals {
     "lynq_llm.config.OLLAMA_BASE_URL"                      = var.ollama_base_url
     "lynq_llm.config.BEDROCK_MODEL_ID"                     = var.bedrock_model_id
     "lynq_llm.config.BEDROCK_REGION"                       = var.bedrock_region
+    "lynq_analytics.config.DB_URL"                         = local.db_url_analytics
+    "lynq_analytics.config.REDIS_ADDRESS"                  = local.db_host
+    "lynq_analytics.config.AWS_REGION"                     = var.aws_region
+    "lynq_analytics.config.LYNQ_ANALYTICS_EVENTS_QUEUE"    = aws_sqs_queue.analytics_events.name
   }
 }
 
@@ -103,6 +108,29 @@ resource "kubernetes_secret" "backend" {
     DB_PASSWORD           = var.db_password
     AWS_ACCESS_KEY_ID     = aws_iam_access_key.backend_sns.id
     AWS_SECRET_ACCESS_KEY = aws_iam_access_key.backend_sns.secret
+    # Checked on /internal/**; lynq-analytics presents it to /internal/score/batch.
+    LYNQ_INTERNAL_TOKEN = var.internal_token
+  }
+  depends_on = [kubernetes_namespace.lynq]
+}
+
+# lynq-analytics has its own schema (lynq_analytics_db) on the same MySQL host,
+# reads Redis for its cache, and consumes lynq-analytics-events with the
+# least-privilege SQS key from sqs.tf.
+resource "kubernetes_secret" "analytics" {
+  metadata {
+    name      = "lynq-analytics-secret"
+    namespace = var.namespace
+  }
+  type = "Opaque"
+  data = {
+    DB_USERNAME           = var.db_username
+    DB_PASSWORD           = var.db_password
+    REDIS_USERNAME        = var.redis_username
+    REDIS_PASSWORD        = var.redis_password
+    LYNQ_INTERNAL_TOKEN   = var.internal_token
+    AWS_ACCESS_KEY_ID     = aws_iam_access_key.analytics_sqs.id
+    AWS_SECRET_ACCESS_KEY = aws_iam_access_key.analytics_sqs.secret
   }
   depends_on = [kubernetes_namespace.lynq]
 }
@@ -175,8 +203,10 @@ resource "helm_release" "lynq" {
     kubernetes_secret.backend,
     kubernetes_secret.file_storage,
     kubernetes_secret.llm,
+    kubernetes_secret.analytics,
     aws_s3_bucket.lynq,
     aws_sns_topic.domain_events,
+    aws_sns_topic_subscription.analytics_events,
     aws_instance.redis_db,
   ]
 }

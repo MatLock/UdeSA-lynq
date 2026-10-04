@@ -176,6 +176,13 @@ variable "jwt_secret" {
   default     = ""
 }
 
+variable "internal_token" {
+  description = "Shared secret of the /internal/** routes: lynq-analytics presents it to lynq-app-backend, and its snapshot CronJob presents it to lynq-analytics."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "bedrock_model_id" {
   description = <<-EOT
     Bedrock model id lynq-llm calls through the Converse API (only if

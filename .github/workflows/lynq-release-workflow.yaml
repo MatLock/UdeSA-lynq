@@ -61,6 +61,10 @@ jobs:
         working-directory: lynq-bff
         run: mvn -B versions:set -DnewVersion="${{ steps.resolve.outputs.version }}" -DgenerateBackupPoms=false
 
+      - name: Bump lynq-analytics pom version
+        working-directory: lynq-analytics
+        run: mvn -B versions:set -DnewVersion="${{ steps.resolve.outputs.version }}" -DgenerateBackupPoms=false
+
       - name: Bump lynq-llm (python) version
         run: echo "${{ steps.resolve.outputs.version }}" > lynq-llm/VERSION
 
@@ -94,7 +98,7 @@ jobs:
       - name: Commit version bump back to main
         uses: ./.github/actions/commit-to-main
         with:
-          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-llm/VERSION lynq-feeders/VERSION lynq-agent/VERSION infrastructure/helm/Chart.yaml .github/badges/version.svg
+          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-analytics/pom.xml lynq-llm/VERSION lynq-feeders/VERSION lynq-agent/VERSION infrastructure/helm/Chart.yaml .github/badges/version.svg
           message: "chore: set release version ${{ steps.resolve.outputs.version }} [skip ci]"
 
   # ===========================================================================
@@ -263,6 +267,12 @@ jobs:
       - name: Build and run tests
         working-directory: lynq-analytics
         run: mvn -B clean verify
+
+      - name: Upload jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: lynq-analytics-jar
+          path: lynq-analytics/target/lynq-analytics.jar
 
       - name: Upload JaCoCo report
         uses: actions/upload-artifact@v4
@@ -576,7 +586,7 @@ jobs:
   push-images:
     name: "4 · Push Docker images"
     runs-on: ubuntu-latest
-    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-llm, build-lynq-feeders, build-lynq-agent, sonar-scan]
+    needs: [set-version, build-lynq-iam, build-lynq-app-backend, build-lynq-file-storage, build-lynq-bff, build-lynq-analytics, build-lynq-llm, build-lynq-feeders, build-lynq-agent, sonar-scan]
     steps:
       - name: Code Checkout
         uses: actions/checkout@v5
@@ -607,6 +617,12 @@ jobs:
         with:
           name: lynq-bff-jar
           path: lynq-bff/target
+
+      - name: Download lynq-analytics jar
+        uses: actions/download-artifact@v4
+        with:
+          name: lynq-analytics-jar
+          path: lynq-analytics/target
 
       - name: Log in to Docker Hub
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
@@ -645,6 +661,14 @@ jobs:
           file: lynq-bff/Dockerfile
           push: true
           tags: ${{ env.DOCKER_NAMESPACE }}:lynq-bff-${{ needs.set-version.outputs.version }}
+
+      - name: Build and push lynq-analytics image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: lynq-analytics
+          file: lynq-analytics/Dockerfile
+          push: true
+          tags: ${{ env.DOCKER_NAMESPACE }}:lynq-analytics-${{ needs.set-version.outputs.version }}
 
       - name: Build and push lynq-llm image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
@@ -923,7 +947,7 @@ jobs:
           # image in both values files to the version pushed in stage 4.
           for f in infrastructure/helm/values/k8s_values-local.yaml \
                    infrastructure/helm/values/k8s_values-prod.yaml; do
-            sed -i -E "s#(image: ${DOCKER_NAMESPACE}:lynq-(iam|app-backend|app-frontend|file-storage|bff|llm|feeders|agent)-).*#\1${VERSION}#" "$f"
+            sed -i -E "s#(image: ${DOCKER_NAMESPACE}:lynq-(iam|app-backend|app-frontend|file-storage|bff|analytics|llm|feeders|agent)-).*#\1${VERSION}#" "$f"
           done
 
       - name: Commit Helm image tag bump to main
@@ -997,6 +1021,10 @@ jobs:
         working-directory: lynq-bff
         run: mvn -B versions:set -DnewVersion="${{ steps.next.outputs.version }}" -DgenerateBackupPoms=false
 
+      - name: Bump lynq-analytics pom version
+        working-directory: lynq-analytics
+        run: mvn -B versions:set -DnewVersion="${{ steps.next.outputs.version }}" -DgenerateBackupPoms=false
+
       - name: Bump lynq-llm (python) version
         run: echo "${{ steps.next.outputs.version }}" > lynq-llm/VERSION
 
@@ -1013,5 +1041,5 @@ jobs:
       - name: Commit next development version to main
         uses: ./.github/actions/commit-to-main
         with:
-          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-llm/VERSION lynq-feeders/VERSION lynq-agent/VERSION infrastructure/helm/Chart.yaml
+          files: lynq-iam/pom.xml lynq-app-backend/pom.xml lynq-file-storage/pom.xml lynq-bff/pom.xml lynq-analytics/pom.xml lynq-llm/VERSION lynq-feeders/VERSION lynq-agent/VERSION infrastructure/helm/Chart.yaml
           message: "chore: prepare next development version ${{ steps.next.outputs.version }} [skip ci]"

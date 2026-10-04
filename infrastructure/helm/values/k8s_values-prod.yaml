@@ -27,10 +27,14 @@ k8s_namespace: prod
 #     LYNQ_INTERNAL_TOKEN       -> same value as in lynq-app-backend-secret
 #
 #   lynq-analytics-secret       (Opaque)
+#     DB_USERNAME, DB_PASSWORD
+#     REDIS_USERNAME, REDIS_PASSWORD   (only if the managed Redis requires auth)
 #     LYNQ_INTERNAL_TOKEN       -> same value as in lynq-app-backend-secret; guards
 #                                  lynq-analytics' /internal/** routes, read by
 #                                  the snapshot CronJob, and presented to
 #                                  lynq-app-backend's /internal/score/batch
+#     AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY   -> consume lynq-analytics-events only
+#                                                   (omit if using IRSA)
 #
 #   lynq-file-storage-secret    (Opaque)
 #     DB_USERNAME, DB_PASSWORD
@@ -191,6 +195,8 @@ lynq_feeders:
     LYNQ_LLM_TIMEOUT: "300"
     HTTP_TIMEOUT: "30"
     SCRAPE_TIMEOUT: "25"
+    VERIFY_MAX_CHECKS: "40"
+    VERIFY_MAX_CONSECUTIVE_FAILURES: "3"
   cron:
     schedule: "0 6 * * *"
     timeZone: Etc/UTC
@@ -200,17 +206,35 @@ lynq_feeders:
     failedJobsHistoryLimit: 3
     startingDeadlineSeconds: 600
     backoffLimit: 1
-    # The trigger pod only waits for the 202, not for the run: the ingest goes on
-    # in the lynq-feeders pod after this one is gone.
+    # The trigger pod only waits for the two 202s, not for the runs: the ingest
+    # and the verification go on in the lynq-feeders pod after this one is gone.
     activeDeadlineSeconds: 120
     requestTimeoutSeconds: 30
 
+# Reached only from inside the cluster: lynq-bff relays the dashboards, the
+# snapshot CronJob triggers the daily run. No `path` and no Ingress.
 lynq_analytics:
+  replicas: 1
+  image: matlock0o/lynq:lynq-analytics-3.0.2-SNAPSHOT
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+  config:
+    SPRING_PROFILES_ACTIVE: production
+    DB_URL: "jdbc:mysql://REPLACE_DB_HOST:3306/lynq_analytics_db"
+    LYNQ_IAM_URL: http://lynq-iam-service:8080/lynq-iam
+    LYNQ_BACKEND_URL: http://lynq-app-backend-service:8080/lynq-backend-app
+    REDIS_ADDRESS: "REPLACE_REDIS_HOST"
+    REDIS_PORT: "6379"
+    AWS_REGION: "REPLACE_AWS_REGION"
+    # No SQS endpoint override: real SQS. The queue is subscribed to
+    # lynq-domain-events by Terraform (sqs.tf).
+    LYNQ_ANALYTICS_EVENTS_QUEUE: "REPLACE_ANALYTICS_EVENTS_QUEUE"
   cron:
-    # Off until lynq-analytics is deployed by the chart: the trigger calls
-    # lynq-analytics-service and reads lynq-analytics-secret, neither of which
-    # exists yet.
-    enabled: false
+    enabled: true
     # 08:00 UTC is 05:00 in Buenos Aires, two hours after the feeders' run, so
     # the day's snapshot includes what they ingested and closed.
     schedule: "0 8 * * *"
@@ -241,6 +265,7 @@ lynq_bff:
     LYNQ_LLM_URL: http://lynq-llm-service:8084/lynq-llm
     LYNQ_FILE_STORAGE_URL: http://lynq-file-storage-service:8080/lynq-file-storage
     LYNQ_AGENT_URL: http://lynq-agent-service:8090/lynq-agent
+    LYNQ_ANALYTICS_URL: http://lynq-analytics-service:8080/lynq-analytics
 
 lynq_app_backend:
   replicas: 1

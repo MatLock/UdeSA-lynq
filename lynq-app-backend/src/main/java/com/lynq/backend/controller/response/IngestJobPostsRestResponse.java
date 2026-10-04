@@ -18,4 +18,5 @@ public class IngestJobPostsRestResponse {
   private int skills;
   private int similarityTags;
   private int skipped;
+  private int reopened;
 }

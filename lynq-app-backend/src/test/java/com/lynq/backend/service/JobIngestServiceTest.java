@@ -2,12 +2,14 @@ package com.lynq.backend.service;
 
 import com.lynq.backend.controller.request.IngestJobPostRequest;
 import com.lynq.backend.controller.response.IngestJobPostsRestResponse;
+import com.lynq.backend.enums.CloseReason;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.WorkType;
 import com.lynq.backend.event.DomainEvent;
 import com.lynq.backend.event.DomainEventPublisher;
 import com.lynq.backend.event.payload.JobPostPublishedPayload;
+import com.lynq.backend.event.payload.JobPostReopenedPayload;
 import com.lynq.backend.model.CompanyEntity;
 import com.lynq.backend.model.JobPostEntity;
 import com.lynq.backend.model.JobPostSimilarityTagEntity;
@@ -25,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.Month;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -234,11 +237,13 @@ class JobIngestServiceTest {
   }
 
   @Test
-  void aClosedJobPostIsIngestedWithoutPublishingIt() {
+  void aClosedJobPostThatReappearsIsReopenedClearingItsClose() {
     JobPostEntity closed = JobPostEntity.builder()
         .id(EXPECTED_JOB_ID)
         .totalSeen(0L)
         .jobStatus(JobStatus.CLOSE)
+        .closedOn(LocalDate.of(2026, Month.SEPTEMBER, 20))
+        .closeReason(CloseReason.VERIFIED_GONE)
         .build();
     when(jobPostRepository.findById(EXPECTED_JOB_ID)).thenReturn(Optional.of(closed));
     savesWhatItIsGiven();
@@ -246,7 +251,132 @@ class JobIngestServiceTest {
     IngestJobPostsRestResponse response = service.ingest(List.of(request().build()));
 
     assertThat(response.getJobs(), is(1));
-    verify(domainEventPublisher, never()).publish(any());
+    assertThat(response.getReopened(), is(1));
+    assertThat(closed.getJobStatus(), is(JobStatus.OPEN));
+    assertThat(closed.getClosedOn(), is(nullValue()));
+    assertThat(closed.getCloseReason(), is(nullValue()));
+  }
+
+  @Test
+  void aReopenedJobPostPublishesItsDetailsAndTheReopeningOnTheDayItWasSeen() {
+    JobPostEntity closed = JobPostEntity.builder()
+        .id(EXPECTED_JOB_ID)
+        .totalSeen(0L)
+        .jobStatus(JobStatus.CLOSE)
+        .closedOn(LocalDate.of(2026, Month.SEPTEMBER, 20))
+        .closeReason(CloseReason.EXPIRED_BY_POLICY)
+        .build();
+    when(jobPostRepository.findById(EXPECTED_JOB_ID)).thenReturn(Optional.of(closed));
+    savesWhatItIsGiven();
+
+    service.ingest(List.of(request().build()));
+
+    ArgumentCaptor<DomainEvent> captor = ArgumentCaptor.forClass(DomainEvent.class);
+    verify(domainEventPublisher, times(2)).publish(captor.capture());
+    assertThat(captor.getAllValues().getFirst().eventType(), is("JobPostPublished"));
+    DomainEvent reopened = captor.getAllValues().get(1);
+    assertThat(reopened.eventType(), is("JobPostReopened"));
+    assertThat(reopened.aggregateId(), is(EXPECTED_JOB_ID));
+    JobPostReopenedPayload payload = (JobPostReopenedPayload) reopened.payload();
+    assertThat(payload.reopenedOn(), is(LocalDate.now(ZoneOffset.UTC)));
+  }
+
+  @Test
+  void anOpenJobPostIngestedAgainIsNotCountedAsReopened() {
+    JobPostEntity open = JobPostEntity.builder()
+        .id(EXPECTED_JOB_ID)
+        .totalSeen(0L)
+        .jobStatus(JobStatus.OPEN)
+        .build();
+    when(jobPostRepository.findById(EXPECTED_JOB_ID)).thenReturn(Optional.of(open));
+    savesWhatItIsGiven();
+
+    IngestJobPostsRestResponse response = service.ingest(List.of(request().build()));
+
+    assertThat(response.getReopened(), is(0));
+    verify(domainEventPublisher, times(1)).publish(any());
+  }
+
+  @Test
+  void everyIngestedJobPostIsStampedAsSeenToday() {
+    JobPostEntity existing = JobPostEntity.builder()
+        .id(EXPECTED_JOB_ID)
+        .totalSeen(0L)
+        .jobStatus(JobStatus.OPEN)
+        .lastSeenOn(LocalDate.of(2026, Month.AUGUST, 1))
+        .build();
+    when(jobPostRepository.findById(EXPECTED_JOB_ID)).thenReturn(Optional.of(existing));
+    savesWhatItIsGiven();
+
+    service.ingest(List.of(request().build()));
+
+    assertThat(existing.getLastSeenOn(), is(LocalDate.now(ZoneOffset.UTC)));
+  }
+
+  @Test
+  void theSalaryCurrencyAndCategoryAreStored() {
+    savesWhatItIsGiven();
+    ArgumentCaptor<JobPostEntity> captor = ArgumentCaptor.forClass(JobPostEntity.class);
+
+    service.ingest(List.of(request()
+        .salaryRangeDown(1500000)
+        .salaryRangeTop(2000000)
+        .salaryCurrency("ARS")
+        .category("TECNOLOGIA")
+        .build()));
+
+    verify(jobPostRepository).save(captor.capture());
+    assertThat(captor.getValue().getSalaryCurrency(), is("ARS"));
+    assertThat(captor.getValue().getCategory(), is("TECNOLOGIA"));
+  }
+
+  @Test
+  void aSalaryWithoutCurrencyIsStoredInPesos() {
+    savesWhatItIsGiven();
+    ArgumentCaptor<JobPostEntity> captor = ArgumentCaptor.forClass(JobPostEntity.class);
+
+    service.ingest(List.of(request().salaryRangeDown(1500000).build()));
+
+    verify(jobPostRepository).save(captor.capture());
+    assertThat(captor.getValue().getSalaryCurrency(), is("ARS"));
+  }
+
+  @Test
+  void aCurrencyWithoutSalaryIsDropped() {
+    savesWhatItIsGiven();
+    ArgumentCaptor<JobPostEntity> captor = ArgumentCaptor.forClass(JobPostEntity.class);
+
+    service.ingest(List.of(request().salaryCurrency("USD").build()));
+
+    verify(jobPostRepository).save(captor.capture());
+    assertThat(captor.getValue().getSalaryCurrency(), is(nullValue()));
+  }
+
+  @Test
+  void aPostingWithoutACategoryKeepsTheStoredOne() {
+    JobPostEntity existing = JobPostEntity.builder()
+        .id(EXPECTED_JOB_ID)
+        .totalSeen(0L)
+        .jobStatus(JobStatus.OPEN)
+        .category("TECNOLOGIA")
+        .build();
+    when(jobPostRepository.findById(EXPECTED_JOB_ID)).thenReturn(Optional.of(existing));
+    savesWhatItIsGiven();
+
+    service.ingest(List.of(request().category("  ").build()));
+
+    assertThat(existing.getCategory(), is("TECNOLOGIA"));
+  }
+
+  @Test
+  void anOverlongCategoryIsTruncatedToTheColumnWidth() {
+    savesWhatItIsGiven();
+    ArgumentCaptor<JobPostEntity> captor = ArgumentCaptor.forClass(JobPostEntity.class);
+
+    service.ingest(List.of(request().category("C".repeat(100)).build()));
+
+    verify(jobPostRepository).save(captor.capture());
+    assertThat(captor.getValue().getCategory().length(), is(64));
   }
 
   @Test

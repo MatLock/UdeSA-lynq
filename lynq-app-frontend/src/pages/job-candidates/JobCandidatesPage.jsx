@@ -13,6 +13,7 @@ import Spinner from '../../components/Spinner/Spinner.jsx'
 import LoadingOverlay from '../../components/LoadingOverlay/LoadingOverlay.jsx'
 import Toast from '../../components/Toast/Toast.jsx'
 import CandidateEvaluationModal from '../../components/CandidateEvaluationModal/CandidateEvaluationModal.jsx'
+import TimeToFillCard from '../../components/TimeToFillCard/TimeToFillCard.jsx'
 import formatRelativeDate from '../../utils/formatRelativeDate'
 import './JobCandidatesPage.css'
 
@@ -40,6 +41,7 @@ const JobCandidatesPage = () => {
   // the header can show its title without a redundant fetch.
   const { state } = useLocation()
   const jobTitle = state?.job?.title ?? null
+  const jobClosed = state?.job?.jobStatus === 'CLOSE'
   const { authFetch } = useApi()
   const { isCompany } = useAuth()
   const navigate = useNavigate()
@@ -133,6 +135,9 @@ const JobCandidatesPage = () => {
             {t.count.replace('{count}', data?.totalElements ?? candidates.length)}
           </span>
         )}
+        <div className="job-candidates-time-to-fill">
+          <TimeToFillCard authFetch={authFetch} jobId={jobId} isClosed={jobClosed} />
+        </div>
       </header>
 
       <main className="job-candidates-results">

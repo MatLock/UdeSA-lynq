@@ -10,6 +10,7 @@ import com.lynq.backend.controller.response.GetJobRestResponse;
 import com.lynq.backend.controller.response.GlobalRestResponse;
 import com.lynq.backend.controller.response.JobCandidateResponse;
 import com.lynq.backend.controller.response.PagedRestResponse;
+import com.lynq.backend.enums.CloseReason;
 import com.lynq.backend.enums.JobPostSource;
 import com.lynq.backend.enums.JobStatus;
 import com.lynq.backend.enums.WorkType;
@@ -940,7 +941,7 @@ class JobServiceTest {
   }
 
   @Test
-  void refreshJobReopensClosedJobStampsCreatedOnWithTodayAndClearsClosedOn() {
+  void refreshJobReopensClosedJobStampsCreatedOnWithTodayAndClearsClosedOnAndItsReason() {
     UserEntity owner = candidateUser(null);
     JobPostEntity job = JobPostEntity.builder()
         .id(JOB_ID)
@@ -948,6 +949,7 @@ class JobServiceTest {
         .createdByUser(owner)
         .createdOn(LocalDate.of(2026, Month.JANUARY, 1))
         .closedOn(LocalDate.of(2026, Month.MAY, 1))
+        .closeReason(CloseReason.OWNER)
         .build();
     stubAuthenticatedUser(owner);
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
@@ -959,6 +961,7 @@ class JobServiceTest {
     assertThat(result.getJobStatus(), is(JobStatus.OPEN));
     assertThat(result.getCreatedOn(), is(LocalDate.now(ZoneOffset.UTC)));
     assertThat(result.getClosedOn(), is(nullValue()));
+    assertThat(result.getCloseReason(), is(nullValue()));
     verify(jobPostRepository).save(job);
   }
 
@@ -1008,7 +1011,7 @@ class JobServiceTest {
   }
 
   @Test
-  void closeJobClosesOpenJobAndStampsClosedOnWithToday() {
+  void closeJobClosesOpenJobAndStampsClosedOnWithTodayAndTheOwnerReason() {
     UserEntity owner = candidateUser(null);
     JobPostEntity job = JobPostEntity.builder()
         .id(JOB_ID)
@@ -1024,6 +1027,7 @@ class JobServiceTest {
 
     assertThat(result.getJobStatus(), is(JobStatus.CLOSE));
     assertThat(result.getClosedOn(), is(LocalDate.now(ZoneOffset.UTC)));
+    assertThat(result.getCloseReason(), is(CloseReason.OWNER));
     verify(jobPostRepository).save(job);
   }
 
@@ -1131,7 +1135,7 @@ class JobServiceTest {
   }
 
   @Test
-  void updateJobClosingOpenJobStampsClosedOnWithToday() {
+  void updateJobClosingOpenJobStampsClosedOnWithTodayAndTheOwnerReason() {
     UserEntity owner = companyUser();
     JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
     stubAuthenticatedUser(owner);
@@ -1145,14 +1149,16 @@ class JobServiceTest {
 
     assertThat(result.getJobStatus(), is(JobStatus.CLOSE));
     assertThat(result.getClosedOn(), is(LocalDate.now(ZoneOffset.UTC)));
+    assertThat(result.getCloseReason(), is(CloseReason.OWNER));
   }
 
   @Test
-  void updateJobReopeningClosedJobClearsClosedOn() {
+  void updateJobReopeningClosedJobClearsClosedOnAndItsReason() {
     UserEntity owner = companyUser();
     JobPostEntity job = ownedJob(owner, List.of(SKILL_JAVA));
     job.setJobStatus(JobStatus.CLOSE);
     job.setClosedOn(LocalDate.of(2026, Month.MAY, 1));
+    job.setCloseReason(CloseReason.OWNER);
     stubAuthenticatedUser(owner);
     when(jobPostRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
     when(jobPostRepository.save(any(JobPostEntity.class)))
@@ -1164,6 +1170,7 @@ class JobServiceTest {
 
     assertThat(result.getJobStatus(), is(JobStatus.OPEN));
     assertThat(result.getClosedOn(), is(nullValue()));
+    assertThat(result.getCloseReason(), is(nullValue()));
   }
 
   @Test
@@ -1751,6 +1758,7 @@ class JobServiceTest {
     JobPostClosedPayload payload = (JobPostClosedPayload) event.payload();
     assertThat(payload.jobId(), is(JOB_ID));
     assertThat(payload.closedOn(), is(LocalDate.now(ZoneOffset.UTC)));
+    assertThat(payload.closeReason(), is("OWNER"));
   }
 
   @Test

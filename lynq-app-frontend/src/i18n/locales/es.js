@@ -191,6 +191,20 @@ const es = {
     error: 'Ocurrió un error al cargar los empleos. Intentá de nuevo.',
     empty: 'No se encontraron empleos. Probá otra búsqueda.',
   },
+  timeToFillCard: {
+    thisJob: 'Este aviso',
+    thisJobOpen: (days) => `este aviso lleva ${days} días publicado`,
+    thisJobClosed: (days) => `este aviso estuvo ${days} días publicado`,
+    middleHalf: (p25, p75) => `la mitad central cerró entre ${p25} y ${p75} días`,
+    external: (external, total) =>
+      `${external} de ${total} son de portales externos: ahí se mide cuánto siguieron publicados, no si se cubrieron`,
+    missing: 'Todavía no hay suficientes avisos parecidos cerrados para dar una mediana propia.',
+    overall: (days, jobs) => `Mediana de todos los avisos cerrados: ${days} días, sobre ${jobs}`,
+    overallMissing: 'Tampoco hay todavía suficientes avisos cerrados en toda la plataforma.',
+    thresholdReason: (min) =>
+      `Se muestra desde ${min}: con menos, la mediana es la de un par de avisos.`,
+    days: (days) => `${days} días`,
+  },
   jobCard: {
     postedBy: 'Publicado por:',
     source: 'Fuente:',
