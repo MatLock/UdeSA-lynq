@@ -1,11 +1,11 @@
 # ---------------------------------------------------------------------------
-# Bedrock access for lynq-llm.
+# Bedrock access for lynq-llm and, below it, for lynq-agent.
 #
 # Mirrors the S3 user in s3.tf: a dedicated IAM user whose only permission is
-# invoking the configured model, with its access key wired into
-# kubernetes_secret.llm. Swap this block for an IRSA role when the cluster has
-# an OIDC provider — the service reads the standard AWS credential chain, so
-# nothing in the code changes.
+# invoking the models in local.bedrock_invocable_models, with its access key
+# wired into kubernetes_secret.llm. Swap this block for an IRSA role when the
+# cluster has an OIDC provider — the service reads the standard AWS credential
+# chain, so nothing in the code changes.
 #
 # ListFoundationModels is what GET /lynq-llm/health probes: it costs nothing and
 # proves credentials, region and reachability without spending tokens.
@@ -15,22 +15,29 @@ resource "aws_iam_user" "llm_bedrock" {
 }
 
 locals {
-  bedrock_model_bare = replace(var.bedrock_model_id, "/^(us|eu|apac|global)\\./", "")
+  bedrock_invocable_models = distinct([
+    for model in concat(var.bedrock_invocable_model_ids, [var.bedrock_model_id, var.agent_bedrock_model_id]) :
+    replace(model, "/^(us|eu|apac|global)\\./", "")
+  ])
+
+  bedrock_invocable_model_arns = flatten([
+    for model in local.bedrock_invocable_models : [
+      "arn:aws:bedrock:*::foundation-model/${model}",
+      "arn:aws:bedrock:${var.bedrock_region}:*:inference-profile/${model}",
+      "arn:aws:bedrock:${var.bedrock_region}:*:inference-profile/*.${model}",
+    ]
+  ])
 }
 
 data "aws_iam_policy_document" "llm_bedrock" {
   statement {
-    sid    = "InvokeConfiguredModel"
+    sid    = "InvokeAllowedModels"
     effect = "Allow"
     actions = [
       "bedrock:InvokeModel",
       "bedrock:InvokeModelWithResponseStream",
     ]
-    resources = [
-      "arn:aws:bedrock:*::foundation-model/${local.bedrock_model_bare}",
-      "arn:aws:bedrock:${var.bedrock_region}:*:inference-profile/${local.bedrock_model_bare}",
-      "arn:aws:bedrock:${var.bedrock_region}:*:inference-profile/*.${local.bedrock_model_bare}",
-    ]
+    resources = local.bedrock_invocable_model_arns
   }
 
   statement {
@@ -64,4 +71,30 @@ moved {
 moved {
   from = aws_iam_access_key.ml_bedrock
   to   = aws_iam_access_key.llm_bedrock
+}
+
+resource "aws_iam_user" "agent_bedrock" {
+  name = "lynq-agent-bedrock"
+}
+
+data "aws_iam_policy_document" "agent_bedrock" {
+  statement {
+    sid    = "InvokeAllowedModels"
+    effect = "Allow"
+    actions = [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream",
+    ]
+    resources = local.bedrock_invocable_model_arns
+  }
+}
+
+resource "aws_iam_user_policy" "agent_bedrock" {
+  name   = "lynq-agent-bedrock-access"
+  user   = aws_iam_user.agent_bedrock.name
+  policy = data.aws_iam_policy_document.agent_bedrock.json
+}
+
+resource "aws_iam_access_key" "agent_bedrock" {
+  user = aws_iam_user.agent_bedrock.name
 }

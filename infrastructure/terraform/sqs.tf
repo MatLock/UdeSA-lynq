@@ -11,7 +11,7 @@ resource "aws_sqs_queue" "analytics_events_dlq" {
 }
 
 resource "aws_sqs_queue" "analytics_events" {
-  name           = "lynq-analytics-events"
+  name = "lynq-analytics-events"
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.analytics_events_dlq.arn
     maxReceiveCount     = 5
