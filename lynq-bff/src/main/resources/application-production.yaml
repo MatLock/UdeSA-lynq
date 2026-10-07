@@ -44,6 +44,17 @@ lynq:
     url: ${LYNQ_AGENT_URL:http://lynq-agent:8090/lynq-agent}
   analytics:
     url: ${LYNQ_ANALYTICS_URL:http://lynq-analytics:8080/lynq-analytics}
+  rate-limit:
+    tiers:
+      light:
+        per-minute: ${LYNQ_RATE_LIMIT_LIGHT_PER_MINUTE:30}
+        per-day: ${LYNQ_RATE_LIMIT_LIGHT_PER_DAY:500}
+      standard:
+        per-minute: ${LYNQ_RATE_LIMIT_STANDARD_PER_MINUTE:10}
+        per-day: ${LYNQ_RATE_LIMIT_STANDARD_PER_DAY:300}
+      heavy:
+        per-minute: ${LYNQ_RATE_LIMIT_HEAVY_PER_MINUTE:10}
+        per-day: ${LYNQ_RATE_LIMIT_HEAVY_PER_DAY:200}
 
 server:
   port: 8080

@@ -16,6 +16,8 @@ import com.lynq.bff.client.response.UpdateJobResponse;
 import com.lynq.bff.client.response.UpskillingSuggestionResponse;
 import com.lynq.bff.controller.JobController;
 import com.lynq.bff.controller.response.GlobalRestResponse;
+import com.lynq.bff.ratelimit.RateLimitTier;
+import com.lynq.bff.ratelimit.RateLimited;
 import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.JobService;
@@ -193,6 +195,7 @@ public class JobControllerImpl implements JobController {
 
   @Override
   @GetMapping("/{jobId}/candidate/{candidateId}/candidate-explanation")
+  @RateLimited(RateLimitTier.STANDARD)
   public ResponseEntity<GlobalRestResponse<CandidateExplanationResponse>> explainCandidate(
       @PathVariable String jobId,
       @PathVariable String candidateId,
@@ -208,6 +211,7 @@ public class JobControllerImpl implements JobController {
 
   @Override
   @GetMapping("/{jobId}/upskilling-suggestion")
+  @RateLimited(RateLimitTier.STANDARD)
   public ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> suggestUpskilling(
       @PathVariable String jobId,
       @RequestParam(defaultValue = "en") String language,

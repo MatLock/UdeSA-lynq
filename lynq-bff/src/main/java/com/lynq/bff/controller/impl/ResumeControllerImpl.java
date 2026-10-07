@@ -9,6 +9,8 @@ import com.lynq.bff.controller.request.UpdateResumeAliasRestRequest;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.controller.response.ResumePreviewRestResponse;
 import com.lynq.bff.controller.response.ResumeTailorApplyRestResponse;
+import com.lynq.bff.ratelimit.RateLimitTier;
+import com.lynq.bff.ratelimit.RateLimited;
 import com.lynq.bff.security.HasRole;
 import com.lynq.bff.security.Role;
 import com.lynq.bff.security.LynqUserPrincipal;
@@ -64,6 +66,7 @@ public class ResumeControllerImpl implements ResumeController {
 
   @Override
   @PostMapping("/preview")
+  @RateLimited(RateLimitTier.STANDARD)
   public ResponseEntity<GlobalRestResponse<ResumePreviewRestResponse>> previewResume(
       @RequestBody PreviewResumeRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
@@ -78,6 +81,7 @@ public class ResumeControllerImpl implements ResumeController {
 
   @Override
   @PostMapping("/document/{fileId}/import")
+  @RateLimited(RateLimitTier.HEAVY)
   public ResponseEntity<GlobalRestResponse<Object>> importResumeDocument(
       @PathVariable String fileId,
       @RequestParam(defaultValue = "EN") String language,
@@ -93,6 +97,7 @@ public class ResumeControllerImpl implements ResumeController {
 
   @Override
   @PostMapping("/{resumeId}/translate")
+  @RateLimited(RateLimitTier.HEAVY)
   public ResponseEntity<GlobalRestResponse<Object>> translateResume(
       @PathVariable String resumeId,
       @RequestBody TranslateResumeRestRequest request,
@@ -145,6 +150,7 @@ public class ResumeControllerImpl implements ResumeController {
 
   @Override
   @PostMapping("/{resumeId}/tailor/{jobId}")
+  @RateLimited(RateLimitTier.HEAVY)
   public ResponseEntity<GlobalRestResponse<Object>> startResumeTailoring(
       @PathVariable String resumeId,
       @PathVariable String jobId,
@@ -161,6 +167,7 @@ public class ResumeControllerImpl implements ResumeController {
 
   @Override
   @PostMapping("/tailor/{conversationId}/turn")
+  @RateLimited(RateLimitTier.HEAVY)
   public ResponseEntity<GlobalRestResponse<Object>> takeResumeTailoringTurn(
       @PathVariable String conversationId,
       @RequestBody TailorTurnRestRequest request,
@@ -176,6 +183,7 @@ public class ResumeControllerImpl implements ResumeController {
 
   @Override
   @GetMapping("/tailor/{conversationId}")
+  @RateLimited(RateLimitTier.LIGHT)
   public ResponseEntity<GlobalRestResponse<Map<String, Object>>> getResumeTailoringConversation(
       @PathVariable String conversationId,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
@@ -190,6 +198,7 @@ public class ResumeControllerImpl implements ResumeController {
 
   @Override
   @PostMapping("/tailor/{conversationId}/apply")
+  @RateLimited(RateLimitTier.STANDARD)
   public ResponseEntity<GlobalRestResponse<ResumeTailorApplyRestResponse>> applyWithTailoredResume(
       @PathVariable String conversationId,
       @RequestBody TailorApplyRestRequest request,

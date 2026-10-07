@@ -920,6 +920,21 @@ class LynqBffApplicationTests extends AbstractE2ETest {
     lynqAnalyticsMock.verify(request(), VerificationTimes.exactly(0));
   }
 
+  @Test
+  void documentsTheRateLimitOnlyOnTheEndpointsThatReachLynqLlmOrLynqAgent() throws Exception {
+    JsonNode paths = payloadOf(sendAnonymous("GET", CONTEXT_PATH + "/v3/api-docs", null))
+        .path("paths");
+
+    JsonNode turn = paths.path("/resume/tailor/{conversationId}/turn").path("post");
+    assertThat(turn.path("responses").path("429").path("description").asText(),
+        containsString("HEAVY quota: 10 requests per minute and 200 per day"));
+    assertThat(turn.path("responses").path("429").path("headers").has("Retry-After"), is(true));
+    assertThat(turn.path("responses").path("200").path("headers").has("X-RateLimit-Remaining"),
+        is(true));
+    assertThat(paths.path("/resume/{resumeId}/alias").path("put").path("responses").has("429"),
+        is(false));
+  }
+
   private static JsonNode payloadOf(HttpResponse<String> response) throws Exception {
     return JSON.readTree(response.body());
   }

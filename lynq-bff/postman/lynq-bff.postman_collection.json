@@ -1,0 +1,3178 @@
+{
+  "info": {
+    "name": "Lynq BFF",
+    "description": "Endpoints of lynq-bff, the backend-for-frontend gateway the browser talks to: it verifies the caller's JWT and relays to lynq-iam, lynq-app-backend, lynq-llm, lynq-file-storage, lynq-agent and lynq-analytics. Every request needs the `lynq-request-uuid` header (403 without it); every route except the anonymous auth ones (register, logins, check-username, check-email) also needs `Authorization: Bearer <accessToken>` (the refresh takes the refresh token instead). Register and login auto-save `accessToken` and `refreshToken` into collection variables, and create requests save the ids later requests chain on.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "lynq-bff-collection"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8087/lynq-bff",
+      "type": "string"
+    },
+    {
+      "key": "requestUuid",
+      "value": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "companyId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "jobId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "candidateId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "resumeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "resumeFileId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "imageFileId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "previewFileId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fileId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "conversationId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Generate a fresh request UUID per call so log tracing stays unique.",
+          "if (typeof crypto !== 'undefined' && crypto.randomUUID) {",
+          "  pm.collectionVariables.set('requestUuid', crypto.randomUUID());",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Auth routes relayed to lynq-iam (`/auth`). Register, logins and availability checks are public; refresh takes the refresh token as bearer.",
+      "item": [
+        {
+          "name": "Register user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"P@ssw0rd123\",\n  \"email\": \"johndoe@example.com\",\n  \"role\": \"R_CANDIDATE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Public. Relays the registration to lynq-iam: creates a user with a unique username and email and the role sent in the body (R_CANDIDATE or R_COMPANY), and auto-saves the returned access/refresh tokens. Returns 201; 400 for a missing or unknown role, 409 if the username or email is taken."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "if (data && data.refreshToken) pm.collectionVariables.set('refreshToken', data.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login by username",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"P@ssw0rd123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login/username",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login",
+                "username"
+              ]
+            },
+            "description": "Public. Authenticates with username + password through lynq-iam and saves the returned access/refresh tokens into collection variables. Returns 200; 401 on bad credentials."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', data.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login by email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"johndoe@example.com\",\n  \"password\": \"P@ssw0rd123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login/email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login",
+                "email"
+              ]
+            },
+            "description": "Public. Authenticates with email + password through lynq-iam and saves the returned access/refresh tokens into collection variables. Returns 200; 401 on bad credentials."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', data.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh access token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{refreshToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Exchanges the opaque refresh token (sent as the bearer credential; the gateway skips its JWT signature check and lynq-iam validates it) for a new access token, which is saved into `accessToken`. Returns 200; 401 if the refresh token is invalid or expired."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newPassword\": \"N3wP@ssw0rd!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/update-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "update-password"
+              ]
+            },
+            "description": "Updates the caller's password in lynq-iam and returns a fresh access/refresh token pair, which is auto-saved into collection variables. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "if (data && data.refreshToken) pm.collectionVariables.set('refreshToken', data.refreshToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check username availability",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/check-username?username=johndoe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "check-username"
+              ],
+              "query": [
+                {
+                  "key": "username",
+                  "value": "johndoe"
+                }
+              ]
+            },
+            "description": "Public. Tells whether a username is still available before registering. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Check email availability",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/check-email?email=johndoe@example.com",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "check-email"
+              ],
+              "query": [
+                {
+                  "key": "email",
+                  "value": "johndoe@example.com"
+                }
+              ]
+            },
+            "description": "Public. Tells whether an email is still available before registering. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "description": "Candidate and user profile routes (`/user`) relayed to lynq-app-backend.",
+      "item": [
+        {
+          "name": "Get current user",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user"
+              ]
+            },
+            "description": "Returns the caller's own lynq-app-backend profile (including `companyId` for company users) and saves `userId`/`companyId`. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.id) pm.collectionVariables.set('userId', data.id);",
+                  "if (data && data.companyId) pm.collectionVariables.set('companyId', data.companyId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create user profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"John Doe\",\n  \"currentPosition\": \"Backend Developer\",\n  \"about\": \"Backend developer who enjoys building APIs.\",\n  \"githubUrl\": \"https://github.com/johndoe-example\",\n  \"linkedinUrl\": \"https://www.linkedin.com/in/johndoe-example\",\n  \"birthDate\": \"1995-05-20\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user"
+              ]
+            },
+            "description": "Creates the caller's profile in lynq-app-backend after registering and saves its id into `userId`. Returns 201."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.id) pm.collectionVariables.set('userId', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update user profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"John Doe\",\n  \"currentPosition\": \"Senior Backend Developer\",\n  \"about\": \"Backend developer focused on distributed systems.\",\n  \"githubUrl\": \"https://github.com/johndoe-example\",\n  \"linkedinUrl\": \"https://www.linkedin.com/in/johndoe-example\",\n  \"birthDate\": \"1995-05-20\",\n  \"expectedSalary\": 3000,\n  \"expectedSalaryCurrency\": \"USD\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user"
+              ]
+            },
+            "description": "Partially updates the caller's profile, including the expected salary. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate profile image upload URL",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/generate-upload-image?file-name=avatar.png",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "generate-upload-image"
+              ],
+              "query": [
+                {
+                  "key": "file-name",
+                  "value": "avatar.png"
+                }
+              ]
+            },
+            "description": "Returns a pre-signed URL to upload the caller's profile image and the `fileId` to confirm it with, saved into `imageFileId`. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.fileId) pm.collectionVariables.set('imageFileId', data.fileId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm profile image upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/confirm-upload-image?file-id={{imageFileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "confirm-upload-image"
+              ],
+              "query": [
+                {
+                  "key": "file-id",
+                  "value": "{{imageFileId}}"
+                }
+              ]
+            },
+            "description": "Confirms that the profile image was uploaded to the pre-signed URL and attaches it to the caller's profile. Returns 204 with no body."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate resume upload URL",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/generate-upload-resume?file-name=johndoe-resume.pdf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "generate-upload-resume"
+              ],
+              "query": [
+                {
+                  "key": "file-name",
+                  "value": "johndoe-resume.pdf"
+                }
+              ]
+            },
+            "description": "Returns a pre-signed URL to upload a resume document and the `fileId` to confirm or import it with, saved into `resumeFileId`. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.fileId) pm.collectionVariables.set('resumeFileId', data.fileId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm resume upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/confirm-upload-resume?file-id={{resumeFileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "confirm-upload-resume"
+              ],
+              "query": [
+                {
+                  "key": "file-id",
+                  "value": "{{resumeFileId}}"
+                }
+              ]
+            },
+            "description": "Confirms that the resume document was uploaded to the pre-signed URL. Returns 204 with no body."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List resumes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/resume",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "resume"
+              ]
+            },
+            "description": "Lists the caller's stored resumes (id, name, alias, language, content, PDF URL). Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List supported resume languages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/resume/languages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "resume",
+                "languages"
+              ]
+            },
+            "description": "Lists the languages a resume can be stored or translated in (lynq-app-backend's supported_languages). Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe - Backend\",\n  \"language\": \"EN\",\n  \"resume\": {\n    \"personal_info\": {\n      \"full_name\": \"John Doe\",\n      \"headline\": \"Backend Developer\",\n      \"email\": \"johndoe@example.com\",\n      \"phone\": \"+1 555 0100\",\n      \"location\": \"Springfield\",\n      \"links\": {\n        \"linkedin\": \"https://www.linkedin.com/in/johndoe-example\",\n        \"github\": \"https://github.com/johndoe-example\",\n        \"portfolio\": null,\n        \"website\": null\n      }\n    },\n    \"summary\": \"Backend developer with 5 years of experience building Java and Spring Boot services.\",\n    \"work_experience\": [\n      {\n        \"company\": \"Example Corp\",\n        \"position\": \"Backend Developer\",\n        \"location\": \"Remote\",\n        \"start_date\": \"2021-03\",\n        \"end_date\": null,\n        \"is_current\": true,\n        \"description\": \"Built and maintained REST APIs for the payments team.\",\n        \"achievements\": [\n          \"Cut p95 latency of the orders API by 40%\"\n        ],\n        \"technologies\": [\n          \"Java\",\n          \"Spring Boot\",\n          \"PostgreSQL\"\n        ]\n      }\n    ],\n    \"education\": [\n      {\n        \"institution\": \"Example University\",\n        \"degree\": \"BSc\",\n        \"field_of_study\": \"Computer Science\",\n        \"start_date\": \"2015-03\",\n        \"end_date\": \"2020-12\",\n        \"is_current\": false,\n        \"description\": null\n      }\n    ],\n    \"skills\": {\n      \"technical\": [\n        \"Java\",\n        \"Spring Boot\",\n        \"SQL\"\n      ],\n      \"tools\": [\n        \"Docker\",\n        \"Git\"\n      ],\n      \"soft\": [\n        \"Teamwork\"\n      ]\n    },\n    \"languages\": [\n      {\n        \"language\": \"English\",\n        \"proficiency\": \"Native\"\n      }\n    ],\n    \"certifications\": [],\n    \"projects\": []\n  },\n  \"fileId\": null,\n  \"similarityTags\": [\n    \"java\",\n    \"spring boot\",\n    \"backend\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/resume",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "resume"
+              ]
+            },
+            "description": "Stores a structured resume for the caller and saves its id into `resumeId`. `language` is one of EN, ES, FR, PR; `fileId` optionally links an uploaded document. Returns 201."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.id) pm.collectionVariables.set('resumeId', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update resume alias (user)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"alias\": \"Backend - Remote\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/user/resume/{{resumeId}}/alias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "resume",
+                "{{resumeId}}",
+                "alias"
+              ]
+            },
+            "description": "Renames one of the caller's resumes by setting its alias, relayed straight to lynq-app-backend. Returns 200; 404 if the resume is not the caller's."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete resume (user)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/resume/{{resumeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "resume",
+                "{{resumeId}}"
+              ]
+            },
+            "description": "Deletes one of the caller's resumes in lynq-app-backend and returns the deleted resume's summary. Returns 200 (with a body, unlike DELETE /resume/{resumeId}); 404 if it is not the caller's."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List applications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/application?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "application"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Pages through the job applications the caller has made. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upskilling suggestion for a job (user)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/upskilling-suggestion/{{jobId}}?language=en",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "upskilling-suggestion",
+                "{{jobId}}"
+              ],
+              "query": [
+                {
+                  "key": "language",
+                  "value": "en"
+                }
+              ]
+            },
+            "description": "Asks lynq-app-backend for the courses and skills the caller should work on to fit the given job post. `language` defaults to `en`. Returns 200. Rate limited per user in tier STANDARD (10/minute, 200/day, `lynq.rate-limit.tiers.standard`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get user profile by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "{{userId}}"
+              ]
+            },
+            "description": "Returns the public profile of any user by id (with its company and job data when it has them). Returns 200; 404 if the user does not exist."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Company",
+      "description": "Company routes (`/company`) relayed to lynq-app-backend.",
+      "item": [
+        {
+          "name": "Create user with company",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Jane Doe\",\n  \"currentPosition\": \"Head of Talent\",\n  \"userAbout\": \"Recruiting engineers for Example Corp.\",\n  \"linkedinUrl\": \"https://www.linkedin.com/in/janedoe-example\",\n  \"birthDate\": \"1990-01-15\",\n  \"companyName\": \"Example Corp\",\n  \"companyAbout\": \"A fictional software company used for testing.\",\n  \"companySize\": 50\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/company",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "company"
+              ]
+            },
+            "description": "Creates the caller's user profile together with the company it owns and saves the new `companyId`. Returns 201."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.companyId) pm.collectionVariables.set('companyId', data.companyId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update company",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Example Corp\",\n  \"about\": \"A fictional software company used for testing.\",\n  \"size\": 75\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/company",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "company"
+              ]
+            },
+            "description": "Partially updates the company the caller owns. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate company image upload URL",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/company/generate-upload-image?file-name=logo.png",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "company",
+                "generate-upload-image"
+              ],
+              "query": [
+                {
+                  "key": "file-name",
+                  "value": "logo.png"
+                }
+              ]
+            },
+            "description": "Returns a pre-signed URL to upload the company logo and the `fileId` to confirm it with, saved into `imageFileId`. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.fileId) pm.collectionVariables.set('imageFileId', data.fileId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm company image upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/company/confirm-upload-image?file-id={{imageFileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "company",
+                "confirm-upload-image"
+              ],
+              "query": [
+                {
+                  "key": "file-id",
+                  "value": "{{imageFileId}}"
+                }
+              ]
+            },
+            "description": "Confirms that the company logo was uploaded to the pre-signed URL and attaches it to the company. Returns 204 with no body."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get company detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/company/{{companyId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "company",
+                "{{companyId}}"
+              ]
+            },
+            "description": "Returns a company's detail by id. Returns 200; 404 if it does not exist."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Job",
+      "description": "Job post routes (`/job`) relayed to lynq-app-backend.",
+      "item": [
+        {
+          "name": "Create job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Backend Developer\",\n  \"description\": \"We are looking for a backend developer with Java and Spring Boot experience.\",\n  \"workType\": \"REMOTE\",\n  \"salaryRangeDown\": 2000,\n  \"salaryRangeTop\": 3500,\n  \"salaryCurrency\": \"USD\",\n  \"jobPostSource\": \"LYNQ\",\n  \"skills\": [\n    \"Java\",\n    \"Spring Boot\",\n    \"SQL\"\n  ],\n  \"similarityTags\": [\n    \"java\",\n    \"spring boot\",\n    \"backend\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/job",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "job"
+              ]
+            },
+            "description": "Publishes a job post for the caller's company and saves its id into `jobId`. `workType` is REMOTE or IN_OFFICE; `jobPostSource` is LYNQ, LINKEDIN, COMPUTRABAJO or BUMERAN. Returns 201."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.jobId) pm.collectionVariables.set('jobId', data.jobId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update job",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Senior Backend Developer\",\n  \"description\": \"We are looking for a senior backend developer with Java and Spring Boot experience.\",\n  \"workType\": \"REMOTE\",\n  \"status\": \"OPEN\",\n  \"salaryRangeDown\": 3000,\n  \"salaryRangeTop\": 4500,\n  \"salaryCurrency\": \"USD\",\n  \"skills\": [\n    \"Java\",\n    \"Spring Boot\",\n    \"SQL\",\n    \"Kafka\"\n  ],\n  \"similarityTags\": [\n    \"java\",\n    \"spring boot\",\n    \"backend\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/job/{{jobId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "job",
+                "{{jobId}}"
+              ]
+            },
+            "description": "Partially updates a job post the caller's company owns; `status` is OPEN or CLOSE. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List jobs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/job?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "job"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "filterValue",
+                  "value": "backend",
+                  "description": "Optional free-text filter",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Pages through job posts, optionally filtered by `filterValue` (free text). `page` defaults to 0 and `size` to 10. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List my jobs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/job/mine?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "job",
+                "mine"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Pages through the job posts published by the caller's company. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get job details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/job/{{jobId}}/details",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "job",
+                "{{jobId}}",
+                "details"
+              ]
+            },
+            "description": "Returns the full detail of a job post. Returns 200; 404 if it does not exist."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Increase job views",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/job/{{jobId}}/increase-seen",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "job",
+                "{{jobId}}",
+                "increase-seen"
+              ]
+            },
+            "description": "Counts one more view of the job post and returns the new total. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh job",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/job/{{jobId}}/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "job",
+                "{{jobId}}",
+                "refresh"
+              ]
+            },
+            "description": "Refreshes a job post the caller's company owns, resetting its creation date and status. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Close job",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/job/{{jobId}}/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "job",
+                "{{jobId}}",
+                "close"
+              ]
+            },
+            "description": "Closes a job post the caller's company owns so it stops taking applications. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apply to job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resumeId\": \"{{resumeId}}\",\n  \"resumeName\": \"John Doe - Backend\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/job/{{jobId}}/apply",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "job",
+                "{{jobId}}",
+                "apply"
+              ]
+            },
+            "description": "Applies the caller to a job post with one of their stored resumes (`resumeId`), or with an already-uploaded PDF (`fileId`, optional). Returns 201."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List job candidates",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/job/{{jobId}}/candidates?page=0&pageSize=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "job",
+                "{{jobId}}",
+                "candidates"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Pages through the candidates who applied to a job post of the caller's company, with their Lynq score, and saves the first candidate's user id into `candidateId`. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.content && data.content.length) pm.collectionVariables.set('candidateId', data.content[0].userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Explain candidate",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/job/{{jobId}}/candidate/{{candidateId}}/candidate-explanation",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "job",
+                "{{jobId}}",
+                "candidate",
+                "{{candidateId}}",
+                "candidate-explanation"
+              ]
+            },
+            "description": "Asks the LLM, through lynq-app-backend, why a candidate (by user id) does or does not fit the job post. Returns 200; 404 if that user did not apply. Rate limited per user in tier STANDARD (10/minute, 200/day, `lynq.rate-limit.tiers.standard`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upskilling suggestion for a job",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/job/{{jobId}}/upskilling-suggestion?language=en",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "job",
+                "{{jobId}}",
+                "upskilling-suggestion"
+              ],
+              "query": [
+                {
+                  "key": "language",
+                  "value": "en"
+                }
+              ]
+            },
+            "description": "Asks the LLM, through lynq-app-backend, which courses and skills would make the caller a better fit for the job post. `language` defaults to `en`. Returns 200. Rate limited per user in tier STANDARD (10/minute, 200/day, `lynq.rate-limit.tiers.standard`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Resume",
+      "description": "Resume orchestration routes (`/resume`), all restricted to R_CANDIDATE: preview, import, translation, alias, deletion and the CV Tailor conversation.",
+      "item": [
+        {
+          "name": "Preview resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resume\": {\n    \"personal_info\": {\n      \"full_name\": \"John Doe\",\n      \"headline\": \"Backend Developer\",\n      \"email\": \"johndoe@example.com\",\n      \"phone\": \"+1 555 0100\",\n      \"location\": \"Springfield\",\n      \"links\": {\n        \"linkedin\": \"https://www.linkedin.com/in/johndoe-example\",\n        \"github\": \"https://github.com/johndoe-example\",\n        \"portfolio\": null,\n        \"website\": null\n      }\n    },\n    \"summary\": \"Backend developer with 5 years of experience building Java and Spring Boot services.\",\n    \"work_experience\": [\n      {\n        \"company\": \"Example Corp\",\n        \"position\": \"Backend Developer\",\n        \"location\": \"Remote\",\n        \"start_date\": \"2021-03\",\n        \"end_date\": null,\n        \"is_current\": true,\n        \"description\": \"Built and maintained REST APIs for the payments team.\",\n        \"achievements\": [\n          \"Cut p95 latency of the orders API by 40%\"\n        ],\n        \"technologies\": [\n          \"Java\",\n          \"Spring Boot\",\n          \"PostgreSQL\"\n        ]\n      }\n    ],\n    \"education\": [\n      {\n        \"institution\": \"Example University\",\n        \"degree\": \"BSc\",\n        \"field_of_study\": \"Computer Science\",\n        \"start_date\": \"2015-03\",\n        \"end_date\": \"2020-12\",\n        \"is_current\": false,\n        \"description\": null\n      }\n    ],\n    \"skills\": {\n      \"technical\": [\n        \"Java\",\n        \"Spring Boot\",\n        \"SQL\"\n      ],\n      \"tools\": [\n        \"Docker\",\n        \"Git\"\n      ],\n      \"soft\": [\n        \"Teamwork\"\n      ]\n    },\n    \"languages\": [\n      {\n        \"language\": \"English\",\n        \"proficiency\": \"Native\"\n      }\n    ],\n    \"certifications\": [],\n    \"projects\": []\n  },\n  \"template\": \"MODERN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/resume/preview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resume",
+                "preview"
+              ]
+            },
+            "description": "Renders a resume into a PDF with the chosen template (MODERN or CLASSIC) and returns its `fileId` and a download URL; the `fileId` is saved into `previewFileId`. Returns 201. Requires role R_CANDIDATE (`@HasRole(Role.CANDIDATE)`); any other role gets 403. Rate limited per user in tier STANDARD (10/minute, 200/day, `lynq.rate-limit.tiers.standard`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.fileId) pm.collectionVariables.set('previewFileId', data.fileId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Import resume document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/resume/document/{{resumeFileId}}/import?language=EN",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resume",
+                "document",
+                "{{resumeFileId}}",
+                "import"
+              ],
+              "query": [
+                {
+                  "key": "language",
+                  "value": "EN"
+                }
+              ]
+            },
+            "description": "Confirms an uploaded resume document (from GET /user/generate-upload-resume), parses it with the LLM and stores it as a new resume, whose id is saved into `resumeId`. `language` (default EN) is the fallback when the language cannot be detected. Returns 201; 502 if the import fails. Requires role R_CANDIDATE (`@HasRole(Role.CANDIDATE)`); any other role gets 403. Rate limited per user in tier HEAVY (10/minute, 200/day, `lynq.rate-limit.tiers.heavy`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.id) pm.collectionVariables.set('resumeId', data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Translate stored resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language\": \"ES\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/resume/{{resumeId}}/translate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resume",
+                "{{resumeId}}",
+                "translate"
+              ]
+            },
+            "description": "Translates one of the caller's stored resumes into another supported language and stores the result as a new resume (the response carries it). Returns 200; 400 if the language is unsupported or the caller already holds a resume in it. Requires role R_CANDIDATE (`@HasRole(Role.CANDIDATE)`); any other role gets 403. Rate limited per user in tier HEAVY (10/minute, 200/day, `lynq.rate-limit.tiers.heavy`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Discard resume preview",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/resume/preview/{{previewFileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resume",
+                "preview",
+                "{{previewFileId}}"
+              ]
+            },
+            "description": "Deletes a preview PDF produced by POST /resume/preview. Returns 204 with no body. Requires role R_CANDIDATE (`@HasRole(Role.CANDIDATE)`); any other role gets 403."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update resume alias",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"alias\": \"Backend - Remote\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/resume/{{resumeId}}/alias",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resume",
+                "{{resumeId}}",
+                "alias"
+              ]
+            },
+            "description": "Assigns the alias the candidate wants one of their resumes known by. Returns 200; 404 if the resume is not the caller's. Requires role R_CANDIDATE (`@HasRole(Role.CANDIDATE)`); any other role gets 403."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete resume",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/resume/{{resumeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resume",
+                "{{resumeId}}"
+              ]
+            },
+            "description": "Deletes one of the caller's resumes together with its stored files. Returns 204 with no body; 404 if the resume is not the caller's. Requires role R_CANDIDATE (`@HasRole(Role.CANDIDATE)`); any other role gets 403."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Start resume tailoring",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/resume/{{resumeId}}/tailor/{{jobId}}?language=EN",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resume",
+                "{{resumeId}}",
+                "tailor",
+                "{{jobId}}"
+              ],
+              "query": [
+                {
+                  "key": "language",
+                  "value": "EN"
+                }
+              ]
+            },
+            "description": "Starts a CV Tailor conversation in lynq-agent that adapts a stored resume to a job post, and saves the returned `conversationId`. `language` (default EN) is the conversation language. Returns 201. Requires role R_CANDIDATE (`@HasRole(Role.CANDIDATE)`); any other role gets 403. Rate limited per user in tier HEAVY (10/minute, 200/day, `lynq.rate-limit.tiers.heavy`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.conversationId) pm.collectionVariables.set('conversationId', data.conversationId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Take resume tailoring turn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Highlight my Spring Boot experience for this role.\",\n  \"turnKey\": \"{{$guid}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/resume/tailor/{{conversationId}}/turn",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resume",
+                "tailor",
+                "{{conversationId}}",
+                "turn"
+              ]
+            },
+            "description": "Sends one message to the CV Tailor conversation and returns the agent's reply and the updated resume. `turnKey` is an idempotency key: retrying with the same key returns the same turn. Returns 200. Requires role R_CANDIDATE (`@HasRole(Role.CANDIDATE)`); any other role gets 403. Rate limited per user in tier HEAVY (10/minute, 200/day, `lynq.rate-limit.tiers.heavy`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get resume tailoring conversation",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/resume/tailor/{{conversationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resume",
+                "tailor",
+                "{{conversationId}}"
+              ]
+            },
+            "description": "Returns the CV Tailor conversation with its messages and current resume. Returns 200; 404 if it is not the caller's. Requires role R_CANDIDATE (`@HasRole(Role.CANDIDATE)`); any other role gets 403. Rate limited per user in tier LIGHT (30/minute, 500/day, `lynq.rate-limit.tiers.light`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Apply with tailored resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"template\": \"MODERN\",\n  \"resumeName\": \"John Doe - Backend (tailored)\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/resume/tailor/{{conversationId}}/apply",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resume",
+                "tailor",
+                "{{conversationId}}",
+                "apply"
+              ]
+            },
+            "description": "Renders the tailored resume (template defaults to MODERN, `resumeName` to the posting title), applies to the conversation's job post with it and closes the conversation. `fileId` optionally reuses a PDF already rendered for this conversation. Returns 201. Requires role R_CANDIDATE (`@HasRole(Role.CANDIDATE)`); any other role gets 403. Rate limited per user in tier STANDARD (10/minute, 200/day, `lynq.rate-limit.tiers.standard`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "File",
+      "description": "File routes (`/files`) relayed to lynq-file-storage.",
+      "item": [
+        {
+          "name": "Create file upload URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileName\": \"portfolio.pdf\",\n  \"contentType\": \"application/pdf\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/files/upload-url",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                "upload-url"
+              ]
+            },
+            "description": "Registers a file in lynq-file-storage and returns a pre-signed upload URL; the new `fileId` is saved into `fileId`. Returns 201."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.fileId) pm.collectionVariables.set('fileId', data.fileId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm file upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/files/{{fileId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                "{{fileId}}",
+                "confirm"
+              ]
+            },
+            "description": "Marks a file the caller owns as uploaded (PENDING to AVAILABLE) and returns it. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get file",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/files/{{fileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                "{{fileId}}"
+              ]
+            },
+            "description": "Returns the metadata of a file the caller owns. Returns 200; 404 if it is not the caller's."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create file download URL",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/files/{{fileId}}/download-url",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                "{{fileId}}",
+                "download-url"
+              ]
+            },
+            "description": "Returns a pre-signed download URL for a file the caller owns. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create file download URLs (batch)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileIds\": [\n    \"{{fileId}}\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/files/download-urls",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                "download-urls"
+              ]
+            },
+            "description": "Returns a map of fileId to pre-signed download URL for several files at once. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete file",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/files/{{fileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                "{{fileId}}"
+              ]
+            },
+            "description": "Deletes a file the caller owns. Returns 204 with no body."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LLM",
+      "description": "lynq-llm generations relayed by the gateway (no path prefix).",
+      "item": [
+        {
+          "name": "Enhance skills",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Backend Developer\",\n  \"description\": \"We are looking for a backend developer with Java and Spring Boot experience.\",\n  \"work_type\": \"REMOTE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/skill-enhance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "skill-enhance"
+              ]
+            },
+            "description": "Asks lynq-llm to suggest skills for a job post from its title, description and work type (`work_type` is REMOTE or IN_OFFICE). Returns 200. Rate limited per user in tier STANDARD (10/minute, 200/day, `lynq.rate-limit.tiers.standard`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Translate resume content",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resume\": {\n    \"personal_info\": {\n      \"full_name\": \"John Doe\",\n      \"headline\": \"Backend Developer\",\n      \"email\": \"johndoe@example.com\",\n      \"phone\": \"+1 555 0100\",\n      \"location\": \"Springfield\",\n      \"links\": {\n        \"linkedin\": \"https://www.linkedin.com/in/johndoe-example\",\n        \"github\": \"https://github.com/johndoe-example\",\n        \"portfolio\": null,\n        \"website\": null\n      }\n    },\n    \"summary\": \"Backend developer with 5 years of experience building Java and Spring Boot services.\",\n    \"work_experience\": [\n      {\n        \"company\": \"Example Corp\",\n        \"position\": \"Backend Developer\",\n        \"location\": \"Remote\",\n        \"start_date\": \"2021-03\",\n        \"end_date\": null,\n        \"is_current\": true,\n        \"description\": \"Built and maintained REST APIs for the payments team.\",\n        \"achievements\": [\n          \"Cut p95 latency of the orders API by 40%\"\n        ],\n        \"technologies\": [\n          \"Java\",\n          \"Spring Boot\",\n          \"PostgreSQL\"\n        ]\n      }\n    ],\n    \"education\": [\n      {\n        \"institution\": \"Example University\",\n        \"degree\": \"BSc\",\n        \"field_of_study\": \"Computer Science\",\n        \"start_date\": \"2015-03\",\n        \"end_date\": \"2020-12\",\n        \"is_current\": false,\n        \"description\": null\n      }\n    ],\n    \"skills\": {\n      \"technical\": [\n        \"Java\",\n        \"Spring Boot\",\n        \"SQL\"\n      ],\n      \"tools\": [\n        \"Docker\",\n        \"Git\"\n      ],\n      \"soft\": [\n        \"Teamwork\"\n      ]\n    },\n    \"languages\": [\n      {\n        \"language\": \"English\",\n        \"proficiency\": \"Native\"\n      }\n    ],\n    \"certifications\": [],\n    \"projects\": []\n  },\n  \"language\": \"ES\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/translate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "translate"
+              ]
+            },
+            "description": "Asks lynq-llm to translate a resume sent in the body into `language` and returns the translated resume without storing it. Returns 200. Rate limited per user in tier HEAVY (10/minute, 200/day, `lynq.rate-limit.tiers.heavy`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detect language",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Desarrollador backend con experiencia en Java.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/detect-language",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "detect-language"
+              ]
+            },
+            "description": "Asks lynq-llm which language a text is written in. Returns 200. Rate limited per user in tier LIGHT (30/minute, 500/day, `lynq.rate-limit.tiers.light`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extract resume skills",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personal_info\": {\n    \"full_name\": \"John Doe\",\n    \"headline\": \"Backend Developer\",\n    \"email\": \"johndoe@example.com\",\n    \"phone\": \"+1 555 0100\",\n    \"location\": \"Springfield\",\n    \"links\": {\n      \"linkedin\": \"https://www.linkedin.com/in/johndoe-example\",\n      \"github\": \"https://github.com/johndoe-example\",\n      \"portfolio\": null,\n      \"website\": null\n    }\n  },\n  \"summary\": \"Backend developer with 5 years of experience building Java and Spring Boot services.\",\n  \"work_experience\": [\n    {\n      \"company\": \"Example Corp\",\n      \"position\": \"Backend Developer\",\n      \"location\": \"Remote\",\n      \"start_date\": \"2021-03\",\n      \"end_date\": null,\n      \"is_current\": true,\n      \"description\": \"Built and maintained REST APIs for the payments team.\",\n      \"achievements\": [\n        \"Cut p95 latency of the orders API by 40%\"\n      ],\n      \"technologies\": [\n        \"Java\",\n        \"Spring Boot\",\n        \"PostgreSQL\"\n      ]\n    }\n  ],\n  \"education\": [\n    {\n      \"institution\": \"Example University\",\n      \"degree\": \"BSc\",\n      \"field_of_study\": \"Computer Science\",\n      \"start_date\": \"2015-03\",\n      \"end_date\": \"2020-12\",\n      \"is_current\": false,\n      \"description\": null\n    }\n  ],\n  \"skills\": {\n    \"technical\": [\n      \"Java\",\n      \"Spring Boot\",\n      \"SQL\"\n    ],\n    \"tools\": [\n      \"Docker\",\n      \"Git\"\n    ],\n    \"soft\": [\n      \"Teamwork\"\n    ]\n  },\n  \"languages\": [\n    {\n      \"language\": \"English\",\n      \"proficiency\": \"Native\"\n    }\n  ],\n  \"certifications\": [],\n  \"projects\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/resume/skill-extraction",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resume",
+                "skill-extraction"
+              ],
+              "query": [
+                {
+                  "key": "language",
+                  "value": "EN",
+                  "description": "Optional",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Asks lynq-llm to extract the skills of a resume sent as the raw body. `language` is optional. Returns 200. Rate limited per user in tier STANDARD (10/minute, 200/day, `lynq.rate-limit.tiers.standard`); when the quota runs out it answers 429 with a `Retry-After` header (seconds)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "LLM (refused)",
+      "description": "lynq-llm routes the gateway maps only to refuse them: they always answer 403, for any HTTP method.",
+      "item": [
+        {
+          "name": "Upskilling suggestion (refused)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/upskilling_suggestion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "upskilling_suggestion"
+              ]
+            },
+            "description": "Always answers 403: this lynq-llm evaluation is built from lynq-backend's data and is only reachable through the job endpoints (use GET /job/{jobId}/upskilling-suggestion or GET /user/upskilling-suggestion/{jobPostId}). Mapped for every HTTP method."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Candidate explanation (refused)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/candidate-explanation",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "candidate-explanation"
+              ]
+            },
+            "description": "Always answers 403: this lynq-llm evaluation is built from lynq-backend's data and is only reachable through the job endpoints (use GET /job/{jobId}/candidate/{candidateId}/candidate-explanation). Mapped for every HTTP method."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Parse resume (refused)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preSignedUrl\": \"https://example.com/resume.pdf\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/parse-resume",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "parse-resume"
+              ]
+            },
+            "description": "Always answers 403: this lynq-llm endpoint fetches a caller-supplied URL server-side, so the gateway does not relay it (use POST /resume/document/{fileId}/import). Mapped for every HTTP method."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resume template creation (refused)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/resume-template-creation",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "resume-template-creation"
+              ]
+            },
+            "description": "Always answers 403: this lynq-llm endpoint fetches a caller-supplied URL server-side, so the gateway does not relay it (use POST /resume/preview, which signs those URLs itself). Mapped for every HTTP method."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "description": "Analytics routes (`/analytics`) relayed to lynq-analytics.",
+      "item": [
+        {
+          "name": "Job time to fill",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/job/{{jobId}}/time-to-fill",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analytics",
+                "job",
+                "{{jobId}}",
+                "time-to-fill"
+              ]
+            },
+            "description": "Returns time-to-fill analytics (median, p25/p75, days open) for a job post from lynq-analytics. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Job standing",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/job/{{jobId}}/standing",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analytics",
+                "job",
+                "{{jobId}}",
+                "standing"
+              ]
+            },
+            "description": "Returns the caller's standing among a job post's applicants (rank, percentile, score vs median) from lynq-analytics. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Job salary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/job/{{jobId}}/salary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analytics",
+                "job",
+                "{{jobId}}",
+                "salary"
+              ]
+            },
+            "description": "Returns the salary distribution of the position and of peers' expected salaries for a job post from lynq-analytics. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Candidate benchmark",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/candidate/me/benchmark",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analytics",
+                "candidate",
+                "me",
+                "benchmark"
+              ]
+            },
+            "description": "Returns the caller's market-fit benchmark as a candidate against peers, with skill unlocks and history, from lynq-analytics. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Market overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/market",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analytics",
+                "market"
+              ],
+              "query": [
+                {
+                  "key": "currency",
+                  "value": "USD",
+                  "description": "Optional",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Returns market analytics (open posts, skill demand, salaries, posts published per week) from lynq-analytics, optionally in a given `currency`. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Company jobs analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/company/me/jobs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analytics",
+                "company",
+                "me",
+                "jobs"
+              ]
+            },
+            "description": "Returns analytics for every job post of the caller's company from lynq-analytics. Returns 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

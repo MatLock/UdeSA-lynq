@@ -44,6 +44,17 @@ lynq:
     url: ${LYNQ_AGENT_URL:http://localhost:8090/lynq-agent}
   analytics:
     url: ${LYNQ_ANALYTICS_URL:http://localhost:8091/lynq-analytics}
+  rate-limit:
+    tiers:
+      light:
+        per-minute: 30
+        per-day: 500
+      standard:
+        per-minute: 10
+        per-day: 300
+      heavy:
+        per-minute: 10
+        per-day: 200
 
 server:
   port: 8087
