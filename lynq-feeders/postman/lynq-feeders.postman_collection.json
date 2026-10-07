@@ -1,0 +1,190 @@
+{
+  "info": {
+    "name": "Lynq Feeders",
+    "description": "Endpoints of the lynq-feeders service, the FastAPI job-listing feeder that scrapes the job portals (bumeran, computrabajo), asks lynq-llm to extract skills from each posting, ingests the batch into lynq-app-backend and later checks whether ingested postings are still live. It is a ClusterIP service with no Ingress and no bearer auth: reach it through `kubectl port-forward svc/lynq-feeders-service 8089:8089`. Every request except the health probe requires the `lynq-request-uuid` header (403 without it); requests with a body also send `Content-Type: application/json`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "lynq-feeders-collection"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8089/lynq-feeders",
+      "type": "string"
+    },
+    {
+      "key": "requestUuid",
+      "value": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Generate a fresh request UUID per call so log tracing stays unique.",
+          "if (typeof crypto !== 'undefined' && crypto.randomUUID) {",
+          "  pm.collectionVariables.set('requestUuid', crypto.randomUUID());",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Liveness/readiness probe used by the Kubernetes Deployment; it is the only route exempt from the `lynq-request-uuid` header. Always answers 200 and reports whether lynq-llm and lynq-app-backend are reachable (`UP`/`DOWN`) instead of failing when they are not."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('service reports UP', () => pm.expect(pm.response.json().status).to.eql('UP'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ingest",
+      "item": [
+        {
+          "name": "Run ingest (configured defaults)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ingest",
+              "host": ["{{baseUrl}}"],
+              "path": ["ingest"]
+            },
+            "description": "Starts a full feed run with the configured sources, categories and jobs per category, exactly as the daily CronJob does, and answers 202 with no body (409 if a run is already in progress). Warning: it scrapes the live job portals, calls lynq-llm for every posting and writes the result into lynq-app-backend; follow it in the pod logs by request uuid."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 202', () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Run ingest (scoped)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sources\": [\"computrabajo\"],\n  \"categories\": [\"TECNOLOGIA\"],\n  \"jobs_per_category\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/ingest",
+              "host": ["{{baseUrl}}"],
+              "path": ["ingest"]
+            },
+            "description": "On-demand feed run narrowed to the given sources (`bumeran`, `computrabajo`), categories (e.g. ADMINISTRACION, TECNOLOGIA, CONTABILIDAD, RECURSOS HUMANOS; unmapped ones fall back to a keyword search) and `jobs_per_category` (1-50); every field is optional. Answers 202 with no body, 400 for an unknown source or out-of-range field, 409 if a run is in progress. Warning: it scrapes the live portals and writes into lynq-app-backend."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 202', () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Verify",
+      "item": [
+        {
+          "name": "Run verify (all sources)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["verify"]
+            },
+            "description": "Starts a liveness check of previously ingested postings across every configured source, as the daily CronJob does right after the ingest; the run waits for any ingest in progress. Answers 202 with no body (409 if a verify run is already in progress). Warning: it requests the live portal pages and closes gone postings in lynq-app-backend."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 202', () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Run verify (scoped)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sources\": [\"computrabajo\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["verify"]
+            },
+            "description": "On-demand liveness check limited to the given sources (`bumeran`, `computrabajo`); postings of other sources are left for the next run. Answers 202 with no body, 400 for an unknown source, 409 if a verify run is in progress. Warning: it requests the live portal pages and closes gone postings in lynq-app-backend."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 202', () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -8,7 +8,13 @@ from response import ErrorRestResponse
 
 REQUEST_UUID_HEADER = "lynq-request-uuid"
 
-EXEMPT_PATHS = frozenset({"/lynq-feeders/health"})
+EXEMPT_PATHS = frozenset({
+    "/lynq-feeders/health",
+    "/docs",
+    "/docs/oauth2-redirect",
+    "/redoc",
+    "/openapi.json",
+})
 
 
 async def require_request_uuid(request: Request, call_next):

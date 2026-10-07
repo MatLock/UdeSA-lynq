@@ -52,6 +52,11 @@ class RequireRequestUuidTest(unittest.TestCase):
         with llm, backend:
             self.assertEqual(self.client.get("/lynq-feeders/health").status_code, 200)
 
+    def test_the_api_docs_are_served_without_the_header(self):
+        for path in ("/openapi.json", "/docs", "/redoc"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
+
     def test_the_header_reaches_the_logging_context(self):
         seen = {}
 

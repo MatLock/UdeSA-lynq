@@ -119,7 +119,7 @@ Four categories are scraped by default. The mappings were verified against both 
 | `ADMINISTRACION`    | `administracion-contabilidad-y-finanzas`   | `administracion` | `administracion` |
 | `TECNOLOGIA`        | `tecnologia-sistemas-y-telecomunicaciones` | —              | `sistemas`         |
 | `CONTABILIDAD`      | `administracion-contabilidad-y-finanzas`   | `contabilidad` | `contabilidad`     |
-| `RECURSOS_HUMANOS`  | `recursos-humanos-y-capacitacion`          | —              | `recursos-humanos` |
+| `RECURSOS HUMANOS`  | `recursos-humanos-y-capacitacion`          | —              | `recursos-humanos` |
 
 Bumeran has no separate accounting area, so `ADMINISTRACION` and `CONTABILIDAD` share area id 1 and are narrowed by a query. Computrabajo has no category API at all, so it is searched by keyword slug — `sistemas` rather than `tecnologia`, because the latter matches maintenance technicians.
 
@@ -359,7 +359,7 @@ All configuration is via environment variables (see `set_env.sh` for defaults):
 | `LYNQ_BACKEND_URL`             | `http://localhost:8082/lynq-backend-app`           | Base URL of the service that owns the database.                |
 | `LYNQ_INTERNAL_TOKEN`          | `local-internal-token-not-a-secret`                | Shared secret for the `/internal/**` routes of lynq-app-backend **and** lynq-llm. |
 | `LYNQ_FEEDERS_SYSTEM_USER_ID`  | `00000000-0000-0000-0000-00000000feed`             | Sent as `user-id` to `lynq-llm`'s internal route; only reaches its logs. |
-| `FEEDER_CATEGORIES`                | `ADMINISTRACION,TECNOLOGIA,CONTABILIDAD,RECURSOS_HUMANOS` | Categories scraped per run.                                 |
+| `FEEDER_CATEGORIES`                | `ADMINISTRACION,TECNOLOGIA,CONTABILIDAD,RECURSOS HUMANOS` | Categories scraped per run.                                 |
 | `FEEDER_SOURCES`               | `bumeran,computrabajo`                             | Portals scraped per run.                                       |
 | `FEEDER_JOBS_PER_CATEGORY`        | `10`                                               | Postings kept per category per portal, newest first.              |
 | `LYNQ_LLM_CONCURRENCY`         | `2`                                                | Concurrent skill-enhance calls.                                |
