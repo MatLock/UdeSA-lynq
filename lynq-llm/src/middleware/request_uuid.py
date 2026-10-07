@@ -11,7 +11,13 @@ from response import ErrorRestResponse
 REQUEST_UUID_HEADER = "lynq-request-uuid"
 
 #: Paths exempt from the header check (e.g. probes hit by infra, not clients).
-EXEMPT_PATHS = frozenset({"/lynq-llm/health"})
+EXEMPT_PATHS = frozenset({
+    "/lynq-llm/health",
+    "/docs",
+    "/docs/oauth2-redirect",
+    "/redoc",
+    "/openapi.json",
+})
 
 
 async def require_request_uuid(request: Request, call_next):

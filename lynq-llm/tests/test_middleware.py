@@ -73,6 +73,11 @@ class RequestUuidMiddlewareTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_the_api_docs_are_served_without_the_header(self) -> None:
+        for path in ("/openapi.json", "/docs", "/redoc"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()
