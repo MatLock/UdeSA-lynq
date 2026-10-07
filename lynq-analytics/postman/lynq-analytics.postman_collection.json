@@ -1,0 +1,410 @@
+{
+  "info": {
+    "name": "Lynq Analytics",
+    "description": "Read-side analytics for Lynq job posts, candidates and companies (time to fill, standing, salary, candidate benchmark, market, company jobs) plus the internal daily snapshot trigger. Every request requires the `lynq-request-uuid` header. `/dmz/analytics/**` endpoints also require `Authorization: Bearer <accessToken>` issued by lynq-iam (run the Auth folder first; it auto-saves `accessToken`). `/internal/**` endpoints use the `lynq-internal-token` header instead of a bearer token.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "lynq-analytics-collection"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8091/lynq-analytics",
+      "type": "string"
+    },
+    {
+      "key": "iamUrl",
+      "value": "http://localhost:8080/lynq-iam",
+      "type": "string"
+    },
+    {
+      "key": "requestUuid",
+      "value": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "jobId",
+      "value": "11111111-2222-3333-4444-555555555555",
+      "type": "string"
+    },
+    {
+      "key": "currency",
+      "value": "ARS",
+      "type": "string"
+    },
+    {
+      "key": "internalToken",
+      "value": "local-internal-token-not-a-secret",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Generate a fresh request UUID per call so log tracing stays unique.",
+          "if (typeof crypto !== 'undefined' && crypto.randomUUID) {",
+          "  pm.collectionVariables.set('requestUuid', crypto.randomUUID());",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth (lynq-iam)",
+      "item": [
+        {
+          "name": "Login by username",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"P@ssw0rd123\"\n}"
+            },
+            "url": {
+              "raw": "{{iamUrl}}/auth/login/username",
+              "host": [
+                "{{iamUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login",
+                "username"
+              ]
+            },
+            "description": "Authenticates against lynq-iam and saves the returned access token into `accessToken`. Log in with an R_COMPANY user for time-to-fill and company jobs, and with an R_CANDIDATE user for standing and the candidate benchmark."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('accessToken', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Get job post time to fill",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dmz/analytics/job/{{jobId}}/time-to-fill",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dmz",
+                "analytics",
+                "job",
+                "{{jobId}}",
+                "time-to-fill"
+              ]
+            },
+            "description": "Returns how many days job posts similar to this one took to close (median, p25, p75, n) and how long this one has been open. Only the R_COMPANY user who published the job post; 403 for anyone else, 404 if the job post is unknown."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get my standing in a job post",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dmz/analytics/job/{{jobId}}/standing",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dmz",
+                "analytics",
+                "job",
+                "{{jobId}}",
+                "standing"
+              ]
+            },
+            "description": "Returns the caller's rank, percentile and score among the applicants of the job post, plus the median score (null below five applicants). Only R_CANDIDATE users who applied; 403 for anyone else, 404 if the job post is unknown."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get job post salary insights",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dmz/analytics/job/{{jobId}}/salary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dmz",
+                "analytics",
+                "job",
+                "{{jobId}}",
+                "salary"
+              ]
+            },
+            "description": "Returns the salary medians of similar job posts and the expected salary of similar candidates, in the job post's currency. Open to any authenticated user; 404 if the job post is unknown."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get my candidate benchmark",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dmz/analytics/candidate/me/benchmark",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dmz",
+                "analytics",
+                "candidate",
+                "me",
+                "benchmark"
+              ]
+            },
+            "description": "Returns the authenticated candidate's market fit, reach, percentile among similar candidates, skill unlocks and 90-day series from the latest daily snapshot. Only R_CANDIDATE users; 403 otherwise. Before the first snapshot, snapshotOn is null and the lists are empty."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get market overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dmz/analytics/market?currency={{currency}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dmz",
+                "analytics",
+                "market"
+              ],
+              "query": [
+                {
+                  "key": "currency",
+                  "value": "{{currency}}",
+                  "description": "ARS or USD; defaults to ARS when omitted."
+                }
+              ]
+            },
+            "description": "Returns the latest market snapshot: open job posts, top demanded skills, salary by category and work type in the requested currency, and weekly publications. Open to any authenticated user; 400 if the currency is not ARS or USD."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get my company jobs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dmz/analytics/company/me/jobs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dmz",
+                "analytics",
+                "company",
+                "me",
+                "jobs"
+              ]
+            },
+            "description": "Returns every job post the authenticated company published, newest first, with status, application count and median applicant score. Only R_COMPANY users; 403 otherwise."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Internal snapshot",
+      "item": [
+        {
+          "name": "Take daily snapshot",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "lynq-internal-token",
+                "value": "{{internalToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/internal/snapshot",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "internal",
+                "snapshot"
+              ]
+            },
+            "description": "Internal endpoint meant for the lynq-analytics Kubernetes CronJob, not for end users: starts the daily snapshot in the background and returns 202 with no body. Authenticated with the shared `lynq-internal-token` header (401 if wrong or missing), 409 if a snapshot is already running."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 202', () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

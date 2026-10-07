@@ -9,6 +9,8 @@ import com.lynq.bff.client.response.SkillExtractionResponse;
 import com.lynq.bff.controller.LlmController;
 import com.lynq.bff.controller.response.GlobalRestResponse;
 import com.lynq.bff.exceptions.ForbiddenException;
+import com.lynq.bff.ratelimit.RateLimitTier;
+import com.lynq.bff.ratelimit.RateLimited;
 import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.LlmService;
@@ -49,6 +51,7 @@ public class LlmControllerImpl implements LlmController {
 
   @Override
   @PostMapping("/skill-enhance")
+  @RateLimited(RateLimitTier.STANDARD)
   public ResponseEntity<GlobalRestResponse<SkillEnhanceResponse>> enhanceSkills(
       @RequestBody SkillEnhanceRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
@@ -63,6 +66,7 @@ public class LlmControllerImpl implements LlmController {
 
   @Override
   @PostMapping("/translate")
+  @RateLimited(RateLimitTier.HEAVY)
   public ResponseEntity<GlobalRestResponse<Object>> translateResume(
       @RequestBody TranslateResumeRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
@@ -77,6 +81,7 @@ public class LlmControllerImpl implements LlmController {
 
   @Override
   @PostMapping("/detect-language")
+  @RateLimited(RateLimitTier.LIGHT)
   public ResponseEntity<GlobalRestResponse<LanguageDetectionResponse>> detectLanguage(
       @RequestBody LanguageDetectionRequest request,
       @RequestHeader(REQUEST_UUID_HEADER) String requestUuid,
@@ -91,6 +96,7 @@ public class LlmControllerImpl implements LlmController {
 
   @Override
   @PostMapping("/resume/skill-extraction")
+  @RateLimited(RateLimitTier.STANDARD)
   public ResponseEntity<GlobalRestResponse<SkillExtractionResponse>> extractResumeSkills(
       @RequestBody Object resume,
       @RequestParam(required = false) String language,

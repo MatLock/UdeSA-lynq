@@ -22,7 +22,7 @@ REQUEST_UUID = HEADERS["lynq-request-uuid"]
 def _settings() -> Settings:
     settings = Settings()
     settings.sources = ["bumeran", "computrabajo"]
-    settings.categories = ["ADMINISTRACION", "TECNOLOGIA", "CONTABILIDAD", "RECURSOS_HUMANOS"]
+    settings.categories = ["ADMINISTRACION", "TECNOLOGIA", "CONTABILIDAD", "RECURSOS HUMANOS"]
     settings.jobs_per_category = 10
     return settings
 

@@ -18,6 +18,8 @@ import com.lynq.bff.client.response.UserApplicationResponse;
 import com.lynq.bff.client.response.UserResumeResponse;
 import com.lynq.bff.controller.UserController;
 import com.lynq.bff.controller.response.GlobalRestResponse;
+import com.lynq.bff.ratelimit.RateLimitTier;
+import com.lynq.bff.ratelimit.RateLimited;
 import com.lynq.bff.security.LynqUserPrincipal;
 import com.lynq.bff.service.Caller;
 import com.lynq.bff.service.UserService;
@@ -226,6 +228,7 @@ public class UserControllerImpl implements UserController {
 
   @Override
   @GetMapping("/upskilling-suggestion/{jobPostId}")
+  @RateLimited(RateLimitTier.STANDARD)
   public ResponseEntity<GlobalRestResponse<UpskillingSuggestionResponse>> suggestUpskilling(
       @PathVariable String jobPostId,
       @RequestParam(defaultValue = "en") String language,

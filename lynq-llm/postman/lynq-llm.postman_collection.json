@@ -1,0 +1,538 @@
+{
+  "info": {
+    "name": "Lynq LLM",
+    "description": "LLM-backed endpoints of the lynq-llm service (FastAPI): job-posting skill extraction, resume parsing, skill extraction, translation, language detection, PDF rendering and candidate assessment. Every route except `/health` requires the `lynq-request-uuid` header (403 without it). `/dmz` routes also require `Authorization: Bearer <accessToken>`, which lynq-llm resolves against lynq-iam (401 if missing or invalid, 503 if lynq-iam is down); run the Auth folder first to save `accessToken`. `/upskilling_suggestion` and `/candidate-explanation` also require `company-id`. `/internal` routes take `lynq-internal-token` instead of a bearer token. Errors use the `{ success: false, data, reason }` envelope; validation errors return 400.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "lynq-llm-collection"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8084/lynq-llm",
+      "type": "string"
+    },
+    {
+      "key": "hostUrl",
+      "value": "http://localhost:8084",
+      "type": "string"
+    },
+    {
+      "key": "iamUrl",
+      "value": "http://localhost:8080/lynq-iam",
+      "type": "string"
+    },
+    {
+      "key": "requestUuid",
+      "value": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "companyId",
+      "value": "company-1",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "user-1",
+      "type": "string"
+    },
+    {
+      "key": "outputLanguage",
+      "value": "es",
+      "type": "string"
+    },
+    {
+      "key": "internalToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Generate a fresh request UUID per call so log tracing stays unique.",
+          "if (typeof crypto !== 'undefined' && crypto.randomUUID) {",
+          "  pm.collectionVariables.set('requestUuid', crypto.randomUUID());",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth (lynq-iam)",
+      "item": [
+        {
+          "name": "Login by username",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"P@ssw0rd123\"\n}"
+            },
+            "url": {
+              "raw": "{{iamUrl}}/auth/login/username",
+              "host": ["{{iamUrl}}"],
+              "path": ["auth", "login", "username"]
+            },
+            "description": "Authenticates against lynq-iam with username + password and saves the returned access token into `accessToken`, which every `/dmz` request sends as a bearer token. Returns 200; 401 on bad credentials."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('accessToken', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Liveness/readiness probe reporting service, LLM and PDF renderer status. Needs no headers and is not wrapped in the standard envelope; returns 200 when the configured LLM is reachable and 503 otherwise."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Job postings",
+      "item": [
+        {
+          "name": "Extract job posting skills",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" },
+              { "key": "company-id", "value": "{{companyId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Senior Backend Java Developer\",\n  \"description\": \"Building scalable services with Java, Spring and AWS.\",\n  \"work_type\": \"REMOTE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dmz/skill-enhance",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "skill-enhance"]
+            },
+            "description": "Calls the LLM to extract 5-15 key skills plus generalized similarity tags from a job posting; `company-id` is optional here. Can take long. Returns 200; 400 on an invalid `work_type` (REMOTE or IN_OFFICE), 502 if the LLM fails or returns malformed output."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Resume",
+      "item": [
+        {
+          "name": "Parse resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preSignedUrl\": \"https://example-bucket.s3.amazonaws.com/resumes/jane-doe.pdf?X-Amz-Signature=EXAMPLE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dmz/parse-resume",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "parse-resume"]
+            },
+            "description": "Downloads a PDF/DOCX resume from a presigned URL, extracts its text and calls the LLM to structure it into the `Resume` JSON. Can take long. Returns 200; 400 for an unsupported document format, 502 if the download or the LLM fails."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Extract resume skills",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personal_info\": {\n    \"full_name\": \"Jane Doe\",\n    \"headline\": \"Backend Engineer\",\n    \"email\": \"janedoe@example.com\",\n    \"phone\": \"+1 555 0100\",\n    \"location\": \"Springfield\",\n    \"links\": {\n      \"linkedin\": \"https://www.linkedin.com/in/janedoe-example\",\n      \"github\": \"https://github.com/janedoe-example\",\n      \"portfolio\": null,\n      \"website\": \"https://janedoe.example.com\"\n    }\n  },\n  \"summary\": \"Backend engineer with 5 years building Java services.\",\n  \"work_experience\": [\n    {\n      \"company\": \"Acme Corp\",\n      \"position\": \"Backend Engineer\",\n      \"location\": \"Remote\",\n      \"start_date\": \"2021-03\",\n      \"end_date\": null,\n      \"is_current\": true,\n      \"description\": \"- Built REST APIs with Spring Boot\\n- Migrated batch jobs to AWS Lambda\",\n      \"achievements\": [\n        \"Cut p95 latency of the orders API by 40%\"\n      ],\n      \"technologies\": [\n        \"Java\",\n        \"Spring Boot\",\n        \"AWS\",\n        \"PostgreSQL\"\n      ]\n    }\n  ],\n  \"education\": [\n    {\n      \"institution\": \"Example University\",\n      \"degree\": \"BSc\",\n      \"field_of_study\": \"Computer Science\",\n      \"start_date\": \"2015-03\",\n      \"end_date\": \"2020-12\",\n      \"is_current\": false,\n      \"description\": null\n    }\n  ],\n  \"skills\": {\n    \"technical\": [\n      \"Java\",\n      \"Spring Boot\",\n      \"SQL\"\n    ],\n    \"tools\": [\n      \"Docker\",\n      \"Git\"\n    ],\n    \"soft\": [\n      \"Leadership\",\n      \"Communication\"\n    ]\n  },\n  \"languages\": [\n    {\n      \"language\": \"English\",\n      \"proficiency\": \"Native\"\n    },\n    {\n      \"language\": \"Spanish\",\n      \"proficiency\": \"Intermediate\"\n    }\n  ],\n  \"certifications\": [\n    {\n      \"name\": \"Example Cloud Practitioner\",\n      \"issuer\": \"Example Cloud\",\n      \"issue_date\": \"2022-06\",\n      \"credential_id\": \"EXAMPLE-0000\"\n    }\n  ],\n  \"projects\": [\n    {\n      \"name\": \"todo-api\",\n      \"description\": \"Sample task tracker API.\",\n      \"technologies\": [\n        \"Java\",\n        \"Spring Boot\"\n      ],\n      \"url\": \"https://github.com/janedoe-example/todo-api\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dmz/resume/skill-extraction?language=es",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "resume", "skill-extraction"],
+              "query": [
+                { "key": "language", "value": "es" }
+              ]
+            },
+            "description": "Calls the LLM to consolidate a structured resume's skills into technical/tools/soft buckets plus English similarity tags; the optional `language` query param sets the language of the soft skills (English when omitted). Can take long. Returns 200; 502 if the LLM fails."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Translate resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resume\": {\n    \"personal_info\": {\n      \"full_name\": \"Jane Doe\",\n      \"headline\": \"Backend Engineer\",\n      \"email\": \"janedoe@example.com\",\n      \"phone\": \"+1 555 0100\",\n      \"location\": \"Springfield\",\n      \"links\": {\n        \"linkedin\": \"https://www.linkedin.com/in/janedoe-example\",\n        \"github\": \"https://github.com/janedoe-example\",\n        \"portfolio\": null,\n        \"website\": \"https://janedoe.example.com\"\n      }\n    },\n    \"summary\": \"Backend engineer with 5 years building Java services.\",\n    \"work_experience\": [\n      {\n        \"company\": \"Acme Corp\",\n        \"position\": \"Backend Engineer\",\n        \"location\": \"Remote\",\n        \"start_date\": \"2021-03\",\n        \"end_date\": null,\n        \"is_current\": true,\n        \"description\": \"- Built REST APIs with Spring Boot\\n- Migrated batch jobs to AWS Lambda\",\n        \"achievements\": [\n          \"Cut p95 latency of the orders API by 40%\"\n        ],\n        \"technologies\": [\n          \"Java\",\n          \"Spring Boot\",\n          \"AWS\",\n          \"PostgreSQL\"\n        ]\n      }\n    ],\n    \"education\": [\n      {\n        \"institution\": \"Example University\",\n        \"degree\": \"BSc\",\n        \"field_of_study\": \"Computer Science\",\n        \"start_date\": \"2015-03\",\n        \"end_date\": \"2020-12\",\n        \"is_current\": false,\n        \"description\": null\n      }\n    ],\n    \"skills\": {\n      \"technical\": [\n        \"Java\",\n        \"Spring Boot\",\n        \"SQL\"\n      ],\n      \"tools\": [\n        \"Docker\",\n        \"Git\"\n      ],\n      \"soft\": [\n        \"Leadership\",\n        \"Communication\"\n      ]\n    },\n    \"languages\": [\n      {\n        \"language\": \"English\",\n        \"proficiency\": \"Native\"\n      },\n      {\n        \"language\": \"Spanish\",\n        \"proficiency\": \"Intermediate\"\n      }\n    ],\n    \"certifications\": [\n      {\n        \"name\": \"Example Cloud Practitioner\",\n        \"issuer\": \"Example Cloud\",\n        \"issue_date\": \"2022-06\",\n        \"credential_id\": \"EXAMPLE-0000\"\n      }\n    ],\n    \"projects\": [\n      {\n        \"name\": \"todo-api\",\n        \"description\": \"Sample task tracker API.\",\n        \"technologies\": [\n          \"Java\",\n          \"Spring Boot\"\n        ],\n        \"url\": \"https://github.com/janedoe-example/todo-api\"\n      }\n    ]\n  },\n  \"language\": \"ES\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dmz/translate",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "translate"]
+            },
+            "description": "Calls the LLM to translate every value of a structured resume into `language` (EN, ES, FR or PR). Can take long. Returns 200 with the translated `Resume`; 400 on an unknown language, 502 if the LLM fails."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detect language",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Ingeniera backend con 5 años construyendo servicios en Java.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dmz/detect-language",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "detect-language"]
+            },
+            "description": "Calls the LLM to detect the main language of a text, returned as one of EN, ES, FR or PR so it can feed `/translate`. Returns 200; 502 if the LLM fails or answers with an unsupported value."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create resume PDF",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resume_content\": {\n    \"personal_info\": {\n      \"full_name\": \"Jane Doe\",\n      \"headline\": \"Backend Engineer\",\n      \"email\": \"janedoe@example.com\",\n      \"phone\": \"+1 555 0100\",\n      \"location\": \"Springfield\",\n      \"links\": {\n        \"linkedin\": \"https://www.linkedin.com/in/janedoe-example\",\n        \"github\": \"https://github.com/janedoe-example\",\n        \"portfolio\": null,\n        \"website\": \"https://janedoe.example.com\"\n      }\n    },\n    \"summary\": \"Backend engineer with 5 years building Java services.\",\n    \"work_experience\": [\n      {\n        \"company\": \"Acme Corp\",\n        \"position\": \"Backend Engineer\",\n        \"location\": \"Remote\",\n        \"start_date\": \"2021-03\",\n        \"end_date\": null,\n        \"is_current\": true,\n        \"description\": \"- Built REST APIs with Spring Boot\\n- Migrated batch jobs to AWS Lambda\",\n        \"achievements\": [\n          \"Cut p95 latency of the orders API by 40%\"\n        ],\n        \"technologies\": [\n          \"Java\",\n          \"Spring Boot\",\n          \"AWS\",\n          \"PostgreSQL\"\n        ]\n      }\n    ],\n    \"education\": [\n      {\n        \"institution\": \"Example University\",\n        \"degree\": \"BSc\",\n        \"field_of_study\": \"Computer Science\",\n        \"start_date\": \"2015-03\",\n        \"end_date\": \"2020-12\",\n        \"is_current\": false,\n        \"description\": null\n      }\n    ],\n    \"skills\": {\n      \"technical\": [\n        \"Java\",\n        \"Spring Boot\",\n        \"SQL\"\n      ],\n      \"tools\": [\n        \"Docker\",\n        \"Git\"\n      ],\n      \"soft\": [\n        \"Leadership\",\n        \"Communication\"\n      ]\n    },\n    \"languages\": [\n      {\n        \"language\": \"English\",\n        \"proficiency\": \"Native\"\n      },\n      {\n        \"language\": \"Spanish\",\n        \"proficiency\": \"Intermediate\"\n      }\n    ],\n    \"certifications\": [\n      {\n        \"name\": \"Example Cloud Practitioner\",\n        \"issuer\": \"Example Cloud\",\n        \"issue_date\": \"2022-06\",\n        \"credential_id\": \"EXAMPLE-0000\"\n      }\n    ],\n    \"projects\": [\n      {\n        \"name\": \"todo-api\",\n        \"description\": \"Sample task tracker API.\",\n        \"technologies\": [\n          \"Java\",\n          \"Spring Boot\"\n        ],\n        \"url\": \"https://github.com/janedoe-example/todo-api\"\n      }\n    ]\n  },\n  \"profile_url\": \"https://example-bucket.s3.amazonaws.com/photos/jane-doe.jpg?X-Amz-Signature=EXAMPLE\",\n  \"put_resume_url\": \"https://example-bucket.s3.amazonaws.com/resumes/jane-doe-modern.pdf?X-Amz-Signature=EXAMPLE\",\n  \"template\": \"MODERN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dmz/resume-template-creation",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "resume-template-creation"]
+            },
+            "description": "Renders a structured resume into a styled PDF (template MODERN or CLASSIC, photo optional) and uploads it to the presigned PUT URL; no LLM call. Returns 201 with an empty envelope; 500 if rendering fails, 502 if the upload fails (expected with these placeholder URLs)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Candidate assessment",
+      "item": [
+        {
+          "name": "Upskilling suggestion",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" },
+              { "key": "company-id", "value": "{{companyId}}" },
+              { "key": "output-language", "value": "{{outputLanguage}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job\": {\n    \"description\": \"Backend role needing Kubernetes and GraphQL.\",\n    \"skills\": [\n      \"Java\",\n      \"AWS\",\n      \"Kubernetes\",\n      \"GraphQL\"\n    ]\n  },\n  \"candidate\": {\n    \"description\": \"Junior backend developer.\",\n    \"skills\": [\n      \"Java\",\n      \"AWS\"\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dmz/upskilling_suggestion",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "upskilling_suggestion"]
+            },
+            "description": "Calls the LLM to compare a candidate with a job and resolves each skill gap to Udemy courses; prose is written in the optional `output-language` (English by default) and `company-id` is required. Can take long. Returns 200; 502 if the LLM or the course search fails."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Candidate explanation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" },
+              { "key": "company-id", "value": "{{companyId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job\": {\n    \"description\": \"Backend role needing Kubernetes and GraphQL.\",\n    \"skills\": [\n      \"Java\",\n      \"AWS\",\n      \"Kubernetes\",\n      \"GraphQL\"\n    ]\n  },\n  \"candidate\": {\n    \"description\": \"Junior backend developer.\",\n    \"skills\": [\n      \"Java\",\n      \"AWS\"\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dmz/candidate-explanation",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "candidate-explanation"]
+            },
+            "description": "Calls the LLM with the same job/candidate payload to return a hire, no_hire or maybe recommendation with strengths and concerns; `company-id` is required. Can take long. Returns 200; 502 if the LLM fails or returns malformed output."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Internal (lynq-feeders)",
+      "item": [
+        {
+          "name": "Extract job posting skills (internal)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "lynq-internal-token", "value": "{{internalToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" },
+              { "key": "user-id", "value": "{{userId}}" },
+              { "key": "company-id", "value": "{{companyId}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Senior Backend Java Developer\",\n  \"description\": \"Building scalable services with Java, Spring and AWS.\",\n  \"work_type\": \"REMOTE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/skill-enhance",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "skill-enhance"]
+            },
+            "description": "Same LLM skill extraction as the DMZ route, for service callers without a user token: authenticated by `lynq-internal-token` (set `internalToken` to the local `LYNQ_INTERNAL_TOKEN`); `user-id` and `company-id` are optional log context. Can take long. Returns 200; 401 on a missing or wrong internal token, 502 if the LLM fails."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Docs (FastAPI built-in)",
+      "item": [
+        {
+          "name": "OpenAPI spec",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "url": {
+              "raw": "{{hostUrl}}/openapi.json",
+              "host": ["{{hostUrl}}"],
+              "path": ["openapi.json"]
+            },
+            "description": "FastAPI's generated OpenAPI document, served at the root rather than under `/lynq-llm`. Returns 200; 403 without `lynq-request-uuid`, since the request-UUID middleware only exempts `/lynq-llm/health`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Swagger UI",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "url": {
+              "raw": "{{hostUrl}}/docs",
+              "host": ["{{hostUrl}}"],
+              "path": ["docs"]
+            },
+            "description": "FastAPI's Swagger UI HTML page, served at the root. Returns 200; a browser cannot load it because neither the page nor the `/openapi.json` it fetches carries `lynq-request-uuid` (403)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ReDoc",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "url": {
+              "raw": "{{hostUrl}}/redoc",
+              "host": ["{{hostUrl}}"],
+              "path": ["redoc"]
+            },
+            "description": "FastAPI's ReDoc HTML page, served at the root. Returns 200; like Swagger UI it fails in a browser because `/openapi.json` requires `lynq-request-uuid` (403)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

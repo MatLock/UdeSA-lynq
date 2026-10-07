@@ -33,6 +33,11 @@ class BumeranCategoryTest(unittest.TestCase):
         self.assertTrue(administracion.query)
         self.assertTrue(contabilidad.query)
 
+    def test_recursos_humanos_as_configured_maps_to_the_hr_area(self):
+        self.assertEqual(
+            bumeran_category("RECURSOS HUMANOS").area, "recursos-humanos-y-capacitacion"
+        )
+
     def test_unknown_category_falls_back_to_a_keyword_query(self):
         config = bumeran_category("LOGISTICA")
         self.assertIsNone(config.area)

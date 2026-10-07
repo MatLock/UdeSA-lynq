@@ -7,7 +7,9 @@ import com.lynq.bff.exceptions.ConflictException;
 import com.lynq.bff.exceptions.ForbiddenException;
 import com.lynq.bff.exceptions.MethodNotAllowedException;
 import com.lynq.bff.exceptions.NotFoundException;
+import com.lynq.bff.exceptions.TooManyRequestsException;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -28,6 +30,7 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
   private static final String UNEXPECTED_ERROR = "Unexpected error while proxying the request";
   private static final String ONLY_ROLE_CAN_PERFORM = "Only users of type %s can perform this action";
   private static final String ACCESS_DENIED = "The authenticated user is not allowed to perform this action";
+  private static final String RATE_LIMIT_EXCEEDED_CODE = "RATE_LIMIT_EXCEEDED";
   private static final Pattern REQUIRED_ROLE = Pattern.compile("hasRole\\('([^']+)'\\)");
 
   @ExceptionHandler(BadGatewayException.class)
@@ -77,6 +80,14 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
     return ResponseEntity
         .status(HttpStatus.FORBIDDEN)
         .body(new ErrorRestResponse<>(null, accessDeniedReason(ex)));
+  }
+
+  @ExceptionHandler(TooManyRequestsException.class)
+  public ResponseEntity<ErrorRestResponse<Void>> handleTooManyRequests(TooManyRequestsException ex) {
+    return ResponseEntity
+        .status(HttpStatus.TOO_MANY_REQUESTS)
+        .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfterSeconds()))
+        .body(new ErrorRestResponse<>(null, ex.getMessage(), RATE_LIMIT_EXCEEDED_CODE));
   }
 
   @ExceptionHandler(MethodNotAllowedException.class)

@@ -1,0 +1,344 @@
+{
+  "info": {
+    "name": "Lynq Agent",
+    "description": "CV Tailor endpoints for the lynq-agent service: a conversational agent that adapts a candidate's resume to a job posting. The conversation API lives under `/dmz` and every call there requires the `lynq-request-uuid` header and an `Authorization: Bearer <accessToken>` header of a user with the CANDIDATE role, resolved against lynq-iam (run \"Login by username\" first). The health probe needs no headers. \"Start conversation\" auto-saves `conversationId` into the collection variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "lynq-agent-collection"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8090/lynq-agent",
+      "type": "string"
+    },
+    {
+      "key": "requestUuid",
+      "value": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "iamUrl",
+      "value": "http://localhost:8080/lynq-iam",
+      "type": "string"
+    },
+    {
+      "key": "conversationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "baseResumeId",
+      "value": "resume-0001",
+      "type": "string"
+    },
+    {
+      "key": "turnKey",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Generate a fresh request UUID per call so log tracing stays unique.",
+          "if (typeof crypto !== 'undefined' && crypto.randomUUID) {",
+          "  pm.collectionVariables.set('requestUuid', crypto.randomUUID());",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth (lynq-iam)",
+      "item": [
+        {
+          "name": "Login by username",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"P@ssw0rd123\"\n}"
+            },
+            "url": {
+              "raw": "{{iamUrl}}/auth/login/username",
+              "host": [
+                "{{iamUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login",
+                "username"
+              ]
+            },
+            "description": "Authenticates a CANDIDATE user against lynq-iam and saves the returned access token into `accessToken`, which every `/dmz` route of lynq-agent requires."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('accessToken', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Liveness/readiness probe that returns `{ \"status\": \"UP\" }` with 200. Exempt from the `lynq-request-uuid` header and needs no token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Conversation",
+      "item": [
+        {
+          "name": "Start conversation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job\": {\n    \"id\": \"job-0001\",\n    \"title\": \"Senior Backend Engineer\",\n    \"description\": \"Backend role building services with Kubernetes, PostgreSQL and Jenkins.\",\n    \"company\": \"Acme Corp\",\n    \"workType\": \"REMOTE\",\n    \"skills\": [\n      \"Kubernetes\",\n      \"PostgreSQL\",\n      \"Jenkins\"\n    ]\n  },\n  \"baseResumeId\": \"{{baseResumeId}}\",\n  \"baseResume\": {\n    \"personal_info\": {\n      \"full_name\": \"John Doe\",\n      \"email\": \"johndoe@example.com\"\n    },\n    \"summary\": \"Backend engineer with eight years on distributed systems.\",\n    \"work_experience\": [\n      {\n        \"company\": \"Example Inc\",\n        \"position\": \"Backend Engineer\",\n        \"description\": \"Built and operated Java services on Postgres.\",\n        \"achievements\": [\n          \"Cut p95 latency of the orders API by 40%\"\n        ]\n      }\n    ],\n    \"skills\": {\n      \"technical\": [\n        \"Java\",\n        \"Postgres\"\n      ],\n      \"tools\": [\n        \"Docker\"\n      ],\n      \"soft\": [\n        \"Teamwork\"\n      ]\n    }\n  },\n  \"language\": \"en\",\n  \"resumeLanguage\": \"en\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dmz/conversation",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dmz",
+                "conversation"
+              ]
+            },
+            "description": "Opens a tailoring conversation over a job posting and a base resume and answers with a templated greeting; it calls lynq-llm once to extract the posting's skills, falling back to the declared ones if it is unavailable. Returns 200 and saves `conversationId`; 400 on invalid fields, 401 without a valid token, 403 if the caller is not a candidate."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.conversationId) pm.collectionVariables.set('conversationId', data.conversationId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Take turn",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Highlight my experience with Kubernetes and PostgreSQL.\",\n  \"turnKey\": \"{{turnKey}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dmz/conversation/{{conversationId}}/turn",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dmz",
+                "conversation",
+                "{{conversationId}}",
+                "turn"
+              ]
+            },
+            "description": "Runs one exchange: the candidate's message goes through the agent's LLM loop (intent, advise, edit, judge) and the tailored resume comes back, so it can take long. Returns 200; 404 if the conversation does not exist, 403 if it belongs to someone else, 409 with a `code` (TURN_IN_PROGRESS, CONVERSATION_EXHAUSTED, ALREADY_APPLIED), 502 if the agent could not finish the turn."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Fresh turn key per send so each call is a new turn.",
+                  "if (typeof crypto !== 'undefined' && crypto.randomUUID) {",
+                  "  pm.collectionVariables.set('turnKey', crypto.randomUUID());",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get conversation",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dmz/conversation/{{conversationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dmz",
+                "conversation",
+                "{{conversationId}}"
+              ]
+            },
+            "description": "Returns the conversation's thread of messages, the current resume and the list of resume versions. Returns 200; 404 if it does not exist, 403 if the caller is not its owner."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark conversation applied",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appliedResumeId\": \"resume-0002\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dmz/conversation/{{conversationId}}/applied",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dmz",
+                "conversation",
+                "{{conversationId}}",
+                "applied"
+              ]
+            },
+            "description": "Closes the conversation once lynq-bff applied to the job with one of its resumes. Returns 200 with the new status; 404 if it does not exist, 403 if the caller is not its owner, 409 ALREADY_APPLIED if it was applied with a different resume."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
