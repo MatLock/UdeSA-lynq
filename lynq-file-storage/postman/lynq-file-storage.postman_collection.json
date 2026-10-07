@@ -1,0 +1,309 @@
+{
+  "info": {
+    "name": "Lynq File Storage",
+    "description": "File endpoints for the lynq-file-storage service. The service never receives file bytes: a client registers a file, gets a pre-signed S3 URL, PUTs the bytes straight to the bucket (LocalStack locally) and then confirms the upload. Every `/dmz` request requires the `lynq-request-uuid` header (403 if missing) and `Authorization: Bearer <access token>` issued by lynq-iam (401 if missing or invalid). Run \"Login by username\" first to fill `accessToken`; \"Create upload URL\" saves `fileId` and `uploadUrl` for the requests that follow.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "lynq-file-storage-collection"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8085/lynq-file-storage",
+      "type": "string"
+    },
+    {
+      "key": "iamUrl",
+      "value": "http://localhost:8080/lynq-iam",
+      "type": "string"
+    },
+    {
+      "key": "requestUuid",
+      "value": "550e8400-e29b-41d4-a716-446655440000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fileId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "uploadUrl",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "downloadUrl",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Generate a fresh request UUID per call so log tracing stays unique.",
+          "if (typeof crypto !== 'undefined' && crypto.randomUUID) {",
+          "  pm.collectionVariables.set('requestUuid', crypto.randomUUID());",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth (lynq-iam)",
+      "item": [
+        {
+          "name": "Login by username",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"P@ssw0rd123\"\n}"
+            },
+            "url": {
+              "raw": "{{iamUrl}}/auth/login/username",
+              "host": ["{{iamUrl}}"],
+              "path": ["auth", "login", "username"]
+            },
+            "description": "Authenticates against lynq-iam with username + password and saves the returned access token into `accessToken`, which every lynq-file-storage request sends as a bearer token. Returns 200 on success."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "pm.collectionVariables.set('accessToken', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "File",
+      "item": [
+        {
+          "name": "Create upload URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileName\": \"john-doe-resume.pdf\",\n  \"contentType\": \"application/pdf\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dmz/files/upload-url",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "files", "upload-url"]
+            },
+            "description": "Registers a file owned by the caller as PENDING and returns a pre-signed S3 PUT URL. Saves `fileId` and `uploadUrl` into collection variables. Returns 201 on success, 400 if `fileName` is blank or longer than 255 characters."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.fileId) pm.collectionVariables.set('fileId', data.fileId);",
+                  "if (data && data.uploadUrl) pm.collectionVariables.set('uploadUrl', data.uploadUrl);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload bytes to pre-signed URL",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/pdf" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "%PDF-1.4\n% Fake resume used only for local testing\n%%EOF"
+            },
+            "url": {
+              "raw": "{{uploadUrl}}"
+            },
+            "description": "PUTs the file bytes straight to S3 (LocalStack locally) using the pre-signed `uploadUrl`; it does not go through lynq-file-storage, so no Lynq headers are needed. `Content-Type` must match the `contentType` sent when the URL was created or S3 rejects the signature with 403. Returns 200 on success."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dmz/files/{{fileId}}/confirm",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "files", "{{fileId}}", "confirm"]
+            },
+            "description": "Checks that the object is in the bucket and marks the file as AVAILABLE. Returns 200 on success, 400 if the object has not been uploaded yet, 403 if the file belongs to another user, 404 if the file id is unknown."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get owned file",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dmz/files/{{fileId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "files", "{{fileId}}"]
+            },
+            "description": "Returns the metadata (name, content type, S3 key, status, timestamps) of a file the caller owns. Returns 200 on success, 403 if the file belongs to another user, 404 if the file id is unknown."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get download URL",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dmz/files/{{fileId}}/download-url",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "files", "{{fileId}}", "download-url"]
+            },
+            "description": "Issues a pre-signed S3 GET URL for the file and saves it into `downloadUrl`. Returns 200 on success, 404 if the file id is unknown."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json().data;",
+                  "if (data && data.downloadUrl) pm.collectionVariables.set('downloadUrl', data.downloadUrl);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get download URLs (batch)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fileIds\": [\n    \"{{fileId}}\",\n    \"00000000-0000-7000-8000-000000000000\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/dmz/files/download-urls",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "files", "download-urls"]
+            },
+            "description": "Issues pre-signed download URLs for up to 100 files, returned as a map keyed by file id; unknown ids are omitted instead of failing the batch. Returns 200 on success, 400 if the list is empty or has more than 100 ids."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete file",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/dmz/files/{{fileId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["dmz", "files", "{{fileId}}"]
+            },
+            "description": "Deletes the object from the bucket and forgets its metadata. Idempotent: an unknown id also returns 204. Returns 403 if the file belongs to another user."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
