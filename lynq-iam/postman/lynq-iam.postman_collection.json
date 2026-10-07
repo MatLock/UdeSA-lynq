@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Lynq IAM",
-    "description": "Auth endpoints for the lynq-iam service. All requests require the `lynq-request-uuid` header. Login endpoints auto-save `accessToken` and `refreshToken` into collection variables.",
+    "description": "Auth endpoints for the lynq-iam service. All requests live under `/auth` and require the `lynq-request-uuid` header. Login endpoints auto-save `accessToken` and `refreshToken` into collection variables.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_postman_id": "lynq-iam-collection"
   },
@@ -55,9 +55,9 @@
           "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"P@ssw0rd123\",\n  \"email\": \"johndoe@example.com\",\n  \"role\": \"R_CANDIDATE\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/register",
+          "raw": "{{baseUrl}}/auth/register",
           "host": ["{{baseUrl}}"],
-          "path": ["register"]
+          "path": ["auth", "register"]
         },
         "description": "Creates a new user with unique username and email, granted the role sent in the body. Returns 201 on success, 400 if the role is missing or unknown, 409 if username/email already exists."
       },
@@ -89,9 +89,9 @@
           "raw": "{\n  \"username\": \"johndoe\",\n  \"password\": \"P@ssw0rd123\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/login/username",
+          "raw": "{{baseUrl}}/auth/login/username",
           "host": ["{{baseUrl}}"],
-          "path": ["login", "username"]
+          "path": ["auth", "login", "username"]
         },
         "description": "Authenticates a user with username + password. Saves the returned access/refresh tokens into collection variables."
       },
@@ -123,9 +123,9 @@
           "raw": "{\n  \"email\": \"johndoe@example.com\",\n  \"password\": \"P@ssw0rd123\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/login/email",
+          "raw": "{{baseUrl}}/auth/login/email",
           "host": ["{{baseUrl}}"],
-          "path": ["login", "email"]
+          "path": ["auth", "login", "email"]
         },
         "description": "Authenticates a user with email + password. Saves the returned access/refresh tokens into collection variables."
       },
@@ -153,9 +153,9 @@
           { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
         ],
         "url": {
-          "raw": "{{baseUrl}}/validate",
+          "raw": "{{baseUrl}}/auth/validate",
           "host": ["{{baseUrl}}"],
-          "path": ["validate"]
+          "path": ["auth", "validate"]
         },
         "description": "Returns `{ success: true, data: true|false }` depending on whether the bearer access token is valid and not expired."
       },
@@ -180,9 +180,9 @@
           { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
         ],
         "url": {
-          "raw": "{{baseUrl}}/userinfo",
+          "raw": "{{baseUrl}}/auth/user-info",
           "host": ["{{baseUrl}}"],
-          "path": ["userinfo"]
+          "path": ["auth", "user-info"]
         },
         "description": "Returns the user identity (id, username, email) extracted from the access token."
       },
@@ -207,9 +207,9 @@
           { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
         ],
         "url": {
-          "raw": "{{baseUrl}}/refresh",
+          "raw": "{{baseUrl}}/auth/refresh",
           "host": ["{{baseUrl}}"],
-          "path": ["refresh"]
+          "path": ["auth", "refresh"]
         },
         "description": "Exchanges a valid refresh token for a new access token. Updates `accessToken` in the collection variables."
       },
@@ -241,9 +241,9 @@
           "raw": "{\n  \"newPassword\": \"N3wP@ssw0rd!\"\n}"
         },
         "url": {
-          "raw": "{{baseUrl}}/update-password",
+          "raw": "{{baseUrl}}/auth/update-password",
           "host": ["{{baseUrl}}"],
-          "path": ["update-password"]
+          "path": ["auth", "update-password"]
         },
         "description": "Updates the user's password. Returns a fresh access/refresh token pair which are auto-saved into collection variables."
       },
@@ -257,6 +257,64 @@
               "const data = pm.response.json().data;",
               "if (data && data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
               "if (data && data.refreshToken) pm.collectionVariables.set('refreshToken', data.refreshToken);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Check username availability",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/auth/check-username?username=johndoe",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "check-username"],
+          "query": [
+            { "key": "username", "value": "johndoe" }
+          ]
+        },
+        "description": "Public. Returns `{ valid, reason }`: whether the username is well formed and still free to register."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Check email availability",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "lynq-request-uuid", "value": "{{requestUuid}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/auth/check-email?email=johndoe@example.com",
+          "host": ["{{baseUrl}}"],
+          "path": ["auth", "check-email"],
+          "query": [
+            { "key": "email", "value": "johndoe@example.com" }
+          ]
+        },
+        "description": "Public. Returns `{ valid, reason }`: whether the email is well formed and not already registered."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', () => pm.response.to.have.status(200));"
             ]
           }
         }
