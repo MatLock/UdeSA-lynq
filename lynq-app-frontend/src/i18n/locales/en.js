@@ -533,7 +533,7 @@ const en = {
           ADMINISTRACION: 'Administration',
           TECNOLOGIA: 'Technology',
           CONTABILIDAD: 'Accounting',
-          RECURSOS_HUMANOS: 'Human resources',
+          'RECURSOS HUMANOS': 'Human resources',
         },
         workType: { REMOTE: 'Remote', IN_OFFICE: 'On-site' },
         salaryEmpty: (currency) => `No open posting publishes its salary in ${currency}.`,

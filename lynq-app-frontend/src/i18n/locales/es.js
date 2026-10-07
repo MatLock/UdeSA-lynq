@@ -533,7 +533,7 @@ const es = {
           ADMINISTRACION: 'Administración',
           TECNOLOGIA: 'Tecnología',
           CONTABILIDAD: 'Contabilidad',
-          RECURSOS_HUMANOS: 'Recursos humanos',
+          'RECURSOS HUMANOS': 'Recursos humanos',
         },
         workType: { REMOTE: 'Remoto', IN_OFFICE: 'Presencial' },
         salaryEmpty: (currency) => `Ningún aviso abierto publica su salario en ${currency}.`,
