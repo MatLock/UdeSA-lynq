@@ -94,7 +94,7 @@ ingress:
 
 lynq_llm:
   replicas: 1
-  image: matlock0o/lynq:lynq-llm-3.1.1
+  image: matlock0o/lynq:lynq-llm-3.1.2
   resources:
     requests:
       cpu: 100m
@@ -121,7 +121,7 @@ lynq_llm:
 
 lynq_agent:
   replicas: 1
-  image: matlock0o/lynq:lynq-agent-3.1.1
+  image: matlock0o/lynq:lynq-agent-3.1.2
   # Unused in prod: DB_URL comes whole from the external lynq-agent-secret, so
   # there is no host to interpolate here. Kept so both values files share a shape.
   dbHost: ""
@@ -175,7 +175,7 @@ lynq_agent:
 
 lynq_feeders:
   replicas: 1
-  image: matlock0o/lynq:lynq-feeders-3.1.1
+  image: matlock0o/lynq:lynq-feeders-3.1.2
   resources:
     requests:
       cpu: 50m
@@ -215,7 +215,7 @@ lynq_feeders:
 # snapshot CronJob triggers the daily run. No `path` and no Ingress.
 lynq_analytics:
   replicas: 1
-  image: matlock0o/lynq:lynq-analytics-3.1.1
+  image: matlock0o/lynq:lynq-analytics-3.1.2
   resources:
     requests:
       cpu: 100m
@@ -250,7 +250,7 @@ lynq_analytics:
 
 lynq_bff:
   replicas: 1
-  image: matlock0o/lynq:lynq-bff-3.1.1
+  image: matlock0o/lynq:lynq-bff-3.1.2
   resources:
     requests:
       cpu: 100m
@@ -269,7 +269,7 @@ lynq_bff:
 
 lynq_app_backend:
   replicas: 1
-  image: matlock0o/lynq:lynq-app-backend-3.1.1
+  image: matlock0o/lynq:lynq-app-backend-3.1.2
   resources:
     requests:
       cpu: 100m
@@ -291,7 +291,7 @@ lynq_app_backend:
 # file metadata all live here.
 lynq_file_storage:
   replicas: 1
-  image: matlock0o/lynq:lynq-file-storage-3.1.1
+  image: matlock0o/lynq:lynq-file-storage-3.1.2
   resources:
     requests:
       cpu: 100m
@@ -310,7 +310,7 @@ lynq_file_storage:
 
 lynq_iam:
   replicas: 1
-  image: matlock0o/lynq:lynq-iam-3.1.1
+  image: matlock0o/lynq:lynq-iam-3.1.2
   resources:
     requests:
       cpu: 100m
