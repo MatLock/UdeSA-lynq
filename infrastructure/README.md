@@ -2,7 +2,7 @@
 
 Kubernetes deployment for the Lynq platform, packaged as a Helm chart. The same chart runs both a self-contained local cluster (minikube) and the production cluster (AWS EKS); a small set of flags in the values files is what tells the two environments apart. In production the chart is not installed by hand — Terraform coordinates it — while locally you install it directly with Helm.
 
-The chart deploys the application modules (`lynq-iam`, `lynq-bff`, `lynq-app-backend`, `lynq-file-storage`, `lynq-llm`, `lynq-agent`, `lynq-feeders`, `lynq-analytics`, and the frontend) together with their configuration, and — locally only — their infrastructure dependencies (MySQL, Redis, LocalStack). In production MySQL and Redis are external hosts, S3/SNS/SQS are the real AWS services, the frontend is served from Cloudflare, and secrets are created outside the chart.
+The chart deploys the application modules (`lynq-iam`, `lynq-bff`, `lynq-app-backend`, `lynq-file-storage`, `lynq-llm`, `lynq-agent`, `lynq-feeders`, `lynq-analytics`, and the frontend) together with their configuration, and — locally only — their infrastructure dependencies (MySQL, Redis, LocalStack). In production MySQL and Redis run on an EC2 instance Terraform creates, S3/SNS/SQS are the real AWS services, the frontend is served from Cloudflare, and secrets are created outside the chart.
 
 
 ## Layout
@@ -29,6 +29,7 @@ infrastructure/
     ├── main.tf               # Namespace, external Secrets and the helm_release
     ├── vpc.tf                # VPC, public/private subnets, NAT
     ├── eks.tf                # Cluster, node group, OIDC provider
+    ├── data_host.tf          # EC2 instance running MySQL + Redis, its security group and Elastic IP
     ├── lbc.tf                # AWS Load Balancer Controller and its IRSA role
     ├── dns.tf                # ACM certificate and Cloudflare records
     ├── s3.tf
@@ -37,6 +38,7 @@ infrastructure/
     ├── bedrock.tf            # Bedrock-only IAM users for lynq-llm and lynq-agent
     ├── outputs.tf
     ├── policies/             # Vendored IAM policy of the load balancer controller
+    ├── templates/            # Bootstrap script of the data host (user_data)
     └── environments/
         └── prod.tfvars
 ```
@@ -51,7 +53,7 @@ The chart is driven by per-environment values files. A handful of flags decide w
 | Flag | Local | Prod | Effect |
 |------|-------|------|--------|
 | `manageSecrets` | `true` | `false` | Whether Helm renders the Secrets. In prod they are created outside the chart. |
-| `localInfra` | `true` | `false` | Whether MySQL / Redis / LocalStack run in-cluster. In prod these are managed services. |
+| `localInfra` | `true` | `false` | Whether MySQL / Redis / LocalStack run in-cluster. In prod they run outside the cluster. |
 | `ollamaInCluster` | `false` | `false` | Whether Ollama runs in-cluster. Locally it defaults to the Ollama on your host. |
 | `localFrontend` | `true` | `false` | Whether the frontend runs in-cluster. In prod it is served from Cloudflare (Wrangler). |
 
@@ -186,7 +188,7 @@ Production runs on AWS EKS and is applied **only with Terraform** (local uses He
 - **The network** (`vpc.tf`). A VPC with two public and two private subnets in two AZs, an internet gateway, and a single NAT gateway. The public subnets hold the ALB and the NAT and are tagged `kubernetes.io/role/elb`; the private ones hold the cluster. Every pod leaves the VPC through the NAT's Elastic IP (`terraform output nat_public_ip`).
 - **The EKS cluster itself and its EC2 worker nodes** (`eks.tf`), in the private subnets. The control plane is AWS-managed; the workers are a managed node group of `t3.medium` on-demand instances (2 by default, max 3). The cluster's OIDC provider is created too, which is what the load balancer controller's IRSA role trusts.
 - **The AWS Load Balancer Controller** (`lbc.tf`), installed with Helm into `kube-system`. Its IAM role is assumed through IRSA, with the official policy vendored under `policies/` for the pinned chart version.
-- **MySQL and Redis are external.** Terraform does not create them: `db_host` / `redis_host` point at them, and the apps' `DB_URL` / `REDIS_ADDRESS` are derived from those. They must accept connections from the NAT's IP.
+- **MySQL and Redis on their own EC2 instance** (`data_host.tf`), separate from the worker nodes. It is an Ubuntu 24.04 `t3.small` in a public subnet with an Elastic IP. On first boot its `user_data` (`templates/data-host-init.sh.tftpl`) installs MySQL 8 and Redis, creates the five `lynq_*_db` schemas and the MySQL user, the Redis ACL user, and a Linux user for SSH with password. The security group opens MySQL and Redis only to the EKS nodes, which reach them on the instance's private IP — the apps' `DB_URL` / `REDIS_ADDRESS` are derived from it — and SSH only to `data_host_ssh_cidr`. The data lives on the instance's EBS volume, with no backups.
 - **S3 bucket** (private, with CORS for pre-signed uploads) for `lynq-file-storage`, the only service that talks to S3.
 - **SNS + SQS** (`sns.tf`, `sqs.tf`): the `lynq-domain-events` topic `lynq-app-backend` publishes to, and `lynq-analytics-events`, subscribed to it with raw message delivery and a dead-letter queue after five receives. Same shape as the LocalStack init hook used locally.
 - **External Secrets.** `manageSecrets: false` — Helm renders no Secrets; Terraform creates `dockerhub-secret`, `lynq-iam-secret`, `lynq-bff-secret`, `lynq-app-backend-secret`, `lynq-file-storage-secret`, `lynq-llm-secret`, `lynq-agent-secret`, `lynq-feeders-secret`, and `lynq-analytics-secret`, and the deployments consume them by reference. The JWT secret and the internal token are generated by Terraform; the DB/Redis credentials and the Cloudflare and Docker Hub tokens are supplied at apply time via `TF_VAR_*` (never committed).
@@ -203,7 +205,7 @@ Prerequisites on the machine that runs Terraform:
 - AWS credentials allowed to create everything above (VPC, EKS, IAM users/roles/policies, S3, SNS, SQS, ACM). Configure them with `aws configure` or the `AWS_*` env vars; Terraform and the AWS CLI both read them from there. The identity that creates the cluster becomes its admin.
 - In the Bedrock console, check that the account can invoke every model in `bedrock_invocable_model_ids` (Nova Lite and Nova Pro) in `bedrock_region`.
 
-Fill in the `REPLACE_*` values in `environments/prod.tfvars` first: `db_host`, `redis_host`, `cloudflare_zone_id` and `s3_bucket_name` (bucket names are global, pick a unique one).
+Fill in the `REPLACE_*` values in `environments/prod.tfvars` first: `data_host_ssh_cidr` (your public IP as `x.x.x.x/32`, e.g. from `curl -s https://checkip.amazonaws.com`), `cloudflare_zone_id` and `s3_bucket_name` (bucket names are global, pick a unique one).
 
 ### 0. Cloudflare token and zone id
 
@@ -217,34 +219,24 @@ Terraform needs a Cloudflare API token (to manage DNS) and the zone id of `lynqo
 
 **Zone id** — open the domain in the dashboard (Websites → `lynqoficial.com`) → **Overview** → bottom-right **API → Zone ID**.
 
-### 1. Prepare MySQL and Redis
+### 1. Pick the data host passwords
 
-Terraform does not create the schemas. On the external MySQL, create the five databases and one user with access to all of them:
+Terraform creates MySQL and Redis on the data host, so there is nothing to prepare there: choose a user and password for each, and a password for SSH. Only the SSH password's SHA-512 hash is handed to Terraform:
 
-```sql
-CREATE DATABASE IF NOT EXISTS lynq_iam_db;
-CREATE DATABASE IF NOT EXISTS lynq_backend_db;
-CREATE DATABASE IF NOT EXISTS lynq_file_storage_db;
-CREATE DATABASE IF NOT EXISTS lynq_analytics_db;
-CREATE DATABASE IF NOT EXISTS lynq_agent_db;
-CREATE USER '<DB_USER>'@'%' IDENTIFIED BY '<DB_PASSWORD>';
-GRANT ALL PRIVILEGES ON lynq_iam_db.*          TO '<DB_USER>'@'%';
-GRANT ALL PRIVILEGES ON lynq_backend_db.*      TO '<DB_USER>'@'%';
-GRANT ALL PRIVILEGES ON lynq_file_storage_db.* TO '<DB_USER>'@'%';
-GRANT ALL PRIVILEGES ON lynq_analytics_db.*    TO '<DB_USER>'@'%';
-GRANT ALL PRIVILEGES ON lynq_agent_db.*        TO '<DB_USER>'@'%';
-FLUSH PRIVILEGES;
+```bash
+openssl passwd -6
 ```
 
-Each service creates its own tables on first start (Liquibase). Redis is reached over plain TCP — the services do not speak TLS to it — with an optional ACL user.
+The credentials are written into the instance's `user_data` once, on first boot. Terraform ignores later changes to them on the instance (`ignore_changes`), so rotating one means changing it on the host over SSH and then in `TF_VAR_*`, which updates the Secrets.
 
 ### 2. Export the secrets
 
 ```bash
 export TF_VAR_db_username=<DB_USER>
 export TF_VAR_db_password=<DB_PASSWORD>
-export TF_VAR_redis_username=<REDIS_USER>       # only if Redis requires auth
-export TF_VAR_redis_password=<REDIS_PASSWORD>   # only if Redis requires auth
+export TF_VAR_redis_username=<REDIS_USER>
+export TF_VAR_redis_password=<REDIS_PASSWORD>
+export TF_VAR_data_host_ssh_password_hash='<output of openssl passwd -6>'
 export TF_VAR_cloudflare_api_token=<cloudflare-dns-token>
 export TF_VAR_dockerhub_token=<dockerhub-access-token>
 ```
@@ -274,12 +266,13 @@ terraform init
 
 terraform apply \
   -var-file=environments/prod.tfvars \
-  -target=aws_eks_addon.core
+  -target=aws_eks_addon.core \
+  -target=aws_eip.data_host
 
-terraform output nat_public_ip
+terraform output data_host_public_ip
 ```
 
-Allow that IP on the MySQL and Redis firewalls before the next step — it is where every pod connects from.
+The data host is created in this phase so MySQL and Redis are installed by the time the services start. Its bootstrap takes a few minutes; once it is done you can log in with `ssh lynq-admin@<data_host_public_ip>` (the user is `data_host_ssh_username`) and check it with `sudo tail /var/log/cloud-init-output.log`.
 
 ### 4. Deploy everything else
 
@@ -329,4 +322,4 @@ terraform init -backend=false
 terraform validate
 ```
 
-Rendering the prod values is a quick way to confirm the environment split holds: with `k8s_values-prod.yaml` the output must contain **no** Secret objects and **no** in-cluster infra (MySQL/Redis/LocalStack/Ollama) or frontend — those are external in production.
+Rendering the prod values is a quick way to confirm the environment split holds: with `k8s_values-prod.yaml` the output must contain **no** Secret objects and **no** in-cluster infra (MySQL/Redis/LocalStack/Ollama) or frontend — those live outside the cluster in production.

@@ -1,5 +1,5 @@
 locals {
-  db_address = "${var.db_host}:${var.db_port}"
+  db_address = "${aws_instance.data_host.private_ip}:${var.db_port}"
 
   db_url_iam          = "jdbc:mysql://${local.db_address}/lynq_iam_db"
   db_url_backend      = "jdbc:mysql://${local.db_address}/lynq_backend_db"
@@ -14,7 +14,7 @@ locals {
     "ingress.host"                                         = var.ingress_host
     "ingress.certificateArn"                               = aws_acm_certificate_validation.lynq.certificate_arn
     "lynq_iam.config.DB_URL"                               = local.db_url_iam
-    "lynq_iam.config.REDIS_ADDRESS"                        = var.redis_host
+    "lynq_iam.config.REDIS_ADDRESS"                        = aws_instance.data_host.private_ip
     "lynq_iam.config.REDIS_PORT"                           = tostring(var.redis_port)
     "lynq_app_backend.config.DB_URL"                       = local.db_url_backend
     "lynq_app_backend.config.AWS_REGION"                   = var.aws_region
@@ -29,7 +29,7 @@ locals {
     "lynq_agent.config.BEDROCK_MODEL_ID"                   = var.agent_bedrock_model_id
     "lynq_agent.config.BEDROCK_REGION"                     = var.bedrock_region
     "lynq_analytics.config.DB_URL"                         = local.db_url_analytics
-    "lynq_analytics.config.REDIS_ADDRESS"                  = var.redis_host
+    "lynq_analytics.config.REDIS_ADDRESS"                  = aws_instance.data_host.private_ip
     "lynq_analytics.config.REDIS_PORT"                     = tostring(var.redis_port)
     "lynq_analytics.config.AWS_REGION"                     = var.aws_region
     "lynq_analytics.config.LYNQ_ANALYTICS_EVENTS_QUEUE"    = aws_sqs_queue.analytics_events.name

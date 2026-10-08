@@ -21,7 +21,7 @@ variable "namespace" {
 }
 
 # ---------------------------------------------------------------------------
-# Networking (vpc.tf) and the external MySQL + Redis the services connect to.
+# Networking (vpc.tf) and the MySQL + Redis host the services connect to (data_host.tf).
 # ---------------------------------------------------------------------------
 
 variable "vpc_cidr" {
@@ -30,26 +30,49 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
-variable "db_host" {
-  description = "Host or IP of the external MySQL. It must already have lynq_iam_db, lynq_backend_db, lynq_file_storage_db, lynq_analytics_db and lynq_agent_db, and accept connections from the nat_public_ip output."
-  type        = string
-}
-
 variable "db_port" {
-  description = "Port of the external MySQL."
+  description = "Port MySQL listens on in the data host."
   type        = number
   default     = 3306
 }
 
-variable "redis_host" {
-  description = "Host or IP of the external Redis (plain TCP, no TLS). It must accept connections from the nat_public_ip output."
-  type        = string
-}
-
 variable "redis_port" {
-  description = "Port of the external Redis."
+  description = "Port Redis listens on in the data host (plain TCP, no TLS)."
   type        = number
   default     = 6379
+}
+
+variable "data_host_instance_type" {
+  description = "EC2 instance type of the host that runs MySQL and Redis."
+  type        = string
+  default     = "t3.small"
+}
+
+variable "data_host_disk_size" {
+  description = "EBS volume size (GiB) of the data host. MySQL and Redis keep their data on it."
+  type        = number
+  default     = 20
+}
+
+variable "data_host_ssh_cidr" {
+  description = "The only CIDR allowed to SSH into the data host, e.g. your public IP as x.x.x.x/32."
+  type        = string
+
+  validation {
+    condition     = can(cidrhost(var.data_host_ssh_cidr, 0)) && var.data_host_ssh_cidr != "0.0.0.0/0"
+    error_message = "data_host_ssh_cidr must be a valid CIDR other than 0.0.0.0/0."
+  }
+}
+
+variable "data_host_ssh_username" {
+  description = "Linux user created on the data host for SSH with password, in the sudo group."
+  type        = string
+  default     = "lynq-admin"
+
+  validation {
+    condition     = can(regex("^[a-z_][a-z0-9_-]{0,31}$", var.data_host_ssh_username))
+    error_message = "data_host_ssh_username must be a valid Linux user name."
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -121,29 +144,48 @@ variable "dockerhub_email" {
 }
 
 variable "db_username" {
-  description = "Username of the external MySQL, shared by every service. Needs all privileges on the five lynq_*_db schemas."
+  description = "MySQL user shared by every service. The data host creates it with all privileges on the five lynq_*_db schemas."
   type        = string
   sensitive   = true
 }
 
 variable "db_password" {
-  description = "Password of the external MySQL user."
+  description = "Password of the MySQL user."
   type        = string
   sensitive   = true
 }
 
 variable "redis_username" {
-  description = "Username of the external Redis (optional)."
+  description = "Redis ACL user the data host creates for the services."
   type        = string
   sensitive   = true
-  default     = ""
+
+  validation {
+    condition     = can(regex("^[^\\s\"']+$", var.redis_username))
+    error_message = "redis_username must not be empty or contain whitespace or quotes."
+  }
 }
 
 variable "redis_password" {
-  description = "Password of the external Redis (optional)."
+  description = "Password of the Redis ACL user."
   type        = string
   sensitive   = true
-  default     = ""
+
+  validation {
+    condition     = can(regex("^[^\\s\"']+$", var.redis_password))
+    error_message = "redis_password must not be empty or contain whitespace or quotes."
+  }
+}
+
+variable "data_host_ssh_password_hash" {
+  description = "SHA-512 crypt hash of the SSH password of data_host_ssh_username (generate it with: openssl passwd -6). Only the hash reaches the instance."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = can(regex("^\\$6\\$", var.data_host_ssh_password_hash))
+    error_message = "data_host_ssh_password_hash must be a SHA-512 crypt hash ($6$...), as printed by: openssl passwd -6."
+  }
 }
 
 variable "bedrock_model_id" {

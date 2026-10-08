@@ -1,0 +1,57 @@
+#!/bin/bash
+set -euo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+DB_USER="$(echo '${db_username_b64}' | base64 -d)"
+DB_PASS="$(echo '${db_password_b64}' | base64 -d)"
+REDIS_USER="$(echo '${redis_username_b64}' | base64 -d)"
+REDIS_PASS="$(echo '${redis_password_b64}' | base64 -d)"
+SSH_USER='${ssh_username}'
+SSH_HASH="$(echo '${ssh_hash_b64}' | base64 -d)"
+
+useradd -m -s /bin/bash -G sudo "$SSH_USER"
+echo "$SSH_USER:$SSH_HASH" | chpasswd -e
+
+cat > /etc/ssh/sshd_config.d/01-lynq.conf <<EOF
+PasswordAuthentication yes
+KbdInteractiveAuthentication no
+PermitRootLogin no
+AllowUsers $SSH_USER
+EOF
+systemctl restart ssh
+
+until apt-get -o DPkg::Lock::Timeout=300 update --error-on=any; do sleep 5; done
+apt-get -o DPkg::Lock::Timeout=300 install -y mysql-server redis-server
+
+cat > /etc/mysql/mysql.conf.d/zz-lynq.cnf <<EOF
+[mysqld]
+bind-address = 0.0.0.0
+port         = ${db_port}
+EOF
+systemctl restart mysql
+
+mysql <<SQL
+CREATE DATABASE IF NOT EXISTS lynq_iam_db;
+CREATE DATABASE IF NOT EXISTS lynq_backend_db;
+CREATE DATABASE IF NOT EXISTS lynq_file_storage_db;
+CREATE DATABASE IF NOT EXISTS lynq_analytics_db;
+CREATE DATABASE IF NOT EXISTS lynq_agent_db;
+CREATE USER IF NOT EXISTS '$DB_USER'@'%' IDENTIFIED BY '$DB_PASS';
+GRANT ALL PRIVILEGES ON lynq_iam_db.*          TO '$DB_USER'@'%';
+GRANT ALL PRIVILEGES ON lynq_backend_db.*      TO '$DB_USER'@'%';
+GRANT ALL PRIVILEGES ON lynq_file_storage_db.* TO '$DB_USER'@'%';
+GRANT ALL PRIVILEGES ON lynq_analytics_db.*    TO '$DB_USER'@'%';
+GRANT ALL PRIVILEGES ON lynq_agent_db.*        TO '$DB_USER'@'%';
+FLUSH PRIVILEGES;
+SQL
+
+install -m 640 -o redis -g redis /dev/null /etc/redis/lynq.conf
+cat > /etc/redis/lynq.conf <<EOF
+bind 0.0.0.0
+port ${redis_port}
+user default off
+user $REDIS_USER on >$REDIS_PASS ~* &* +@all
+EOF
+echo "include /etc/redis/lynq.conf" >> /etc/redis/redis.conf
+systemctl restart redis-server

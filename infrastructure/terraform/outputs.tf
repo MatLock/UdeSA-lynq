@@ -34,8 +34,18 @@ output "vpc_id" {
 }
 
 output "nat_public_ip" {
-  description = "Public IP every pod leaves the VPC through. Allow it on the external MySQL and Redis."
+  description = "Public IP every pod leaves the VPC through."
   value       = aws_eip.nat.public_ip
+}
+
+output "data_host_public_ip" {
+  description = "Elastic IP of the MySQL + Redis host. SSH to it with: ssh <data_host_ssh_username>@<this>."
+  value       = aws_eip.data_host.public_ip
+}
+
+output "data_host_private_ip" {
+  description = "Private IP the services reach MySQL and Redis on."
+  value       = aws_instance.data_host.private_ip
 }
 
 output "file_storage_s3_access_key_id" {
