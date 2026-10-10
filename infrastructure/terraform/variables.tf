@@ -55,7 +55,7 @@ variable "data_host_disk_size" {
 }
 
 variable "data_host_ssh_cidr" {
-  description = "The only CIDR allowed to SSH into the data host, e.g. your public IP as x.x.x.x/32."
+  description = "The only CIDR allowed to reach the data host from outside the VPC, on SSH and MySQL, e.g. your public IP as x.x.x.x/32."
   type        = string
 
   validation {

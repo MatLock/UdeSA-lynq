@@ -12,7 +12,7 @@ db_port    = 3306
 redis_port = 6379
 
 data_host_instance_type = "t3.small"
-data_host_ssh_cidr      = "REPLACE_MY_IP/32"
+data_host_ssh_cidr      = "181.229.27.122/32"
 data_host_ssh_username  = "lynq-admin"
 
 # EKS control plane + EC2 worker nodes, in the private subnets of the VPC above.
@@ -23,9 +23,9 @@ eks_node_desired_size  = 2
 # Public API host + Cloudflare DNS. Terraform creates the ACM cert, validates it
 # via a Cloudflare DNS record, and points this host at the ALB.
 ingress_host       = "api.lynqoficial.com"
-cloudflare_zone_id = "REPLACE_CF_ZONE_ID"
+cloudflare_zone_id = "cc56ac77fa9857b800ff11d634e08726"
 
-s3_bucket_name = "REPLACE_BUCKET_NAME"
+s3_bucket_name = "lynq-oficial-file-storage"
 
 # lynq-llm and lynq-agent run on Bedrock in prod (LLM_PROVIDER=bedrock in
 # k8s_values-prod.yaml). Both models must be enabled in this region.

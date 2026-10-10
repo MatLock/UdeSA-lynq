@@ -28,7 +28,7 @@ locals {
 
 resource "aws_security_group" "data_host" {
   name        = "lynq-data-host"
-  description = "MySQL and Redis for the EKS nodes, SSH for the operator"
+  description = "MySQL and Redis for the EKS nodes, SSH and MySQL for the operator"
   vpc_id      = aws_vpc.lynq.id
 
   tags = {
@@ -54,6 +54,15 @@ resource "aws_vpc_security_group_ingress_rule" "data_host_mysql" {
   referenced_security_group_id = aws_eks_cluster.lynq.vpc_config[0].cluster_security_group_id
 }
 
+resource "aws_vpc_security_group_ingress_rule" "data_host_mysql_operator" {
+  security_group_id = aws_security_group.data_host.id
+  description       = "MySQL from the operator"
+  ip_protocol       = "tcp"
+  from_port         = var.db_port
+  to_port           = var.db_port
+  cidr_ipv4         = var.data_host_ssh_cidr
+}
+
 resource "aws_vpc_security_group_ingress_rule" "data_host_redis" {
   security_group_id            = aws_security_group.data_host.id
   description                  = "Redis from the EKS nodes"
@@ -71,11 +80,12 @@ resource "aws_vpc_security_group_egress_rule" "data_host_all" {
 }
 
 resource "aws_instance" "data_host" {
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.data_host_instance_type
-  subnet_id              = aws_subnet.public[0].id
-  vpc_security_group_ids = [aws_security_group.data_host.id]
-  user_data              = local.data_host_init
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = var.data_host_instance_type
+  subnet_id                   = aws_subnet.public[0].id
+  associate_public_ip_address = false
+  vpc_security_group_ids      = [aws_security_group.data_host.id]
+  user_data                   = local.data_host_init
 
   root_block_device {
     volume_type = "gp3"
@@ -96,6 +106,7 @@ resource "aws_instance" "data_host" {
     aws_vpc_security_group_egress_rule.data_host_all,
     aws_vpc_security_group_ingress_rule.data_host_ssh,
     aws_vpc_security_group_ingress_rule.data_host_mysql,
+    aws_vpc_security_group_ingress_rule.data_host_mysql_operator,
     aws_vpc_security_group_ingress_rule.data_host_redis,
   ]
 
