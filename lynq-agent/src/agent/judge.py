@@ -30,6 +30,9 @@ async def judge(
     job_skills: list[str],
     callbacks: list,
     retries: int,
+    statements: list[str] | None = None,
+    asked: str = "",
+    message: str = "",
 ) -> tuple[set[str], list[Rejection]]:
     """The judging agent: reads every part of the proposal beside the text it
     replaces and says, part by part, whether the resume supports it. It never
@@ -44,6 +47,9 @@ async def judge(
         language=language,
         resume_language=state.resume_language,
         parts=parts,
+        statements=statements if statements is not None else state.evidence(),
+        asked=asked,
+        message=message,
     )
     spans_before = len(state.spans)
     verdict = await ask(model, Verdict, [HumanMessage(prompt)], callbacks=callbacks, retries=retries)

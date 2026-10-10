@@ -14,6 +14,7 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__f
 TEMPLATE_DIR = os.path.join(_REPO_ROOT, "resources", "greetings")
 DEFAULT_LANGUAGE = "en"
 SUFFIX = ".jinja"
+GREETED_GAPS = 4
 
 _environment = Environment(
     loader=FileSystemLoader(TEMPLATE_DIR),
@@ -32,7 +33,7 @@ def languages() -> set[str]:
     }
 
 
-def render(job_snapshot: dict[str, Any], language: str) -> str:
+def render(job_snapshot: dict[str, Any], language: str, gaps: list[str] | None = None) -> str:
     code = bare_language(language)
     if code not in languages():
         log.warning(
@@ -47,5 +48,6 @@ def render(job_snapshot: dict[str, Any], language: str) -> str:
         job={
             "title": job_snapshot.get("title") or "",
             "company": job_snapshot.get("company") or "",
-        }
+        },
+        gaps=list(gaps or [])[:GREETED_GAPS],
     ).strip()

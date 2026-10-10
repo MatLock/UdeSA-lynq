@@ -39,6 +39,31 @@ class GreetingTest(unittest.TestCase):
             "version of your resume aimed at it?",
         )
 
+    def test_the_gaps_are_asked_about_in_english(self) -> None:
+        self.assertEqual(
+            render(JOB, "en", ["Spring Boot", "Kafka", "Go"]),
+            "I read the posting for Senior Backend Engineer at Acme. Should I put "
+            "together a version of your resume aimed at it? The posting also asks for "
+            "Spring Boot, Kafka and Go, which your resume does not mention: if you have "
+            "experience with any of them, tell me which, in which job and what you did, "
+            "and I will bring it in.",
+        )
+
+    def test_one_gap_reads_in_the_singular(self) -> None:
+        greeting = render(JOB, "en", ["Spring Boot"])
+
+        self.assertIn("asks for Spring Boot, which your resume does not mention: if you have experience with it, tell me in which job", greeting)
+
+    def test_the_gaps_are_asked_about_in_spanish(self) -> None:
+        self.assertIn("Spring Boot y Kafka", render(JOB, "es", ["Spring Boot", "Kafka"]))
+        self.assertIn("Spring Boot,", render(JOB, "es", ["Spring Boot"]))
+
+    def test_no_more_than_a_few_gaps_are_greeted(self) -> None:
+        greeting = render(JOB, "en", ["A", "B", "C", "D", "E"])
+
+        self.assertIn("A, B, C and D, which", greeting)
+        self.assertNotIn(", E", greeting)
+
     def test_a_posting_with_no_title_still_greets(self) -> None:
         self.assertIn("this job", render({"company": "Acme"}, "en"))
         self.assertIn("este puesto", render({"company": "Acme"}, "es"))

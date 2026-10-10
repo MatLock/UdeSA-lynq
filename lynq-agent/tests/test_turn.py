@@ -10,10 +10,12 @@ from langchain_core.messages import AIMessage
 from tests.fixtures.spanish import (
     ASK_FOR_ADVICE,
     ASK_FOR_GO,
+    CONFIRMED_SPRING_BOOT,
     GO_AHEAD,
     GREETING,
     REPLY,
     WARNING,
+    YES,
 )
 from tests.support import bedrock_error, breaking, intending, scripted, tool_call
 
@@ -213,6 +215,42 @@ class EditTurnTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome.reply, REPLY)
         self.assertEqual(outcome.resume["summary"], NEW_SUMMARY)
 
+    async def test_what_the_candidate_confirmed_comes_back_in_the_outcome_and_backs_the_edit(self) -> None:
+        model = scripted(
+            tool_call("EditProposal", {"reply": REPLY, "confirmed": [CONFIRMED_SPRING_BOOT], "skills": {"technical": ["Java", "Postgres", "Spring Boot"]}}, "1"),
+            tool_call("Verdict", {"parts": [{"id": "skills:technical", "ok": True}]}, "2"),
+        )
+
+        outcome = await run_turn(context_for(message=YES), model=model, intent_model=intending())
+
+        self.assertEqual(outcome.confirmed, [CONFIRMED_SPRING_BOOT])
+        self.assertEqual(outcome.resume["skills"]["technical"], ["Java", "Postgres", "Spring Boot"])
+        self.assertEqual(outcome.spans[-1].output, "OK")
+
+    async def test_the_judge_reads_what_was_asked_and_what_the_candidate_answered(self) -> None:
+        model = scripted(
+            tool_call("EditProposal", {"reply": REPLY, "confirmed": [CONFIRMED_SPRING_BOOT], "skills": {"technical": ["Java", "Postgres", "Spring Boot"]}}, "1"),
+            tool_call("Verdict", {"parts": [{"id": "skills:technical", "ok": True}]}, "2"),
+        )
+
+        await run_turn(context_for(message=YES), model=model, intent_model=intending())
+
+        judge_prompt = model.prompts[1][0].content
+        self.assertIn(f"CV Tailor asked: {GREETING}", judge_prompt)
+        self.assertIn(f"The candidate answered: {YES}", judge_prompt)
+        self.assertIn(f"- {CONFIRMED_SPRING_BOOT}", judge_prompt)
+
+    async def test_the_editor_reads_the_candidates_earlier_words_and_the_gaps(self) -> None:
+        model = scripted(tool_call("EditProposal", PROPOSAL, "1"), tool_call("Verdict", APPROVE_ALL, "2"))
+
+        await run_turn(context_for(statements=[CONFIRMED_SPRING_BOOT]), model=model, intent_model=intending())
+
+        system_prompt = model.prompts[0][0].content
+        self.assertIn(f"- {CONFIRMED_SPRING_BOOT}", system_prompt)
+        self.assertNotIn(f"- {ASK_FOR_GO}", system_prompt)
+        self.assertIn("neither the resume nor the candidate has mentioned: PostgreSQL", system_prompt)
+        self.assertNotIn("mentioned: PostgreSQL, Go", system_prompt)
+
     async def test_a_turn_that_applied_nothing_says_so(self) -> None:
         model = scripted(tool_call("EditProposal", {"reply": REPLY}, "1"))
 
@@ -264,6 +302,20 @@ class AdviseTurnTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual([r["id"] for r in outcome.recommendations], [1, 2])
         self.assertEqual(outcome.recommendations[1]["entry"], "Backend Engineer at Acme")
+        self.assertTrue(outcome.reply.startswith(REPLY))
+        self.assertTrue(outcome.reply.endswith("\n\n1. Name Kubernetes in the summary\n2. Say what ran on Kubernetes"))
+
+    async def test_what_the_candidate_told_the_advisor_is_confirmed_too(self) -> None:
+        model = scripted(tool_call("Advice", {**ADVICE, "confirmed": [CONFIRMED_SPRING_BOOT]}, "1"))
+
+        outcome = await run_turn(
+            context_for(message=ASK_FOR_ADVICE),
+            model=model,
+            intent_model=intending(Intent.ADVISE),
+        )
+
+        self.assertEqual(outcome.confirmed, [CONFIRMED_SPRING_BOOT])
+        self.assertEqual(outcome.changes, [])
 
     async def test_an_edit_turn_recommends_through_its_reply_only(self) -> None:
         model = scripted(tool_call("EditProposal", PROPOSAL, "1"), tool_call("Verdict", APPROVE_ALL, "2"))

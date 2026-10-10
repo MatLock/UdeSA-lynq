@@ -128,6 +128,15 @@ async def list_messages(session: AsyncSession, conversation_id: str) -> list[Mes
     return list(result)
 
 
+async def candidate_statements(session: AsyncSession, conversation_id: str) -> list[str]:
+    result = await session.scalars(
+        select(Message.content)
+        .where(Message.conversation_id == conversation_id, Message.role == MessageRole.USER)
+        .order_by(Message.seq)
+    )
+    return list(result)
+
+
 async def recent_messages(
     session: AsyncSession, conversation_id: str, limit: int
 ) -> list[Message]:
@@ -273,6 +282,17 @@ async def close_turn(
         (r.cost_usd or Decimal("0") for r in records), Decimal("0")
     )
     conversation.updated_on = utc_now()
+    await session.flush()
+
+
+async def confirm(
+    session: AsyncSession, conversation: Conversation, facts: list[str]
+) -> None:
+    known = list(conversation.confirmed or [])
+    new = [fact for fact in facts if fact and fact not in known]
+    if not new:
+        return
+    conversation.confirmed = [*known, *new]
     await session.flush()
 
 

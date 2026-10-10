@@ -14,6 +14,17 @@ A message that asks for a change and also asks something is `edit`. A message th
 what could be done next is `advise`, even when the answer to it is a list of changes:
 naming a change is not asking for it.
 
+CV Tailor asks the candidate whether they have the skills the posting wants and the
+resume does not mention. A yes to that — alone, or with where they used the skill and
+what they did with it — is `edit`: the skill was offered as an addition, and the yes
+asks for it. So is an answer to where or how something they confirmed should go. A no,
+or a message that only tells something about the candidate with no change to make from
+it, is `advise`.
+
+A message about CV Tailor's own last answer — where is it, I do not see it, what did
+you mean, say it again — is `advise`: it asks about the answer, not for a change to the
+resume, even when that answer recommended changes.
+
 <conversation>
 {% for role, content in history %}
 {{ role }}: {{ content }}

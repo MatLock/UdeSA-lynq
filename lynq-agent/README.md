@@ -27,7 +27,11 @@ The greeting it answers with costs nothing: it is a Jinja template per language,
 `resources/greetings/{en,es}.jinja`, chosen by the conversation's `language` and falling
 back to English when the locale has no template of its own. It is the one place in the
 module where Spanish is allowed, because it is the only text the candidate reads that
-the model did not write.
+the model did not write. It already asks the first question of the conversation: the
+skills the posting asks for that the resume names nowhere — the gaps, computed in code
+by `apply.gaps_in` from `extractedSkills` against the base resume — are listed, four
+at most, with a request to say which of them the candidate has, in which job and
+doing what.
 
 The greeting is stored as the conversation's first message so the front can render it,
 but it is never replayed to the model: a turn's history is trimmed to start on a user
@@ -78,13 +82,16 @@ graph TD;
 ```
 
 
-[`docs/un-turno-por-dentro.html`](docs/un-turno-por-dentro.html) walks through a real
+[`docs/un-turno-por-dentro.html`](docs/un-turno-por-dentro.html) walks through a
 conversation step by step — the message, the node the turn is on, what the model proposed
 and what was let in — with the trace spans each step leaves. Open it in a browser; it
-is one file with no build. The turns come from a run against `qwen2.5:7b` on
+is one file with no build. Turns 1 to 4 come from runs against `qwen2.5:7b` on
 2026-09-28, made under the earlier design where a set of rules in code stood where the
-judge stands now; the page shows the current graph and the rejections with the judge's
-kinds, and says so. `TurnGraphState` is what flows between the nodes: the
+judge stands now and the cap was two passes; the page shows the current graph and the
+rejections with the judge's kinds, and says so. Turns 5 and 6 are not a run: they walk
+the gap flow of 2026-10-10 — the greeting that asks, the yes that is an `edit`, the skill
+that enters the bucket while the editor asks where, the bullet that enters the entry the
+candidate named — with the model's answers written by hand to show the expected path. `TurnGraphState` is what flows between the nodes: the
 context and the turn state the service built, the model handles, and what each node
 leaves for the next — the intent, the thread, the proposal, the parts, the verdict and how
 many passes have been made.
@@ -93,7 +100,10 @@ many passes have been made.
 reads the message of the candidate together with the last four messages of the exchange
 and answers one word, `edit` or `advise`. It exists because an agent that treats every
 message as a request to change the resume — asked *what else do you suggest?* — rewrites
-things and reports the work as done. It is the first thing the turn does and it leaves a
+things and reports the work as done. A yes to a skill CV Tailor asked about is `edit`,
+because the skill was offered as an addition and the yes asks for it; a no, or a message
+that only tells something about the candidate, is `advise`, so that it never ends in
+the "nothing changed" notice an edit turn appends. It is the first thing the turn does and it leaves a
 `step=0` span named `intent` whose output is the word that was read. Anything that goes
 wrong with it — a model that breaks, an answer that says neither word — falls back to
 `edit` and writes a `kind='error'` span: the classifier never takes a turn down. It
@@ -102,30 +112,40 @@ is priced with that model's own sheet, not with the rates frozen on the conversa
 
 **2. The advising agent** (`src/agent/advisor.py`, prompt `resources/prompts/advise.jinja`)
 takes an `advise` turn. It answers the question and recommends the edits it would apply
-next, as prose in `reply` and as data in `recommendations` — `{id, section, entry,
-what}`, numbered by the code, 1..n, whatever the model wrote. It is given no way to
+next, as data in `recommendations` — `{id, section, entry, what}`, numbered by the code,
+1..n, whatever the model wrote — and the code appends that numbered list to `reply`
+under the answer, dropping any line the model already wrote for one of them, so the
+chat, the stored message and the history of the next turn all carry the same list with
+the same numbers; the model is told not to write it in `reply` itself. It is given no way to
 change the resume: its answer schema has no field for one, so a `resume_version` written
 on an `advise` turn would be a bug. The recommendations are stored on the assistant
 message, and the next turn's editing agent reads them, so *do the second one* means what
-the candidate read, not what the model reconstructs from the thread.
+the candidate read, not what the model reconstructs from the thread. It also carries
+the gap question — see *What the candidate says is true* below — and records in
+`confirmed` what the candidate told it about themselves.
 
 **3. The editing agent** (`src/agent/editor.py`, prompt `resources/prompts/edit.jinja`)
 takes an `edit` turn. It answers **once**, with the whole change of the turn as one
 `EditProposal`: the new summary, the entries of the work experience it rewrites — each
 named by `company` and `position`, never by index — and the skill buckets it replaces,
-plus `reply` and `warnings`. That is the entire surface: the summary, the description and
-achievements of an experience entry, and the skills. Reordering, the education, the
-projects, the certifications, a company, a position, a date — the schema has no field for
-any of them, so they cannot be asked for, let alone done.
+plus `reply`, `warnings` and `confirmed`. That is the entire surface: the summary, the
+description and achievements of an experience entry, and the skills. Reordering, the
+education, the projects, the certifications, a company, a position, a date — the schema
+has no field for any of them, so they cannot be asked for, let alone done. A skill the
+candidate confirmed enters the skills bucket in the same turn; it enters an entry of the
+experience only once the candidate has said in which job they used it and what they did
+with it, and until then the editor asks instead of guessing the entry.
 
 **4. The judge** (`src/agent/judge.py`, prompt `resources/prompts/judge.jinja`) reads the
 proposal part by part, each part beside the text it replaces in the **base** resume, and
-says for each one whether the resume supports it. It never rewrites: `ok`, or a `kind`
-and a `reason` written in the candidate's language. The one rule it applies is that a
-change may only say what the candidate's own resume already says — where, in the order
-and in the language the resume says it. Tailoring is a choice of words: the text after
-the change carries the same facts, the same lines and the same skills as before. The
-checks run in a fixed order and the first failure names the kind:
+says for each one whether the resume, or the candidate, supports it. It never rewrites:
+`ok`, or a `kind` and a `reason` written in the candidate's language. The one rule it
+applies is that a change may only say what the candidate's own resume already says, or
+what the candidate themselves said in the conversation — where, in the order and in the
+language the resume says it. Tailoring is a choice of words: the text after the change
+carries the same facts, the same lines and the same skills as before, plus what the
+resume or the candidate already said. The checks run in a fixed order and the first
+failure names the kind:
 
 | kind | what the judge saw |
 | --- | --- |
@@ -133,8 +153,8 @@ checks run in a fixed order and the first failure names the kind:
 | `dropped_content` | fewer lines than the original, a line with no counterpart at its position, or two lines merged into one |
 | `reordered` | the same lines, or the same skills, in another order; a new skill anywhere but at the end of its bucket |
 | `dropped_skill` | a bucket that leaves out a skill the current one has: a bucket may be grown at its end, never shrunk |
-| `invented` | a number, a duration, a result, a team size, a responsibility, a role or an employer the resume does not state — a requirement of the posting written in as if met counts |
-| `unsupported_skill` | a technology the resume names nowhere — and in an entry of the experience, one that entry does not name: a technology never moves into a job that never used it |
+| `invented` | a number, a duration, a result, a team size, a responsibility, a role or an employer that neither the resume states nor the candidate said — a requirement of the posting written in as if met counts |
+| `unsupported_skill` | a technology that neither the resume nor the candidate names anywhere — and in an entry of the experience, one that entry does not name and the candidate did not place there: a technology never moves into a job that never used it |
 | `wording` | the posting's spelling of a technology the resume spells otherwise (`PostgreSQL` over `Postgres`) |
 | `padding` | much more text than the original, not a rephrasing |
 
@@ -147,9 +167,10 @@ achievements item for item, a bucket in its order with new skills at the end, an
 everything in the language of the resume whatever language the candidate writes in.
 
 The judge has to **quote before it decides**: for every part it writes into `evidence`
-the two line counts and then the words of the resume that back the change — copied from
-the resume, never from the proposal, since Nova Pro was seen quoting the proposed
-sentence as its own evidence — and it may only approve what it quoted. A
+the two line counts and then the words of the resume, or of the candidate, that back the
+change — copied from the resume or from the candidate's statements, never from the
+proposal, since Nova Pro was seen quoting the proposed sentence as its own evidence —
+and it may only approve what it quoted. A
 model that has to find the sentence is far less likely to say "the resume does not
 mention Kubernetes" when the Acme entry lists it — which is exactly what `qwen2.5:7b` did
 before this field existed. The quote stays in the trace, so a wrong verdict can be
@@ -173,9 +194,11 @@ or an achievements list with fewer lines than the base, without one of its numbe
 without a technology the base named — any name from the skill buckets or the
 `technologies` of an entry — is `cut`; one with a line moved as it was is `moved`. A
 bucket missing a skill is `cut`, one that moves a skill or inserts before the last
-original one is `moved`, and one that appends a skill the resume names nowhere, spelled
-as the resume spells it, is `unbacked`. All of this happens before the judge reads a
-word. These are the code's kinds, and `docs/queries.sql` groups them apart from the
+original one is `moved`, and one that appends a skill that neither the resume nor the
+candidate names anywhere is `unbacked`. A name is found whatever way its spaces, dots
+and dashes are drawn — `springboot` in the chat backs `Spring Boot` in the resume — and
+a two-word name the candidate typed as one is matched as the pair. All of this happens
+before the judge reads a word. These are the code's kinds, and `docs/queries.sql` groups them apart from the
 judge's, so the trace says how often the guard fired and how often the judge did. The
 achievements a model sends as one string with newlines in it are split back into one
 item each before any of this, and an entry reaches the judge whole on both sides — a
@@ -205,6 +228,47 @@ purpose: that nothing is removed or reordered is a property of counts and positi
 provable in code, and Nova Pro was seen approving a bucket missing `Git` with the
 original list quoted as its evidence. The trace keeps every verdict, so the thesis can report how often the judge
 agreed with a person on a labelled sample, which is a result the rules could never give.
+
+### What the candidate says is true
+
+The candidate's own messages are evidence with the same weight as the resume. What
+they say in the chat — that they have a skill, where they used it, what they did with
+it — backs a change exactly as a line of the resume does, for the code and for the
+judge. Three things make that work across a whole conversation:
+
+- **Statements.** Every user message of the conversation, not just the four pairs the
+  model reads, reaches the turn as `TurnContext.statements`, together with the facts
+  recorded on `conversation.confirmed` (changelog `02-conversation-confirmed.sql`).
+  `apply.plan` adds them to the backing of every part, and the judge gets them in a
+  `<candidate_statements>` block.
+- **Confirmed facts.** A yes to *do you have Spring Boot?* does not name Spring Boot,
+  so a regex over the messages cannot back it. The editing and the advising agent
+  therefore return `confirmed`: what the candidate stated this turn about themselves,
+  in their words. The code treats it as backing in the same turn, the service appends
+  it to `conversation.confirmed`, and every later turn reads it as the candidate's. The
+  judge sees, in `<this_turn>`, what CV Tailor asked and what the candidate answered,
+  so a yes can be checked against the question it answers. This is the one place where
+  a model's reading of the conversation becomes evidence; it is logged in the trace like
+  everything else.
+- **Gaps.** `apply.gaps_in` lists the posting skills that neither the resume nor the
+  statements name. The greeting asks about them from the first message, and both agents
+  get them in a `<gaps>` block with the instruction to end the reply with one short
+  question about the ones that matter most, three at most, and never to cover a gap in
+  the resume. The check is lexical, so a posting that says `PostgreSQL` over a resume
+  that says `Postgres` is listed; the prompts tell the model that another spelling of
+  what the resume has is not a gap.
+
+The flow the feature is built for: the greeting or a reply asks about a gap; the
+candidate says yes, which the intent agent reads as `edit`; the editor adds the skill
+to its bucket, records the confirmation, and asks in which job it was used and what
+they did; the candidate answers; the editor adds a bullet to that entry, in the
+resume's language and voice, backed by the candidate's words, and the judge approves
+it against `<candidate_statements>`. What this gives up is that the judge no longer
+guards against the candidate's own claims — only against the model's. That is by
+design: the resume is theirs, and a candidate who wanted to claim a skill could always
+have written it into the resume and uploaded that one instead. Guarding against the
+candidate here would protect nothing; guarding against the model is what the judge is
+for.
 
 **The model never sees `personal_info`.** The code splits it off before rendering any
 prompt and pins it back when each version is serialized (§13.2 of the plan: it is the

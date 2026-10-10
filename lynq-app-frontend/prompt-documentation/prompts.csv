@@ -202,3 +202,4 @@ date,prompt
 "04-10-2026","make the salary by category and work type list scroll inside its card past about 8 rows, keeping the scale and the footer visible"
 "04-10-2026","the sidebar scrolls away on long pages and leaves a blank strip at the bottom; make it sticky at the top with the full viewport height"
 "04-10-2026","SonarCloud flags javascript:S9383 on the analytics load effects: mark the fire-and-forget load() calls with void in useAnalyticsQuery, TimeToFillCard, SalaryInsightsCard and CandidateStandingCard"
+"10-10-2026","the CV Tailor chat dropped the recommendations the agent returns with each reply: keep them on the assistant message in useTailorConversation and render them under the latest reply in TailorResumeModal as numbered chips that send Apply recommendation N with its text, hidden once the conversation is exhausted"

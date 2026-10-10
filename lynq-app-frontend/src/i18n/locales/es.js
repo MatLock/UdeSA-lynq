@@ -324,6 +324,9 @@ const es = {
       },
       messagePlaceholder: 'Pedile un cambio a tu CV…',
       send: 'Enviar',
+      recommendationsHint: 'Aplicar una recomendación:',
+      applyRecommendation: 'La {id}',
+      recommendationRequest: 'Aplicá la recomendación {id}: {what}',
       thinking: [
         'Buscando evidencia en tu CV…',
         'Reescribiendo lo que pediste…',

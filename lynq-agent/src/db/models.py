@@ -80,6 +80,7 @@ class Conversation(Base):
     max_steps: Mapped[int] = mapped_column(Integer, nullable=False)
     turn_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     applied_resume_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    confirmed: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     llm_calls: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_prompt_tokens: Mapped[int] = mapped_column(

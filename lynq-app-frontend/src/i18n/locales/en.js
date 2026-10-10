@@ -324,6 +324,9 @@ const en = {
       },
       messagePlaceholder: 'Ask for a change to your resume…',
       send: 'Send',
+      recommendationsHint: 'Apply a recommendation:',
+      applyRecommendation: '#{id}',
+      recommendationRequest: 'Apply recommendation {id}: {what}',
       thinking: [
         'Looking for evidence in your resume…',
         'Rewriting what you asked for…',

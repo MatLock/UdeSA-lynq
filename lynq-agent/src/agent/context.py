@@ -54,6 +54,7 @@ class TurnContext:
     message: str
     turns_left: int
     recommendations: list[dict[str, Any]] = field(default_factory=list)
+    statements: list[str] = field(default_factory=list)
     resume_version_id: str | None = None
     spans: list[SpanRecord] = field(default_factory=list)
 
@@ -67,6 +68,7 @@ class TurnOutcome:
     spans: list[SpanRecord] = field(default_factory=list)
     intent: str = DEFAULT_INTENT
     recommendations: list[dict[str, Any]] = field(default_factory=list)
+    confirmed: list[str] = field(default_factory=list)
 
 
 def deep_copy(value: Any) -> Any:

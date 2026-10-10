@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from agent.apply import gaps_in
 from agent.context import SpanRecord, TurnContext, TurnOutcome, apply_pricing, utc_now
 from agent.turn import run_turn
 from agent.language import verify_resume_language
@@ -83,7 +84,9 @@ class ConversationService:
         resume_language = verify_resume_language(
             request.base_resume, request.resume_language
         )
-        greeting = greeting_template.render(job, request.language)
+        greeting = greeting_template.render(
+            job, request.language, gaps_in(job["extractedSkills"], request.base_resume, [])
+        )
         now = utc_now()
 
         conversation = Conversation(
@@ -293,6 +296,7 @@ class ConversationService:
             await repository.save_spans(
                 session, conversation_id, user_message_id, outcome.spans
             )
+            await repository.confirm(session, conversation, outcome.confirmed)
             await repository.close_turn(session, conversation, outcome.spans)
             await session.commit()
 
@@ -412,6 +416,7 @@ class ConversationService:
         history = await repository.recent_messages(
             session, conversation.id, HISTORY_PAIRS * 2
         )
+        spoken = await repository.candidate_statements(session, conversation.id)
         return TurnContext(
             conversation_id=conversation.id,
             run_token=run_token,
@@ -424,8 +429,16 @@ class ConversationService:
             message=request.message,
             turns_left=self._turns_left(conversation),
             recommendations=self._last_recommendations(history),
+            statements=self._statements(spoken, conversation, request.message),
             resume_version_id=current.id if current else None,
         )
+
+    @staticmethod
+    def _statements(
+        spoken: list[str], conversation: Conversation, message: str
+    ) -> list[str]:
+        earlier = [content for content in spoken if content != message]
+        return [*earlier, *(conversation.confirmed or [])]
 
     @staticmethod
     def _last_recommendations(history: list[Message]) -> list[dict]:

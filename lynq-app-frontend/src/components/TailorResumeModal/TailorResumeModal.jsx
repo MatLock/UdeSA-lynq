@@ -132,6 +132,10 @@ const TailorResumeModal = ({
 
   const busy = conversation.starting || conversation.thinking || saving || externalBusy
   const isExhausted = conversation.status === EXHAUSTED
+  const lastAssistantIndex = conversation.messages.reduce(
+    (last, message, index) => (message.role === 'assistant' ? index : last),
+    -1,
+  )
   const shownResume = conversation.resume ?? workingResume?.resume ?? null
   const changedSections = tailorChangedSections(conversation.changes)
   const diff = resumeDiff.compare(workingResume?.resume ?? null, shownResume, diffLabels)
@@ -198,6 +202,15 @@ const TailorResumeModal = ({
     const message = draft
     setDraft('')
     conversation.send(message)
+  }
+
+  const requestRecommendation = (recommendation) => {
+    if (conversation.thinking || isExhausted) return
+    conversation.send(
+      t.recommendationRequest
+        .replace('{id}', recommendation.id)
+        .replace('{what}', recommendation.what),
+    )
   }
 
   // The tailored resume never becomes one of the candidate's own: it is
@@ -383,6 +396,26 @@ const TailorResumeModal = ({
                   ))}
                 </ul>
               )}
+              {message.recommendations?.length > 0 &&
+                index === lastAssistantIndex &&
+                !isExhausted && (
+                  <div className="tailor-resume-recommendations">
+                    <span className="tailor-resume-recommendations-hint">
+                      {t.recommendationsHint}
+                    </span>
+                    {message.recommendations.map((recommendation) => (
+                      <button
+                        type="button"
+                        key={recommendation.id}
+                        className="tailor-resume-chip"
+                        disabled={conversation.thinking}
+                        onClick={() => requestRecommendation(recommendation)}
+                      >
+                        {t.applyRecommendation.replace('{id}', recommendation.id)}
+                      </button>
+                    ))}
+                  </div>
+                )}
             </div>
           </div>
         ))}

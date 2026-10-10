@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from tests.test_turn import RESUME, context_for
+from tests.fixtures.spanish import CONFIRM_SPRING_BOOT, CONFIRMED_SPRING_BOOT, GO_AHEAD, YES
+from tests.test_turn import JOB, RESUME, context_for
 
 from agent import apply
 from agent.schemas import EditProposal, EntryEdit, SkillsEdit
@@ -138,11 +139,39 @@ class StructureGuardTest(unittest.TestCase):
         self.assertEqual(rejections[0].kind, apply.CUT)
         self.assertIn("technologies of the original are missing: Postgres", rejections[0])
 
-    def test_a_new_skill_the_resume_names_nowhere_is_unbacked(self) -> None:
-        _, rejections = apply.plan(state_for(), proposal(skills=SkillsEdit(technical=["Java", "Postgres", "Go"])))
+    def test_a_new_skill_neither_the_resume_nor_the_candidate_names_is_unbacked(self) -> None:
+        _, rejections = apply.plan(state_for(message=GO_AHEAD), proposal(skills=SkillsEdit(technical=["Java", "Postgres", "Go"])))
 
         self.assertEqual(rejections[0].kind, apply.UNBACKED)
-        self.assertEqual(str(rejections[0]), "skills.technical: the resume names these nowhere: Go")
+        self.assertEqual(str(rejections[0]), "skills.technical: neither the resume nor the candidate names these: Go")
+
+    def test_a_new_skill_the_candidate_said_they_have_is_backed(self) -> None:
+        parts, rejections = apply.plan(state_for(), proposal(skills=SkillsEdit(technical=["Java", "Postgres", "Go"])))
+
+        self.assertEqual((rejections, parts[0].names), ([], ["Java", "Postgres", "Go"]))
+
+    def test_what_the_candidate_said_earlier_in_the_conversation_still_backs(self) -> None:
+        state = state_for(message=GO_AHEAD, statements=[CONFIRM_SPRING_BOOT])
+        parts, rejections = apply.plan(state, proposal(skills=SkillsEdit(technical=["Java", "Postgres", "Spring Boot"])))
+
+        self.assertEqual((rejections, parts[0].names), ([], ["Java", "Postgres", "Spring Boot"]))
+
+    def test_a_fact_the_proposal_records_as_confirmed_backs_it(self) -> None:
+        state = state_for(message=YES)
+        parts, rejections = apply.plan(state, proposal(confirmed=[CONFIRMED_SPRING_BOOT], skills=SkillsEdit(technical=["Java", "Postgres", "Spring Boot"])))
+
+        self.assertEqual((rejections, parts[0].names), ([], ["Java", "Postgres", "Spring Boot"]))
+
+    def test_a_fact_confirmed_in_an_earlier_turn_backs_an_entry_line(self) -> None:
+        state = state_for(message=GO_AHEAD)
+        state.confirm([CONFIRMED_SPRING_BOOT])
+        _, rejections = apply.plan(state, proposal(entries=[EntryEdit(company="Acme", position="Backend Engineer", description="Built services deployed on Kubernetes.\n- Built microservices on Spring Boot")]))
+
+        self.assertEqual(rejections, [])
+
+    def test_a_name_is_the_same_name_however_its_spaces_and_dots_are_drawn(self) -> None:
+        self.assertEqual(apply.unbacked_names("- Built it on Spring Boot and Node.js", "tengo springboot y nodejs"), [])
+        self.assertEqual(apply.unbacked_names("- Built it on Spring Boot", "tengo Spring"), ["Boot"])
 
     def test_a_new_skill_an_entry_lists_is_backed(self) -> None:
         parts, rejections = apply.plan(state_for(), proposal(skills=SkillsEdit(technical=["Java", "Postgres", "Kubernetes"])))
@@ -160,7 +189,7 @@ class StructureGuardTest(unittest.TestCase):
         _, rejections = apply.plan(self.state(), self.entry(self.ORIGINAL + "\n- Utilized AWS services including Lambdas and Cognito."))
 
         self.assertEqual(rejections[0].kind, apply.UNBACKED)
-        self.assertIn("names the resume does not state here, so they cannot enter: AWS, Lambdas, Cognito", rejections[0])
+        self.assertIn("names neither the resume states here nor the candidate said, so they cannot enter: AWS, Lambdas, Cognito", rejections[0])
 
     def test_a_name_from_another_entry_does_not_back_this_one(self) -> None:
         _, rejections = apply.plan(self.state(), self.entry(self.ORIGINAL + "\n- Kept the Java monolith alive"))
@@ -175,6 +204,11 @@ class StructureGuardTest(unittest.TestCase):
 
     def test_the_first_word_of_a_sentence_is_not_a_name(self) -> None:
         self.assertEqual(apply.names_in("- Designed REST APIs. Built Kafka consumers, 3 of them"), ["REST", "APIs", "Kafka", "3"])
+
+    def test_a_name_glued_to_a_word_by_a_dot_is_still_a_name(self) -> None:
+        self.assertEqual(apply.names_in("- Utilized C# and.NET Core, then Node.js"), ["C#", "NET", "Core", "Node.js"])
+        self.assertEqual(apply.unbacked_names("- Utilized C# and.NET Core", "Built it on C# and .NET Core"), [])
+        self.assertEqual(apply.unbacked_names("- Utilized C# and.NET Core", "Built it on Java"), ["C#", "NET", "Core"])
 
     def test_a_summary_may_only_name_what_the_resume_names(self) -> None:
         _, unbacked = apply.plan(state_for(), proposal(summary="Backend engineer with eight years on distributed systems and Postgres, proficient in PostgreSQL and JUnit."))
@@ -198,6 +232,18 @@ class StructureGuardTest(unittest.TestCase):
 
         self.assertEqual(rejections, [])
         self.assertEqual(parts[0].names, ["java", "Postgres", "Kubernetes"])
+
+
+class GapsTest(unittest.TestCase):
+
+    def test_a_posting_skill_named_nowhere_is_a_gap(self) -> None:
+        self.assertEqual(apply.gaps_in(JOB["extractedSkills"], RESUME, []), ["PostgreSQL", "Go"])
+
+    def test_a_skill_the_candidate_mentioned_is_no_longer_a_gap(self) -> None:
+        self.assertEqual(apply.gaps_in(JOB["extractedSkills"], RESUME, [CONFIRM_SPRING_BOOT, "Go"]), ["PostgreSQL"])
+
+    def test_another_spelling_of_what_the_resume_has_still_counts_as_a_gap_for_the_code(self) -> None:
+        self.assertIn("PostgreSQL", apply.gaps_in(["PostgreSQL"], RESUME, []))
 
 
 class CommitTest(unittest.TestCase):

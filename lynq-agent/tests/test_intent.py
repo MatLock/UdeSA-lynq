@@ -172,6 +172,14 @@ class PromptTest(unittest.TestCase):
                 "naming a change is not asking for it", self.render(provider)
             )
 
+    def test_a_yes_to_a_skill_asked_about_is_an_edit_and_a_no_is_not(self) -> None:
+        for provider in PROVIDERS:
+            prompt = self.render(provider)
+
+            self.assertIn("A yes to that — alone, or with where they used the skill", prompt)
+            self.assertIn("is `edit`", prompt)
+            self.assertIn("A no,", prompt)
+
     def test_the_exchange_and_the_message_travel_in_their_own_blocks(self) -> None:
         for provider in PROVIDERS:
             prompt = self.render(provider)

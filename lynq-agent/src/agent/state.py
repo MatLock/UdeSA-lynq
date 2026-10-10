@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from agent.context import SpanRecord, TurnContext, deep_copy
+from db.models import MessageRole
 
 PERSONAL_INFO = "personal_info"
 
@@ -21,6 +22,8 @@ class TurnState:
     personal_info: dict[str, Any]
     resume: dict[str, Any]
     job_skills: list[str]
+    statements: list[str] = field(default_factory=list)
+    confirmed: list[str] = field(default_factory=list)
     changes: list[dict[str, Any]] = field(default_factory=list)
     spans: list[SpanRecord] = field(default_factory=list)
     steps: int = 0
@@ -28,6 +31,16 @@ class TurnState:
     def next_step(self) -> int:
         self.steps += 1
         return self.steps
+
+    def confirm(self, facts: list[str]) -> None:
+        for fact in facts:
+            fact = " ".join(str(fact or "").split())
+            if fact and fact not in self.confirmed and fact not in self.statements:
+                self.confirmed.append(fact)
+
+    def evidence(self, excluding: str = "") -> list[str]:
+        spoken = " ".join(excluding.split())
+        return [fact for fact in [*self.statements, *self.confirmed] if fact != spoken]
 
     def record_change(
         self,
@@ -68,6 +81,16 @@ def without_personal_info(
     return deep_copy(editable), deep_copy(resume.get(PERSONAL_INFO) or {})
 
 
+def statements_of(context: TurnContext) -> list[str]:
+    spoken = context.statements or [
+        content for role, content in context.history if role == MessageRole.USER
+    ]
+    return list(dict.fromkeys(
+        text for text in (" ".join(str(item or "").split()) for item in [*spoken, context.message])
+        if text
+    ))
+
+
 def build_turn_state(context: TurnContext) -> TurnState:
     resume, personal_info = without_personal_info(context.current_resume)
     return TurnState(
@@ -79,5 +102,6 @@ def build_turn_state(context: TurnContext) -> TurnState:
         personal_info=personal_info,
         resume=resume,
         job_skills=list(context.job_snapshot.get("extractedSkills") or []),
+        statements=statements_of(context),
         spans=context.spans,
     )

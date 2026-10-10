@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 
 from tests.support import JOB, RESUME, STUB_REPLY, TemporaryDatabase, stub_loop
 
+from agent.apply import gaps_in
 from agent.context import Intent, SpanRecord, TurnOutcome
 from client.lynq_llm_client import SkillExtractionFailed
 from config import Settings, reset_settings
@@ -155,9 +156,53 @@ class ConversationServiceTest(unittest.IsolatedAsyncioTestCase):
         english = await self._create(language="en")
 
         snapshot = (await self._conversation(spanish.conversation_id)).job_snapshot
-        self.assertEqual(spanish.greeting, greeting_template.render(snapshot, "es"))
-        self.assertEqual(english.greeting, greeting_template.render(snapshot, "en"))
+        gaps = gaps_in(snapshot["extractedSkills"], RESUME, [])
+        self.assertEqual(spanish.greeting, greeting_template.render(snapshot, "es", gaps))
+        self.assertEqual(english.greeting, greeting_template.render(snapshot, "en", gaps))
         self.assertNotEqual(spanish.greeting, english.greeting)
+
+    async def test_the_greeting_asks_about_the_skills_the_resume_does_not_mention(self) -> None:
+        created = await self._create(language="en")
+
+        self.assertIn("Kubernetes and PostgreSQL, which your resume does not mention", created.greeting)
+
+    async def test_a_resume_that_covers_the_posting_is_greeted_without_a_question(self) -> None:
+        covered = {**RESUME, "skills": {"technical": ["Kubernetes", "PostgreSQL"]}}
+        created = await self._create(language="en", baseResume=covered)
+
+        self.assertNotIn("does not mention", created.greeting)
+
+    async def test_what_the_candidate_confirmed_is_kept_and_reaches_the_next_turn(self) -> None:
+        seen = []
+
+        async def confirming_loop(context) -> TurnOutcome:
+            seen.append(list(context.statements))
+            outcome = await stub_loop(context)
+            outcome.confirmed = ["Has Kubernetes, used at Acme"] if len(seen) == 1 else []
+            return outcome
+
+        service = self.service(loop_runner=confirming_loop)
+        created = await self._create(service)
+        await service.turn(created.conversation_id, TurnRequest(message="Yes, Kubernetes", turnKey="k1"), USER)
+        await service.turn(created.conversation_id, TurnRequest(message="Go on", turnKey="k2"), USER)
+
+        conversation = await self._conversation(created.conversation_id)
+        self.assertEqual(conversation.confirmed, ["Has Kubernetes, used at Acme"])
+        self.assertEqual(seen[0], [])
+        self.assertEqual(seen[1], ["Yes, Kubernetes", "Has Kubernetes, used at Acme"])
+
+    async def test_a_fact_confirmed_twice_is_kept_once(self) -> None:
+        async def confirming_loop(context) -> TurnOutcome:
+            outcome = await stub_loop(context)
+            outcome.confirmed = ["Has Kubernetes"]
+            return outcome
+
+        service = self.service(loop_runner=confirming_loop)
+        created = await self._create(service)
+        await service.turn(created.conversation_id, TurnRequest(message="Yes", turnKey="k1"), USER)
+        await service.turn(created.conversation_id, TurnRequest(message="Yes again", turnKey="k2"), USER)
+
+        self.assertEqual((await self._conversation(created.conversation_id)).confirmed, ["Has Kubernetes"])
 
     async def test_create_truncates_the_job_description(self) -> None:
         long_description = "x" * 9000

@@ -132,6 +132,7 @@ const useTailorConversation = (jobId) => {
             role: 'assistant',
             content: answer.reply,
             warnings: answer.warnings ?? [],
+            recommendations: answer.recommendations ?? [],
           },
         ])
         const before = resumeRef.current

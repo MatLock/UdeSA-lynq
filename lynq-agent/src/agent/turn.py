@@ -105,4 +105,5 @@ async def run_turn(
         spans=state.spans,
         intent=intent,
         recommendations=recommendations,
+        confirmed=state.confirmed,
     )

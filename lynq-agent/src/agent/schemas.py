@@ -71,6 +71,14 @@ class EditProposal(BaseModel):
         default_factory=list,
         description="What the candidate asked for that the resume does not back",
     )
+    confirmed: list[str] = Field(
+        default_factory=list,
+        description=(
+            "What the candidate stated this turn about themselves that the resume does not say: "
+            "a skill they have, where they used it, what they did with it; in their own words, "
+            "one fact per item; empty when they stated nothing new"
+        ),
+    )
     summary: str = Field(
         default="",
         description=(
@@ -108,6 +116,14 @@ class Advice(BaseModel):
         default_factory=list,
         description="What the candidate asked for that the resume does not back",
     )
+    confirmed: list[str] = Field(
+        default_factory=list,
+        description=(
+            "What the candidate stated this turn about themselves that the resume does not say: "
+            "a skill they have, where they used it, what they did with it; in their own words, "
+            "one fact per item; empty when they stated nothing new"
+        ),
+    )
     recommendations: list[Recommendation] = Field(
         default_factory=list, description="The edits you would apply next, best first"
     )
@@ -119,10 +135,10 @@ class PartVerdict(BaseModel):
         default="",
         description=(
             "The line counts of the original and the proposed text, then the words of the "
-            "resume that back the change, quoted; no quote when nothing does"
+            "resume or of the candidate that back the change, quoted; no quote when nothing does"
         ),
     )
-    ok: bool = Field(default=False, description="true when the resume supports the change")
+    ok: bool = Field(default=False, description="true when the resume or the candidate supports the change")
     kind: str = Field(
         default="",
         description=(

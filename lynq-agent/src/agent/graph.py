@@ -13,7 +13,7 @@ from agent.intent import classify
 from agent.judge import judge
 from agent.schemas import Advice, EditProposal
 from agent.state import TurnState
-from db.models import SpanKind
+from db.models import MessageRole, SpanKind
 from prompt.tailor import ADVISE as ADVISE_PROMPT, EDIT as EDIT_PROMPT, JUDGE as JUDGE_PROMPT, reference
 
 log = logging.getLogger(__name__)
@@ -90,6 +90,7 @@ async def propose_node(graph: TurnGraphState) -> TurnGraphState:
     proposal = await editor.propose(
         graph["model"], thread, callbacks=graph["callbacks"], retries=graph["retries"]
     )
+    graph["state"].confirm(proposal.confirmed)
     return {"thread": thread, "proposal": proposal}
 
 
@@ -104,6 +105,8 @@ async def judge_node(graph: TurnGraphState) -> TurnGraphState:
         state, parts, graph.get("judge_model") or graph["model"],
         provider=graph["provider"], language=context.language,
         job_skills=state.job_skills, callbacks=graph["callbacks"], retries=graph["retries"],
+        statements=state.evidence(excluding=context.message), asked=last_reply(context),
+        message=context.message,
     )
     return {"parts": parts, "approved": approved, "rejections": [*misplaced, *rejected]}
 
@@ -125,6 +128,13 @@ def apply_node(graph: TurnGraphState) -> TurnGraphState:
         )
     )
     return {"passes": graph.get("passes", 0) + 1}
+
+
+def last_reply(context: TurnContext) -> str:
+    for role, content in reversed(context.history):
+        if role == MessageRole.ASSISTANT:
+            return content
+    return ""
 
 
 def route_intent(graph: TurnGraphState) -> str:

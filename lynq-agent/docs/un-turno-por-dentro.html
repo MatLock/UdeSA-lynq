@@ -165,7 +165,7 @@
 <body>
 <div class="wrap">
   <h1>Un turno por dentro</h1>
-  <p class="lead">Una conversación real de CV Tailor, paso a paso: qué escribe el candidato, por qué nodo del grafo pasa el turno, qué propone el agente de edición, qué dice el juez y qué escribe el código en el CV. Los turnos 1 a 3 son ediciones; el turno 4 es una consulta y recorre la rama <code>advise</code>.</p>
+  <p class="lead">Una conversación de CV Tailor, paso a paso: qué escribe el candidato, por qué nodo del grafo pasa el turno, qué propone el agente de edición, qué dice el juez y qué escribe el código en el CV. Los turnos 1 a 3 son ediciones; el turno 4 es una consulta y recorre la rama <code>advise</code>; los turnos 5 y 6 muestran el flujo de hoy para un gap: el aviso pide algo que el CV no nombra, CV Tailor pregunta, el candidato confirma, y lo que dice entra al CV con el mismo peso que el CV.</p>
   <p class="legend"><span class="i"><i></i>agente de intención</span><span class="e"><i></i>agente de edición</span><span class="a"><i></i>agente de recomendación</span><span class="j"><i></i>agente juez</span><span class="g"><i></i>rechazado</span><span><i></i>código, sin modelo</span></p>
 
   <div class="stepper" role="group" aria-label="Recorrido">
@@ -201,7 +201,7 @@
           </g>
           <text x="128" y="134" class="edge-label">edit</text>
           <text x="282" y="134" class="edge-label">advise</text>
-          <text x="204" y="256" class="edge-label">rechazos, 1 vez</text>
+          <text x="204" y="256" class="edge-label">rechazos, hasta 2 veces</text>
           <g id="nodes">
             <g class="node terminal c-start" data-node="start"><rect x="180" y="18" width="60" height="28"></rect><text x="210" y="36" text-anchor="middle">start</text></g>
             <g class="node c-intent" data-node="classify"><rect x="160" y="78" width="100" height="30"></rect><text x="210" y="98" text-anchor="middle">classify</text></g>
@@ -225,7 +225,7 @@
     </section>
   </div>
 
-  <p class="foot">Turnos 1 a 3: corrida real del 28/09/2026 contra <code>qwen2.5:7b</code> en Ollama. En esa corrida el nodo <code>judge</code> era todavía un conjunto de reglas en código (el "guard"); acá sus rechazos se muestran con el <code>kind</code> que hoy devuelve el juez, y la razón literal que quedó en la traza. El turno 4 es la rama <code>advise</code>, tomado de la segunda corrida del mismo día, ya con el juez: la misma pregunta que el turno 2, que esa vez sí fue leída como consulta.</p>
+  <p class="foot">Turnos 1 a 3: corrida real del 28/09/2026 contra <code>qwen2.5:7b</code> en Ollama. En esa corrida el nodo <code>judge</code> era todavía un conjunto de reglas en código (el "guard") y el tope eran dos pasadas; acá sus rechazos se muestran con el <code>kind</code> que hoy devuelve el juez, y la razón literal que quedó en la traza. El turno 4 es la rama <code>advise</code>, tomado de la segunda corrida del mismo día, ya con el juez: la misma pregunta que el turno 2, que esa vez sí fue leída como consulta. Los turnos 5 y 6 no son una corrida: son el flujo de gaps tal como lo implementa el código del 10/10/2026 (saludo con gaps, campo <code>confirmed</code>, bloques <code>candidate_statements</code> y <code>this_turn</code> del juez), con las respuestas del modelo escritas a mano para mostrar el camino esperado.</p>
 </div>
 
 <script>
@@ -243,6 +243,10 @@
   const R3 = "He ajustado tu resumen para que se alinee mejor con las expectativas del puesto. Mantengo el foco en tus habilidades relevantes, como Kubernetes y PostgreSQL, pero no puedo incluir PostgreSQL ya que no está respaldada por tu base de datos actual.";
   const R4 = "He ajustado tu resumen y la descripción del trabajo en Acme para que se alineen mejor con las expectativas del puesto. Los cambios principales son: un resumen más conciso y enfocado, una descripción de tu experiencia en Acme que destaca tus habilidades relevantes, y actualizaciones en los buckets de habilidades.";
   const W4 = "Tu currículum no menciona experiencia directa con PostgreSQL, Go ni observabilidad, por lo que estos campos podrían parecer débiles al reclutador.";
+  const GREETING = "Miré el aviso de Senior Backend Engineer en Acme. ¿Armo una versión de tu CV apuntada a este puesto? El aviso también pide PostgreSQL y Go, y tu CV no los menciona: si tenés experiencia con alguno, contame cuál, en qué puesto y qué hiciste, y lo sumo.";
+  const R5 = "Sumé Go a tus skills técnicas, que es una de las dos cosas que el aviso pide y tu CV no nombraba. Para que también aparezca en tu experiencia, decime en qué puesto lo usaste y qué hiciste con él. Después de eso: 1. una línea en esa entrada sobre tu trabajo con Go. ¿Y PostgreSQL, tenés experiencia?";
+  const R6 = "Agregué a tu experiencia en Acme una línea sobre los workers de pagos en Go, que es justo lo que el aviso busca en el backend. Con eso, Go está en tus skills y en tu experiencia. Queda PostgreSQL como único punto que el aviso pide y tu CV no menciona: si lo manejás, contame dónde.";
+  const ACME6 = "Built services deployed on Kubernetes.\n- Built the payment workers in Go";
   const RECS = ["[summary] Refinar el resumen para enfatizar las habilidades relevantes y la experiencia en Kubernetes.", "[work_experience · Acme - Backend Engineer (2021-01 - Presente)] Añadir detalles sobre tu trabajo con PostgreSQL y Go en Acme.", "[skills] Incluir Kubernetes, PostgreSQL, Go y CI/CD en el bucket de habilidades técnicas."];
 
   const no = (where, reason, kind) => ({ s: "no", where, reason: (kind ? "kind: " + kind + " — " : "") + reason });
@@ -253,27 +257,27 @@
   // the verdicts of the guard, and what to say about it.
   const STEPS = [
     // ---- turn 1
-    { t: 1, node: "start", chat: [["u", "Dale, armá la versión de mi CV para este puesto"]], res: {...BASE},
-      chip: "start", title: "El candidato pide la versión", text: ["El servicio marca la conversación como <code>RUNNING</code>, guarda el mensaje y arma el <code>TurnContext</code>: aviso, CV base, CV actual, los últimos 4 pares del hilo. Recién ahí llama al grafo, sin ninguna transacción abierta."] },
+    { t: 1, node: "start", chat: [["g", GREETING], ["u", "Dale, armá la versión de mi CV para este puesto"]], res: {...BASE},
+      chip: "start", title: "El candidato pide la versión", text: ["Antes de cualquier modelo, el saludo ya hizo la primera pregunta: el código comparó las skills del aviso con el CV base y encontró dos que no nombra, PostgreSQL y Go. Son los <b>gaps</b>.", "El servicio marca la conversación como <code>RUNNING</code>, guarda el mensaje y arma el <code>TurnContext</code>: aviso, CV base, CV actual, los últimos 4 pares del hilo, y además <code>statements</code>: todos los mensajes del candidato en la conversación más lo que ya confirmó. Recién ahí llama al grafo, sin ninguna transacción abierta."] },
     { t: 1, node: "classify", edge: "start-classify", typing: true, chat: [["u", "Dale, armá la versión de mi CV para este puesto"]], res: {...BASE},
-      chip: "intent", title: "Agente 1 lee la intención: <code>edit</code>", text: ["Una llamada, una palabra. Lee el mensaje con los últimos 4 mensajes del hilo y contesta <code>edit</code> o <code>advise</code>. Si falla o dice otra cosa, cae a <code>edit</code>: nunca tira un turno."], span: "step 0 · intent · qwen2.5:7b · output: <b>edit</b>" },
+      chip: "intent", title: "Agente 1 lee la intención: <code>edit</code>", text: ["Una llamada, una palabra. Lee el mensaje con los últimos 4 mensajes del hilo y contesta <code>edit</code> o <code>advise</code>. Un sí a una skill por la que CV Tailor preguntó también es <code>edit</code>: la skill se ofreció como agregado y el sí la pide. Si falla o dice otra cosa, cae a <code>edit</code>: nunca tira un turno."], span: "step 0 · intent · qwen2.5:7b · output: <b>edit</b>" },
     { t: 1, node: "propose", edge: "classify-propose", typing: true, chat: [["u", "Dale, armá la versión de mi CV para este puesto"]], res: {...BASE},
-      chip: "edit", title: "Agente 3 propone todo el cambio en una respuesta", text: ["Recibe el system prompt con el aviso y el CV (sin <code>personal_info</code>) y contesta un <code>EditProposal</code>: summary, entradas de experiencia nombradas por empresa y puesto, y buckets de skills. Sin tools, sin loop: un formulario. El código (<code>plan</code>) resuelve cada parte a su lugar en el CV y la pone junto al texto original que reemplaza."],
+      chip: "edit", title: "Agente 3 propone todo el cambio en una respuesta", text: ["Recibe el system prompt con el aviso, el CV (sin <code>personal_info</code>), lo que el candidato ya dijo en la conversación y la lista de gaps, y contesta un <code>EditProposal</code>: summary, entradas de experiencia nombradas por empresa y puesto, buckets de skills, y <code>confirmed</code>, lo que el candidato afirmó sobre sí mismo en este turno. Sin tools, sin loop: un formulario. El código verifica primero la forma: líneas, números y nombres; un nombre que ni el CV ni el candidato escribieron rebota antes del juez. El código (<code>plan</code>) resuelve cada parte a su lugar en el CV y la pone junto al texto original que reemplaza."],
       verdicts: [pend("summary", "…distributed systems, Postgres, Kubernetes and CI/CD."), pend("experiencia · Acme", "…services on Kubernetes backed by PostgreSQL."), pend("skills.technical", "Java, Postgres, Kubernetes")], span: "step 1 · model · edit@… · EditProposal" },
     { t: 1, node: "judge", edge: "propose-judge", typing: true, chat: [["u", "Dale, armá la versión de mi CV para este puesto"]], res: null,
-      chip: "judge", title: "El juez lee cada parte junto a su original", text: ["Parte por parte, cada una junto al texto original del CV base. <b>CI/CD</b> no aparece en ningún lado del CV base: el summary rebota. <b>PostgreSQL</b> no está en la entrada de Acme (una tecnología no se muda a un laburo que nunca la usó): rebota. <b>Kubernetes</b> sí está en la prosa de Acme: entra a skills, con la palabra del CV."],
+      chip: "judge", title: "El juez lee cada parte junto a su original", text: ["Parte por parte, cada una junto al texto original del CV base, con las líneas numeradas y contadas. Hoy recibe además las palabras del candidato en <code>candidate_statements</code> y, en <code>this_turn</code>, qué preguntó CV Tailor y qué contestó. Tiene que citar la evidencia antes de aprobar, copiada del CV o del candidato, nunca de la propuesta. <b>CI/CD</b> no aparece en ningún lado del CV base ni lo dijo el candidato: el summary rebota. <b>PostgreSQL</b> no está en la entrada de Acme (una tecnología no se muda a un laburo que nunca la usó): rebota. <b>Kubernetes</b> sí está en la prosa de Acme: entra a skills, con la palabra del CV."],
       verdicts: [no("summary", "a posting skill the base resume does not back (CI/CD)", "unsupported_skill"), no("experiencia · Acme", "a posting skill the base resume does not back (PostgreSQL)", "unsupported_skill"), ok("skills.technical", "Kubernetes agregada; Java y Postgres se quedan")], span: "step 2 · model · judge@… · Verdict" },
     { t: 1, node: "apply", edge: "judge-apply", typing: true, chat: [["u", "Dale, armá la versión de mi CV para este puesto"]], res: {...BASE, skills: ["Java", "Postgres", "Kubernetes"]}, changed: ["skills"],
-      chip: "apply", title: "El código escribe lo aprobado", text: ["Sin decidir nada: <code>commit</code> escribe en el CV las partes que el juez aprobó, registra cada una en <code>changes</code> y deja un span <code>apply</code> con las partes y el veredicto. Si quedaron rechazos y es la primera pasada, el grafo vuelve a <code>propose</code>."],
+      chip: "apply", title: "El código escribe lo aprobado", text: ["Sin decidir nada: <code>commit</code> escribe en el CV las partes que el juez aprobó, registra cada una en <code>changes</code> y deja un span <code>apply</code> con las partes y el veredicto. Si quedaron rechazos y quedan pasadas (tres como máximo, <code>MAX_PASSES</code>), el grafo vuelve a <code>propose</code>."],
       verdicts: [no("summary", "a posting skill the base resume does not back (CI/CD)", "unsupported_skill"), no("experiencia · Acme", "a posting skill the base resume does not back (PostgreSQL)", "unsupported_skill"), ok("skills.technical", "Kubernetes agregada; Java y Postgres se quedan")], span: "step 3 · apply · 2 rechazos → vuelve a propose" },
     { t: 1, node: "propose", edge: "guard-propose", typing: true, chat: [["u", "Dale, armá la versión de mi CV para este puesto"]], res: {...BASE, skills: ["Java", "Postgres", "Kubernetes"]},
-      chip: "edit", title: "Segunda pasada: el modelo corrige con el motivo en mano", text: ["El mismo hilo sigue con un mensaje más: <i>estas partes fueron rechazadas por esto; lo demás quedó aplicado; proponé de nuevo solo lo rechazado o dejalo vacío y avisale al candidato</i>. Es la única vuelta atrás del grafo."],
+      chip: "edit", title: "Segunda pasada: el modelo corrige con el motivo en mano", text: ["El mismo hilo sigue con un mensaje más: <i>estas partes fueron rechazadas por esto; lo demás quedó aplicado; proponé de nuevo solo lo rechazado o dejalo vacío y avisale al candidato</i>. Es la única vuelta atrás del grafo, y hoy se recorre hasta dos veces por turno."],
       verdicts: [pend("summary", "…distributed systems and Postgres, experienced in Kubernetes."), pend("experiencia · Acme", "…services on Kubernetes with CI/CD pipelines.")], span: "step 3 · model · edit@… · EditProposal" },
     { t: 1, node: "judge", edge: "propose-judge", typing: true, chat: [["u", "Dale, armá la versión de mi CV para este puesto"]], res: null,
-      chip: "judge", title: "Veredicto de la segunda pasada", text: ["El summary corregido no afirma nada que el CV base no diga. El modelo insistió con Acme, ahora con CI/CD: rebota otra vez. Ya hubo dos pasadas, así que el grafo termina."],
+      chip: "judge", title: "Veredicto de la segunda pasada", text: ["El summary corregido no afirma nada que el CV base no diga. El modelo insistió con Acme, ahora con CI/CD: rebota otra vez. En esa corrida el tope eran dos pasadas, así que el grafo terminó; hoy habría una tercera."],
       verdicts: [ok("summary", "reescrito"), no("experiencia · Acme", "a posting skill the base resume does not back (CI/CD)", "unsupported_skill")], span: "step 4 · model · judge@… · Verdict" },
     { t: 1, node: "apply", edge: "judge-apply", typing: true, chat: [["u", "Dale, armá la versión de mi CV para este puesto"]], res: {...BASE, summary: S1, skills: ["Java", "Postgres", "Kubernetes"]}, changed: ["summary"],
-      chip: "apply", title: "El código escribe lo aprobado", text: ["Sin decidir nada: <code>commit</code> escribe en el CV las partes que el juez aprobó, registra cada una en <code>changes</code> y deja un span <code>apply</code> con las partes y el veredicto. Si quedaron rechazos y es la primera pasada, el grafo vuelve a <code>propose</code>."],
+      chip: "apply", title: "El código escribe lo aprobado", text: ["Sin decidir nada: <code>commit</code> escribe en el CV las partes que el juez aprobó, registra cada una en <code>changes</code> y deja un span <code>apply</code> con las partes y el veredicto. Si quedaron rechazos y quedan pasadas (tres como máximo, <code>MAX_PASSES</code>), el grafo vuelve a <code>propose</code>."],
       verdicts: [ok("summary", "reescrito"), no("experiencia · Acme", "a posting skill the base resume does not back (CI/CD)", "unsupported_skill")], span: "step 5 · apply · 1 rechazo · passes = 2 → end" },
     { t: 1, node: "end", edge: "guard-end", chat: [["u", "Dale, armá la versión de mi CV para este puesto"], ["b", R1, ["Parte de lo propuesto no entró al CV: la experiencia (Backend Engineer at Acme), una skill del aviso que el CV no respalda: CI/CD."]]], res: {...BASE, summary: S1, skills: ["Java", "Postgres", "Kubernetes"]}, version: "resume_version 1 · changes: skills/replace, summary/rewrite",
       chip: "end", title: "El reply es del modelo; el documento, del juez", text: ["El candidato recibe la respuesta del modelo y, aparte, un warning escrito por el código con lo que quedó afuera y por qué, en su idioma. El chat no promete lo que el CV de al lado no dice. Se persiste la versión 1 con sus <code>changes</code>."] },
@@ -287,19 +291,19 @@
       chip: "edit", title: "El agente 3 igual propone", text: ["Como el turno entró por la rama de edición, el modelo propone: un summary con <i>8 years</i>, PostgreSQL en Acme otra vez, y <i>Go</i> en skills."],
       verdicts: [pend("summary", "Backend engineer with 8 years…"), pend("experiencia · Acme", "…Kubernetes and PostgreSQL…"), pend("skills.technical", "Java, Postgres, Kubernetes, Go")], span: "step 1 · model · EditProposal" },
     { t: 2, node: "judge", edge: "propose-judge", typing: true, chat: [["u", "¿Qué más me sugerís cambiar?"]], res: null,
-      chip: "judge", title: "El juez rechaza las tres partes", text: ["<b>8</b> es un número que el CV base no afirma: dice <i>eight</i> (<code>kind: invented</code>). <b>PostgreSQL</b> sigue sin estar en Acme. <b>Go</b> no tiene evidencia en ningún lado."],
+      chip: "judge", title: "El juez rechaza las tres partes", text: ["<b>8</b> es un número que el CV base no afirma: dice <i>eight</i> (<code>kind: invented</code>). <b>PostgreSQL</b> sigue sin estar en Acme. <b>Go</b> no tiene evidencia en ningún lado: ni en el CV ni en lo que el candidato dijo hasta acá. En el turno 5 lo dice, y la misma skill entra."],
       verdicts: [no("summary", "a number the base resume does not carry (8)", "invented"), no("experiencia · Acme", "a posting skill the base resume does not back (PostgreSQL)", "unsupported_skill"), no("skills.technical", "no evidence in base resume (Go)", "unsupported_skill")], span: "step 2 · model · judge@… · Verdict" },
     { t: 2, node: "apply", edge: "judge-apply", typing: true, chat: [["u", "¿Qué más me sugerís cambiar?"]], res: {...BASE, summary: S1, skills: ["Java", "Postgres", "Kubernetes"]},
-      chip: "apply", title: "El código escribe lo aprobado", text: ["Sin decidir nada: <code>commit</code> escribe en el CV las partes que el juez aprobó, registra cada una en <code>changes</code> y deja un span <code>apply</code> con las partes y el veredicto. Si quedaron rechazos y es la primera pasada, el grafo vuelve a <code>propose</code>."],
+      chip: "apply", title: "El código escribe lo aprobado", text: ["Sin decidir nada: <code>commit</code> escribe en el CV las partes que el juez aprobó, registra cada una en <code>changes</code> y deja un span <code>apply</code> con las partes y el veredicto. Si quedaron rechazos y quedan pasadas (tres como máximo, <code>MAX_PASSES</code>), el grafo vuelve a <code>propose</code>."],
       verdicts: [no("summary", "a number the base resume does not carry (8)", "invented"), no("experiencia · Acme", "a posting skill the base resume does not back (PostgreSQL)", "unsupported_skill"), no("skills.technical", "no evidence in base resume (Go)", "unsupported_skill")], span: "step 3 · apply · 3 rechazos → propose" },
     { t: 2, node: "propose", edge: "guard-propose", typing: true, chat: [["u", "¿Qué más me sugerís cambiar?"]], res: {...BASE, summary: S1, skills: ["Java", "Postgres", "Kubernetes"]},
       chip: "edit", title: "Segunda pasada", text: ["El modelo saca Go de las skills… y de paso saca <b>Java</b>. Mantiene el <i>8</i> y PostgreSQL en Acme."],
       verdicts: [pend("summary", "Backend engineer with 8 years…"), pend("experiencia · Acme", "…Kubernetes and PostgreSQL…"), pend("skills.technical", "Kubernetes, Postgres")], span: "step 3 · model · EditProposal" },
     { t: 2, node: "judge", edge: "propose-judge", typing: true, chat: [["u", "¿Qué más me sugerís cambiar?"]], res: null,
-      chip: "judge", title: "Segundo veredicto: borrar una skill no es adaptar", text: ["Un bucket se puede reordenar y agrandar, nunca achicar: <b>Java</b> es del candidato (<code>kind: dropped_skill</code>). Segunda pasada: después de este veredicto no queda nada para escribir."],
+      chip: "judge", title: "Segundo veredicto: borrar una skill no es adaptar", text: ["Un bucket se puede reordenar y agrandar, nunca achicar: <b>Java</b> es del candidato (<code>kind: dropped_skill</code>). Segunda pasada: después de este veredicto no queda nada para escribir; hoy habría una tercera."],
       verdicts: [no("summary", "a number the base resume does not carry (8)", "invented"), no("experiencia · Acme", "a posting skill the base resume does not back (PostgreSQL)", "unsupported_skill"), no("skills.technical", "drops a skill the resume lists (Java)", "dropped_skill")], span: "step 4 · model · judge@… · Verdict" },
     { t: 2, node: "apply", edge: "judge-apply", typing: true, chat: [["u", "¿Qué más me sugerís cambiar?"]], res: {...BASE, summary: S1, skills: ["Java", "Postgres", "Kubernetes"]},
-      chip: "apply", title: "El código escribe lo aprobado", text: ["Sin decidir nada: <code>commit</code> escribe en el CV las partes que el juez aprobó, registra cada una en <code>changes</code> y deja un span <code>apply</code> con las partes y el veredicto. Si quedaron rechazos y es la primera pasada, el grafo vuelve a <code>propose</code>."],
+      chip: "apply", title: "El código escribe lo aprobado", text: ["Sin decidir nada: <code>commit</code> escribe en el CV las partes que el juez aprobó, registra cada una en <code>changes</code> y deja un span <code>apply</code> con las partes y el veredicto. Si quedaron rechazos y quedan pasadas (tres como máximo, <code>MAX_PASSES</code>), el grafo vuelve a <code>propose</code>."],
       verdicts: [no("summary", "a number the base resume does not carry (8)", "invented"), no("experiencia · Acme", "a posting skill the base resume does not back (PostgreSQL)", "unsupported_skill"), no("skills.technical", "drops a skill the resume lists (Java)", "dropped_skill")], span: "step 5 · apply · 3 rechazos · passes = 2 → end" },
     { t: 2, node: "end", edge: "guard-end", chat: [["u", "¿Qué más me sugerís cambiar?"], ["b", R2, ["Parte de lo propuesto no entró al CV: el resumen, un número que el CV no respalda: 8; la experiencia (Backend Engineer at Acme), una skill del aviso que el CV no respalda: PostgreSQL; las skills (technical), borraría una skill que el CV ya lista: Java.", "!Este turno no llegó a cambiar nada del CV: lo que se intentó no se pudo aplicar. Pedímelo otra vez, más acotado."]]], res: {...BASE, summary: S1, skills: ["Java", "Postgres", "Kubernetes"]}, version: "sin versión nueva: el turno no aplicó ninguna edición",
       chip: "end", title: "El CV queda como estaba y el candidato lo sabe", text: ["Dos avisos escritos por el código: qué no entró y por qué, y que el turno no cambió nada. El reply del modelo dice que <i>ajustó</i> cosas; los warnings lo desmienten. No se escribe ninguna versión."] },
@@ -316,7 +320,7 @@
       chip: "judge", title: "El idioma también se juzga", text: ["El summary está en castellano y el CV en inglés: <code>kind: language</code>. Las otras dos partes, como siempre."],
       verdicts: [no("summary", "not written in the language of the resume (es, not en)", "language"), no("experiencia · Acme", "a posting skill the base resume does not back (PostgreSQL)", "unsupported_skill"), no("skills.technical", "no evidence in base resume (Go)", "unsupported_skill")], span: "step 2 · model · judge@… · Verdict" },
     { t: 3, node: "apply", edge: "judge-apply", typing: true, chat: [["u", "Hacé la 1"]], res: {...BASE, summary: S1, skills: ["Java", "Postgres", "Kubernetes"]},
-      chip: "apply", title: "El código escribe lo aprobado", text: ["Sin decidir nada: <code>commit</code> escribe en el CV las partes que el juez aprobó, registra cada una en <code>changes</code> y deja un span <code>apply</code> con las partes y el veredicto. Si quedaron rechazos y es la primera pasada, el grafo vuelve a <code>propose</code>."],
+      chip: "apply", title: "El código escribe lo aprobado", text: ["Sin decidir nada: <code>commit</code> escribe en el CV las partes que el juez aprobó, registra cada una en <code>changes</code> y deja un span <code>apply</code> con las partes y el veredicto. Si quedaron rechazos y quedan pasadas (tres como máximo, <code>MAX_PASSES</code>), el grafo vuelve a <code>propose</code>."],
       verdicts: [no("summary", "not written in the language of the resume (es, not en)", "language"), no("experiencia · Acme", "a posting skill the base resume does not back (PostgreSQL)", "unsupported_skill"), no("skills.technical", "no evidence in base resume (Go)", "unsupported_skill")], span: "step 3 · apply · 3 rechazos → propose" },
     { t: 3, node: "propose", edge: "guard-propose", typing: true, chat: [["u", "Hacé la 1"]], res: {...BASE, summary: S1, skills: ["Java", "Postgres", "Kubernetes"]},
       chip: "edit", title: "Segunda pasada: summary en inglés", text: ["Corrige el idioma. Deja Acme como estaba en la propuesta. Saca Go."],
@@ -325,7 +329,7 @@
       chip: "judge", title: "Veredicto: el summary está respaldado", text: ["Está respaldado: <i>eight years</i>, Postgres (misma tecnología que PostgreSQL), Kubernetes. Con el juez de hoy, <i>PostgreSQL</i> donde el CV dice <i>Postgres</i> sería un rechazo de tipo <code>wording</code>, y el modelo tendría con qué corregir."],
       verdicts: [ok("summary", "reescrito"), no("experiencia · Acme", "a posting skill the base resume does not back (PostgreSQL)", "unsupported_skill")], span: "step 4 · model · judge@… · Verdict" },
     { t: 3, node: "apply", edge: "judge-apply", typing: true, chat: [["u", "Hacé la 1"]], res: {...BASE, summary: S3, skills: ["Java", "Postgres", "Kubernetes"]}, changed: ["summary"],
-      chip: "apply", title: "El código escribe lo aprobado", text: ["Sin decidir nada: <code>commit</code> escribe en el CV las partes que el juez aprobó, registra cada una en <code>changes</code> y deja un span <code>apply</code> con las partes y el veredicto. Si quedaron rechazos y es la primera pasada, el grafo vuelve a <code>propose</code>."],
+      chip: "apply", title: "El código escribe lo aprobado", text: ["Sin decidir nada: <code>commit</code> escribe en el CV las partes que el juez aprobó, registra cada una en <code>changes</code> y deja un span <code>apply</code> con las partes y el veredicto. Si quedaron rechazos y quedan pasadas (tres como máximo, <code>MAX_PASSES</code>), el grafo vuelve a <code>propose</code>."],
       verdicts: [ok("summary", "reescrito"), no("experiencia · Acme", "a posting skill the base resume does not back (PostgreSQL)", "unsupported_skill")], span: "step 5 · apply · 1 rechazo · passes = 2 → end" },
     { t: 3, node: "end", edge: "guard-end", chat: [["u", "Hacé la 1"], ["b", R3, ["Parte de lo propuesto no entró al CV: la experiencia (Backend Engineer at Acme), una skill del aviso que el CV no respalda: PostgreSQL."]]], res: {...BASE, summary: S3, skills: ["Java", "Postgres", "Kubernetes"]}, version: "resume_version 2 · changes: summary/rewrite",
       chip: "end", title: "Versión 2", text: ["Un cambio aplicado, uno rechazado y avisado. La experiencia, la educación, las fechas y <code>personal_info</code> no se tocaron en ningún turno: el schema no tiene campo para pedirlo."] },
@@ -338,7 +342,41 @@
     { t: 4, node: "advise", edge: "classify-advise", typing: true, chat: [["u", "¿Qué más me sugerís cambiar?"]], res: null,
       chip: "advise", title: "Agente 2 contesta y recomienda", text: ["Una llamada con su propio prompt. Devuelve <code>reply</code>, <code>warnings</code> y <code>recommendations</code> como datos: <code>{id, section, entry, what}</code>. Su schema no tiene ningún campo para tocar el CV. El código renumera 1..n."], span: "step 1 · model · advise@… · Advice · 114 s en CPU" },
     { t: 4, node: "end", edge: "advise-end", chat: [["u", "¿Qué más me sugerís cambiar?"], ["b", R4, [W4], RECS]], res: null, version: "sin versión nueva · 3 recommendations guardadas en el mensaje",
-      chip: "end", title: "El CV no cambió, aunque el reply diga lo contrario", text: ["Mirá el reply: el 7B escribió <i>he ajustado tu resumen…</i> en un turno donde no podía ajustar nada, y el CV de la derecha es idéntico al de antes. Es la diferencia entre pedirle al modelo que no edite y no darle con qué: la segunda no depende de que obedezca.", "Las recomendaciones quedan en <code>message.recommendations</code>. En el próximo turno, si el candidato dice <i>hacé la 2</i>, el agente de edición recibe esa lista en su prompt y sabe exactamente a qué se refiere. La 2 y la 3 piden PostgreSQL, Go y CI/CD en Acme y en skills: el juez las va a rechazar, porque el CV no las respalda — el agente 2 recomienda, no verifica."] },
+      chip: "end", title: "El CV no cambió, aunque el reply diga lo contrario", text: ["Mirá el reply: el 7B escribió <i>he ajustado tu resumen…</i> en un turno donde no podía ajustar nada, y el CV de la derecha es idéntico al de antes. Es la diferencia entre pedirle al modelo que no edite y no darle con qué: la segunda no depende de que obedezca.", "Las recomendaciones quedan en <code>message.recommendations</code>. En el próximo turno, si el candidato dice <i>hacé la 2</i>, el agente de edición recibe esa lista en su prompt y sabe exactamente a qué se refiere. La 2 y la 3 piden PostgreSQL, Go y CI/CD en Acme y en skills: el juez las va a rechazar, porque ni el CV ni el candidato las respaldan — el agente 2 recomienda, no verifica.", "Con el prompt de hoy, este reply terminaría con una pregunta: <i>¿tenés experiencia con PostgreSQL o Go?</i> El agente 2 recibe la lista de gaps y cierra cada respuesta preguntando por los que más pesan para el aviso, tres como máximo. Lo que sigue es ese camino."] },
+
+    // ---- turn 5 (the gap flow as the code of 2026-10-10 runs it; model answers written by hand)
+    { t: 5, node: "start", chat: [["u", "Sí, Go lo tengo"]], res: {...BASE, summary: S3, skills: ["Java", "Postgres", "Kubernetes"]},
+      chip: "start", title: "El candidato confirma un gap", text: ["Un sí no nombra dónde ni para qué. El <code>TurnContext</code> trae en <code>statements</code> todo lo que el candidato dijo en la conversación, no solo la ventana de 4 pares que lee el modelo, más los hechos ya confirmados en turnos anteriores (<code>conversation.confirmed</code>, todavía vacío)."] },
+    { t: 5, node: "classify", edge: "start-classify", typing: true, chat: [["u", "Sí, Go lo tengo"]], res: null,
+      chip: "intent", title: "Un sí a una skill ofrecida es <code>edit</code>", text: ["La skill se ofreció como agregado y el sí la pide. Un <i>no, Kafka nunca lo usé</i> iría a <code>advise</code>: no hay cambio que hacer, y así no termina en el aviso de <i>no cambió nada</i> que un turno de edición agrega."], span: "step 0 · intent · output: <b>edit</b>" },
+    { t: 5, node: "propose", edge: "classify-propose", typing: true, chat: [["u", "Sí, Go lo tengo"]], res: null,
+      chip: "edit", title: "Agrega la skill, registra la confirmación y pregunta dónde", text: ["Go entra al bucket técnico, al final, con la palabra del candidato. No entra a ninguna entrada de experiencia: el candidato no dijo en qué puesto lo usó, y el prompt prohíbe adivinar la entrada. En <code>confirmed</code> va <i>Tiene Go</i>, en las palabras del candidato: el código lo toma como respaldo en este mismo turno y el servicio lo guarda en la conversación. El <code>reply</code> pregunta en qué puesto y qué hizo con Go.", "El guard de forma pasa: el bucket conserva Java, Postgres y Kubernetes en su orden, y <i>Go</i> aparece en lo que el candidato dijo."],
+      verdicts: [pend("skills.technical", "Java, Postgres, Kubernetes, Go"), pend("confirmed", "Tiene Go")], span: "step 1 · model · edit@… · EditProposal" },
+    { t: 5, node: "judge", edge: "propose-judge", typing: true, chat: [["u", "Sí, Go lo tengo"]], res: null,
+      chip: "judge", title: "El juez cita al candidato", text: ["La evidencia ya no es solo el CV. En <code>this_turn</code> el juez lee qué preguntó CV Tailor y qué contestó el candidato, y cita eso como respaldo: un sí a la pregunta por Go confirma Go, y solo Go. El aviso sigue sin ser evidencia: pedir una skill no significa tenerla."],
+      verdicts: [ok("skills.technical", "evidence: original 3 lines, proposed 4 lines · «The candidate answered: Sí, Go lo tengo»")], span: "step 2 · model · judge@… · Verdict" },
+    { t: 5, node: "apply", edge: "judge-apply", typing: true, chat: [["u", "Sí, Go lo tengo"]], res: {...BASE, summary: S3, skills: ["Java", "Postgres", "Kubernetes", "Go"]}, changed: ["skills"], newSkills: ["Go"],
+      chip: "apply", title: "El código escribe lo aprobado", text: ["Sin decidir nada: <code>commit</code> escribe el bucket y registra el cambio. No hubo rechazos: una sola pasada."],
+      verdicts: [ok("skills.technical", "Go agregada al final; Java, Postgres y Kubernetes se quedan")], span: "step 3 · apply · OK → end" },
+    { t: 5, node: "end", edge: "guard-end", chat: [["u", "Sí, Go lo tengo"], ["b", R5]], res: {...BASE, summary: S3, skills: ["Java", "Postgres", "Kubernetes", "Go"]}, version: "resume_version 3 · changes: skills/replace · conversation.confirmed: [\"Tiene Go\"]",
+      chip: "end", title: "La skill está; la experiencia espera la respuesta", text: ["El candidato ve Go en sus skills y una pregunta concreta. Lo que confirmó queda persistido en la conversación y vuelve en todos los turnos siguientes, dentro de la ventana o fuera de ella. Es el único lugar donde una lectura del modelo, qué quiso decir un sí, se vuelve evidencia; queda en la traza como todo lo demás."] },
+
+    // ---- turn 6
+    { t: 6, node: "start", chat: [["u", "En Acme, para los workers de pagos"]], res: {...BASE, summary: S3, skills: ["Java", "Postgres", "Kubernetes", "Go"]},
+      chip: "start", title: "El candidato dice dónde y para qué", text: ["Responde la pregunta del turno anterior. En <code>statements</code> viajan sus mensajes anteriores y <i>Tiene Go</i>."] },
+    { t: 6, node: "classify", edge: "start-classify", typing: true, chat: [["u", "En Acme, para los workers de pagos"]], res: null,
+      chip: "intent", title: "Una respuesta a dónde va algo confirmado es <code>edit</code>", text: ["No es una pregunta ni un dato suelto: es la pieza que faltaba para un cambio ya pedido."], span: "step 0 · intent · output: <b>edit</b>" },
+    { t: 6, node: "propose", edge: "classify-propose", typing: true, chat: [["u", "En Acme, para los workers de pagos"]], res: null,
+      chip: "edit", title: "Un bullet nuevo al final de Acme, en el idioma y la voz del CV", text: ["La descripción de Acme conserva su línea original en su lugar y gana una al final: <i>Built the payment workers in Go</i>. El hecho es del candidato, las palabras son del CV: en inglés, sin conector conversacional, sin números que nadie dijo. En <code>confirmed</code>, <i>Usó Go en Acme para los workers de pagos</i>.", "El guard de forma cuenta: 1 línea original, 2 propuestas, ninguna movida; el único nombre nuevo, <i>Go</i>, está en lo que el candidato dijo."],
+      verdicts: [pend("experiencia · Acme", "Built services deployed on Kubernetes.\n- Built the payment workers in Go"), pend("confirmed", "Usó Go en Acme para los workers de pagos")], span: "step 1 · model · edit@… · EditProposal" },
+    { t: 6, node: "judge", edge: "propose-judge", typing: true, chat: [["u", "En Acme, para los workers de pagos"]], res: null,
+      chip: "judge", title: "La tecnología entra a la entrada donde el candidato dijo que la usó", text: ["La regla de siempre, <i>una tecnología no se muda a un laburo que nunca la usó</i>, sigue en pie: Go entra a Acme porque el candidato dijo Acme. Si hubiera dicho solo <i>sí</i>, un bullet en Acme sería <code>unsupported_skill</code>. El juez cita <code>this_turn</code> y <code>candidate_statements</code> y aprueba. Lo que el candidato dijo en castellano y la propuesta dice en inglés es el mismo hecho."],
+      verdicts: [ok("experiencia · Acme", "evidence: original 1 lines, proposed 2 lines · «The candidate answered: En Acme, para los workers de pagos» · «Tiene Go»")], span: "step 2 · model · judge@… · Verdict" },
+    { t: 6, node: "apply", edge: "judge-apply", typing: true, chat: [["u", "En Acme, para los workers de pagos"]], res: {...BASE, summary: S3, skills: ["Java", "Postgres", "Kubernetes", "Go"], acme: ACME6}, changed: ["acme"],
+      chip: "apply", title: "El código escribe lo aprobado", text: ["<code>commit</code> reemplaza la descripción de Acme por la aprobada y registra <i>rewrote description of Backend Engineer at Acme</i>. Empresa, puesto y fechas no se tocan: el schema no tiene campo para eso."],
+      verdicts: [ok("experiencia · Acme", "descripción reescrita: la línea original en su lugar, el bullet nuevo después")], span: "step 3 · apply · OK → end" },
+    { t: 6, node: "end", edge: "guard-end", chat: [["u", "En Acme, para los workers de pagos"], ["b", R6]], res: {...BASE, summary: S3, skills: ["Java", "Postgres", "Kubernetes", "Go"], acme: ACME6}, version: "resume_version 4 · changes: work_experience/rewrite · conversation.confirmed: [\"Tiene Go\", \"Usó Go en Acme para los workers de pagos\"]",
+      chip: "end", title: "El gap se cerró con lo que el candidato dijo, no con lo que el aviso pide", text: ["PostgreSQL sigue siendo un gap: el candidato no dijo nada de eso, y CV Tailor no lo cubre; pregunta una vez y, si el candidato dice que no, deja de preguntar.", "Por qué el juez no protege contra el candidato: siempre pudo escribir Go en el CV y subir ese. Cuidar contra el candidato acá no protegería nada; cuidar contra el modelo es para lo que está el juez."] },
   ];
 
   let i = 0;
@@ -350,7 +388,8 @@
     const chat = $("chat"); chat.innerHTML = "";
     // messages of earlier turns, collapsed to the last reply of each
     const earlier = STEPS.filter((s) => s.t < step.t && s.node === "end");
-    for (const s of earlier) for (const m of s.chat) chat.appendChild(msg(m, true));
+    for (const s of earlier) for (const m of s.chat) if (m[0] !== "g") chat.appendChild(msg(m, true));
+    if (step.t > 1 && !step.chat.some((m) => m[0] === "g")) chat.prepend(msg(["g", GREETING], true));
     for (const m of step.chat) chat.appendChild(msg(m, false));
     if (step.typing) { const d = document.createElement("div"); d.className = "msg bot typing"; d.textContent = "…"; chat.appendChild(d); }
     if (step.version) { const v = document.createElement("div"); v.className = "version"; v.textContent = step.version; chat.appendChild(v); }
@@ -359,8 +398,8 @@
   function msg([who, text, warns, recs], faded) {
     const d = document.createElement("div");
     d.className = "msg " + (who === "u" ? "user" : "bot");
-    if (faded) d.style.opacity = ".55";
-    d.innerHTML = '<span class="who">' + (who === "u" ? "Ada" : "CV Tailor") + ":</span> " + esc(text);
+    if (faded || who === "g") d.style.opacity = ".55";
+    d.innerHTML = '<span class="who">' + (who === "u" ? "Ada" : (who === "g" ? "CV Tailor (saludo, sin modelo)" : "CV Tailor")) + ":</span> " + esc(text);
     if (warns && warns.length) {
       const ul = document.createElement("ul"); ul.className = "warns";
       for (const w of warns) {
@@ -413,13 +452,15 @@
 
   function renderResume(step) {
     const r = step.res || resumeOf(i), ch = new Set(step.changed || []);
-    const skill = (s) => '<span class="' + (s === "Kubernetes" && r.skills.includes("Kubernetes") && step.t === 1 && ch.has("skills") ? "new" : "") + '">' + esc(s) + "</span>";
+    const fresh = new Set(step.newSkills || (step.t === 1 && ch.has("skills") ? ["Kubernetes"] : []));
+    const skill = (s) => '<span class="' + (fresh.has(s) ? "new" : "") + '">' + esc(s) + "</span>";
     $("resume").innerHTML =
       '<div class="sec"><div class="k">summary</div><div class="v' + (ch.has("summary") ? " changed" : "") + '">' + esc(r.summary) + "</div></div>" +
       '<div class="sec"><div class="k">skills.technical · tools</div><div class="v skills' + (ch.has("skills") ? " changed" : "") + '">' + r.skills.map(skill).join("") + '<span style="opacity:.6">' + r.tools.join("") + "</span></div></div>" +
-      '<div class="sec"><div class="k">work_experience[1] · Backend Engineer at Acme · 2021 – hoy</div><div class="v">' + esc(r.acme) + "</div></div>" +
+      '<div class="sec"><div class="k">work_experience[1] · Backend Engineer at Acme · 2021 – hoy</div><div class="v' + (ch.has("acme") ? " changed" : "") + '">' + esc(r.acme).replace(/\n/g, "<br>") + "</div></div>" +
       '<div class="sec"><div class="k">work_experience[0] · Semi Senior at Globex · 2018 – 2020</div><div class="v">' + esc(r.globex) + "</div></div>" +
-      '<div class="sec"><div class="k">education · personal_info · orden de las entradas</div><div class="v locked">Fuera del schema: el modelo no puede pedir cambiarlos. <span class="lock">inmutables por construcción</span></div></div>';
+      '<div class="sec"><div class="k">education · personal_info · orden de las entradas</div><div class="v locked">Fuera del schema: el modelo no puede pedir cambiarlos. <span class="lock">inmutables por construcción</span></div></div>' +
+      '<div class="sec"><div class="k">conversation.confirmed · lo que el candidato afirmó</div><div class="v' + (step.t >= 5 ? "" : " locked") + '">' + (step.t >= 6 || (step.t === 5 && ["apply", "end"].includes(step.node)) ? "Tiene Go" + (step.t === 6 && step.node === "end" ? " · Usó Go en Acme para los workers de pagos" : "") : "— (nada confirmado todavía)") + "</div></div>";
 
     const v = $("verdicts");
     if (!step.verdicts) { v.hidden = true; v.innerHTML = ""; return; }
@@ -439,9 +480,9 @@
   }
 
   const turns = $("turns");
-  [1, 2, 3, 4].forEach((t) => {
+  [1, 2, 3, 4, 5, 6].forEach((t) => {
     const b = document.createElement("button"); b.type = "button"; b.dataset.t = t;
-    b.textContent = t === 4 ? "turno 4 · consulta (advise)" : "turno " + t + " · edición";
+    b.textContent = ({4: "turno 4 · consulta (advise)", 5: "turno 5 · gap confirmado", 6: "turno 6 · dónde lo usó"})[t] || ("turno " + t + " · edición");
     b.addEventListener("click", () => { i = STEPS.findIndex((s) => s.t === t); render(); });
     turns.appendChild(b);
   });

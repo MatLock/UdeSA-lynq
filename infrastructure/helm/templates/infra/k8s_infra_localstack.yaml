@@ -23,7 +23,7 @@ data:
       "CORSRules": [
         {
           "AllowedOrigins": ["*"],
-          "AllowedMethods": ["GET", "PUT", "HEAD"],
+          "AllowedMethods": ["GET", "PUT", "HEAD"],f
           "AllowedHeaders": ["*"],
           "ExposeHeaders": ["ETag"],
           "MaxAgeSeconds": 3000

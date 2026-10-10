@@ -53,6 +53,8 @@ def render(
     resume_language: str,
     turns_left: int,
     recommendations: list[dict[str, Any]] | None = None,
+    statements: list[str] | None = None,
+    gaps: list[str] | None = None,
 ) -> str:
     template = _environment.get_template(f"{family}.jinja")
     return template.render(
@@ -69,6 +71,8 @@ def render(
         resume_language=language_name(resume_language),
         turns_left=turns_left,
         recommendations=recommendations or [],
+        statements=statements or [],
+        gaps=gaps or [],
     )
 
 
@@ -80,6 +84,9 @@ def render_judge(
     language: str,
     resume_language: str,
     parts: list,
+    statements: list[str] | None = None,
+    asked: str = "",
+    message: str = "",
 ) -> str:
     template = _environment.get_template(f"{JUDGE}.jinja")
     return template.render(
@@ -93,4 +100,7 @@ def render_judge(
         language=language_name(language),
         resume_language=language_name(resume_language),
         parts=parts,
+        statements=statements or [],
+        asked=asked,
+        message=message,
     )

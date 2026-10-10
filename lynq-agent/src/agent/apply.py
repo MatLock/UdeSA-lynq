@@ -35,6 +35,8 @@ _WORD = re.compile(r"\w+")
 # sentence, or carrying a digit — `Cognito`, `JUnit`, `S3`, `CSV/HTML`.
 _NAME = re.compile(r"^(?:[A-Z][A-Za-z0-9+#./-]*|[A-Za-z]*\d[A-Za-z0-9+#./-]*)$")
 _PUNCTUATION = ".,;:()[]{}\"'"
+_SEPARATOR = re.compile(r"[\s.\-_]+")
+_SEPARATOR_CLASS = r"[\s.\-_]*"
 
 
 class Rejection(str):
@@ -137,7 +139,23 @@ def _same_line(one: str, other: str) -> bool:
 def _names(text: str, name: str) -> bool:
     # A plural is the same name: `APIs` is backed by `REST API`, `Lambda` by `Lambdas`.
     stem = name[:-1] if name.endswith("s") and len(name) > 2 else name
-    return re.search(rf"(?<!\w){re.escape(stem)}s?(?!\w)", text, re.IGNORECASE) is not None
+    pieces = [re.escape(piece) for piece in _SEPARATOR.split(stem) if piece]
+    if not pieces:
+        return False
+    pattern = _SEPARATOR_CLASS.join(pieces)
+    return re.search(rf"(?<!\w){pattern}s?(?!\w)", text, re.IGNORECASE) is not None
+
+
+def spoken(statements: list[str]) -> str:
+    return "\n".join(statement for statement in statements if statement)
+
+
+def gaps_in(job_skills: list[str], resume: dict[str, Any], statements: list[str]) -> list[str]:
+    backing = resume_text(resume) + "\n" + spoken(statements)
+    return list(dict.fromkeys(
+        skill.strip() for skill in job_skills
+        if skill.strip() and not _names(backing, skill.strip())
+    ))
 
 
 def technologies_of(resume: dict[str, Any]) -> list[str]:
@@ -178,19 +196,35 @@ def names_in(line: str) -> list[str]:
     opens_sentence = True
     for raw in _GLYPH.sub("", line).split():
         token = raw.strip(_PUNCTUATION)
-        if token and not opens_sentence and _NAME.match(token):
-            names.append(token)
+        if token and not opens_sentence:
+            names.extend(_names_of(token))
         opens_sentence = raw.endswith((".", ":", ";", "!", "?"))
     return list(dict.fromkeys(names))
 
 
+def _names_of(token: str) -> list[str]:
+    if _NAME.match(token):
+        return [token]
+    if "." in token:
+        return [piece for piece in token.split(".") if piece and _NAME.match(piece)]
+    return []
+
+
 def unbacked_names(proposed: str, backing: str) -> list[str]:
-    return [
-        name
-        for line in _lines(proposed)
-        for name in names_in(line)
-        if not _names(backing, name)
-    ]
+    unbacked: list[str] = []
+    for line in _lines(proposed):
+        names = names_in(line)
+        index = 0
+        while index < len(names):
+            name = names[index]
+            if _names(backing, name):
+                index += 1
+            elif index + 1 < len(names) and _names(backing, f"{name} {names[index + 1]}"):
+                index += 2
+            else:
+                unbacked.append(name)
+                index += 1
+    return unbacked
 
 
 def text_fault(
@@ -198,9 +232,10 @@ def text_fault(
 ) -> tuple[str, str] | None:
     """Why a proposed text cannot replace the original, if it cannot: it has fewer
     lines, it lost a number or a technology, it moved a line, or it names something
-    its backing — the entry for an entry, the resume for the summary — does not. A
-    line may be rewritten in its place and lines may be added after the last
-    original one, in the words of the resume; nothing else."""
+    its backing — the entry for an entry, the resume for the summary, and what the
+    candidate said for both — does not. A line may be rewritten in its place and
+    lines may be added after the last original one, in the words of the resume or
+    of the candidate; nothing else."""
     original_lines, proposed_lines = _lines(original), _lines(proposed)
     if len(proposed_lines) < len(original_lines):
         return CUT, (
@@ -226,7 +261,7 @@ def text_fault(
     unbacked = unbacked_names(proposed, backing or original)
     if unbacked:
         return UNBACKED, (
-            "names the resume does not state here, so they cannot enter: "
+            "names neither the resume states here nor the candidate said, so they cannot enter: "
             + ", ".join(dict.fromkeys(unbacked))
         )
     return None
@@ -234,7 +269,7 @@ def text_fault(
 
 def skills_fault(original: list[str], proposed: list[str], resume: str = "") -> tuple[str, str] | None:
     """A bucket keeps every skill it has, in its order; new skills go after the last,
-    and only when the resume names them somewhere, spelled as it spells them."""
+    and only when the resume or the candidate names them somewhere."""
     def key(name: str) -> str:
         return " ".join(str(name).lower().split())
 
@@ -247,7 +282,7 @@ def skills_fault(original: list[str], proposed: list[str], resume: str = "") -> 
         return MOVED, "the bucket keeps its skills in their order, new skills go after the last"
     unbacked = [name for name in proposed[len(original):] if not _names(resume, name)]
     if unbacked:
-        return UNBACKED, f"the resume names these nowhere: {', '.join(unbacked)}"
+        return UNBACKED, f"neither the resume nor the candidate names these: {', '.join(unbacked)}"
     return None
 
 
@@ -255,11 +290,13 @@ def plan(state: TurnState, proposal: EditProposal) -> tuple[list[Part], list[Rej
     """Every part of the proposal with its place in the resume, and the parts that
     have none or that changed shape. Entries are never added, dropped or reordered,
     so an index is the same in the base resume and in the one being edited. The
-    shape of a part is measured against the base resume, like the judge does."""
+    shape of a part is measured against the base resume, like the judge does; what
+    the candidate said in the conversation backs a name like the resume does."""
     parts: list[Part] = []
     rejections: list[Rejection] = []
     technologies = technologies_of(state.base_resume)
-    backing = resume_text(state.base_resume)
+    said = spoken([*state.evidence(), *proposal.confirmed])
+    backing = resume_text(state.base_resume) + "\n" + said
 
     def keep(part: Part, fault: tuple[str, str] | None) -> None:
         if fault is None:
@@ -293,7 +330,7 @@ def plan(state: TurnState, proposal: EditProposal) -> tuple[list[Part], list[Rej
             rejections.append(Rejection(WORK_EXPERIENCE, label, UNKNOWN_ENTRY, UNKNOWN_ENTRY))
             continue
         base = base_entries[index]
-        entry_backing = resume_text(base)
+        entry_backing = resume_text(base) + "\n" + said
         fault = None
         if "description" in fields:
             fault = text_fault(
