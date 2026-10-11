@@ -111,7 +111,7 @@ resource "aws_instance" "data_host" {
   ]
 
   lifecycle {
-    ignore_changes = [ami, user_data]
+    ignore_changes = [ami, user_data, associate_public_ip_address]
   }
 }
 

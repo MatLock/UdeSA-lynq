@@ -247,7 +247,7 @@ Everything else is generated. The JWT secret and the internal token come from `r
 
 | IAM identity | Permissions | Secret |
 | --- | --- | --- |
-| `lynq-backend-s3` (`s3.tf`) | `s3:GetObject/PutObject/DeleteObject` + `ListBucket`, scoped to the bucket | `lynq-file-storage-secret` |
+| `lynq-file-storage-s3` (`s3.tf`) | `s3:GetObject/PutObject/DeleteObject` + `ListBucket`, scoped to the bucket | `lynq-file-storage-secret` |
 | `lynq-llm-bedrock` (`bedrock.tf`) | `bedrock:InvokeModel` on the allowed models (below), `ListFoundationModels` for the health probe | `lynq-llm-secret` |
 | `lynq-agent-bedrock` (`bedrock.tf`) | `bedrock:InvokeModel` on the allowed models (below) | `lynq-agent-secret` |
 | `lynq-app-backend-sns` (`sns.tf`) | `sns:Publish` on `lynq-domain-events` | `lynq-app-backend-secret` |

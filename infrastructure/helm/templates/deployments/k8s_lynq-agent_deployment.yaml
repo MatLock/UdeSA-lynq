@@ -52,7 +52,7 @@ spec:
             # Higher than the other Python services: the first start migrates the
             # schema with Liquibase before the app answers.
             initialDelaySeconds: 30
-            periodSeconds: 10
+            periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
@@ -60,6 +60,6 @@ spec:
               path: /lynq-agent/health
               port: http
             initialDelaySeconds: 20
-            periodSeconds: 10
+            periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3

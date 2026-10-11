@@ -230,6 +230,7 @@ lynq_analytics:
     REDIS_ADDRESS: "REPLACE_REDIS_HOST"
     REDIS_PORT: "6379"
     AWS_REGION: "REPLACE_AWS_REGION"
+    AWS_ENDPOINT: "REPLACE_SQS_ENDPOINT"
     # No SQS endpoint override: real SQS. The queue is subscribed to
     # lynq-domain-events by Terraform (sqs.tf).
     LYNQ_ANALYTICS_EVENTS_QUEUE: "REPLACE_ANALYTICS_EVENTS_QUEUE"

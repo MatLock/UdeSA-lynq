@@ -50,7 +50,7 @@ output "data_host_private_ip" {
 
 output "file_storage_s3_access_key_id" {
   description = "Access key id of the S3-only IAM user consumed by lynq-file-storage (the secret lives only in state / the k8s Secret)."
-  value       = aws_iam_access_key.backend_s3.id
+  value       = aws_iam_access_key.file_storage_s3.id
 }
 
 output "domain_events_topic_arn" {

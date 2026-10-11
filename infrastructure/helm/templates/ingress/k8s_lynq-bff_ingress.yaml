@@ -16,6 +16,7 @@ metadata:
     # Actuator lives on the management port (8081).
     alb.ingress.kubernetes.io/healthcheck-port: '8081'
     alb.ingress.kubernetes.io/healthcheck-path: /actuator/health/readiness
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '30'
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:

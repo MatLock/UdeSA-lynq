@@ -51,7 +51,7 @@ spec:
               path: /actuator/health/liveness
               port: management
             initialDelaySeconds: 30
-            periodSeconds: 10
+            periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
@@ -59,6 +59,6 @@ spec:
               path: /actuator/health/readiness
               port: management
             initialDelaySeconds: 20
-            periodSeconds: 10
+            periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3

@@ -38,6 +38,7 @@ spring:
   cloud:
     aws:
       sqs:
+        endpoint: ${AWS_ENDPOINT:https://sqs.${AWS_REGION:us-east-1}.amazonaws.com}
         queue-not-found-strategy: fail
 
 lynq:
