@@ -582,6 +582,9 @@
     gap: 18px;
     margin-top: 12px;
   }
+  @media (max-width: 640px) {
+    .closing .cta-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+  }
   .btn-primary {
     background: var(--ink);
     color: var(--bg);
@@ -591,6 +594,7 @@
     font-size: 13px;
     letter-spacing: .08em;
     text-transform: uppercase;
+    white-space: nowrap;
     transition: transform .2s, background .2s;
   }
   .btn-primary:hover { background: var(--warm); transform: translateY(-2px); }
@@ -601,6 +605,7 @@
     font-size: 13px;
     letter-spacing: .08em;
     text-transform: uppercase;
+    white-space: nowrap;
     border-bottom: 1px solid var(--ink);
   }
 
@@ -656,7 +661,7 @@
       <a href="#producto">§ 03 / Producto</a>
       <a href="#datos">§ 04 / Datos</a>
     </div>
-    <a href="#cierre" class="nav-cta">Empezar</a>
+    <a href="https://app.lynqoficial.com" class="nav-cta">Ir a la App</a>
   </div>
 </nav>
 
@@ -906,8 +911,9 @@
   <span class="label reveal">Hipótesis validada</span>
   <h2 class="reveal">Que <em>buscar</em> trabajo no sea un trabajo.</h2>
   <div class="cta-row reveal">
-    <a href="#top" class="btn-primary">Volver al inicio ↑</a>
+    <a href="https://app.lynqoficial.com" class="btn-primary">Ir a la App →</a>
     <a href="#producto" class="btn-ghost">Ver el producto →</a>
+    <a href="#top" class="btn-ghost">Volver al inicio ↑</a>
   </div>
 </section>
 
