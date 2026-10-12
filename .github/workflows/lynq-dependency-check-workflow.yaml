@@ -1,0 +1,27 @@
+name: dependency-check CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "**/pom.xml"
+      - "**/requirements.txt"
+      - "**/package-lock.json"
+      - dependency-check-suppressions.xml
+      - .github/workflows/dependency-check-workflow.yaml
+      - .github/workflows/lynq-dependency-check-workflow.yaml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-check:
+    name: "dependency-check"
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dependency-check-workflow.yaml
+    secrets:
+      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}

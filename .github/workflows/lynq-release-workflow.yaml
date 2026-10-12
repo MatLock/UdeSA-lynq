@@ -11,12 +11,33 @@ env:
 
 jobs:
   # ===========================================================================
+  # Stage 0 — Scan the full git history for leaked secrets and every service's
+  # dependencies for known vulnerabilities before anything is committed back to
+  # main or published.
+  # ===========================================================================
+  gitleaks:
+    name: "0 · Secret scan"
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/gitleaks-workflow.yaml
+
+  dependency-check:
+    name: "0 · Dependency scan"
+    permissions:
+      contents: read
+    uses: ./.github/workflows/dependency-check-workflow.yaml
+    secrets:
+      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+
+  # ===========================================================================
   # Stage 1 — Stamp the release tag into every project's version metadata and
   # commit it back to main so the built artifacts and images carry the version.
   # ===========================================================================
   set-version:
     name: "1 · Set release version"
     runs-on: ubuntu-latest
+    needs: [gitleaks, dependency-check]
     permissions:
       contents: write
     outputs:
