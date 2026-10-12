@@ -1,0 +1,108 @@
+name: dependency-check
+
+on:
+  workflow_call:
+    secrets:
+      NVD_API_KEY:
+        required: true
+
+env:
+  DEPENDENCY_CHECK_VERSION: 13.0.0
+  DEPENDENCY_CHECK_SHA256: 44d920d1ec03e948df862a253f0912782a31b9beee8a7c8895b9cb95760176ed
+  FAIL_ON_CVSS: 7
+
+jobs:
+  dependency-check:
+    name: "dependency-check: Vulnerable dependencies"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Require the NVD API key
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [ -z "$NVD_API_KEY" ]; then
+            echo "::error::The NVD_API_KEY repository secret is not set. Request a key at https://nvd.nist.gov/developers/request-an-api-key and store it as a GitHub secret."
+            exit 1
+          fi
+
+      - name: Code Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Java Environment
+        uses: actions/setup-java@v5
+        with:
+          java-version: 21
+          distribution: temurin
+          architecture: x64
+          cache: maven
+
+      - name: Resolve Java runtime dependencies
+        run: |
+          set -euo pipefail
+          for module in lynq-iam lynq-app-backend lynq-file-storage lynq-bff lynq-analytics; do
+            mvn -B -q -f "$module/pom.xml" dependency:copy-dependencies \
+              -DincludeScope=runtime \
+              -DoutputDirectory="$RUNNER_TEMP/dependency-check-scan/$module"
+          done
+
+      - name: Flatten Python lockfiles
+        run: |
+          set -euo pipefail
+          for module in lynq-llm lynq-feeders lynq-agent; do
+            mkdir -p "$RUNNER_TEMP/dependency-check-scan/$module"
+            sed -E \
+              -e '/^[[:space:]]*(#|-)/d' \
+              -e 's/[[:space:]]*\\$//' \
+              -e 's/[[:space:]]*;.*$//' \
+              -e 's/\[[^]]*\]//' \
+              -e 's/(==[0-9.]+)\.post[0-9]+$/\1/' \
+              "$module/requirements.txt" > "$RUNNER_TEMP/dependency-check-scan/$module/requirements.txt"
+          done
+
+      - name: Install Dependency-Check CLI
+        run: |
+          set -euo pipefail
+          ARCHIVE="$RUNNER_TEMP/dependency-check.zip"
+          curl -sSfL --proto '=https' --proto-redir '=https' -o "$ARCHIVE" \
+            "https://github.com/dependency-check/DependencyCheck/releases/download/v${DEPENDENCY_CHECK_VERSION}/dependency-check-${DEPENDENCY_CHECK_VERSION}-release.zip"
+          echo "${DEPENDENCY_CHECK_SHA256}  ${ARCHIVE}" | sha256sum -c -
+          unzip -q "$ARCHIVE" -d "$RUNNER_TEMP"
+
+      - name: Compute vulnerability database cache key
+        id: cache-key
+        run: echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore vulnerability database
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/dependency-check-data
+          key: dependency-check-data-${{ env.DEPENDENCY_CHECK_VERSION }}-${{ steps.cache-key.outputs.date }}
+          restore-keys: dependency-check-data-${{ env.DEPENDENCY_CHECK_VERSION }}-
+
+      - name: Run Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          "$RUNNER_TEMP/dependency-check/bin/dependency-check.sh" \
+            --project lynq \
+            --scan "$RUNNER_TEMP/dependency-check-scan" \
+            --scan lynq-app-frontend/package-lock.json \
+            --data "$RUNNER_TEMP/dependency-check-data" \
+            --nvdApiKey "$NVD_API_KEY" \
+            --enableExperimental \
+            --disableOssIndex \
+            --nodeAuditSkipDevDependencies \
+            --suppression dependency-check-suppressions.xml \
+            --failOnCVSS "$FAIL_ON_CVSS" \
+            --format HTML \
+            --format SARIF \
+            --out "$RUNNER_TEMP/dependency-check-report"
+
+      - name: Upload Dependency-Check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: ${{ runner.temp }}/dependency-check-report/
