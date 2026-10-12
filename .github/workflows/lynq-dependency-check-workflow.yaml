@@ -3,13 +3,6 @@ name: dependency-check CI
 on:
   push:
     branches: [main]
-    paths:
-      - "**/pom.xml"
-      - "**/requirements.txt"
-      - "**/package-lock.json"
-      - dependency-check-suppressions.xml
-      - .github/workflows/dependency-check-workflow.yaml
-      - .github/workflows/lynq-dependency-check-workflow.yaml
   pull_request:
     paths:
       - "**/pom.xml"
@@ -18,8 +11,6 @@ on:
       - dependency-check-suppressions.xml
       - .github/workflows/dependency-check-workflow.yaml
       - .github/workflows/lynq-dependency-check-workflow.yaml
-  schedule:
-    - cron: "0 9 * * 1"
   workflow_dispatch:
 
 concurrency:
