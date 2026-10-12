@@ -2,10 +2,14 @@
 
 [![lynq-latest-version](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/version.svg)](https://github.com/MatLock/UdeSA-lynq/releases)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=MatLock_UdeSA-lynq&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=MatLock_UdeSA-lynq)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Link: UdeSA](https://img.shields.io/badge/Link-UdeSA-blue.svg)](https://www.udesa.edu.ar/departamento-de-ingenieria/maestria-en-inteligencia-artificial)
 
 Lynq is a job-search platform built around the idea that finding a job shouldn't be a job of its own. It aims to streamline the experience for candidates by bringing the pieces of the search — identity, listings, applications, and tracking — under one roof.
 
 This repository is the umbrella for all modules that make up the platform. Each subdirectory is an independent module with its own README and lifecycle.
+
+Lynq is a thesis project for the Master's in Artificial Intelligence (Maestría en Inteligencia Artificial) at Universidad de San Andrés (UdeSA). It is an academic, non-commercial project hosted in a personal repository.
 
 > * Lynq Home Page: https://lynqoficial.com/  
 > * Trello Board: https://trello.com/b/2inGRZwL/lyqn 
@@ -68,3 +72,8 @@ docker compose up
 ```
 
 This brings up the application modules (`lynq-iam`, `lynq-bff`, `lynq-app-backend`, `lynq-file-storage`, `lynq-app-frontend`, `lynq-llm`, `lynq-feeders`, `lynq-agent`, `lynq-analytics`) together with their infrastructure dependencies: MySQL, Redis, LocalStack, and an Ollama model server (pulled on first start). Each module can also be built and run on its own — see the individual module READMEs for details.
+
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
