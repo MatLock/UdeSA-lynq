@@ -105,6 +105,7 @@ jobs:
             --noupdate \
             --enableExperimental \
             --disableOssIndex \
+            --disableCentral \
             --nodeAuditSkipDevDependencies \
             --suppression dependency-check-suppressions.xml \
             --failOnCVSS "$FAIL_ON_CVSS" \
