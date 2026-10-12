@@ -29,6 +29,8 @@
 	<properties>
 		<java.version>21</java.version>
 		<testcontainers.version>1.20.4</testcontainers.version>
+		<httpclient5.version>5.6.5</httpclient5.version>
+		<httpcore5.version>5.4.4</httpcore5.version>
 	</properties>
 
 	<dependencyManagement>
