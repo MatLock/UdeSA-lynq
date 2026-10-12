@@ -15,6 +15,7 @@ jobs:
   dependency-check:
     name: "dependency-check: Vulnerable dependencies"
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     permissions:
       contents: read
     steps:
@@ -75,22 +76,33 @@ jobs:
         run: echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"
 
       - name: Restore vulnerability database
-        uses: actions/cache@v5
+        id: restore-db
+        uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/dependency-check-data
           key: dependency-check-data-${{ env.DEPENDENCY_CHECK_VERSION }}-${{ steps.cache-key.outputs.date }}
           restore-keys: dependency-check-data-${{ env.DEPENDENCY_CHECK_VERSION }}-
 
-      - name: Run Dependency-Check
+      - name: Update vulnerability database
+        id: update-db
+        timeout-minutes: 120
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          "$RUNNER_TEMP/dependency-check/bin/dependency-check.sh" \
+            --updateonly \
+            --data "$RUNNER_TEMP/dependency-check-data" \
+            --nvdApiKey "$NVD_API_KEY"
+
+      - name: Run Dependency-Check
+        timeout-minutes: 45
         run: |
           "$RUNNER_TEMP/dependency-check/bin/dependency-check.sh" \
             --project lynq \
             --scan "$RUNNER_TEMP/dependency-check-scan" \
             --scan lynq-app-frontend/package-lock.json \
             --data "$RUNNER_TEMP/dependency-check-data" \
-            --nvdApiKey "$NVD_API_KEY" \
+            --noupdate \
             --enableExperimental \
             --disableOssIndex \
             --nodeAuditSkipDevDependencies \
@@ -99,6 +111,13 @@ jobs:
             --format HTML \
             --format SARIF \
             --out "$RUNNER_TEMP/dependency-check-report"
+
+      - name: Save vulnerability database
+        if: always() && steps.update-db.outcome == 'success' && steps.restore-db.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/dependency-check-data
+          key: dependency-check-data-${{ env.DEPENDENCY_CHECK_VERSION }}-${{ steps.cache-key.outputs.date }}
 
       - name: Upload Dependency-Check report
         if: always()
