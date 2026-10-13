@@ -1,0 +1,14 @@
+7a9317622616ebcc8b5ce79a916d6d7e11b2fcb8:lynq-bff/src/test/java/com/lynq/bff/service/ResumeTailorServiceTest.java:generic-api-key:57
+7a9317622616ebcc8b5ce79a916d6d7e11b2fcb8:lynq-bff/src/test/java/com/lynq/bff/controller/impl/ResumeControllerImplTest.java:generic-api-key:49
+95777f1ed84fdbcae921a4e17ab0f50cd4df1196:lynq-bff/src/test/java/com/lynq/bff/service/IamAuthProxyServiceTest.java:generic-api-key:43
+95777f1ed84fdbcae921a4e17ab0f50cd4df1196:lynq-bff/src/test/java/com/lynq/bff/LynqBffApplicationTests.java:generic-api-key:51
+f7c0858c9421bb3143f9a736c42c310317438877:lynq-bff/src/test/resources/application-test.yaml:generic-api-key:9
+6b14e6569965398d55eceadc32a0ee52fed4c39a:.github/workflows/lynq-release-workflow.yaml:curl-auth-user:257
+6b14e6569965398d55eceadc32a0ee52fed4c39a:.github/workflows/lynq-release-workflow.yaml:curl-auth-user:259
+deca3fe4dd88ab7965cbdb833b7b595dee8c5b51:infrastructure/helm/values/k8s_values-local.yaml:generic-api-key:39
+30477d18a28c4c5d7735109d3517d79c8b92599b:lynq-app-backend/src/main/resources/application.yaml:generic-api-key:41
+30477d18a28c4c5d7735109d3517d79c8b92599b:lynq-app-backend/src/test/resources/application-test.yaml:generic-api-key:27
+7097298c9afe9d90974807fe55ccf74518e3a958:lynq-iam/src/test/resources/application-test.yaml:generic-api-key:27
+1bb46303af822dafd7a961844a1324d7483ffed7:lynq-iam/src/main/resources/application.yaml:generic-api-key:37
+92771d9500fd653928a1332631528fd09afd6883:lynq-iam/README.md:generic-api-key:316
+92771d9500fd653928a1332631528fd09afd6883:lynq-iam/README.md:generic-api-key:317
