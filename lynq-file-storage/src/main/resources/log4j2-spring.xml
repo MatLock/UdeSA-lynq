@@ -12,23 +12,27 @@
                     pattern="%msg %n %throwable" />
         </Console>
 
-        <RollingFile name="RollingFile"
-                     fileName="./logs/lynq-file-storage.log"
-                     filePattern="./logs/$${date:yyyy-MM}/lynq-file-storage-%d{-dd-MMMM-yyyy}-%i.log.gz">
-            <PatternLayout>
-                <pattern>%d %p %c{1.} [%t] %m%n</pattern>
-            </PatternLayout>
-            <Policies>
-                <OnStartupTriggeringPolicy />
-                <SizeBasedTriggeringPolicy size="1000 MB" />
-                <TimeBasedTriggeringPolicy />
-            </Policies>
-        </RollingFile>
+        <SpringProfile name="!production">
+            <RollingFile name="RollingFile"
+                         fileName="./logs/lynq-file-storage.log"
+                         filePattern="./logs/$${date:yyyy-MM}/lynq-file-storage-%d{-dd-MMMM-yyyy}-%i.log.gz">
+                <PatternLayout>
+                    <pattern>%d %p %c{1.} [%t] [%X{requestId}] %m%n</pattern>
+                </PatternLayout>
+                <Policies>
+                    <OnStartupTriggeringPolicy />
+                    <SizeBasedTriggeringPolicy size="1000 MB" />
+                    <TimeBasedTriggeringPolicy />
+                </Policies>
+            </RollingFile>
+        </SpringProfile>
     </Appenders>
     <Loggers>
         <Root level="info">
             <AppenderRef ref="Console" />
-            <AppenderRef ref="RollingFile" />
+            <SpringProfile name="!production">
+                <AppenderRef ref="RollingFile" />
+            </SpringProfile>
         </Root>
     </Loggers>
 </Configuration>
