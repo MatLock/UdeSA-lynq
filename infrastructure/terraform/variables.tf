@@ -232,6 +232,24 @@ variable "eks_kubernetes_version" {
   default     = "1.35"
 }
 
+variable "eks_cluster_logging_enabled" {
+  description = "Send the control plane logs (eks_cluster_log_types) to CloudWatch Logs. Off by default: the api and audit streams alone ingest about 1 GB a day, which exhausts the 5 GB free tier and is billed per GB after that."
+  type        = bool
+  default     = false
+}
+
+variable "eks_cluster_log_types" {
+  description = "Control plane log types sent to CloudWatch when eks_cluster_logging_enabled is true. authenticator is the cheap one; api and audit are the bulk."
+  type        = list(string)
+  default     = ["api", "audit", "authenticator"]
+}
+
+variable "eks_cluster_log_retention_days" {
+  description = "Retention of the control plane log group when logging is enabled."
+  type        = number
+  default     = 30
+}
+
 variable "eks_public_access_cidrs" {
   description = "CIDRs allowed to reach the public Kubernetes API endpoint. Narrow this to your IP for a private setup."
   type        = list(string)

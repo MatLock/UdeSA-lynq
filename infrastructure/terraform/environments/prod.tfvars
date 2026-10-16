@@ -20,6 +20,14 @@ eks_node_instance_type = "t3.medium"
 eks_node_capacity_type = "ON_DEMAND"
 eks_node_desired_size  = 2
 
+# Only this CIDR may reach the public Kubernetes API endpoint (kubectl, Terraform, Freelens).
+# The nodes and the load balancer controller use the private endpoint, so they are unaffected.
+eks_public_access_cidrs = ["181.229.27.122/32"]
+
+# Control plane logs to CloudWatch are off: nothing is sent and no log group is
+# kept. Set to true (and choose eks_cluster_log_types) to turn them back on.
+eks_cluster_logging_enabled = false
+
 # Public API host + Cloudflare DNS. Terraform creates the ACM cert, validates it
 # via a Cloudflare DNS record, and points this host at the ALB.
 ingress_host       = "api.lynqoficial.com"

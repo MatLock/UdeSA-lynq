@@ -38,9 +38,22 @@ resource "aws_eks_cluster" "lynq" {
     public_access_cidrs     = var.eks_public_access_cidrs
   }
 
-  enabled_cluster_log_types = ["api", "audit", "authenticator"]
+  enabled_cluster_log_types = var.eks_cluster_logging_enabled ? var.eks_cluster_log_types : []
 
-  depends_on = [aws_iam_role_policy_attachment.eks_cluster]
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_cluster,
+    aws_cloudwatch_log_group.eks,
+  ]
+}
+
+# EKS writes the control plane logs to this group and creates it without
+# retention if it does not exist, so it is declared here, ahead of the cluster,
+# whenever logging is on. With logging off nothing is sent to CloudWatch.
+resource "aws_cloudwatch_log_group" "eks" {
+  count = var.eks_cluster_logging_enabled ? 1 : 0
+
+  name              = "/aws/eks/${var.eks_cluster_name}/cluster"
+  retention_in_days = var.eks_cluster_log_retention_days
 }
 
 # OIDC provider: lets a Kubernetes ServiceAccount assume an IAM role (IRSA),
