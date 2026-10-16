@@ -2,5 +2,5 @@ apiVersion: v2
 name: lynq
 description: Helm chart for the lynq platform (iam, backend, llm), its config/secrets, ingress, and optional local infra (mysql, redis, localstack, ollama).
 type: application
-version: 0.1.1
+version: 0.1.2
 appVersion: "3.2.0-SNAPSHOT"

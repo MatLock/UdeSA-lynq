@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: lynq-bff-deployment
+  name: lynq-bff
   namespace: lynq-{{ .Values.k8s_namespace }}-namespace
   labels:
     app: lynq-bff

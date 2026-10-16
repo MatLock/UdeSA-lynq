@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: lynq-file-storage-deployment
+  name: lynq-file-storage
   namespace: lynq-{{ .Values.k8s_namespace }}-namespace
   labels:
     app: lynq-file-storage

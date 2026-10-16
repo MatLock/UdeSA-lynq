@@ -202,8 +202,8 @@ lynq_feeders:
     timeZone: Etc/UTC
     image: curlimages/curl:8.11.1
     concurrencyPolicy: Forbid
-    successfulJobsHistoryLimit: 3
-    failedJobsHistoryLimit: 3
+    successfulJobsHistoryLimit: 0
+    failedJobsHistoryLimit: 1
     startingDeadlineSeconds: 600
     backoffLimit: 1
     # The trigger pod only waits for the two 202s, not for the runs: the ingest
@@ -241,8 +241,8 @@ lynq_analytics:
     schedule: "0 8 * * *"
     timeZone: Etc/UTC
     image: curlimages/curl:8.11.1
-    successfulJobsHistoryLimit: 3
-    failedJobsHistoryLimit: 3
+    successfulJobsHistoryLimit: 0
+    failedJobsHistoryLimit: 1
     startingDeadlineSeconds: 600
     backoffLimit: 1
     # The trigger pod only waits for the 202, not for the snapshot.
