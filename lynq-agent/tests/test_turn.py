@@ -8,8 +8,10 @@ from botocore.exceptions import ClientError
 from langchain_core.messages import AIMessage
 
 from tests.fixtures.spanish import (
+    AMBIGUOUS,
     ASK_FOR_ADVICE,
     ASK_FOR_GO,
+    CLARIFICATION,
     CONFIRMED_SPRING_BOOT,
     GO_AHEAD,
     GREETING,
@@ -19,7 +21,7 @@ from tests.fixtures.spanish import (
 )
 from tests.support import bedrock_error, breaking, intending, scripted, tool_call
 
-from agent.context import INTENT_SPAN, Intent, TurnContext
+from agent.context import CLARIFY_SPAN, INTENT_SPAN, Intent, TurnContext
 from agent.graph import APPLY_SPAN
 from agent.turn import run_turn, turn_messages
 from config import reset_settings
@@ -323,6 +325,48 @@ class AdviseTurnTest(unittest.IsolatedAsyncioTestCase):
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
         self.assertEqual(outcome.recommendations, [])
+
+
+class ClarifyTurnTest(unittest.IsolatedAsyncioTestCase):
+
+    def setUp(self) -> None:
+        reset_settings()
+        patcher = patch.dict("os.environ", {"LLM_PROVIDER": "ollama"}, clear=False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(reset_settings)
+
+    async def test_a_message_it_cannot_read_is_answered_with_a_question(self) -> None:
+        model = scripted(tool_call("EditProposal", PROPOSAL, "1"))
+        intent_model = scripted(
+            AIMessage(content=Intent.UNKNOWN), AIMessage(content=CLARIFICATION)
+        )
+
+        outcome = await run_turn(
+            context_for(message=AMBIGUOUS), model=model, intent_model=intent_model
+        )
+
+        self.assertEqual(outcome.intent, Intent.UNKNOWN)
+        self.assertEqual(outcome.reply, CLARIFICATION)
+        self.assertEqual(outcome.changes, [])
+        self.assertEqual(outcome.resume, RESUME)
+        self.assertEqual(outcome.warnings, [])
+        self.assertEqual(outcome.recommendations, [])
+        self.assertEqual(model.prompts, [])
+
+    async def test_the_question_leaves_its_span_after_the_intent(self) -> None:
+        intent_model = scripted(
+            AIMessage(content=Intent.UNKNOWN), AIMessage(content=CLARIFICATION)
+        )
+
+        outcome = await run_turn(
+            context_for(message=AMBIGUOUS),
+            model=scripted(tool_call("EditProposal", PROPOSAL, "1")),
+            intent_model=intent_model,
+        )
+
+        self.assertEqual([span.name for span in outcome.spans], [INTENT_SPAN, CLARIFY_SPAN])
+        self.assertEqual(outcome.spans[1].output, CLARIFICATION)
 
 
 class TurnMessagesTest(unittest.TestCase):

@@ -8,6 +8,7 @@ from langgraph.graph import END, START, StateGraph
 
 from agent import apply, editor
 from agent.advisor import advise
+from agent.clarifier import clarify
 from agent.context import Intent, SpanRecord, TurnContext
 from agent.intent import classify
 from agent.judge import judge
@@ -19,6 +20,7 @@ from prompt.tailor import ADVISE as ADVISE_PROMPT, EDIT as EDIT_PROMPT, JUDGE as
 log = logging.getLogger(__name__)
 
 CLASSIFY = "classify"
+CLARIFY = "clarify"
 ADVISE = "advise"
 PROPOSE = "propose"
 JUDGE = "judge"
@@ -61,11 +63,19 @@ class TurnGraphState(TypedDict, total=False):
     rejections: list
     passes: int
     advice: Advice
+    clarification: str
 
 
 async def classify_node(graph: TurnGraphState) -> TurnGraphState:
     intent = await classify(graph["context"], graph["provider"], graph.get("intent_model"))
     return {"intent": intent}
+
+
+async def clarify_node(graph: TurnGraphState) -> TurnGraphState:
+    clarification = await clarify(
+        graph["context"], graph["state"], graph["provider"], graph.get("intent_model")
+    )
+    return {"clarification": clarification}
 
 
 async def advise_node(graph: TurnGraphState) -> TurnGraphState:
@@ -138,6 +148,8 @@ def last_reply(context: TurnContext) -> str:
 
 
 def route_intent(graph: TurnGraphState) -> str:
+    if graph["intent"] == Intent.UNKNOWN:
+        return CLARIFY
     return ADVISE if graph["intent"] == Intent.ADVISE else PROPOSE
 
 
@@ -150,13 +162,15 @@ def route_apply(graph: TurnGraphState) -> str:
 def build_graph():
     graph = StateGraph(TurnGraphState)
     graph.add_node(CLASSIFY, classify_node)
+    graph.add_node(CLARIFY, clarify_node)
     graph.add_node(ADVISE, advise_node)
     graph.add_node(PROPOSE, propose_node)
     graph.add_node(JUDGE, judge_node)
     graph.add_node(APPLY, apply_node)
 
     graph.add_edge(START, CLASSIFY)
-    graph.add_conditional_edges(CLASSIFY, route_intent, [ADVISE, PROPOSE])
+    graph.add_conditional_edges(CLASSIFY, route_intent, [CLARIFY, ADVISE, PROPOSE])
+    graph.add_edge(CLARIFY, END)
     graph.add_edge(ADVISE, END)
     graph.add_edge(PROPOSE, JUDGE)
     graph.add_edge(JUDGE, APPLY)

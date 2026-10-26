@@ -25,7 +25,9 @@ log = logging.getLogger(__name__)
 
 EXCHANGE_MESSAGES = 4
 
-_WORD = re.compile(rf"\b({Intent.ADVISE}|{Intent.EDIT})\b", re.IGNORECASE)
+_WORD = re.compile(
+    rf"\b({Intent.ADVISE}|{Intent.EDIT}|{Intent.UNKNOWN})\b", re.IGNORECASE
+)
 
 
 def recent_exchange(context: TurnContext) -> list[tuple[str, str]]:
@@ -42,7 +44,7 @@ def read(answer: str) -> str | None:
     return found.group(1).lower() if found is not None else None
 
 
-def _text_of(message) -> str:
+def text_of(message) -> str:
     content = getattr(message, "content", message)
     if isinstance(content, str):
         return content
@@ -110,7 +112,7 @@ async def classify(context: TurnContext, provider: str, model=None) -> str:
         _span(context, provider, started_at, DEFAULT_INTENT, {}, error=str(exc))
         return DEFAULT_INTENT
 
-    text = _text_of(answer)
+    text = text_of(answer)
     intent = read(text)
     if intent is None:
         log.warning(

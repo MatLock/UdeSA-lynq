@@ -9,6 +9,7 @@ from agent.context import Intent
 from agent.graph import (
     ADVISE,
     APPLY,
+    CLARIFY,
     CLASSIFY,
     JUDGE,
     PROPOSE,
@@ -23,14 +24,15 @@ from agent.graph import (
 
 class TurnGraphTest(unittest.TestCase):
 
-    def test_the_graph_has_the_four_agents_and_the_apply_step(self) -> None:
+    def test_the_graph_has_the_five_agents_and_the_apply_step(self) -> None:
         nodes = set(TURN_GRAPH.get_graph().nodes) - {"__start__", "__end__"}
 
-        self.assertEqual(nodes, {CLASSIFY, ADVISE, PROPOSE, JUDGE, APPLY})
+        self.assertEqual(nodes, {CLASSIFY, CLARIFY, ADVISE, PROPOSE, JUDGE, APPLY})
 
-    def test_the_intent_decides_between_advising_and_editing(self) -> None:
+    def test_the_intent_decides_between_clarifying_advising_and_editing(self) -> None:
         self.assertEqual(route_intent({"intent": Intent.ADVISE}), ADVISE)
         self.assertEqual(route_intent({"intent": Intent.EDIT}), PROPOSE)
+        self.assertEqual(route_intent({"intent": Intent.UNKNOWN}), CLARIFY)
 
     def test_a_rejection_goes_back_to_the_editor_once(self) -> None:
         self.assertEqual(route_apply({"rejections": ["summary: x"], "passes": 1}), PROPOSE)
@@ -51,6 +53,12 @@ class TurnGraphTest(unittest.TestCase):
         self.assertNotIn((ADVISE, JUDGE), edges)
         self.assertNotIn((ADVISE, PROPOSE), edges)
 
+    def test_clarifying_only_asks_and_ends_the_turn(self) -> None:
+        edges = {(edge.source, edge.target) for edge in TURN_GRAPH.get_graph().edges}
+
+        self.assertIn((CLASSIFY, CLARIFY), edges)
+        self.assertEqual({target for source, target in edges if source == CLARIFY}, {"__end__"})
+
     def test_the_hard_cap_sits_above_what_the_routes_can_reach(self) -> None:
         longest = 1 + 3 * editor.MAX_PASSES  # classify, then propose+judge+apply per pass
         self.assertGreater(RECURSION_LIMIT, longest)
@@ -58,7 +66,7 @@ class TurnGraphTest(unittest.TestCase):
     def test_the_diagram_can_be_drawn(self) -> None:
         drawing = mermaid()
 
-        for node in (CLASSIFY, ADVISE, PROPOSE, JUDGE, APPLY):
+        for node in (CLASSIFY, CLARIFY, ADVISE, PROPOSE, JUDGE, APPLY):
             self.assertIn(node, drawing)
 
     def test_the_prompt_reference_follows_the_intent(self) -> None:

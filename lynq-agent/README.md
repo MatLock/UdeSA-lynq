@@ -1,7 +1,7 @@
 # lynq-agent
 
 CV Tailor: the conversational agent that adapts a candidate's resume to a concrete
-job posting. FastAPI, a LangGraph of four agents — intent, advise, edit, judge — where the
+job posting. FastAPI, a LangGraph of five agents — intent, clarify, advise, edit, judge — where the
 code decides only where a change goes and the judge decides whether it may, and MySQL
 for the conversation and its traces.
 
@@ -48,7 +48,7 @@ means the turn itself failed — it does not cost the candidate a turn.
 
 ## The turn, inside
 
-A turn is four agents, each with its own prompt and its own single answer, and no
+A turn is five agents, each with its own prompt and its own single answer, and no
 agent holds a tool. They are the nodes of a LangGraph `StateGraph` in
 `src/agent/graph.py`, together with the `apply` step; `src/agent/turn.py` builds the
 state and runs it. The graph is fixed and acyclic but for one edge: a rejected proposal
@@ -63,6 +63,7 @@ config:
 graph TD;
 	__start__([<p>__start__</p>]):::first
 	classify(classify)
+	clarify(clarify)
 	advise(advise)
 	propose(propose)
 	judge(judge)
@@ -72,10 +73,12 @@ graph TD;
 	apply -.-> __end__;
 	apply -.-> propose;
 	classify -.-> advise;
+	classify -.-> clarify;
 	classify -.-> propose;
 	judge --> apply;
 	propose --> judge;
 	advise --> __end__;
+	clarify --> __end__;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0
 	classDef last fill:#bfb6fc
@@ -98,19 +101,37 @@ many passes have been made.
 
 **1. The intent agent** (`src/agent/intent.py`, prompt `resources/prompts/intent/`)
 reads the message of the candidate together with the last four messages of the exchange
-and answers one word, `edit` or `advise`. It exists because an agent that treats every
+and answers one word, `edit`, `advise` or `unknown`. It exists because an agent that treats every
 message as a request to change the resume — asked *what else do you suggest?* — rewrites
 things and reports the work as done. A yes to a skill CV Tailor asked about is `edit`,
 because the skill was offered as an addition and the yes asks for it; a no, or a message
 that only tells something about the candidate, is `advise`, so that it never ends in
-the "nothing changed" notice an edit turn appends. It is the first thing the turn does and it leaves a
+the "nothing changed" notice an edit turn appends. `unknown` is for the message it
+cannot read as either, even with the exchange — one that reads both ways with nothing
+to settle it, a fragment that answers nothing CV Tailor asked — and the prompt makes
+it the last resort: a yes, a no or a number from a list is never `unknown`, and neither
+is the answer to CV Tailor asking what the candidate meant. It is the first thing the turn does and it leaves a
 `step=0` span named `intent` whose output is the word that was read. Anything that goes
-wrong with it — a model that breaks, an answer that says neither word — falls back to
+wrong with it — a model that breaks, an answer that says none of the words — falls back to
 `edit` and writes a `kind='error'` span: the classifier never takes a turn down. It
 answers one word, so it may run on a cheaper model (`BEDROCK_INTENT_MODEL_ID`); its span
 is priced with that model's own sheet, not with the rates frozen on the conversation.
 
-**2. The advising agent** (`src/agent/advisor.py`, prompt `resources/prompts/advise.jinja`)
+**2. The clarifying agent** (`src/agent/clarifier.py`, prompt
+`resources/prompts/clarify/`) takes an `unknown` turn. Rather than guess a branch, it asks
+the candidate what they meant: when the message reads two ways it names both and asks
+which, and when it reads no way it asks them to say it again in other words and reminds
+them what CV Tailor can do. It reads what the intent agent read — the message and the
+last four messages — writes in the candidate's language, and its reply is the whole turn:
+no warnings, no recommendations, no version. It runs on the intent model and leaves a
+span named `clarify`, priced with that model's sheet like the intent span. Unlike the
+classifier it has no fallback: a model that breaks or answers nothing fails the turn
+with a `kind='error'` span, as the other agents do. The turn still counts against
+`max_turns`. The next message is the answer to the question, and the intent prompt tells
+the classifier to read it as `edit` or `advise`; nothing in code forbids a second
+`unknown` in a row.
+
+**3. The advising agent** (`src/agent/advisor.py`, prompt `resources/prompts/advise.jinja`)
 takes an `advise` turn. It answers the question and recommends the edits it would apply
 next, as data in `recommendations` — `{id, section, entry, what}`, numbered by the code,
 1..n, whatever the model wrote — and the code appends that numbered list to `reply`
@@ -124,7 +145,7 @@ the candidate read, not what the model reconstructs from the thread. It also car
 the gap question — see *What the candidate says is true* below — and records in
 `confirmed` what the candidate told it about themselves.
 
-**3. The editing agent** (`src/agent/editor.py`, prompt `resources/prompts/edit.jinja`)
+**4. The editing agent** (`src/agent/editor.py`, prompt `resources/prompts/edit.jinja`)
 takes an `edit` turn. It answers **once**, with the whole change of the turn as one
 `EditProposal`: the new summary, the entries of the work experience it rewrites — each
 named by `company` and `position`, never by index — and the skill buckets it replaces,
@@ -136,7 +157,7 @@ candidate confirmed enters the skills bucket in the same turn; it enters an entr
 experience only once the candidate has said in which job they used it and what they did
 with it, and until then the editor asks instead of guessing the entry.
 
-**4. The judge** (`src/agent/judge.py`, prompt `resources/prompts/judge.jinja`) reads the
+**5. The judge** (`src/agent/judge.py`, prompt `resources/prompts/judge.jinja`) reads the
 proposal part by part, each part beside the text it replaces in the **base** resume, and
 says for each one whether the resume, or the candidate, supports it. It never rewrites:
 `ok`, or a `kind` and a `reason` written in the candidate's language. The one rule it
@@ -303,7 +324,9 @@ estimated, and the tariff of the model lives in `src/llm/pricing.py` and is froz
 the conversation when it is created; a model that is not in the sheet costs zero and
 logs a warning. The LLM span does **not** store the system prompt: it stores the
 messages of the turn, the `resume_version_id` and the hash of the template
-(`edit@<hash>`, `advise@<hash>`), which is enough to rebuild it exactly.
+(`edit@<hash>`, `advise@<hash>`; `intent/<provider>@<hash>` and
+`clarify/<provider>@<hash>` for the two that run on the intent model), which is enough
+to rebuild it exactly.
 
 ## The database
 

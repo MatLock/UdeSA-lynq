@@ -11,10 +11,12 @@ PER_MILLION = Decimal("1000000")
 class Intent:
     ADVISE = "advise"
     EDIT = "edit"
+    UNKNOWN = "unknown"
 
 
 DEFAULT_INTENT = Intent.EDIT
 INTENT_SPAN = "intent"
+CLARIFY_SPAN = "clarify"
 
 
 def utc_now() -> datetime:
