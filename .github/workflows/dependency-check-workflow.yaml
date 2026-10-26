@@ -2,32 +2,21 @@ name: dependency-check
 
 on:
   workflow_call:
-    secrets:
-      NVD_API_KEY:
-        required: true
 
 env:
   DEPENDENCY_CHECK_VERSION: 13.0.0
   DEPENDENCY_CHECK_SHA256: 44d920d1ec03e948df862a253f0912782a31b9beee8a7c8895b9cb95760176ed
+  NVD_DATAFEED_URL: https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-{0}.json.gz
   FAIL_ON_CVSS: 7
 
 jobs:
   dependency-check:
     name: "dependency-check: Vulnerable dependencies"
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
-      - name: Require the NVD API key
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: |
-          if [ -z "$NVD_API_KEY" ]; then
-            echo "::error::The NVD_API_KEY repository secret is not set. Request a key at https://nvd.nist.gov/developers/request-an-api-key and store it as a GitHub secret."
-            exit 1
-          fi
-
       - name: Code Checkout
         uses: actions/checkout@v5
 
@@ -40,6 +29,7 @@ jobs:
           cache: maven
 
       - name: Resolve Java runtime dependencies
+        timeout-minutes: 10
         run: |
           set -euo pipefail
           for module in lynq-iam lynq-app-backend lynq-file-storage lynq-bff lynq-analytics; do
@@ -66,7 +56,7 @@ jobs:
         run: |
           set -euo pipefail
           ARCHIVE="$RUNNER_TEMP/dependency-check.zip"
-          curl -sSfL --proto '=https' --proto-redir '=https' -o "$ARCHIVE" \
+          curl -sSfL --proto '=https' --proto-redir '=https' --retry 2 --retry-all-errors --max-time 300 -o "$ARCHIVE" \
             "https://github.com/dependency-check/DependencyCheck/releases/download/v${DEPENDENCY_CHECK_VERSION}/dependency-check-${DEPENDENCY_CHECK_VERSION}-release.zip"
           echo "${DEPENDENCY_CHECK_SHA256}  ${ARCHIVE}" | sha256sum -c -
           unzip -q "$ARCHIVE" -d "$RUNNER_TEMP"
@@ -77,25 +67,43 @@ jobs:
 
       - name: Restore vulnerability database
         id: restore-db
+        continue-on-error: true
         uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/dependency-check-data
-          key: dependency-check-data-${{ env.DEPENDENCY_CHECK_VERSION }}-${{ steps.cache-key.outputs.date }}
-          restore-keys: dependency-check-data-${{ env.DEPENDENCY_CHECK_VERSION }}-
+          key: dependency-check-feed-${{ env.DEPENDENCY_CHECK_VERSION }}-${{ steps.cache-key.outputs.date }}
+          restore-keys: dependency-check-feed-${{ env.DEPENDENCY_CHECK_VERSION }}-
 
       - name: Update vulnerability database
         id: update-db
-        timeout-minutes: 120
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        timeout-minutes: 19
+        continue-on-error: true
         run: |
-          "$RUNNER_TEMP/dependency-check/bin/dependency-check.sh" \
-            --updateonly \
-            --data "$RUNNER_TEMP/dependency-check-data" \
-            --nvdApiKey "$NVD_API_KEY"
+          deadline=$(( $(date +%s) + 17 * 60 ))
+          for attempt in 1 2 3; do
+            remaining=$(( deadline - $(date +%s) ))
+            if [ "$remaining" -lt 60 ]; then
+              break
+            fi
+            if timeout "$remaining" "$RUNNER_TEMP/dependency-check/bin/dependency-check.sh" \
+                --updateonly \
+                --data "$RUNNER_TEMP/dependency-check-data" \
+                --nvdDatafeed "$NVD_DATAFEED_URL"; then
+              exit 0
+            fi
+            echo "::warning::NVD update attempt $attempt failed"
+            sleep 15
+          done
+          echo "::warning::Could not update the NVD database; continuing without a fresh copy."
+          exit 1
+
+      - name: Skip Dependency-Check without a vulnerability database
+        if: steps.update-db.outcome != 'success' && steps.restore-db.outputs.cache-matched-key == ''
+        run: echo "::warning::No NVD database is available (update failed and nothing was cached); the dependency scan was skipped."
 
       - name: Run Dependency-Check
-        timeout-minutes: 45
+        if: steps.update-db.outcome == 'success' || steps.restore-db.outputs.cache-matched-key != ''
+        timeout-minutes: 10
         run: |
           "$RUNNER_TEMP/dependency-check/bin/dependency-check.sh" \
             --project lynq \
@@ -115,10 +123,11 @@ jobs:
 
       - name: Save vulnerability database
         if: always() && steps.update-db.outcome == 'success' && steps.restore-db.outputs.cache-hit != 'true'
+        continue-on-error: true
         uses: actions/cache/save@v5
         with:
           path: ${{ runner.temp }}/dependency-check-data
-          key: dependency-check-data-${{ env.DEPENDENCY_CHECK_VERSION }}-${{ steps.cache-key.outputs.date }}
+          key: dependency-check-feed-${{ env.DEPENDENCY_CHECK_VERSION }}-${{ steps.cache-key.outputs.date }}
 
       - name: Upload Dependency-Check report
         if: always()

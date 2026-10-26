@@ -23,5 +23,3 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/dependency-check-workflow.yaml
-    secrets:
-      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
