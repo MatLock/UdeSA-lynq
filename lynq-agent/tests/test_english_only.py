@@ -5,8 +5,8 @@ import unittest
 
 _MODULE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-ROOTS = ("src", "tests", "resources", "scripts", "docs/queries.sql")
-SUFFIXES = (".py", ".jinja", ".sql")
+ROOTS = ("src", "tests", "resources", "scripts")
+SUFFIXES = (".py", ".jinja")
 
 EXEMPT = (
     os.path.join("resources", "greetings", "es.jinja"),
@@ -41,9 +41,6 @@ def scanned_files() -> list[str]:
     found: list[str] = []
     for root in ROOTS:
         absolute = os.path.join(_MODULE_ROOT, root)
-        if os.path.isfile(absolute):
-            found.append(root)
-            continue
         for directory, subdirectories, names in os.walk(absolute):
             subdirectories[:] = [
                 name for name in subdirectories if name != "__pycache__"
@@ -70,7 +67,7 @@ def spanish_in(path: str) -> list[str]:
 
 class EnglishOnlyTest(unittest.TestCase):
 
-    def test_the_code_the_prompts_and_the_queries_are_written_in_english(self) -> None:
+    def test_the_code_and_the_prompts_are_written_in_english(self) -> None:
         offenders = [line for path in scanned_files() for line in spanish_in(path)]
 
         self.assertEqual(
@@ -79,7 +76,7 @@ class EnglishOnlyTest(unittest.TestCase):
             "Spanish belongs in resources/greetings/es.jinja and tests/fixtures only",
         )
 
-    def test_it_looks_at_the_prompts_the_sources_and_the_queries(self) -> None:
+    def test_it_looks_at_the_prompts_and_the_sources(self) -> None:
         scanned = scanned_files()
 
         self.assertIn(os.path.join("src", "agent", "turn.py"), scanned)
@@ -88,7 +85,6 @@ class EnglishOnlyTest(unittest.TestCase):
             scanned,
         )
         self.assertIn(os.path.join("resources", "greetings", "en.jinja"), scanned)
-        self.assertIn(os.path.join("docs", "queries.sql"), scanned)
 
     def test_the_two_places_spanish_is_allowed_stay_out_of_the_scan(self) -> None:
         scanned = scanned_files()

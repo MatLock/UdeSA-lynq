@@ -47,3 +47,8 @@ NO_KAFKA = "No, Kafka no lo usé nunca"
 CONFIRM_SPRING_BOOT = "Sí, tengo springboot: lo usé en Acme para armar microservicios"
 CONFIRMED_SPRING_BOOT = "Tiene Spring Boot, usado en Acme para microservicios"
 ASK_ABOUT_SPRING_BOOT = "¿Tenés experiencia con Spring Boot?"
+AMBIGUOUS = "Lo de Kubernetes"
+CLARIFICATION = (
+    "No estoy seguro de qué querés con eso: ¿que sume Kubernetes a tu CV, o que te "
+    "cuente qué dice el CV de Kubernetes?"
+)

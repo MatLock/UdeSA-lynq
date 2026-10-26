@@ -5,7 +5,13 @@ import unittest
 
 from langchain_core.messages import AIMessage
 
-from tests.fixtures.spanish import ASK_FOR_ADVICE, ASK_FOR_GO, GO_AHEAD, GREETING
+from tests.fixtures.spanish import (
+    AMBIGUOUS,
+    ASK_FOR_ADVICE,
+    ASK_FOR_GO,
+    GO_AHEAD,
+    GREETING,
+)
 from tests.support import bedrock_error, breaking, intending, scripted
 from tests.test_turn import context_for
 
@@ -19,14 +25,16 @@ PROVIDERS = ("bedrock", "ollama")
 
 class ReadTest(unittest.TestCase):
 
-    def test_the_two_words_are_read_as_they_are(self) -> None:
+    def test_the_three_words_are_read_as_they_are(self) -> None:
         self.assertEqual(read("edit"), Intent.EDIT)
         self.assertEqual(read("advise"), Intent.ADVISE)
+        self.assertEqual(read("unknown"), Intent.UNKNOWN)
 
     def test_a_word_wrapped_in_noise_is_still_read(self) -> None:
         self.assertEqual(read("`advise`"), Intent.ADVISE)
         self.assertEqual(read("Edit."), Intent.EDIT)
         self.assertEqual(read("The intent is: advise\n"), Intent.ADVISE)
+        self.assertEqual(read("`Unknown`."), Intent.UNKNOWN)
 
     def test_an_answer_that_says_neither_is_not_read(self) -> None:
         self.assertIsNone(read(""))
@@ -85,6 +93,15 @@ class ClassifyTest(unittest.IsolatedAsyncioTestCase):
         intent = await classify(context, "ollama", intending(Intent.ADVISE))
 
         self.assertEqual(intent, Intent.ADVISE)
+
+    async def test_a_message_it_cannot_read_is_left_unknown(self) -> None:
+        context = context_for(message=AMBIGUOUS)
+
+        intent = await classify(context, "ollama", intending(Intent.UNKNOWN))
+
+        self.assertEqual(intent, Intent.UNKNOWN)
+        self.assertEqual(context.spans[0].kind, SpanKind.LLM)
+        self.assertEqual(context.spans[0].output, Intent.UNKNOWN)
 
     async def test_the_decision_leaves_a_span_of_its_own_before_the_loop(self) -> None:
         context = context_for(message=ASK_FOR_ADVICE)
@@ -152,16 +169,26 @@ class PromptTest(unittest.TestCase):
     def test_both_providers_have_their_own_template(self) -> None:
         self.assertNotEqual(self.render("bedrock"), self.render("ollama"))
 
-    def test_it_asks_for_one_of_the_two_words(self) -> None:
+    def test_it_asks_for_one_of_the_three_words(self) -> None:
         for provider in PROVIDERS:
             prompt = self.render(provider)
 
             self.assertIn("Answer with one word and nothing else", prompt)
             self.assertIn(f"`{Intent.EDIT}`", prompt)
             self.assertIn(f"`{Intent.ADVISE}`", prompt)
+            self.assertIn(f"`{Intent.UNKNOWN}`", prompt)
+
+    def test_unknown_is_the_last_resort(self) -> None:
+        for provider in PROVIDERS:
+            prompt = " ".join(self.render(provider).split())
+
+            self.assertIn("`unknown` is the last resort", prompt)
+            self.assertIn("a yes, a no, a number from the list it gave — is never `unknown`", prompt)
+            self.assertIn("the answer to CV Tailor asking what the candidate meant", prompt)
 
     def test_the_ollama_variant_spells_the_format_out(self) -> None:
         self.assertIn("Your whole answer is one lowercase word", self.render("ollama"))
+        self.assertIn("`edit`, `advise` or `unknown`", self.render("ollama"))
         self.assertNotIn(
             "Your whole answer is one lowercase word", self.render("bedrock")
         )

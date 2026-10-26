@@ -44,7 +44,8 @@ async def run_turn(
     context: TurnContext, model=None, intent_model=None, judge_model=None
 ) -> TurnOutcome:
     """One turn through the graph: the intent agent reads the message, then
-    either the advising agent answers or the editing agent proposes, the judge
+    the clarifying agent asks what it meant, the advising agent answers or the
+    editing agent proposes, the judge
     decides part by part and the code applies what it approved, with one
     correction pass when something is rejected. A scripted `model` serves the
     judge too, so a test scripts both answers in order."""
@@ -72,7 +73,9 @@ async def run_turn(
     )
 
     intent = result["intent"]
-    if intent == Intent.ADVISE:
+    if intent == Intent.UNKNOWN:
+        reply, warnings, recommendations = result["clarification"], [], []
+    elif intent == Intent.ADVISE:
         advice = result["advice"]
         reply, warnings = advice.reply, list(advice.warnings)
         recommendations = [r.model_dump() for r in advice.recommendations]

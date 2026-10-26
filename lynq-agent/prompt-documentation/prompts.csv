@@ -103,3 +103,7 @@ date,prompt
 "28-09-2026","require_candidate never awaits anything, so declaring it async says something about the function that is not true and SonarCloud reads it as python:S7503. Make it a plain def — FastAPI resolves a sync dependency that depends on an async one just the same"
 "03-10-2026","raise MAX_PASSES in the editor so a rejected part goes back to the model twice instead of once"
 "03-10-2026","the skill-extraction service is now called lynq-llm and lives at /lynq-llm: rename lynq_ml_client to lynq_llm_client and LYNQ_ML_URL / ML_TIMEOUT to LYNQ_LLM_URL / LYNQ_LLM_TIMEOUT, keeping it apart from the LLM_TIMEOUT the agent already uses for its own model"
+"26-10-2026","add a third intent, unknown, so the intent agent can say it cannot tell whether the candidate wants the resume changed or is asking something"
+"26-10-2026","add a clarify agent with its own per-provider prompt under resources/prompts/clarify that runs on the intent model and asks the candidate what they meant, naming both readings when there are two or asking them to rephrase when there are none"
+"26-10-2026","route unknown from classify to a new clarify node that ends the turn, reply with its question and no warnings, recommendations or version, and leave a clarify span priced with the intent model's sheet"
+"26-10-2026","update the README and the graph diagram with the clarify node, and cover unknown in the intent, clarifier, graph and turn tests"
