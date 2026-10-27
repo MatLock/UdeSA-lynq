@@ -7,8 +7,8 @@ from langchain_core.tools import tool
 from langdetect import LangDetectException, detect
 
 from agent.context import SpanRecord
-from evaluation.arms.react.state import PERSONAL_INFO, TurnState, current_turn_state
-from evaluation.arms.react.lexical import claim_words, find_match, matches, normalize
+from evaluation.react.state import PERSONAL_INFO, TurnState, current_turn_state
+from evaluation.react.lexical import claim_words, find_match, matches, normalize
 from db.models import SpanKind
 
 log = logging.getLogger(__name__)

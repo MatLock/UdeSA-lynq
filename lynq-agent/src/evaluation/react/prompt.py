@@ -9,7 +9,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoes
 
 from prompt import bare_language
 
-_MODULE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+_MODULE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 TEMPLATE_DIR = os.path.join(_MODULE_ROOT, "resources", "evaluation", "react")
 FAMILY = "react"
 LANGUAGE_NAMES = {"en": "English", "es": "Spanish", "pt": "Portuguese"}

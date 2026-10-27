@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 
-from evaluation.arms.react.answer import TurnAnswer
+from evaluation.react.answer import TurnAnswer
 from prompt.refusal import render as refusal
 
 log = logging.getLogger(__name__)

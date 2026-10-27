@@ -10,7 +10,7 @@ from tests.test_turn import context_for
 from agent.context import INTENT_SPAN, Intent
 from config import reset_settings
 from db.models import SpanKind
-from evaluation.arms.react.loop import react_intent, recursion_limit, run_turn
+from evaluation.react.loop import react_intent, recursion_limit, run_turn
 
 ANSWER = {"reply": REPLY, "warnings": [WARNING]}
 

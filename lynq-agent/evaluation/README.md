@@ -23,11 +23,11 @@ These are the judge's own kinds, so the judge can be scored on the vocabulary
 the humans use.
 
 **Arms.** Three designs, all taking the same `TurnContext` and answering the
-same `TurnOutcome` (`src/evaluation/arms/__init__.py`):
+same `TurnOutcome` (`src/evaluation/arms.py`):
 
 | arm | what runs | where it lives |
 |---|---|---|
-| `react` | the baseline: one agent over two tools, `find_evidence` and `edit`, up to 12 steps and 2 edits per turn, the tools writing as they are called. `edit` reaches the summary, one entry, the order of a section and the skill buckets through flat typed arguments, which is what the thesis document describes; the first `apply_edit` with a free-form payload broke on Bedrock and is not the baseline | `src/evaluation/arms/react/`, restored from the commit that removed it (`3582bd6`) with the four typed edit tools folded back into one, prompts in `resources/evaluation/react/` |
+| `react` | the baseline: one agent over two tools, `find_evidence` and `edit`, up to 12 steps and 2 edits per turn, the tools writing as they are called. `edit` reaches the summary, one entry, the order of a section and the skill buckets through flat typed arguments, which is what the thesis document describes; the first `apply_edit` with a free-form payload broke on Bedrock and is not the baseline | `src/evaluation/react/`, restored from the commit that removed it (`3582bd6`) with the four typed edit tools folded back into one, prompts in `resources/evaluation/react/` |
 | `guard` | the current graph with the judge switched off: the editing agent proposes once, `agent.apply.plan` rejects what lost lines, numbers or technologies, what moved, and what names something unbacked, and everything that passes is applied | `agent.turn.run_turn(judge_enabled=False)` |
 | `judge` | the current design: proposal, shape guard, judge with quoted evidence, apply, up to `editor.MAX_PASSES` passes | `agent.turn.run_turn` |
 

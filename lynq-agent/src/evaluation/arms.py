@@ -25,7 +25,7 @@ Runner = Callable[..., Awaitable[TurnOutcome]]
 
 
 async def run_react(context: TurnContext, **models: Any) -> TurnOutcome:
-    from evaluation.arms.react.loop import run_turn
+    from evaluation.react.loop import run_turn
 
     return await run_turn(
         context, model=models.get("model"), intent_model=models.get("intent_model")

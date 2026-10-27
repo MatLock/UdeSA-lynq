@@ -11,11 +11,11 @@ from agent.intent import classify
 from agent.turn import template_provider, turn_messages
 from config import get_settings
 from db.models import SpanKind
-from evaluation.arms.react.answer import TurnAnswer, from_result
-from evaluation.arms.react.prompt import reference, render
-from evaluation.arms.react.scope import SPAN_NAME, SPAN_REASON, enforce
-from evaluation.arms.react.state import DEFAULT_MAX_EDITS, build_turn_state, use_turn_state
-from evaluation.arms.react.tools import EDIT_TOOLS, find_evidence
+from evaluation.react.answer import TurnAnswer, from_result
+from evaluation.react.prompt import reference, render
+from evaluation.react.scope import SPAN_NAME, SPAN_REASON, enforce
+from evaluation.react.state import DEFAULT_MAX_EDITS, build_turn_state, use_turn_state
+from evaluation.react.tools import EDIT_TOOLS, find_evidence
 from llm.errors import retryable
 from llm.factory import build_model
 from prompt.notice import render as no_change_notice
