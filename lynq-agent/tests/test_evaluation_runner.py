@@ -82,7 +82,7 @@ class RunnerTest(unittest.IsolatedAsyncioTestCase):
     async def test_the_react_arm_runs_through_the_same_runner(self) -> None:
         plan = plan_run([PAIR], [SCRIPT], [REACT])
         await run_all(plan, self.output, models(
-            tool_call("reorder_entries", {"section": "work_experience", "order": [1, 0]}, "1"),
+            tool_call("edit", {"section": "work_experience", "order": [1, 0]}, "1"),
             tool_call("TurnAnswer", {"reply": REPLY, "warnings": []}, "2"),
         ), timeout=30)
 

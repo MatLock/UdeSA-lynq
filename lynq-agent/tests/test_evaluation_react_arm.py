@@ -29,7 +29,7 @@ class ReactArmTest(unittest.IsolatedAsyncioTestCase):
     async def test_the_loop_can_reorder_the_experience(self) -> None:
         model = scripted(
             tool_call("find_evidence", {"claims": ["Kubernetes"]}, "1"),
-            tool_call("reorder_entries", {"section": "work_experience", "order": [1, 0]}, "2"),
+            tool_call("edit", {"section": "work_experience", "order": [1, 0]}, "2"),
             tool_call("TurnAnswer", ANSWER, "3"),
         )
 
@@ -41,13 +41,13 @@ class ReactArmTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome.spans[0].name, INTENT_SPAN)
         self.assertEqual(
             [s.name for s in outcome.spans if s.kind == SpanKind.TOOL],
-            ["find_evidence", "reorder_entries"],
+            ["find_evidence", "edit"],
         )
         self.assertEqual(outcome.resume["personal_info"], context_for().base_resume["personal_info"])
 
     async def test_a_skill_without_evidence_is_rejected_by_the_tool(self) -> None:
         model = scripted(
-            tool_call("replace_skills", {"technical": ["Java", "Postgres", "Go"]}, "1"),
+            tool_call("edit", {"section": "skills", "technical": ["Java", "Postgres", "Go"]}, "1"),
             tool_call("TurnAnswer", ANSWER, "2"),
         )
 
@@ -66,8 +66,35 @@ class ReactArmTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome.intent, Intent.ADVISE)
         bound = model.binds[-1]["tools"]
         self.assertIn("find_evidence", bound)
-        for edit_tool in ("rewrite_summary", "rewrite_entry", "reorder_entries", "replace_skills"):
-            self.assertNotIn(edit_tool, bound)
+        self.assertNotIn("edit", bound)
+
+    async def test_an_edit_turn_holds_exactly_find_evidence_and_edit(self) -> None:
+        model = scripted(tool_call("TurnAnswer", ANSWER, "1"))
+
+        await run_turn(context_for(message=ASK_FOR_GO), model=model, intent_model=intending())
+
+        self.assertEqual([t for t in model.binds[-1]["tools"] if t != "TurnAnswer"], ["find_evidence", "edit"])
+
+    async def test_the_one_edit_tool_reaches_every_part_of_the_surface(self) -> None:
+        model = scripted(
+            tool_call("edit", {"section": "summary", "text": "Backend engineer on Postgres."}, "1"),
+            tool_call("edit", {"section": "work_experience", "index": 0, "description": "Kept a Java monolith."}, "2"),
+            tool_call("edit", {"section": "skills", "technical": ["Java", "Postgres"], "tools": ["Jenkins", "Java"]}, "3"),
+            tool_call("edit", {"section": "personal_info", "text": "x"}, "4"),
+            tool_call("edit", {"section": "work_experience", "index": 9, "description": "x"}, "5"),
+            tool_call("TurnAnswer", ANSWER, "6"),
+        )
+
+        outcome = await run_turn(context_for(message=ASK_FOR_GO), model=model, intent_model=intending(), max_edits=5)
+
+        self.assertEqual(outcome.resume["summary"], "Backend engineer on Postgres.")
+        self.assertEqual(outcome.resume["work_experience"][0]["description"], "Kept a Java monolith.")
+        self.assertEqual(outcome.resume["skills"]["tools"], ["Jenkins", "Java"])
+        outputs = [s.output for s in outcome.spans if s.kind == SpanKind.TOOL]
+        self.assertEqual(outputs[:3], ["OK", "OK", "OK"])
+        self.assertEqual(outputs[3], "REJECTED: personal_info is immutable")
+        self.assertEqual(outputs[4], "REJECTED: index out of range")
+        self.assertEqual([c["kind"] for c in outcome.changes], ["rewrite", "rewrite", "replace"])
 
     def test_the_unknown_intent_falls_back_to_edit_as_the_old_loop_did(self) -> None:
         self.assertEqual(react_intent(Intent.UNKNOWN), Intent.EDIT)

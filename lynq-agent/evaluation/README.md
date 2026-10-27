@@ -27,7 +27,7 @@ same `TurnOutcome` (`src/evaluation/arms/__init__.py`):
 
 | arm | what runs | where it lives |
 |---|---|---|
-| `react` | the baseline: one agent over `find_evidence` and four edit tools (`rewrite_summary`, `rewrite_entry`, `reorder_entries`, `replace_skills`), up to 12 steps and 2 edits per turn, the tools writing as they are called | `src/evaluation/arms/react/`, restored from the commit that removed it (`3582bd6`), prompts in `resources/evaluation/react/` |
+| `react` | the baseline: one agent over two tools, `find_evidence` and `edit`, up to 12 steps and 2 edits per turn, the tools writing as they are called. `edit` reaches the summary, one entry, the order of a section and the skill buckets through flat typed arguments, which is what the thesis document describes; the first `apply_edit` with a free-form payload broke on Bedrock and is not the baseline | `src/evaluation/arms/react/`, restored from the commit that removed it (`3582bd6`) with the four typed edit tools folded back into one, prompts in `resources/evaluation/react/` |
 | `guard` | the current graph with the judge switched off: the editing agent proposes once, `agent.apply.plan` rejects what lost lines, numbers or technologies, what moved, and what names something unbacked, and everything that passes is applied | `agent.turn.run_turn(judge_enabled=False)` |
 | `judge` | the current design: proposal, shape guard, judge with quoted evidence, apply, up to `editor.MAX_PASSES` passes | `agent.turn.run_turn` |
 
@@ -137,6 +137,7 @@ nothing has a perfect invalid rate and zero coverage.
 - The real corpus (see above). The pilot pairs are synthetic.
 - The annotation itself: two annotators, a pilot of five pairs to settle the
   guide, then the full set.
-- The first prompt of the ReAct baseline (two tools, `find_evidence` and `edit`)
-  that the thesis document describes was never committed; the baseline here is
-  the last ReAct version that ran in the service, with five tools.
+- The baseline is the last ReAct version that ran in the service, with its
+  typed arguments; its four edit tools were folded back into the one `edit` the
+  thesis document describes. The very first version, with a free-form payload,
+  is in the history (`c16a253^`) and is not an arm.

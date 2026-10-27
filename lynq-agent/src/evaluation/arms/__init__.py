@@ -2,8 +2,8 @@
 `TurnContext` the service builds and answers the same `TurnOutcome`, so the runner
 cannot tell them apart and neither can the diff that follows.
 
-- `react`: the baseline. One agent over `find_evidence` and four edit tools; the
-  tools write as they are called (commit 3582bd6 removed it from the service).
+- `react`: the baseline. One agent over `find_evidence` and `edit`; the tools
+  write as they are called (commit 3582bd6 removed it from the service).
 - `guard`: the current graph with the judge switched off. The editing agent
   proposes once, the shape guard in `agent.apply.plan` rejects what lost lines,
   numbers or technologies or names something unbacked, and everything that

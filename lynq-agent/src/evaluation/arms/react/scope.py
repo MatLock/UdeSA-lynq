@@ -10,12 +10,10 @@ log = logging.getLogger(__name__)
 
 INSTRUCTIONS_END = "<job_posting>"
 SHINGLE_WORDS = 8
+# `edit` is not a marker: the word is too common in a reply to tell a leak from
+# a candidate who wrote it.
 MARKERS = (
     "find_evidence",
-    "rewrite_summary",
-    "rewrite_entry",
-    "reorder_entries",
-    "replace_skills",
     "turnanswer",
     "job_posting",
     "system_prompt",

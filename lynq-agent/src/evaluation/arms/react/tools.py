@@ -378,55 +378,30 @@ def _backed_buckets(
     return accepted, ""
 
 
-REWRITE_SUMMARY_DESCRIPTION = """Rewrite the summary of the resume that is being tailored.
+EDIT_DESCRIPTION = """Edit the resume that is being tailored. One call is one edit, and the
+arguments you send say which edit it is; leave the others empty.
 
-text: the whole summary as it should read once you are done, in the language the resume
-is written in. It replaces what is there; there is no way to append to it.
-
-It answers "OK", or "REJECTED: <reason>" when a rule of the resume forbids it."""
-
-REWRITE_ENTRY_DESCRIPTION = """Rewrite one entry of the experience, the education or the projects.
-
-section: "work_experience", "education" or "projects".
-index: which entry of that section, counting from 0 in the order the resume shows them.
-description: the whole description of that entry as it should read once you are done.
-achievements: the whole list of achievements, replacing the one that is there. Only
-work_experience has achievements; education and projects are rejected for it.
-
-Send description, achievements or both, and leave empty what you are not changing. The
-company, the position, the institution and every date of an entry are not yours to
-change, and there is no way to add an entry: the resume only holds what the candidate
-already lived.
+- The summary: section "summary" and text, the whole summary as it should read once you
+  are done, in the language the resume is written in. It replaces what is there.
+- One entry: section "work_experience", "education" or "projects", index (which entry of
+  that section, counting from 0 in the order the resume shows them), and description
+  and/or achievements, each one whole, replacing what is there. Only work_experience has
+  achievements. The company, the position, the institution and every date of an entry
+  are not yours to change, and there is no way to add an entry.
+- The order of a section: section "work_experience", "education" or "projects" and
+  order, the positions the section already has, in the order you want them, each one
+  exactly once ([2, 0, 1] puts the third entry first). Nothing is added or dropped.
+- The skills: section "skills" and technical, tools and/or soft, the whole list of that
+  bucket as it should read. A bucket you leave empty is kept as it is. Every skill has
+  to be backed by the resume, with the wording find_evidence returned; one skill without
+  evidence rejects the whole call.
 
 It answers "OK", or "REJECTED: <reason>" when a rule of the resume forbids it."""
 
-REORDER_ENTRIES_DESCRIPTION = """Reorder the entries of the experience, the education or the projects.
-
-section: "work_experience", "education" or "projects".
-order: the positions the section already has, in the order you want them, each one
-exactly once. [2, 0, 1] puts the third entry first. Nothing is added or dropped by
-reordering.
-
-It answers "OK", or "REJECTED: <reason>" when a rule of the resume forbids it."""
-
-REPLACE_SKILLS_DESCRIPTION = """Replace the skills of the resume, bucket by bucket.
-
-technical, tools, soft: the whole list of that bucket as it should read once you are
-done. A bucket you leave empty is kept as it is.
-
-Every skill has to be backed by the resume, with the wording find_evidence returned. One
-skill without evidence rejects the whole call.
-
-It answers "OK", or "REJECTED: <reason>" when a rule of the resume forbids it."""
+SKILLS_SECTION = "skills"
 
 
-@tool(description=REWRITE_SUMMARY_DESCRIPTION)
-async def rewrite_summary(text: str) -> str:
-    state = current_turn_state()
-    limit = _limit_answer(state, "rewrite_summary")
-    if limit is not None:
-        return limit
-
+async def _rewrite_summary(state: TurnState, text: str) -> str:
     if not isinstance(text, str) or not text.strip():
         return _rejected(INVALID_PAYLOAD)
 
@@ -441,22 +416,9 @@ async def rewrite_summary(text: str) -> str:
     return _record_change(state, SUMMARY, "rewrite", "rewrote the summary")
 
 
-@tool(description=REWRITE_ENTRY_DESCRIPTION)
-async def rewrite_entry(
-    section: str,
-    index: int,
-    description: str = "",
-    achievements: list[str] = [],
+async def _rewrite_entry(
+    state: TurnState, named: str, index: int, description: str, achievements: list[str]
 ) -> str:
-    state = current_turn_state()
-    limit = _limit_answer(state, "rewrite_entry")
-    if limit is not None:
-        return limit
-
-    named, rejection = _entry_section(state, section)
-    if named is None:
-        return rejection
-
     entries = _entries_of(state, named)
     if not isinstance(index, int) or isinstance(index, bool):
         return _rejected(INVALID_PAYLOAD)
@@ -484,31 +446,9 @@ async def rewrite_entry(
     )
 
 
-@tool(description=REORDER_ENTRIES_DESCRIPTION)
-async def reorder_entries(section: str, order: list[int]) -> str:
-    state = current_turn_state()
-    limit = _limit_answer(state, "reorder_entries")
-    if limit is not None:
-        return limit
-
-    named, rejection = _entry_section(state, section)
-    if named is None:
-        return rejection
-
-    return _reorder(state, named, _entries_of(state, named), order)
-
-
-@tool(description=REPLACE_SKILLS_DESCRIPTION)
-async def replace_skills(
-    technical: list[str] = [],
-    tools: list[str] = [],
-    soft: list[str] = [],
+async def _replace_skills(
+    state: TurnState, technical: list[str], tools: list[str], soft: list[str]
 ) -> str:
-    state = current_turn_state()
-    limit = _limit_answer(state, "replace_skills")
-    if limit is not None:
-        return limit
-
     asked = {"technical": technical, "tools": tools, "soft": soft}
     if any(
         not isinstance(names, list) or any(not isinstance(name, str) for name in names)
@@ -541,4 +481,40 @@ async def replace_skills(
     )
 
 
-EDIT_TOOLS = (rewrite_summary, rewrite_entry, reorder_entries, replace_skills)
+@tool(description=EDIT_DESCRIPTION)
+async def edit(
+    section: str,
+    text: str = "",
+    index: int = -1,
+    description: str = "",
+    achievements: list[str] = [],
+    order: list[int] = [],
+    technical: list[str] = [],
+    tools: list[str] = [],
+    soft: list[str] = [],
+) -> str:
+    """The one edit tool of the baseline. Its arguments are flat and typed —
+    strings, an integer, lists of strings or integers, every one with a default —
+    so Bedrock validates the call against the schema; the first `apply_edit` took
+    a free-form `payload` dict and broke on `ModelErrorException` when the model
+    guessed its shape. Which edit it is follows from the arguments sent."""
+    state = current_turn_state()
+    limit = _limit_answer(state, "edit")
+    if limit is not None:
+        return limit
+
+    named = (section or "").strip()
+    if named == SUMMARY:
+        return await _rewrite_summary(state, text or description)
+    if named == SKILLS_SECTION:
+        return await _replace_skills(state, technical, tools, soft)
+
+    named, rejection = _entry_section(state, named)
+    if named is None:
+        return rejection
+    if order:
+        return _reorder(state, named, _entries_of(state, named), order)
+    return await _rewrite_entry(state, named, index, description, achievements)
+
+
+EDIT_TOOLS = (edit,)
