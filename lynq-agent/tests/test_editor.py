@@ -106,7 +106,10 @@ class CorrectionPassTest(unittest.IsolatedAsyncioTestCase):
                 "original": RESUME["summary"], "proposed": INVENTED,
             }],
         )
-        self.assertEqual(json.loads(first.output), [{"where": f"summary: {JUDGE_REASON_ES}", "kind": "invented"}])
+        self.assertEqual(json.loads(first.output), [{
+            "where": f"summary: {JUDGE_REASON_ES}", "kind": "invented", "section": "summary", "label": "",
+            "original": RESUME["summary"], "proposed": INVENTED,
+        }])
 
     async def test_each_model_span_says_which_template_it_ran_under(self) -> None:
         model = scripted(

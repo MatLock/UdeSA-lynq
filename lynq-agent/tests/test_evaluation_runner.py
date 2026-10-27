@@ -79,6 +79,22 @@ class RunnerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(arm_models.model.prompts), 1, "one proposal, no verdict")
         self.assertEqual(row["passes"], 1)
 
+    async def test_a_part_the_guard_keeps_out_is_a_rejected_unit_with_its_text(self) -> None:
+        dropping = {"reply": REPLY, "skills": {"technical": ["Java"]}}
+        plan = plan_run([PAIR], [SCRIPT], [GUARD])
+
+        await run_all(plan, self.output, models(tool_call("EditProposal", dropping, "1")), timeout=30)
+
+        [row] = self.rows()
+        self.assertEqual(row["units"], [])
+        self.assertEqual(row["after"]["skills"]["technical"], ["Java", "Postgres"])
+        kinds = {(u["label"], u["system_kind"]) for u in row["rejected"]}
+        self.assertIn(("technical", "cut"), kinds)
+        technical = next(u for u in row["rejected"] if u["label"] == "technical")
+        self.assertEqual(technical["original"], "Java, Postgres")
+        self.assertEqual(technical["proposed"], "Java")
+        self.assertFalse(technical["applied"])
+
     async def test_the_react_arm_runs_through_the_same_runner(self) -> None:
         plan = plan_run([PAIR], [SCRIPT], [REACT])
         await run_all(plan, self.output, models(

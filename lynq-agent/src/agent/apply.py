@@ -48,8 +48,13 @@ class Rejection(str):
     label: str
     kind: str
     reason: str
+    original: str
+    proposed: str
 
-    def __new__(cls, section: str, label: str, kind: str, reason: str) -> "Rejection":
+    def __new__(
+        cls, section: str, label: str, kind: str, reason: str,
+        original: str = "", proposed: str = "",
+    ) -> "Rejection":
         where = section if not label else (
             f"{section}.{label}" if section == SKILLS else f"{section} {label}"
         )
@@ -57,6 +62,9 @@ class Rejection(str):
         rejection.section, rejection.label, rejection.kind, rejection.reason = (
             section, label, kind, reason,
         )
+        # The text that was kept out, beside the text it would have replaced:
+        # the trace keeps it so that a rejection can be read, and judged, later.
+        rejection.original, rejection.proposed = original, proposed
         return rejection
 
 
@@ -302,7 +310,7 @@ def plan(state: TurnState, proposal: EditProposal) -> tuple[list[Part], list[Rej
         if fault is None:
             parts.append(part)
         else:
-            rejections.append(Rejection(part.section, part.label, *fault))
+            rejections.append(Rejection(part.section, part.label, *fault, part.original, part.proposed))
 
     if proposal.summary.strip():
         original = str(state.base_resume.get(SUMMARY) or "")
@@ -327,7 +335,9 @@ def plan(state: TurnState, proposal: EditProposal) -> tuple[list[Part], list[Rej
         label = _entry_label({"company": edit.company, "position": edit.position})
         index = find_entry(entries, edit.company, edit.position)
         if index is None or index >= len(base_entries):
-            rejections.append(Rejection(WORK_EXPERIENCE, label, UNKNOWN_ENTRY, UNKNOWN_ENTRY))
+            rejections.append(Rejection(
+                WORK_EXPERIENCE, label, UNKNOWN_ENTRY, UNKNOWN_ENTRY, "", _entry_text(fields),
+            ))
             continue
         base = base_entries[index]
         entry_backing = resume_text(base) + "\n" + said

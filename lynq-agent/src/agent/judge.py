@@ -65,13 +65,16 @@ async def judge(
                 "message= The judge gave no verdict on a part, conversationId=%s, part=%s",
                 state.conversation_id, part.id,
             )
-            rejections.append(Rejection(part.section, part.label, UNJUDGED, UNJUDGED))
+            rejections.append(Rejection(
+                part.section, part.label, UNJUDGED, UNJUDGED, part.original, part.proposed,
+            ))
         elif answer.ok:
             approved.add(part.id)
         else:
             rejections.append(Rejection(
                 part.section, part.label, answer.kind.strip() or "rejected",
                 answer.reason.strip() or answer.kind.strip() or "rejected",
+                part.original, part.proposed,
             ))
     return approved, rejections
 

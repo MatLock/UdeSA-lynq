@@ -144,7 +144,14 @@ def apply_node(graph: TurnGraphState) -> TurnGraphState:
                 ensure_ascii=False,
             ),
             output=OK if not rejections else json.dumps(
-                [{"where": str(r), "kind": r.kind} for r in rejections], ensure_ascii=False
+                [
+                    {
+                        "where": str(r), "kind": r.kind, "section": r.section, "label": r.label,
+                        "original": r.original, "proposed": r.proposed,
+                    }
+                    for r in rejections
+                ],
+                ensure_ascii=False,
             ),
         )
     )

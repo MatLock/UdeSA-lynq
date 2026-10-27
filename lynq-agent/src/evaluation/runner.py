@@ -79,34 +79,27 @@ def _span_totals(spans: list[SpanRecord]) -> dict[str, Any]:
     }
 
 
-def _where(section: str, label: str) -> str:
-    if not label:
-        return section
-    return f"{section}.{label}" if section == "skills" else f"{section} {label}"
-
-
 def rejected_units(key: str, spans: list[SpanRecord]) -> list[Unit]:
-    """The parts the judge or the guard kept out, read from the apply spans: one
-    unit each, with the kind the system gave, so a human can say whether keeping
-    it out was right. A part re-proposed in a later pass is another unit."""
+    """The parts the guard or the judge kept out, read from the apply spans: one
+    unit each, with the kind the system gave and the text it refused beside the
+    text it would have replaced, so a human can say whether keeping it out was
+    right. A part re-proposed in a later pass is another unit."""
     units: list[Unit] = []
     for number, span in enumerate(s for s in spans if s.name == APPLY_SPAN):
+        if (span.output or "OK") == "OK":
+            continue
         try:
-            parts = json.loads(span.input or "[]")
-            rejections = [] if (span.output or "OK") == "OK" else json.loads(span.output or "[]")
+            rejections = json.loads(span.output)
         except json.JSONDecodeError:
             continue
-        kinds = {r.get("where", "").split(":")[0]: r.get("kind", "rejected") for r in rejections}
-        for part in parts:
-            where = _where(part.get("section", ""), part.get("label", ""))
-            kind = kinds.get(where)
-            if kind is None:
-                continue
+        for rejection in rejections:
+            section, label = rejection.get("section", ""), rejection.get("label", "")
+            proposed = rejection.get("proposed", "")
             units.append(Unit(
-                id=unit_id(f"{key}#{number}", part.get("section", ""), part.get("label", ""), part.get("proposed", "")),
-                section=part.get("section", ""), label=part.get("label", ""),
-                original=part.get("original", ""), proposed=part.get("proposed", ""),
-                applied=False, system_kind=kind,
+                id=unit_id(f"{key}#{number}", section, label, proposed),
+                section=section, label=label,
+                original=rejection.get("original", ""), proposed=proposed,
+                applied=False, system_kind=rejection.get("kind", "rejected"),
             ))
     return units
 
