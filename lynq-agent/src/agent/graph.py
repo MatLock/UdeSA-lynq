@@ -51,6 +51,7 @@ class TurnGraphState(TypedDict, total=False):
     model: Any
     intent_model: Any
     judge_model: Any
+    judge_enabled: bool
     callbacks: list
     retries: int
     messages: list
@@ -111,6 +112,10 @@ async def judge_node(graph: TurnGraphState) -> TurnGraphState:
     graph["prompt"].family = JUDGE_PROMPT
     state, context = graph["state"], graph["context"]
     parts, misplaced = apply.plan(state, graph["proposal"])
+    if not graph.get("judge_enabled", True):
+        # The evaluation's `guard` arm: what passed the shape guard is applied
+        # as it is, without asking the judge. The service never runs this way.
+        return {"parts": parts, "approved": {part.id for part in parts}, "rejections": list(misplaced)}
     approved, rejected = await judge(
         state, parts, graph.get("judge_model") or graph["model"],
         provider=graph["provider"], language=context.language,
@@ -129,7 +134,13 @@ def apply_node(graph: TurnGraphState) -> TurnGraphState:
         SpanRecord(
             step=state.next_step(), kind=SpanKind.TOOL, name=APPLY_SPAN,
             input=json.dumps(
-                [{"id": part.id, "proposed": part.proposed} for part in graph["parts"]],
+                [
+                    {
+                        "id": part.id, "section": part.section, "label": part.label,
+                        "original": part.original, "proposed": part.proposed,
+                    }
+                    for part in graph["parts"]
+                ],
                 ensure_ascii=False,
             ),
             output=OK if not rejections else json.dumps(

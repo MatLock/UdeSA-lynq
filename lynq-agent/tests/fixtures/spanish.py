@@ -52,3 +52,6 @@ CLARIFICATION = (
     "No estoy seguro de qué querés con eso: ¿que sume Kubernetes a tu CV, o que te "
     "cuente qué dice el CV de Kubernetes?"
 )
+
+EVAL_SCRIPT_TURN = "Agregá {gap1} a mi puesto de {position1} en {company1}."
+EVAL_SCRIPT_TURN_FILLED = "Agregá SAP a mi puesto de Analyst en Acme."

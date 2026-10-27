@@ -19,3 +19,7 @@ trello.auth.txt
 openai_key.txt
 import_external_jobs.txt
 db_prod.env
+# Evaluation runs are data of a run, not of the repository: the corpus is
+# committed, the outputs are not.
+lynq-agent/evaluation/runs/*
+!lynq-agent/evaluation/runs/.gitkeep

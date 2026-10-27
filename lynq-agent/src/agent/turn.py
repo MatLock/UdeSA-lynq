@@ -41,14 +41,20 @@ def turn_messages(context: TurnContext) -> list:
 
 
 async def run_turn(
-    context: TurnContext, model=None, intent_model=None, judge_model=None
+    context: TurnContext,
+    model=None,
+    intent_model=None,
+    judge_model=None,
+    judge_enabled: bool = True,
 ) -> TurnOutcome:
     """One turn through the graph: the intent agent reads the message, then
     the clarifying agent asks what it meant, the advising agent answers or the
     editing agent proposes, the judge
     decides part by part and the code applies what it approved, with one
     correction pass when something is rejected. A scripted `model` serves the
-    judge too, so a test scripts both answers in order."""
+    judge too, so a test scripts both answers in order. `judge_enabled=False`
+    is for the evaluation only: the shape guard decides alone and what passes
+    it is applied without a verdict."""
     settings = get_settings()
     state = build_turn_state(context)
     prompt = PromptReference()
@@ -62,8 +68,10 @@ async def run_turn(
             "model": model if model is not None else build_model(),
             "intent_model": intent_model,
             "judge_model": judge_model if judge_model is not None else (
-                None if model is not None else build_model(model=settings.judge_model)
+                None if model is not None or not judge_enabled
+                else build_model(model=settings.judge_model)
             ),
+            "judge_enabled": judge_enabled,
             "callbacks": [collector],
             "retries": settings.model_retries,
             "messages": turn_messages(context),

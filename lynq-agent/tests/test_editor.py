@@ -99,7 +99,13 @@ class CorrectionPassTest(unittest.IsolatedAsyncioTestCase):
         outcome = await run_turn(context_for(), model=model, intent_model=intending())
 
         first = [span for span in outcome.spans if span.name == APPLY_SPAN][0]
-        self.assertEqual(json.loads(first.input), [{"id": "summary", "proposed": INVENTED}])
+        self.assertEqual(
+            json.loads(first.input),
+            [{
+                "id": "summary", "section": "summary", "label": "",
+                "original": RESUME["summary"], "proposed": INVENTED,
+            }],
+        )
         self.assertEqual(json.loads(first.output), [{"where": f"summary: {JUDGE_REASON_ES}", "kind": "invented"}])
 
     async def test_each_model_span_says_which_template_it_ran_under(self) -> None:

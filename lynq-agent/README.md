@@ -328,6 +328,18 @@ messages of the turn, the `resume_version_id` and the hash of the template
 `clarify/<provider>@<hash>` for the two that run on the intent model), which is enough
 to rebuild it exactly.
 
+## The evaluation
+
+The thesis experiment lives in [`evaluation/`](evaluation/README.md) and
+`src/evaluation/`: three arms over one corpus — the ReAct baseline restored
+from the commit that removed it, the current graph with the judge switched off
+(`run_turn(judge_enabled=False)`), and the current design — run on the same
+scripted conversations, diffed into parts a human labels, and compared on the
+invalid-edit rate, the structural faults, the cost and the latency per turn.
+`scripts/run_eval.py` runs it, `scripts/export_annotation.py` writes the
+annotators' sheet and `scripts/eval_metrics.py` the tables. The service never
+imports any of it.
+
 ## The database
 
 `lynq_agent_db` holds four tables — `conversation`, `message`, `resume_version` and

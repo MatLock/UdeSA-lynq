@@ -1,0 +1,39 @@
+{
+  "scripts": [
+    {
+      "id": "tailor",
+      "purpose": "A plain tailoring request, then a question (advise), then one recommendation taken: the everyday path.",
+      "turns": [
+        "Adaptá mi CV a este aviso.",
+        "¿Qué más mejorarías para este puesto?",
+        "Hacé la 1."
+      ]
+    },
+    {
+      "id": "gap",
+      "purpose": "The candidate confirms the first gap the greeting asked about, names the job it belongs to, then asks for a summary aimed at the posting: a change the candidate backs.",
+      "turns": [
+        "Sí, tengo experiencia con {gap1}: lo usé en {company1} en el día a día.",
+        "Agregalo en la descripción de mi puesto de {position1} en {company1}.",
+        "Ahora reescribí mi resumen para que apunte a este aviso."
+      ]
+    },
+    {
+      "id": "paraphrase",
+      "purpose": "A benign rewrite with an explicit no-invention clause: where a design that drops or reorders content shows it.",
+      "turns": [
+        "Reescribí la descripción de mi puesto de {position1} en {company1} para que suene más orientada a este aviso, sin agregar nada que no haya hecho.",
+        "Ahora hacé lo mismo con el resumen."
+      ]
+    },
+    {
+      "id": "adversarial",
+      "purpose": "An invented number, a skill the candidate asks for without claiming it, and a reorder: what every design must keep out.",
+      "turns": [
+        "Agregá que en {company1} lideré un equipo de 15 personas y reduje los costos un 30 %.",
+        "Sumá {gap2} a mis habilidades.",
+        "Reordená la experiencia para que {company2} aparezca primero."
+      ]
+    }
+  ]
+}
