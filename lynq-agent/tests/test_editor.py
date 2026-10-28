@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from langchain_core.messages import HumanMessage
 
-from tests.fixtures.spanish import JUDGE_REASON_ES
+from tests.fixtures.spanish import JUDGE_REASON_ES, REJECTION_OPENING_ES
 from tests.support import intending, scripted, tool_call
 from tests.test_turn import RESUME, context_for
 
@@ -18,6 +18,7 @@ from agent.state import build_turn_state
 from agent.turn import run_turn
 from config import reset_settings
 from db.models import SpanKind
+from prompt.notice import render as no_change_notice
 from prompt.rejection import render as rejection_notice
 
 FIXED = "Backend engineer with eight years on distributed systems, Postgres and Kubernetes."
@@ -71,7 +72,37 @@ class CorrectionPassTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome.resume["summary"], RESUME["summary"])
         self.assertEqual(outcome.changes, [])
         self.assertEqual(len(model.prompts), 2 * editor.MAX_PASSES)
-        self.assertIn(rejection_notice("es", [Rejection("summary", "", "invented", JUDGE_REASON_ES)]), outcome.warnings)
+        self.assertEqual(outcome.reply, rejection_notice("es", [Rejection("summary", "", "invented", JUDGE_REASON_ES)], nothing_applied=True))
+
+    async def test_a_reply_that_claims_an_edit_nothing_applied_is_replaced_by_the_notice(self) -> None:
+        model = scripted(
+            tool_call("EditProposal", {"reply": "added Kubernetes", "skills": {"technical": ["Java", "Postgres", "Kubernetes"]}}, "1"),
+            verdict({"id": "skills:technical", "ok": False, "kind": "unsupported_skill", "reason": JUDGE_REASON_ES}),
+            tool_call("EditProposal", {"reply": "added Kubernetes"}, "2"),
+        )
+
+        outcome = await run_turn(context_for(), model=model, intent_model=intending())
+
+        self.assertEqual(outcome.changes, [])
+        self.assertEqual(outcome.reply, rejection_notice("es", [Rejection("skills", "technical", "unsupported_skill", JUDGE_REASON_ES)], nothing_applied=True))
+        self.assertNotIn(no_change_notice("es"), outcome.warnings)
+
+    async def test_a_rejection_the_correction_drops_is_still_told(self) -> None:
+        model = scripted(
+            tool_call("EditProposal", {"reply": "first", "entries": [{"company": "Lily AI", "position": "Backend Engineer", "description": "Built services."}], "skills": {"technical": ["Java", "Postgres", "Kubernetes"]}}, "1"),
+            verdict({"id": "skills:technical", "ok": True}),
+            tool_call("EditProposal", {"reply": "second"}, "2"),
+        )
+
+        outcome = await run_turn(context_for(), model=model, intent_model=intending())
+
+        self.assertEqual(outcome.reply, "second")
+        self.assertEqual(outcome.resume["skills"]["technical"], ["Java", "Postgres", "Kubernetes"])
+        notice = [warning for warning in outcome.warnings if warning.startswith(REJECTION_OPENING_ES)]
+        self.assertEqual(len(notice), 1)
+        self.assertIn("(Backend Engineer at Lily AI)", notice[0])
+        self.assertIn("Semi Senior at Globex; Backend Engineer at Acme", notice[0])
+        self.assertIn("its entries are Semi Senior at Globex; Backend Engineer at Acme", model.prompts[2][-1].content)
 
     async def test_a_clean_proposal_costs_two_calls(self) -> None:
         model = scripted(
@@ -140,3 +171,9 @@ class ThreadTest(unittest.TestCase):
         self.assertEqual([message.type for message in thread], ["system", "human"])
         self.assertIn("EditProposal", thread[0].content)
         self.assertNotIn("Ada Lovelace", thread[0].content)
+
+    def test_the_edit_prompt_lists_the_entries_the_experience_has(self) -> None:
+        context = context_for()
+        thread = editor.opening_thread(context, build_turn_state(context), "ollama", [HumanMessage("go")])
+
+        self.assertIn("entries and no others: Semi Senior at Globex; Backend Engineer at Acme.", thread[0].content)

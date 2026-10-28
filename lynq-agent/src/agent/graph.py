@@ -61,6 +61,7 @@ class TurnGraphState(TypedDict, total=False):
     parts: list
     approved: set
     rejections: list
+    outstanding: dict
     passes: int
     advice: Advice
     clarification: str
@@ -137,7 +138,17 @@ def apply_node(graph: TurnGraphState) -> TurnGraphState:
             ),
         )
     )
-    return {"passes": graph.get("passes", 0) + 1}
+    return {"passes": graph.get("passes", 0) + 1, "outstanding": outstanding_after(graph)}
+
+
+def outstanding_after(graph: TurnGraphState) -> dict:
+    outstanding = dict(graph.get("outstanding") or {})
+    for part in graph["parts"]:
+        if part.id in graph["approved"]:
+            outstanding.pop((part.section, part.label), None)
+    for rejection in graph["rejections"]:
+        outstanding[(rejection.section, rejection.label)] = rejection
+    return outstanding
 
 
 def last_reply(context: TurnContext) -> str:

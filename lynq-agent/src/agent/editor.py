@@ -4,7 +4,7 @@ import logging
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-from agent.apply import gaps_in
+from agent.apply import entry_labels, gaps_in
 from agent.context import TurnContext
 from agent.schemas import EditProposal
 from agent.state import TurnState
@@ -41,6 +41,7 @@ def opening_thread(context: TurnContext, state: TurnState, provider: str, messag
             recommendations=context.recommendations,
             statements=state.evidence(excluding=context.message),
             gaps=gaps_in(state.job_skills, state.base_resume, state.evidence()),
+            entries=entry_labels(state.base_resume),
         )
     )
     return [system, *messages]

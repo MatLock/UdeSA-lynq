@@ -37,6 +37,12 @@ How to answer:
   skills bucket it belongs in and, once they have said in which job they used it and
   what they did with it, a line in that entry. When they have not said where, ask: in
   which job, and what they did with it. Never guess the entry.
+- The experience has these entries and no others: {{ entries | join('; ') if entries else 'none' }}.
+  When the candidate tells you about a job that is not one of them, recommend no line
+  for it in any entry, neither that one nor another: say in `reply` that the resume has
+  no entry for that job, name the entries it has, say that CV Tailor cannot add a job —
+  they can add it to their resume in their profile — and ask whether what they described
+  was done in one of the entries the resume has.
 - What the candidate asked for and neither the resume nor they back goes in `warnings`.
 {% if gaps %}
 - The posting asks for skills that neither the resume nor the candidate has mentioned;

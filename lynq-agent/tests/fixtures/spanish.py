@@ -35,9 +35,11 @@ SUMMARY_REWRITE = (
 )
 
 REJECTION_OPENING_ES = "Parte de lo propuesto no entró al CV:"
+NOTHING_APPLIED_OPENING_ES = "Nada de lo propuesto entró al CV:"
 REJECTED_SKILL_ES = "sin respaldo en el CV"
 JUDGE_REASON_ES = "El CV dice ocho años, no doce."
-UNKNOWN_ENTRY_ES = "el CV no tiene esa entrada"
+UNKNOWN_ENTRY_ES = "el CV no tiene ese empleo y CV Tailor no puede agregar empleos"
+KNOWN_ENTRIES_ES = "sus empleos son:"
 REJECTED_SUMMARY_ES = "el resumen"
 CUT_ES = "la propuesta dejaba afuera algo que el CV ya tiene"
 MOVED_ES = "la propuesta cambiaba el orden que tiene el CV"

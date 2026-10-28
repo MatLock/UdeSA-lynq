@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from tests.fixtures.spanish import CUT_ES, JUDGE_REASON_ES, MOVED_ES, UNBACKED_ES, REJECTED_SUMMARY_ES, REJECTION_OPENING_ES, UNKNOWN_ENTRY_ES
+from tests.fixtures.spanish import CUT_ES, JUDGE_REASON_ES, KNOWN_ENTRIES_ES, MOVED_ES, NOTHING_APPLIED_OPENING_ES, UNBACKED_ES, REJECTED_SUMMARY_ES, REJECTION_OPENING_ES, UNKNOWN_ENTRY_ES
 
 from agent.apply import CUT, MOVED, UNBACKED, UNKNOWN_ENTRY, Rejection
 from agent.judge import UNJUDGED
@@ -21,6 +21,17 @@ class RejectionNoticeTest(unittest.TestCase):
 
         self.assertIn(f"(CTO at Initech), {UNKNOWN_ENTRY_ES}", notice)
         self.assertNotIn(UNKNOWN_ENTRY, notice)
+
+    def test_a_job_the_resume_does_not_have_is_told_with_the_jobs_it_has(self) -> None:
+        notice = render("es", [Rejection("work_experience", "Backend Engineer at Lily AI", UNKNOWN_ENTRY, "detail", ("Semi Senior at Globex", "Backend Engineer at Acme"))])
+
+        self.assertIn(f"{UNKNOWN_ENTRY_ES} ({KNOWN_ENTRIES_ES} Semi Senior at Globex; Backend Engineer at Acme)", notice)
+        self.assertNotIn("detail", notice)
+
+    def test_a_turn_that_applied_nothing_opens_the_notice_saying_so(self) -> None:
+        notice = render("es", [Rejection("summary", "", "invented", JUDGE_REASON_ES)], nothing_applied=True)
+
+        self.assertEqual(notice, f"{NOTHING_APPLIED_OPENING_ES} {REJECTED_SUMMARY_ES}, {JUDGE_REASON_ES}.")
 
     def test_the_structure_guards_rejections_are_translated_and_their_detail_stays_out(self) -> None:
         notice = render("es", [

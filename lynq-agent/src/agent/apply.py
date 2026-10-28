@@ -48,8 +48,12 @@ class Rejection(str):
     label: str
     kind: str
     reason: str
+    known_entries: tuple[str, ...]
 
-    def __new__(cls, section: str, label: str, kind: str, reason: str) -> "Rejection":
+    def __new__(
+        cls, section: str, label: str, kind: str, reason: str,
+        known_entries: tuple[str, ...] = (),
+    ) -> "Rejection":
         where = section if not label else (
             f"{section}.{label}" if section == SKILLS else f"{section} {label}"
         )
@@ -57,6 +61,7 @@ class Rejection(str):
         rejection.section, rejection.label, rejection.kind, rejection.reason = (
             section, label, kind, reason,
         )
+        rejection.known_entries = tuple(known_entries)
         return rejection
 
 
@@ -80,12 +85,28 @@ def _normalize(text: str) -> str:
     return " ".join(str(text or "").lower().split())
 
 
-def _entry_label(entry: dict[str, Any]) -> str:
+def entry_label(entry: dict[str, Any]) -> str:
     return " at ".join(
         str(entry.get(field) or "").strip()
         for field in ("position", "company")
         if entry.get(field)
     ) or "?"
+
+
+def entry_labels(resume: dict[str, Any]) -> list[str]:
+    return [
+        entry_label(entry) for entry in resume.get(WORK_EXPERIENCE) or [] if isinstance(entry, dict)
+    ]
+
+
+def unknown_entry_reason(company: str, known_entries: list[str]) -> str:
+    entries = "; ".join(known_entries) or "none"
+    return (
+        f"the resume has no entry at {company or 'that company'}, and entries are never added: "
+        f"its entries are {entries}. What the candidate did in a job the resume does not have "
+        "cannot enter any entry, neither that one nor another; the skill goes in its bucket, "
+        "and `reply` tells the candidate which entries the resume has"
+    )
 
 
 def find_entry(entries: list[Any], company: str, position: str) -> int | None:
@@ -324,10 +345,14 @@ def plan(state: TurnState, proposal: EditProposal) -> tuple[list[Part], list[Rej
         if not fields:
             # An entry sent with nothing written is "keep it", as the prompt says.
             continue
-        label = _entry_label({"company": edit.company, "position": edit.position})
+        label = entry_label({"company": edit.company, "position": edit.position})
         index = find_entry(entries, edit.company, edit.position)
         if index is None or index >= len(base_entries):
-            rejections.append(Rejection(WORK_EXPERIENCE, label, UNKNOWN_ENTRY, UNKNOWN_ENTRY))
+            known_entries = entry_labels(state.base_resume)
+            rejections.append(Rejection(
+                WORK_EXPERIENCE, label, UNKNOWN_ENTRY,
+                unknown_entry_reason(edit.company.strip(), known_entries), tuple(known_entries),
+            ))
             continue
         base = base_entries[index]
         entry_backing = resume_text(base) + "\n" + said
@@ -348,7 +373,7 @@ def plan(state: TurnState, proposal: EditProposal) -> tuple[list[Part], list[Rej
         kept = {key: base.get(key) for key in ("description", "achievements")}
         keep(
             Part(
-                id=f"entry:{number}", section=WORK_EXPERIENCE, label=_entry_label(entries[index]),
+                id=f"entry:{number}", section=WORK_EXPERIENCE, label=entry_label(entries[index]),
                 original=_entry_text(base), proposed=_entry_text({**kept, **fields}),
                 index=index, fields=fields,
             ),

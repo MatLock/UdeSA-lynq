@@ -31,7 +31,7 @@ def languages() -> set[str]:
     }
 
 
-def render(language: str, rejections: list[str]) -> str:
+def render(language: str, rejections: list[str], nothing_applied: bool = False) -> str:
     code = bare_language(language)
     if code not in languages():
         log.warning(
@@ -41,4 +41,6 @@ def render(language: str, rejections: list[str]) -> str:
         )
         code = DEFAULT_LANGUAGE
 
-    return _environment.get_template(f"{code}{SUFFIX}").render(rejections=rejections).strip()
+    return _environment.get_template(f"{code}{SUFFIX}").render(
+        rejections=rejections, nothing_applied=nothing_applied
+    ).strip()

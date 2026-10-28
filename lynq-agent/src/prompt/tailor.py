@@ -55,6 +55,7 @@ def render(
     recommendations: list[dict[str, Any]] | None = None,
     statements: list[str] | None = None,
     gaps: list[str] | None = None,
+    entries: list[str] | None = None,
 ) -> str:
     template = _environment.get_template(f"{family}.jinja")
     return template.render(
@@ -73,6 +74,7 @@ def render(
         recommendations=recommendations or [],
         statements=statements or [],
         gaps=gaps or [],
+        entries=entries or [],
     )
 
 

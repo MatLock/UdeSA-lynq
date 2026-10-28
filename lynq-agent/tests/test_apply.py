@@ -43,8 +43,16 @@ class PlanTest(unittest.TestCase):
         parts, rejections = apply.plan(state_for(), proposal(entries=[EntryEdit(company="Initech", position="CTO", description="Led everything.")]))
 
         self.assertEqual(parts, [])
-        self.assertEqual(rejections, [f"work_experience CTO at Initech: {apply.UNKNOWN_ENTRY}"])
+        self.assertEqual(len(rejections), 1)
+        self.assertTrue(rejections[0].startswith("work_experience CTO at Initech: the resume has no entry at Initech"))
         self.assertEqual(rejections[0].kind, apply.UNKNOWN_ENTRY)
+
+    def test_an_entry_the_resume_does_not_have_names_the_entries_it_has(self) -> None:
+        _, rejections = apply.plan(state_for(), proposal(entries=[EntryEdit(company="Lily AI", position="Backend Engineer", description="Built services with Spring Boot.")]))
+
+        self.assertEqual(rejections[0].known_entries, ("Semi Senior at Globex", "Backend Engineer at Acme"))
+        self.assertIn("its entries are Semi Senior at Globex; Backend Engineer at Acme", rejections[0])
+        self.assertIn("entries are never added", rejections[0])
 
     def test_a_paraphrased_position_still_finds_the_entry_by_its_company(self) -> None:
         parts, _ = apply.plan(state_for(), proposal(entries=[EntryEdit(company="Acme", position="Backend Developer", description="Ran services on Kubernetes.")]))

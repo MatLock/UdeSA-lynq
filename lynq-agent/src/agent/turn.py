@@ -86,9 +86,12 @@ async def run_turn(
         # The reply is the model's; the document is the guard's. When they differ,
         # the candidate is told which parts stayed out, so the chat never promises
         # what the resume beside it does not say.
-        if result.get("rejections"):
-            warnings.append(rejection_notice(context.language, result["rejections"]))
-        if not state.changes:
+        outstanding = list((result.get("outstanding") or {}).values())
+        if outstanding and not state.changes:
+            reply = rejection_notice(context.language, outstanding, nothing_applied=True)
+        elif outstanding:
+            warnings.append(rejection_notice(context.language, outstanding))
+        elif not state.changes:
             warnings.append(no_change_notice(context.language))
 
     log.info(

@@ -293,6 +293,13 @@ class AdviseTurnTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcome.resume, RESUME)
         self.assertNotIn(no_change_notice("es"), outcome.warnings)
 
+    async def test_the_advisor_reads_the_entries_the_experience_has(self) -> None:
+        model = scripted(tool_call("Advice", ADVICE, "1"))
+
+        await run_turn(context_for(message=ASK_FOR_ADVICE), model=model, intent_model=intending(Intent.ADVISE))
+
+        self.assertIn("entries and no others: Semi Senior at Globex; Backend Engineer at Acme.", model.prompts[0][0].content)
+
     async def test_the_recommendations_come_back_numbered_by_the_code(self) -> None:
         model = scripted(tool_call("Advice", ADVICE, "1"))
 

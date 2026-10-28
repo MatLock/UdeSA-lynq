@@ -206,8 +206,9 @@ approved (`unjudged`): the safe default costs a correction pass, never an invent
 it decides nothing about content. Before the judge, `plan` resolves each part to its
 place — which entry a `company`/`position` names (a paraphrased position still finds its
 entry by company when that is unambiguous), which bucket — and rejects on its own what
-is mechanical to check: an entry the resume does not have (`unknown_entry`), and a part
-whose **shape** changed. The shape of a text is its lines, its numbers and the
+is mechanical to check: an entry the resume does not have (`unknown_entry`, whose reason
+names the entries the resume has, because entries are never added and both the retry and
+the candidate need to know which jobs there are), and a part whose **shape** changed. The shape of a text is its lines, its numbers and the
 technologies it names; the shape of a bucket is its skills and their order; and the
 rule is the same for both: everything the base resume has stays in its place, and
 anything new goes after it and has to be found in the resume. A description, a summary
@@ -231,10 +232,13 @@ judge, `commit` writes the approved parts and records each as a change.
 The parts are independent — a summary the judge rejects does not hold back skills it
 approves — and a rejection goes back to the editor up to **twice** (`MAX_PASSES = 3`),
 with its reason, as the next message of the same thread: the model re-proposes the
-rejected parts with the reason in hand, and what is still rejected after the last pass
-stays out — and reaches the candidate as a warning, in their language (`resources/rejections/`), because the reply is the model's
+rejected parts with the reason in hand, and a part rejected in any pass and never approved
+in a later one stays out — and reaches the candidate as a warning, in their language (`resources/rejections/`), because the reply is the model's
 and the document is the judge's, and the chat must never promise what the resume beside it
-does not say. Each pass leaves a `kind='tool'` span named `apply` whose input is the
+does not say. A correction that drops a rejected part instead of fixing it does not hide
+the rejection. When the turn applied nothing and something was rejected, that notice is
+the reply: the model's reply was written before the judge read a word and, on a retry,
+is often the first one copied, claiming the edit that never entered. Each pass leaves a `kind='tool'` span named `apply` whose input is the
 parts and whose output is `OK` or the list of rejections with their kinds;
 `docs/queries.sql` groups by kind. The `tool` kind is the trace's word for "a step the
 code ran", kept from the loop design: no agent holds a tool, and nothing a model says can

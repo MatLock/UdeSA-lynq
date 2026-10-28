@@ -5,7 +5,7 @@ import re
 
 from langchain_core.messages import SystemMessage
 
-from agent.apply import gaps_in
+from agent.apply import entry_labels, gaps_in
 from agent.context import TurnContext
 from agent.schemas import Advice, Recommendation
 from agent.state import TurnState
@@ -78,6 +78,7 @@ async def advise(
             turns_left=context.turns_left,
             statements=state.evidence(excluding=context.message),
             gaps=gaps_in(state.job_skills, state.base_resume, state.evidence()),
+            entries=entry_labels(state.base_resume),
         )
     )
     advice = await ask(model, Advice, [system, *messages], callbacks=callbacks, retries=retries)
