@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-import json
 import logging
 import time
 
 from langchain_core.messages import HumanMessage
 
-from agent.context import CLARIFY_SPAN, SpanRecord, TurnContext, span_cost
-from agent.intent import recent_exchange, text_of
+from agent.context import CLARIFY_SPAN, TurnContext
+from agent.intent import intent_model_span, recent_exchange, text_of
 from agent.state import TurnState
 from config import get_settings
-from db.models import SpanKind
 from llm.factory import build_model
 from prompt.clarify import reference, render
 
@@ -28,30 +26,18 @@ def _span(
     usage: dict,
     error: str | None = None,
 ) -> None:
-    settings = get_settings()
-    record = SpanRecord(
-        step=state.next_step(),
-        kind=SpanKind.ERROR if error is not None else SpanKind.LLM,
-        name=CLARIFY_SPAN,
-        input=json.dumps(
-            {
-                "message": context.message,
-                "prompt": reference(provider),
-                "model": settings.intent_model,
-            },
-            ensure_ascii=False,
-        ),
-        output=output,
-        prompt_tokens=usage.get("input_tokens"),
-        completion_tokens=usage.get("output_tokens"),
-        latency_ms=int((time.monotonic() - started_at) * 1000),
-        error=error,
-    )
-    if record.prompt_tokens or record.completion_tokens:
-        record.cost_usd = span_cost(
-            record, settings.intent_input_price_per_1m, settings.intent_output_price_per_1m
+    state.spans.append(
+        intent_model_span(
+            context,
+            state.next_step(),
+            CLARIFY_SPAN,
+            reference(provider),
+            started_at,
+            output,
+            usage,
+            error,
         )
-    state.spans.append(record)
+    )
 
 
 async def clarify(

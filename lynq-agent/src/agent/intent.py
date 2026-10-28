@@ -57,23 +57,25 @@ def text_of(message) -> str:
     return str(content)
 
 
-def _span(
+def intent_model_span(
     context: TurnContext,
-    provider: str,
+    step: int,
+    name: str,
+    prompt_reference: str,
     started_at: float,
     output: str,
     usage: dict,
     error: str | None = None,
-) -> None:
+) -> SpanRecord:
     settings = get_settings()
     record = SpanRecord(
-        step=0,
+        step=step,
         kind=SpanKind.ERROR if error is not None else SpanKind.LLM,
-        name=INTENT_SPAN,
+        name=name,
         input=json.dumps(
             {
                 "message": context.message,
-                "prompt": reference(provider),
+                "prompt": prompt_reference,
                 "model": settings.intent_model,
             },
             ensure_ascii=False,
@@ -90,7 +92,22 @@ def _span(
         record.cost_usd = span_cost(
             record, settings.intent_input_price_per_1m, settings.intent_output_price_per_1m
         )
-    context.spans.append(record)
+    return record
+
+
+def _span(
+    context: TurnContext,
+    provider: str,
+    started_at: float,
+    output: str,
+    usage: dict,
+    error: str | None = None,
+) -> None:
+    context.spans.append(
+        intent_model_span(
+            context, 0, INTENT_SPAN, reference(provider), started_at, output, usage, error
+        )
+    )
 
 
 async def classify(context: TurnContext, provider: str, model=None) -> str:
