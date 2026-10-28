@@ -259,7 +259,7 @@
 }
 
 .user-profile-grid--single {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .user-profile-card {
@@ -486,7 +486,7 @@
 
 @media (max-width: 860px) {
   .user-profile-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

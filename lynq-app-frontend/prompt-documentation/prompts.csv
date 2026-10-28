@@ -206,3 +206,4 @@ date,prompt
 "28-10-2026","storing the tokens in localStorage isn't safe. I read the recommendation is to keep them in an HttpOnly cookie with a strict domain, isn't that right?"
 "28-10-2026","stop keeping the refresh token in localStorage/sessionStorage. change strategy to http read only cookies with domain strict"
 "28-10-2026","the analytics page shows nothing while its data loads: render the shared Spinner with a Loading analytics…"
+"28-10-2026","the company page scrolls sideways forever when a company has a lot of job posts, fix it"
