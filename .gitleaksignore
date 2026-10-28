@@ -12,3 +12,6 @@ deca3fe4dd88ab7965cbdb833b7b595dee8c5b51:infrastructure/helm/values/k8s_values-l
 1bb46303af822dafd7a961844a1324d7483ffed7:lynq-iam/src/main/resources/application.yaml:generic-api-key:37
 92771d9500fd653928a1332631528fd09afd6883:lynq-iam/README.md:generic-api-key:316
 92771d9500fd653928a1332631528fd09afd6883:lynq-iam/README.md:generic-api-key:317
+1130266a15d4de35a4f454eb13e94c90d1cac0c3:lynq-bff/src/test/java/com/lynq/bff/controller/impl/AuthControllerImplTest.java:generic-api-key:42
+1130266a15d4de35a4f454eb13e94c90d1cac0c3:lynq-bff/src/test/java/com/lynq/bff/security/RefreshTokenCookieTest.java:generic-api-key:21
+1130266a15d4de35a4f454eb13e94c90d1cac0c3:lynq-bff/src/test/java/com/lynq/bff/client/response/AuthUserResponseTest.java:generic-api-key:16
