@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import logging
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from agent.apply import Part, Rejection
 from agent.context import span_cost
-from agent.schemas import Verdict
+from agent.schemas import PartVerdict, Verdict
 from agent.state import TurnState
 from agent.structured import ask
 from config import get_settings
@@ -18,6 +18,13 @@ log = logging.getLogger(__name__)
 # What the judge answers when it does not answer: a part it left out is not
 # approved. The safe default costs a retry, never an invention.
 UNJUDGED = "unjudged"
+REJECTED = "rejected"
+
+UNDECIDED_NOTE = (
+    "Your verdict left `ok` out on these parts: {parts}. Answer the Verdict again, every "
+    "part with `ok` set to true when the resume or the candidate supports it and false "
+    "when not."
+)
 
 
 async def judge(
@@ -52,15 +59,34 @@ async def judge(
         message=message,
     )
     spans_before = len(state.spans)
-    verdict = await ask(model, Verdict, [HumanMessage(prompt)], callbacks=callbacks, retries=retries)
+    thread = [HumanMessage(prompt)]
+    verdict = await ask(model, Verdict, thread, callbacks=callbacks, retries=retries)
+    answers = {answer.id.strip(): answer for answer in verdict.parts if answer.id.strip()}
+
+    undecided = [part.id for part in parts if part.id in answers and not _decided(answers[part.id])]
+    if undecided:
+        log.warning(
+            "message= The judge left ok out and is asked again, conversationId=%s, parts=%s",
+            state.conversation_id, ", ".join(undecided),
+        )
+        thread = [
+            *thread,
+            AIMessage(verdict.model_dump_json()),
+            HumanMessage(UNDECIDED_NOTE.format(parts=", ".join(undecided))),
+        ]
+        again = await ask(model, Verdict, thread, callbacks=callbacks, retries=retries)
+        answers.update({
+            answer.id.strip(): answer
+            for answer in again.parts
+            if answer.id.strip() in undecided and _decided(answer)
+        })
     _price(state, spans_before)
 
-    answers = {answer.id.strip(): answer for answer in verdict.parts if answer.id.strip()}
     approved: set[str] = set()
     rejections: list[Rejection] = []
     for part in parts:
         answer = answers.get(part.id)
-        if answer is None:
+        if answer is None or not _decided(answer):
             log.warning(
                 "message= The judge gave no verdict on a part, conversationId=%s, part=%s",
                 state.conversation_id, part.id,
@@ -70,10 +96,14 @@ async def judge(
             approved.add(part.id)
         else:
             rejections.append(Rejection(
-                part.section, part.label, answer.kind.strip() or "rejected",
-                answer.reason.strip() or answer.kind.strip() or "rejected",
+                part.section, part.label, answer.kind.strip() or REJECTED,
+                answer.reason.strip() or answer.kind.strip() or REJECTED,
             ))
     return approved, rejections
+
+
+def _decided(answer: PartVerdict) -> bool:
+    return "ok" in answer.model_fields_set
 
 
 def _price(state: TurnState, spans_before: int) -> None:

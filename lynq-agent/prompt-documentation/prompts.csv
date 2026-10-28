@@ -113,3 +113,4 @@ date,prompt
 "28-10-2026","give the edit and advise prompts the list of entries the experience has, and tell them that what the candidate did in a job the resume does not have enters no entry: add the skill to its bucket, name the entries the resume has, say CV Tailor cannot add jobs and ask whether it belongs to one of them"
 "28-10-2026","tell the candidate every rejection of the turn that was never fixed, not only the ones of the last correction pass, and when the turn applied nothing and something was rejected, reply with the rejection notice instead of a model reply that claims an edit"
 "28-10-2026","review every prompt of the agent and point out where they contradict each other or the code"
+"28-10-2026","the judge sometimes leaves ok out and the part gets rejected with no reason. make ok required"

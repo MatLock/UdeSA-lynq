@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from tests.fixtures.spanish import CUT_ES, JUDGE_REASON_ES, KNOWN_ENTRIES_ES, MOVED_ES, NOTHING_APPLIED_OPENING_ES, UNBACKED_ES, REJECTED_SUMMARY_ES, REJECTION_OPENING_ES, UNKNOWN_ENTRY_ES
+from tests.fixtures.spanish import CUT_ES, JUDGE_REASON_ES, KNOWN_ENTRIES_ES, MOVED_ES, NOTHING_APPLIED_OPENING_ES, UNBACKED_ES, REJECTED_SUMMARY_ES, REJECTION_OPENING_ES, UNEXPLAINED_ES, INVENTED_ES, UNKNOWN_ENTRY_ES
 
 from agent.apply import CUT, MOVED, UNBACKED, UNKNOWN_ENTRY, Rejection
-from agent.judge import UNJUDGED
+from agent.judge import REJECTED, UNJUDGED
 from prompt.rejection import render
 
 
@@ -59,6 +59,18 @@ class RejectionNoticeTest(unittest.TestCase):
             "Part of what was proposed did not enter the resume: the summary, The resume says "
             "eight years, not twelve.; the skills (technical), the judge gave no verdict on it.",
         )
+
+    def test_a_rejection_the_judge_gave_no_reason_for_is_told_in_the_candidates_language(self) -> None:
+        notice = render("es", [Rejection("work_experience", "Backend Engineer at Acme", REJECTED, REJECTED)], nothing_applied=True)
+
+        self.assertTrue(notice.startswith(NOTHING_APPLIED_OPENING_ES))
+        self.assertIn(f"(Backend Engineer at Acme), {UNEXPLAINED_ES}.", notice)
+        self.assertNotIn(REJECTED, notice)
+
+    def test_a_kind_the_judge_gave_without_a_reason_is_translated(self) -> None:
+        notice = render("es", [Rejection("summary", "", "invented", "invented")])
+
+        self.assertEqual(notice, f"{REJECTION_OPENING_ES} {REJECTED_SUMMARY_ES}, {INVENTED_ES}.")
 
     def test_an_unknown_language_falls_back_to_english(self) -> None:
         self.assertTrue(render("pt", [Rejection("summary", "", "padding", "x")]).startswith("Part of what"))

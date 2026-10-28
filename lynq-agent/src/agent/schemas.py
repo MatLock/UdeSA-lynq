@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # The answers the agents are asked for. Every field has a default so that the JSON
 # schema Bedrock validates a tool call against carries no `anyOf`/null branches,
@@ -130,6 +130,8 @@ class Advice(BaseModel):
 
 
 class PartVerdict(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"required": ["id", "ok"]})
+
     id: str = Field(default="", description="The id of the part, as given")
     evidence: str = Field(
         default="",
@@ -138,7 +140,10 @@ class PartVerdict(BaseModel):
             "resume or of the candidate that back the change, quoted; no quote when nothing does"
         ),
     )
-    ok: bool = Field(default=False, description="true when the resume or the candidate supports the change")
+    ok: bool = Field(
+        default=False,
+        description="true when the resume or the candidate supports the change, false when not; always given",
+    )
     kind: str = Field(
         default="",
         description=(

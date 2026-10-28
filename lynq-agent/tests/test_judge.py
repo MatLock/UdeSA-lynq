@@ -3,14 +3,16 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from langchain_core.utils.function_calling import convert_to_openai_tool
+
 from tests.fixtures.spanish import JUDGE_REASON_ES
 from tests.support import scripted, tool_call
 from tests.test_turn import context_for
 
 from agent import apply
 from agent.callbacks import TraceCollector
-from agent.judge import UNJUDGED, judge
-from agent.schemas import EditProposal, EntryEdit, SkillsEdit
+from agent.judge import REJECTED, UNJUDGED, judge
+from agent.schemas import EditProposal, EntryEdit, SkillsEdit, Verdict
 from agent.state import build_turn_state
 from config import reset_settings
 from db.models import SpanKind
@@ -74,6 +76,56 @@ class JudgeTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(approved, {"summary"})
         self.assertEqual([r.kind for r in rejections], [UNJUDGED, UNJUDGED])
+
+    async def test_a_part_answered_without_ok_is_asked_again(self) -> None:
+        model = scripted(
+            tool_call("Verdict", {"parts": [
+                {"id": "summary", "ok": False, "kind": "invented", "reason": JUDGE_REASON_ES},
+                {"id": "entry:0", "evidence": "Ran services on Kubernetes."},
+                {"id": "skills:technical", "ok": True},
+            ]}, "1"),
+            tool_call("Verdict", {"parts": [{"id": "entry:0", "ok": True}]}, "2"),
+        )
+
+        _, _, approved, rejections, model = await self.run_judge(model)
+
+        self.assertEqual(approved, {"entry:0", "skills:technical"})
+        self.assertEqual([r.kind for r in rejections], ["invented"])
+        self.assertEqual(len(model.prompts), 2)
+        self.assertIn("left `ok` out on these parts: entry:0.", model.prompts[1][-1].content)
+
+    async def test_a_part_still_answered_without_ok_is_unjudged(self) -> None:
+        model = scripted(tool_call("Verdict", {"parts": [
+            {"id": "summary", "ok": True},
+            {"id": "entry:0", "evidence": "Ran services on Kubernetes."},
+            {"id": "skills:technical", "ok": True},
+        ]}, "1"))
+
+        _, _, approved, rejections, model = await self.run_judge(model)
+
+        self.assertEqual(approved, {"summary", "skills:technical"})
+        self.assertEqual([(r.label, r.kind) for r in rejections], [("Backend Engineer at Acme", UNJUDGED)])
+        self.assertEqual(len(model.prompts), 2)
+
+    async def test_a_verdict_with_every_ok_given_is_not_asked_again(self) -> None:
+        model = scripted(tool_call("Verdict", {"parts": [
+            {"id": "summary", "ok": False},
+            {"id": "entry:0", "ok": True},
+            {"id": "skills:technical", "ok": True},
+        ]}, "1"))
+
+        _, _, _, rejections, model = await self.run_judge(model)
+
+        self.assertEqual([(r.kind, r.reason) for r in rejections], [(REJECTED, REJECTED)])
+        self.assertEqual(len(model.prompts), 1)
+
+    def test_the_tool_schema_requires_ok_without_a_null_branch(self) -> None:
+        schema = convert_to_openai_tool(Verdict)["function"]["parameters"]
+        part = schema["properties"]["parts"]["items"]
+
+        self.assertIn("ok", part["required"])
+        self.assertEqual(part["properties"]["ok"]["type"], "boolean")
+        self.assertNotIn("anyOf", part["properties"]["ok"])
 
     async def test_the_judge_reads_every_part_beside_its_original(self) -> None:
         model = scripted(tool_call("Verdict", {"parts": []}, "1"))
