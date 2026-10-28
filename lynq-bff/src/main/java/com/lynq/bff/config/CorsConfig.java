@@ -25,6 +25,7 @@ public class CorsConfig {
         config.setExposedHeaders(List.of(
             "lynq-request-uuid", HttpHeaders.RETRY_AFTER, RateLimitInterceptor.REMAINING_HEADER));
         config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
