@@ -19,3 +19,4 @@ trello.auth.txt
 openai_key.txt
 import_external_jobs.txt
 db_prod.env
+aws.env

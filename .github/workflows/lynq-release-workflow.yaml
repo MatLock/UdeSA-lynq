@@ -1014,12 +1014,26 @@ jobs:
       - name: Point kubectl at the cluster
         run: aws eks update-kubeconfig --name "$EKS_CLUSTER" --region "$AWS_REGION"
 
+      - name: Carry the Terraform-injected values over the placeholders
+        run: |
+          helm get values "$HELM_RELEASE" --namespace "$K8S_NAMESPACE" -o yaml > "$RUNNER_TEMP/live-values.yaml"
+          echo '{}' > "$RUNNER_TEMP/terraform-values.yaml"
+          for path in $(yq '.. | select(tag == "!!str" and test("REPLACE_")) | path | join(".")' infrastructure/helm/values/k8s_values-prod.yaml); do
+            VALUE="$(yq ".$path" "$RUNNER_TEMP/live-values.yaml")"
+            if [ "$VALUE" = "null" ]; then
+              echo "::error::$path has no value in the live release"
+              exit 1
+            fi
+            VALUE="$VALUE" yq -i ".$path = strenv(VALUE)" "$RUNNER_TEMP/terraform-values.yaml"
+          done
+
       - name: Upgrade the Helm release
         run: |
           helm upgrade "$HELM_RELEASE" infrastructure/helm \
             --namespace "$K8S_NAMESPACE" \
             --reset-then-reuse-values \
             -f infrastructure/helm/values/k8s_values-prod.yaml \
+            -f "$RUNNER_TEMP/terraform-values.yaml" \
             --atomic \
             --wait \
             --timeout 15m
