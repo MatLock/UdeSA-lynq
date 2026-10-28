@@ -205,3 +205,4 @@ date,prompt
 "10-10-2026","the CV Tailor chat dropped the recommendations the agent returns with each reply: keep them on the assistant message in useTailorConversation and render them under the latest reply in TailorResumeModal as numbered chips that send Apply recommendation N with its text, hidden once the conversation is exhausted"
 "28-10-2026","storing the tokens in localStorage isn't safe. I read the recommendation is to keep them in an HttpOnly cookie with a strict domain, isn't that right?"
 "28-10-2026","stop keeping the refresh token in localStorage/sessionStorage. change strategy to http read only cookies with domain strict"
+"28-10-2026","the analytics page shows nothing while its data loads: render the shared Spinner with a Loading analytics…"

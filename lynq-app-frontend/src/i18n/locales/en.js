@@ -513,6 +513,7 @@ const en = {
       marketHeading: 'The market',
       marketLead: 'What the open postings Lynq sees ask for, from every source.',
       unavailable: 'We could not load this section. Try again in a while.',
+      loading: 'Loading analytics…',
       benchmark: {
         noSnapshot: 'No data available yet.',
         fitMissing: (min) => `At least ${min} open postings similar to your profile are needed to measure your fit.`,

@@ -3,6 +3,7 @@ import strings from "../../i18n";
 import analyticsService from "../../services/analyticsService";
 import useAnalyticsQuery from "../../hooks/useAnalyticsQuery";
 import CalloutNote from "../ds/CalloutNote/CalloutNote";
+import Spinner from "../Spinner/Spinner";
 import MarketFitCard from "../MarketFitCard/MarketFitCard";
 import PeerBenchmarkCard from "../PeerBenchmarkCard/PeerBenchmarkCard";
 import SkillCoverageCard from "../SkillCoverageCard/SkillCoverageCard";
@@ -13,7 +14,13 @@ const CandidateBenchmarkBlock = ({ authFetch }) => {
   const query = useCallback(() => analyticsService.get_candidate_benchmark(authFetch), [authFetch]);
   const { status, data } = useAnalyticsQuery(query);
 
-  if (status === "loading") return null;
+  if (status === "loading") {
+    return (
+      <div className="analytics-state">
+        <Spinner label={t.loading} />
+      </div>
+    );
+  }
   if (status === "unavailable") return <CalloutNote variant="gap">{t.unavailable}</CalloutNote>;
   if (data.snapshotOn == null) {
     return <CalloutNote variant="gap">{t.benchmark.noSnapshot}</CalloutNote>;

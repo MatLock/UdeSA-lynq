@@ -3,6 +3,7 @@ import strings from "../../i18n";
 import analyticsService from "../../services/analyticsService";
 import useAnalyticsQuery from "../../hooks/useAnalyticsQuery";
 import CalloutNote from "../ds/CalloutNote/CalloutNote";
+import Spinner from "../Spinner/Spinner";
 import SkillDemandCard from "../SkillDemandCard/SkillDemandCard";
 import MarketSalaryCard from "../MarketSalaryCard/MarketSalaryCard";
 import PublishedPerWeekCard from "../PublishedPerWeekCard/PublishedPerWeekCard";
@@ -19,7 +20,13 @@ const MarketBlock = ({ authFetch }) => {
   );
   const { status, data } = useAnalyticsQuery(query);
 
-  if (status === "loading" && !data) return null;
+  if (status === "loading" && !data) {
+    return (
+      <div className="analytics-state">
+        <Spinner label={t.loading} />
+      </div>
+    );
+  }
   if (status === "unavailable") return <CalloutNote variant="gap">{t.unavailable}</CalloutNote>;
 
   return (

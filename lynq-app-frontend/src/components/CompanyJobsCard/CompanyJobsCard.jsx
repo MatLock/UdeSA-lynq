@@ -6,6 +6,7 @@ import useAnalyticsQuery from "../../hooks/useAnalyticsQuery";
 import analyticsFormat from "../../utils/analyticsFormat";
 import ChartCard from "../ds/ChartCard/ChartCard";
 import CalloutNote from "../ds/CalloutNote/CalloutNote";
+import Spinner from "../Spinner/Spinner";
 import "./CompanyJobsCard.css";
 
 const MIN_APPLICANTS = 5;
@@ -16,7 +17,13 @@ const CompanyJobsCard = ({ authFetch }) => {
   const query = useCallback(() => analyticsService.get_company_jobs(authFetch), [authFetch]);
   const { status, data } = useAnalyticsQuery(query);
 
-  if (status === "loading" && !data) return null;
+  if (status === "loading" && !data) {
+    return (
+      <div className="analytics-state">
+        <Spinner label={t.loading} />
+      </div>
+    );
+  }
   if (status === "unavailable") return <CalloutNote variant="gap">{t.unavailable}</CalloutNote>;
 
   const jobs = data.jobs;

@@ -513,6 +513,7 @@ const es = {
       marketHeading: 'El mercado',
       marketLead: 'Lo que piden los avisos abiertos que ve Lynq, de todas las fuentes.',
       unavailable: 'No pudimos cargar esta sección. Probá de nuevo en un rato.',
+      loading: 'Cargando analíticas…',
       benchmark: {
         noSnapshot: 'Aún no hay data disponible.',
         fitMissing: (min) => `Hacen falta al menos ${min} avisos abiertos parecidos a tu perfil para medir tu fit.`,
