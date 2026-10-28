@@ -17,10 +17,16 @@ inputs:
     required: false
     default: "5"
 
+outputs:
+  sha:
+    description: Commit main points at once the files are in it.
+    value: ${{ steps.commit.outputs.sha }}
+
 runs:
   using: composite
   steps:
-    - shell: bash
+    - id: commit
+      shell: bash
       env:
         FILES: ${{ inputs.files }}
         MESSAGE: ${{ inputs.message }}
@@ -36,6 +42,7 @@ runs:
         git add -- $FILES
         if git diff --cached --quiet; then
           echo "Nothing to commit for: $FILES"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           exit 0
         fi
         git commit -m "$MESSAGE"
@@ -45,6 +52,7 @@ runs:
           # the SHA that triggered the original run, not on the branch tip.
           if git push origin HEAD:main; then
             echo "Pushed to main on attempt ${attempt}."
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 

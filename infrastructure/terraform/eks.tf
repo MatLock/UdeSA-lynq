@@ -38,6 +38,11 @@ resource "aws_eks_cluster" "lynq" {
     public_access_cidrs     = var.eks_public_access_cidrs
   }
 
+  access_config {
+    authentication_mode                         = "API_AND_CONFIG_MAP"
+    bootstrap_cluster_creator_admin_permissions = true
+  }
+
   enabled_cluster_log_types = var.eks_cluster_logging_enabled ? var.eks_cluster_log_types : []
 
   depends_on = [

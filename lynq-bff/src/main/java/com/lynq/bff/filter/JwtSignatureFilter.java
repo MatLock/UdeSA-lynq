@@ -38,7 +38,7 @@ public class JwtSignatureFilter extends OncePerRequestFilter {
 
   @Override
   protected boolean shouldNotFilter(HttpServletRequest request) {
-    return PublicPaths.isSignatureExempt(request);
+    return PublicPaths.isPublic(request);
   }
 
   @Override

@@ -5,6 +5,7 @@
 *.tfstate.*
 crash.log
 crash.*.log
+*.tfplan
 
 # Local override / secret var files (never commit real secrets)
 *.auto.tfvars

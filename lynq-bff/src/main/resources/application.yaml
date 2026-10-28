@@ -32,6 +32,9 @@ lynq:
   security:
     jwt:
       secret: ${JWT_SECRET:8d2b6d2a9c5e8f4f8f9d1c7a4e3b5f6d8c9a1e2f3a4b5c6d7e8f9a1b2c3d4e5}
+    refresh-cookie:
+      secure: ${LYNQ_REFRESH_COOKIE_SECURE:false}
+      max-age: ${JWT_REFRESH_TOKEN_EXPIRATION_DAYS:30}d
   iam:
     url: ${LYNQ_IAM_URL:http://localhost:8080/lynq-iam}
   backend:

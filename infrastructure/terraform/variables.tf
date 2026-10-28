@@ -302,3 +302,15 @@ variable "lbc_version" {
   type        = string
   default     = "3.5.0"
 }
+
+variable "github_repository" {
+  description = "GitHub repository (owner/name) whose release pipeline may deploy to the cluster."
+  type        = string
+  default     = "MatLock/UdeSA-lynq"
+}
+
+variable "github_deploy_environment" {
+  description = "GitHub environment the deploy job runs in. The OIDC trust is pinned to it."
+  type        = string
+  default     = "production"
+}

@@ -32,7 +32,7 @@ import './ProfilePage.css'
 // birthDate) plus password. The update service call will be wired in later.
 const ProfilePage = () => {
   const t = strings.pages.profile
-  const { user, accessToken, updateUser, applyTokens, isCompany } = useAuth()
+  const { user, accessToken, remembered, updateUser, applyTokens, isCompany } = useAuth()
   // Refresh-aware fetcher: transparently mints a new access token and retries
   // when the current one has expired, so leaving the profile tab open past the
   // token lifetime still loads/saves.
@@ -189,11 +189,8 @@ const ProfilePage = () => {
       // Password change is a separate IAM call and rotates both tokens; only
       // run it when a new password was actually entered.
       if (password) {
-        const auth = await authService.user_update_password(authFetch, password)
-        applyTokens({
-          accessToken: auth.accessToken,
-          refreshToken: auth.refreshToken,
-        })
+        const auth = await authService.user_update_password(authFetch, password, remembered)
+        applyTokens({ accessToken: auth.accessToken })
         setPassword('')
         setConfirmPassword('')
       }

@@ -24,23 +24,19 @@ final class PublicPaths {
 
   /**
    * The relayed auth routes that carry no token at all: the two logins and the registration take a
-   * password in the body, and the availability checks run before an account exists. There is
-   * nothing for this service to verify, and lynq-iam checks the credentials itself.
+   * password in the body, and the availability checks run before an account exists. The refresh and
+   * the logout carry no header either: their credential is the HttpOnly refresh cookie, an opaque,
+   * Redis-backed token that is not a JWT and that only lynq-iam can check. There is nothing for this
+   * service to verify, and lynq-iam checks the credentials itself.
    */
   private static final Set<String> ANONYMOUS_AUTH_PATHS = Set.of(
       "/auth/register",
       "/auth/login/username",
       "/auth/login/email",
+      "/auth/refresh",
+      "/auth/logout",
       "/auth/check-username",
       "/auth/check-email");
-
-  /**
-   * The refresh is the one route in between: its bearer credential is the opaque, Redis-backed
-   * refresh token, so the header must be there, but it is not a JWT and this service holds no
-   * secret that could check it. Only lynq-iam can, so the signature check is skipped and the
-   * credential crosses untouched.
-   */
-  private static final String REFRESH_PATH = "/auth/refresh";
 
   private PublicPaths() {
   }
@@ -57,13 +53,5 @@ final class PublicPaths {
       }
     }
     return false;
-  }
-
-  /**
-   * True when the gateway cannot — or need not — verify an access token's signature for the route:
-   * every public route, plus the refresh, whose credential is not a JWT.
-   */
-  static boolean isSignatureExempt(HttpServletRequest request) {
-    return isPublic(request) || REFRESH_PATH.equals(request.getServletPath());
   }
 }

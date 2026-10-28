@@ -203,3 +203,5 @@ date,prompt
 "04-10-2026","the sidebar scrolls away on long pages and leaves a blank strip at the bottom; make it sticky at the top with the full viewport height"
 "04-10-2026","SonarCloud flags javascript:S9383 on the analytics load effects: mark the fire-and-forget load() calls with void in useAnalyticsQuery, TimeToFillCard, SalaryInsightsCard and CandidateStandingCard"
 "10-10-2026","the CV Tailor chat dropped the recommendations the agent returns with each reply: keep them on the assistant message in useTailorConversation and render them under the latest reply in TailorResumeModal as numbered chips that send Apply recommendation N with its text, hidden once the conversation is exhausted"
+"28-10-2026","storing the tokens in localStorage isn't safe. I read the recommendation is to keep them in an HttpOnly cookie with a strict domain, isn't that right?"
+"28-10-2026","stop keeping the refresh token in localStorage/sessionStorage. change strategy to http read only cookies with domain strict"

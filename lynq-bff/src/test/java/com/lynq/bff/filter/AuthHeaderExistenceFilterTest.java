@@ -134,10 +134,17 @@ class AuthHeaderExistenceFilterTest {
   }
 
   @Test
-  void shouldFilterTheRefreshBecauseItsOpaqueCredentialStillHasToBeThere() {
+  void shouldNotFilterTheRefreshBecauseItsCredentialTravelsInTheCookie() {
     when(request.getServletPath()).thenReturn("/auth/refresh");
 
-    assertThat(filter.shouldNotFilter(request), is(false));
+    assertThat(filter.shouldNotFilter(request), is(true));
+  }
+
+  @Test
+  void shouldNotFilterTheLogoutBecauseAnExpiredSessionMustStillBeAbleToClearItsCookie() {
+    when(request.getServletPath()).thenReturn("/auth/logout");
+
+    assertThat(filter.shouldNotFilter(request), is(true));
   }
 
   @Test
