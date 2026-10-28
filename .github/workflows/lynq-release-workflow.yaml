@@ -950,6 +950,8 @@ jobs:
     needs: [set-version, publish-coverage]
     permissions:
       contents: write
+    outputs:
+      sha: ${{ steps.commit.outputs.sha }}
     steps:
       - name: Code Checkout
         uses: actions/checkout@v5
@@ -970,20 +972,72 @@ jobs:
           done
 
       - name: Commit Helm image tag bump to main
+        id: commit
         uses: ./.github/actions/commit-to-main
         with:
           files: infrastructure/helm/values/k8s_values-local.yaml infrastructure/helm/values/k8s_values-prod.yaml
           message: "chore: point Helm image tags at release ${{ needs.set-version.outputs.version }} [skip ci]"
 
+  deploy-prod:
+    name: "7 · Deploy to production (EKS)"
+    runs-on: ubuntu-latest
+    needs: [sync-helm-images]
+    environment: production
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      EKS_CLUSTER: lynq-eks
+      AWS_REGION: us-east-1
+      HELM_RELEASE: lynq
+      K8S_NAMESPACE: lynq-prod-namespace
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.sync-helm-images.outputs.sha }}
+
+      - name: Assume the deploy role through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.19.0
+
+      - name: Point kubectl at the cluster
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER" --region "$AWS_REGION"
+
+      - name: Upgrade the Helm release
+        run: |
+          helm upgrade "$HELM_RELEASE" infrastructure/helm \
+            --namespace "$K8S_NAMESPACE" \
+            --reset-then-reuse-values \
+            -f infrastructure/helm/values/k8s_values-prod.yaml \
+            --atomic \
+            --wait \
+            --timeout 15m
+
+      - name: Show the deployed revision
+        run: |
+          helm history "$HELM_RELEASE" --namespace "$K8S_NAMESPACE" --max 3
+          kubectl -n "$K8S_NAMESPACE" get deploy -o wide
+
   # ===========================================================================
-  # Stage 7 — Once the release is fully published, open the next development
+  # Stage 8 — Once the release is fully published, open the next development
   # cycle by bumping every project's version one step higher and committing it
   # back to main. A released SNAPSHOT bumps the patch (1.0.5-SNAPSHOT ->
   # 1.0.6-SNAPSHOT); a released final version bumps the minor and resets the
   # patch (1.0.5 -> 1.1.0-SNAPSHOT).
   # ===========================================================================
   bump-next-version:
-    name: "7 · Bump to next development version"
+    name: "8 · Bump to next development version"
     runs-on: ubuntu-latest
     needs: [set-version, sync-helm-images]
     permissions:

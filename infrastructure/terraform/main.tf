@@ -256,4 +256,8 @@ resource "helm_release" "lynq" {
     aws_sns_topic_subscription.analytics_events,
     helm_release.lbc,
   ]
+
+  lifecycle {
+    ignore_changes = [values, set, version]
+  }
 }

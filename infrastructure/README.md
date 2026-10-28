@@ -183,7 +183,7 @@ helm template lynq ./infrastructure/helm -f infrastructure/helm/values/k8s_value
 
 ## Production
 
-Production runs on AWS EKS and is applied **only with Terraform** (local uses Helm directly). Terraform creates everything the chart needs and then runs the `helm_release`:
+Production runs on AWS EKS. Terraform creates everything the chart needs and then runs the `helm_release` (local uses Helm directly); once the cluster exists, new versions are rolled out by the release pipeline (see [Releases](#releases)):
 
 - **The network** (`vpc.tf`). A VPC with two public and two private subnets in two AZs, an internet gateway, and a single NAT gateway. The public subnets hold the ALB and the NAT and are tagged `kubernetes.io/role/elb`; the private ones hold the cluster. Every pod leaves the VPC through the NAT's Elastic IP (`terraform output nat_public_ip`).
 - **The EKS cluster itself and its EC2 worker nodes** (`eks.tf`), in the private subnets. The control plane is AWS-managed; the workers are a managed node group of `t3.medium` on-demand instances (2 by default, max 3). The cluster's OIDC provider is created too, which is what the load balancer controller's IRSA role trusts.
@@ -292,6 +292,27 @@ kubectl -n lynq-prod-namespace get pods
 ### 5. DNS
 
 Terraform creates the `api.lynqoficial.com` CNAME pointing at the ALB automatically (Cloudflare, DNS-only). Because the ALB is provisioned asynchronously by the controller, its hostname may not be ready during the first apply — if the `cloudflare_record.api` step errors on an empty hostname, just **re-run the same `terraform apply`** once the release is up (`kubectl -n lynq-prod-namespace get ingress` shows the ALB address).
+
+### Releases
+
+Terraform and the release pipeline both own the `lynq` Helm release, on purpose. Terraform installs it, so a fresh `terraform apply` rebuilds the whole environment with whatever image tags `k8s_values-prod.yaml` holds at that moment. After that, `helm_release.lynq` ignores changes to `values`, `set` and `version`, and every upgrade comes from GitHub Actions: stage 7 of `lynq-release-workflow.yaml` checks out the commit that pinned the new image tags and runs
+
+```bash
+helm upgrade lynq infrastructure/helm -n lynq-prod-namespace \
+  --reset-then-reuse-values -f infrastructure/helm/values/k8s_values-prod.yaml \
+  --atomic --wait --timeout 15m
+```
+
+`--reset-then-reuse-values` keeps the values Terraform injected with `set` (certificate ARN, data host IP, bucket, topic, queue), which the pipeline cannot recompute because the Terraform state is local. `--atomic` rolls back if the pods do not become ready.
+
+The pipeline holds no AWS keys. It assumes `lynq-eks-github-actions-deploy` through GitHub OIDC (`github_actions.tf`); the role's trust policy only accepts tokens from `github_repository` running in the `github_deploy_environment` GitHub environment, its only IAM permission is `eks:DescribeCluster`, and its EKS access entry grants `AmazonEKSEditPolicy` scoped to the release namespace. That is why the cluster runs in `API_AND_CONFIG_MAP` authentication mode and why the public API endpoint is open (`eks_public_access_cidrs`): GitHub-hosted runners have no fixed IP, so IAM is the gate.
+
+Setup on GitHub, once:
+
+- Create the `production` environment (Settings → Environments). Optionally add required reviewers to approve every deploy.
+- Add the repository secret `AWS_DEPLOY_ROLE_ARN` (Settings → Secrets and variables → Actions → Secrets) with the value of `terraform output -raw github_actions_deploy_role_arn`.
+
+Because Terraform ignores the release after it is created, a change to `chart_overrides` in `main.tf` (a new queue, a new config key) does not reach the running release by itself. Push it once with the same `helm upgrade` plus `--set <key>=<value>`; later upgrades keep it through `--reset-then-reuse-values`. Do not use `terraform apply -replace=helm_release.lynq` for this: it uninstalls the release first, and the Ingress and its ALB go with it.
 
 ### Tearing it down
 

@@ -103,3 +103,8 @@ output "eks_oidc_provider_arn" {
   description = "OIDC provider ARN of the cluster. Use it to grant IRSA roles to ServiceAccounts (replaces the static access keys)."
   value       = aws_iam_openid_connect_provider.eks.arn
 }
+
+output "github_actions_deploy_role_arn" {
+  description = "Role the release pipeline assumes through GitHub OIDC. Store it as the AWS_DEPLOY_ROLE_ARN repository secret."
+  value       = aws_iam_role.github_actions_deploy.arn
+}
