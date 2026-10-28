@@ -3,6 +3,8 @@ package com.lynq.bff;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.startsWith;
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
 import static org.mockserver.model.JsonBody.json;
@@ -29,6 +31,8 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   private static final String CONTEXT_PATH = "/lynq-bff";
 
   private static final String AUTHORIZATION_HEADER = "Authorization";
+  private static final String COOKIE_HEADER = "Cookie";
+  private static final String SET_COOKIE_HEADER = "Set-Cookie";
   private static final String REQUEST_UUID_HEADER = "lynq-request-uuid";
   private static final String CONTENT_TYPE_HEADER = "Content-Type";
   private static final String APPLICATION_JSON = "application/json";
@@ -95,6 +99,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   private static final String AVAILABILITY_BODY = """
       {"success": true, "data": {"valid": false, "reason": "Username is already taken"}}""";
   private static final String OPAQUE_REFRESH_TOKEN = "8f14e45f-ceea-467a-9ae4-9b3f4a1c2d3e";
+  private static final String SESSION_REFRESH_TOKEN = "opaque-refresh-token";
   private static final String REGISTER_BODY = """
       {"username": "janedoe", "email": "jane@lynq.com", "password": "s3cr3tpass", \
 "role": "R_CANDIDATE"}""";
@@ -564,12 +569,45 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
     assertThat(response.statusCode(), is(200));
     assertThat(dataField(response, "accessToken"), is("eyJhbGciOiJIUzI1NiJ9.access.token"));
-    assertThat(dataField(response, "refreshToken"), is("opaque-refresh-token"));
+    assertThat(payloadOf(response).path("data").has("refreshToken"), is(false));
     lynqIamMock.verify(request()
         .withMethod("POST")
         .withPath("/auth/login/email")
         .withBody(json(LOGIN_BODY))
         .withHeader(REQUEST_UUID_HEADER, REQUEST_UUID), VerificationTimes.once());
+  }
+
+  @Test
+  void setsTheRefreshTokenAsAnHttpOnlySessionCookieScopedToTheAuthRoutes() throws Exception {
+    lynqIamMock.when(request().withMethod("POST").withPath("/auth/login/email"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(SESSION_BODY));
+
+    HttpResponse<String> response =
+        sendAnonymous("POST", CONTEXT_PATH + "/auth/login/email", LOGIN_BODY);
+
+    String cookie = response.headers().firstValue(SET_COOKIE_HEADER).orElseThrow();
+    assertThat(cookie, startsWith("lynq_refresh=" + SESSION_REFRESH_TOKEN + ";"));
+    assertThat(cookie, containsString("Path=" + CONTEXT_PATH + "/auth"));
+    assertThat(cookie, containsString("HttpOnly"));
+    assertThat(cookie, containsString("SameSite=Strict"));
+    assertThat(cookie, not(containsString("Max-Age")));
+    assertThat(cookie, not(containsString("Domain")));
+  }
+
+  @Test
+  void setsAPersistentRefreshCookieWhenTheLoginIsRemembered() throws Exception {
+    lynqIamMock.when(request().withMethod("POST").withPath("/auth/login/email"))
+        .respond(response().withStatusCode(200)
+            .withContentType(MediaType.APPLICATION_JSON)
+            .withBody(SESSION_BODY));
+
+    HttpResponse<String> response = sendAnonymous(
+        "POST", CONTEXT_PATH + "/auth/login/email?remember=true", LOGIN_BODY);
+
+    String cookie = response.headers().firstValue(SET_COOKIE_HEADER).orElseThrow();
+    assertThat(cookie, containsString("Max-Age=2592000"));
   }
 
   @Test
@@ -589,7 +627,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void relaysTheRefreshWithItsOpaqueCredentialUntouched() throws Exception {
+  void relaysTheRefreshCookieToLynqIamAsTheBearerCredential() throws Exception {
     lynqIamMock.when(request().withMethod("POST").withPath("/auth/refresh"))
         .respond(response().withStatusCode(200)
             .withContentType(MediaType.APPLICATION_JSON)
@@ -597,7 +635,7 @@ class LynqBffApplicationTests extends AbstractE2ETest {
 
     HttpRequest httpRequest = HttpRequest.newBuilder()
         .uri(URI.create(baseUrl() + CONTEXT_PATH + "/auth/refresh"))
-        .header(AUTHORIZATION_HEADER, "Bearer " + OPAQUE_REFRESH_TOKEN)
+        .header(COOKIE_HEADER, "lynq_refresh=" + OPAQUE_REFRESH_TOKEN)
         .header(REQUEST_UUID_HEADER, REQUEST_UUID)
         .POST(HttpRequest.BodyPublishers.noBody())
         .build();
@@ -614,12 +652,25 @@ class LynqBffApplicationTests extends AbstractE2ETest {
   }
 
   @Test
-  void returnsUnauthorizedWhenTheRefreshCarriesNoCredential() throws Exception {
+  void returnsUnauthorizedWhenTheRefreshCarriesNoCookie() throws Exception {
     HttpResponse<String> response =
         sendAnonymous("POST", CONTEXT_PATH + "/auth/refresh", null);
 
     assertThat(response.statusCode(), is(401));
-    assertThat(response.body(), containsString("Missing Authorization header"));
+    assertThat(response.body(), containsString("Missing refresh token cookie"));
+    lynqIamMock.verify(request(), VerificationTimes.exactly(0));
+  }
+
+  @Test
+  void expiresTheRefreshCookieOnLogoutWithoutCallingLynqIam() throws Exception {
+    HttpResponse<String> response =
+        sendAnonymous("POST", CONTEXT_PATH + "/auth/logout", null);
+
+    assertThat(response.statusCode(), is(204));
+    String cookie = response.headers().firstValue(SET_COOKIE_HEADER).orElseThrow();
+    assertThat(cookie, startsWith("lynq_refresh=;"));
+    assertThat(cookie, containsString("Max-Age=0"));
+    assertThat(cookie, containsString("Path=" + CONTEXT_PATH + "/auth"));
     lynqIamMock.verify(request(), VerificationTimes.exactly(0));
   }
 

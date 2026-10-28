@@ -269,6 +269,7 @@ lynq_bff:
     LYNQ_FILE_STORAGE_URL: http://lynq-file-storage-service:8080/lynq-file-storage
     LYNQ_AGENT_URL: http://lynq-agent-service:8090/lynq-agent
     LYNQ_ANALYTICS_URL: http://lynq-analytics-service:8080/lynq-analytics
+    LYNQ_REFRESH_COOKIE_SECURE: "false"
 
 lynq_app_backend:
   replicas: 1

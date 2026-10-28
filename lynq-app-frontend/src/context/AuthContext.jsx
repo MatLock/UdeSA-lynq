@@ -14,53 +14,53 @@ import profileImageCache from '../utils/profileImageCache'
 import fileToDataUrl from '../utils/fileToDataUrl'
 import useReduxDevtools from '../hooks/useReduxDevtools'
 
-// Holds the authenticated session: the access/refresh tokens and the user
-// identity. RequireAuth treats a session as valid only when all three are set.
+// Holds the authenticated session: the access token and the user identity.
+// RequireAuth treats a session as valid only when both are set.
 //
-// Persistence depends on "remember me" at login time:
-//  - remember me ON  -> localStorage keeps only the durable bits { user,
-//    refreshToken }. The short-lived access token is NOT written to disk; it is
-//    minted fresh from the refresh token (/auth/refresh) on each load.
-//  - remember me OFF -> the full session lives in sessionStorage: it survives a
-//    reload within the tab but is cleared when the tab/browser closes.
+// No token is ever written to browser storage. The refresh token lives in the
+// HttpOnly `lynq_refresh` cookie the gateway sets at login, which no script can
+// read; the short-lived access token lives only in memory and is minted fresh
+// from that cookie (/auth/refresh) on each load. Storage keeps just the user, as
+// a hint that there is a session to rehydrate, in the storage chosen by
+// "remember me" at login time:
+//  - remember me ON  -> localStorage, next to a persistent cookie.
+//  - remember me OFF -> sessionStorage, next to a session cookie: both are
+//    cleared when the browser closes.
 const AuthContext = createContext(null)
 
 const STORAGE_KEY = 'lynq.auth'
 
-// Full session ({ accessToken, refreshToken, user }) from a non-remembered login.
-const readSession = () => {
+const readStored = (storage) => {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
+    const raw = storage.getItem(STORAGE_KEY)
     return raw ? JSON.parse(raw) : null
   } catch {
     return null
   }
 }
 
-// Durable bits ({ refreshToken, user }) from a remembered login.
-const readPersisted = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
+const readHint = () => {
+  const inTab = readStored(sessionStorage)
+  if (inTab?.user) return { user: inTab.user, remembered: false }
+  const persisted = readStored(localStorage)
+  if (persisted?.user) return { user: persisted.user, remembered: true }
+  return null
 }
 
-// Write the session to the storage chosen by its `remembered` flag. A remembered
-// session persists only the durable bits (the access token stays in memory);
-// otherwise the full session goes to sessionStorage.
 const persistSession = (session) => {
+  const hint = JSON.stringify({ user: session.user })
   if (session.remembered) {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ refreshToken: session.refreshToken, user: session.user }),
-    )
+    localStorage.setItem(STORAGE_KEY, hint)
     sessionStorage.removeItem(STORAGE_KEY)
   } else {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session))
+    sessionStorage.setItem(STORAGE_KEY, hint)
     localStorage.removeItem(STORAGE_KEY)
   }
+}
+
+const clearStoredSession = () => {
+  localStorage.removeItem(STORAGE_KEY)
+  sessionStorage.removeItem(STORAGE_KEY)
 }
 
 // Merge an app-backend profile (GetUserRestResponse from GET /user) into a base
@@ -92,12 +92,10 @@ const withProfile = (user, profile) =>
     : user
 
 const AuthProvider = ({ children }) => {
-  const [session, setSession] = useState(readSession)
-  // Bootstrap is only needed when there's no in-tab session but there may be a
-  // remembered one to rehydrate via /auth/refresh.
-  const [loading, setLoading] = useState(
-    () => !readSession() && Boolean(readPersisted()?.refreshToken),
-  )
+  const [session, setSession] = useState(null)
+  // Bootstrap is only needed when a stored user hints at a session whose
+  // refresh cookie can be traded for an access token via /auth/refresh.
+  const [loading, setLoading] = useState(() => Boolean(readHint()))
 
   // Latest session, readable from stable callbacks without re-creating them.
   const sessionRef = useRef(session)
@@ -116,14 +114,13 @@ const AuthProvider = ({ children }) => {
     setSession(next)
   }, [])
 
-  // Replace the session's access/refresh tokens (preserving the remembered
-  // flag), e.g. after a password change that rotates both tokens server-side.
-  const applyTokens = useCallback(({ accessToken, refreshToken }) => {
+  // Replace the session's access token (preserving the remembered flag), e.g.
+  // after a password change that rotates both tokens server-side; the new
+  // refresh token arrives in the response's HttpOnly cookie.
+  const applyTokens = useCallback(({ accessToken }) => {
     const current = sessionRef.current
     if (!current) return
-    const next = { ...current, accessToken, refreshToken }
-    persistSession(next)
-    setSession(next)
+    setSession({ ...current, accessToken })
   }, [])
 
   // Reconcile the locally cached avatar with the pre-signed URL the backend
@@ -157,49 +154,43 @@ const AuthProvider = ({ children }) => {
   // a single /auth/refresh call instead of each firing their own.
   const refreshPromiseRef = useRef(null)
 
-  // On load, rehydrate a remembered session by minting a fresh access token.
+  // On load, rehydrate the stored session by minting a fresh access token
+  // from the refresh cookie.
   useEffect(() => {
     if (session) return
 
-    const persisted = readPersisted()
-    // `loading` is initialized false unless a remembered refresh token exists,
-    // so there's nothing to settle here when one is absent.
-    if (!persisted?.refreshToken) return
+    const hint = readHint()
+    // `loading` is initialized false unless a stored user exists, so there's
+    // nothing to settle here when one is absent.
+    if (!hint) return
 
     let cancelled = false
     const rehydrate = async () => {
       try {
-        const accessToken = await authService.refresh_access_token(
-          persisted.refreshToken,
-        )
+        const accessToken = await authService.refresh_access_token()
         if (cancelled) return
 
-        // Refresh the profile so a remembered session doesn't show stale data.
-        // Non-fatal: fall back to the persisted user if the lookup fails.
-        let user = persisted.user
+        // Refresh the profile so a rehydrated session doesn't show stale data.
+        // Non-fatal: fall back to the stored user if the lookup fails.
+        let user = hint.user
         let profile = null
         try {
           // Pre-session bootstrap: the access token was just minted, so a plain
           // token-bound fetcher (no refresh loop) is the right fit here.
           profile = await userService.get_user(securedFetch.tokenFetcher(accessToken))
-          user = withProfile(persisted.user, profile)
+          user = withProfile(hint.user, profile)
         } catch {
-          // Keep the persisted user — backend unreachable or no profile.
+          // Keep the stored user — backend unreachable or no profile.
         }
         if (cancelled) return
 
-        setSession({
-          accessToken,
-          refreshToken: persisted.refreshToken,
-          user,
-          remembered: true,
-        })
+        setSession({ accessToken, user, remembered: hint.remembered })
         // Refresh the cached avatar if the backend's image differs from cache.
         void syncProfileImageCache(user.id, profile?.userProfileImageUrl)
       } catch {
-        // Refresh token expired/invalid — drop the remembered session.
+        // Refresh cookie missing, expired or invalid — drop the stored session.
         if (!cancelled) {
-          localStorage.removeItem(STORAGE_KEY)
+          clearStoredSession()
           setSession(null)
         }
       } finally {
@@ -216,7 +207,8 @@ const AuthProvider = ({ children }) => {
   }, [])
 
   // Accepts the UserRestResponse returned by authService login/register:
-  // { id, username, email, creationDate, accessToken, refreshToken }.
+  // { id, username, email, creationDate, accessToken }. The refresh token is
+  // not in it: the gateway set it as an HttpOnly cookie on the same response.
   //
   // `profile` is the optional GetUserRestResponse from the app-backend (GET
   // /user). When present its fields are merged into the stored user so consumers
@@ -224,7 +216,6 @@ const AuthProvider = ({ children }) => {
   const login = useCallback((payload, rememberMe = false, profile = null) => {
     const next = {
       accessToken: payload.accessToken,
-      refreshToken: payload.refreshToken,
       user: withProfile(
         {
           id: payload.id,
@@ -245,27 +236,24 @@ const AuthProvider = ({ children }) => {
   }, [syncProfileImageCache])
 
   const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY)
-    sessionStorage.removeItem(STORAGE_KEY)
+    clearStoredSession()
     refreshPromiseRef.current = null
     setSession(null)
+    void authService.end_session()
   }, [])
 
-  // Mint a fresh access token from the current refresh token, persist it to the
-  // active storage, and return it. Concurrent calls share one in-flight request.
+  // Mint a fresh access token from the refresh cookie, keep it in memory, and
+  // return it. Concurrent calls share one in-flight request.
   const refreshSession = useCallback(async () => {
     if (refreshPromiseRef.current) return refreshPromiseRef.current
 
     const run = (async () => {
       const current = sessionRef.current
-      if (!current?.refreshToken) {
-        throw new Error('No refresh token available')
+      if (!current) {
+        throw new Error('No session to refresh')
       }
-      const accessToken = await authService.refresh_access_token(
-        current.refreshToken,
-      )
+      const accessToken = await authService.refresh_access_token()
       const next = { ...current, accessToken }
-      persistSession(next)
       setSession(next)
       return accessToken
     })()
@@ -282,13 +270,11 @@ const AuthProvider = ({ children }) => {
     const roles = accessTokenRoles.rolesOf(session?.accessToken)
     return {
       accessToken: session?.accessToken ?? null,
-      refreshToken: session?.refreshToken ?? null,
       user: session?.user ?? null,
+      remembered: session?.remembered ?? false,
       roles,
       isCompany: roles.includes(accessTokenRoles.COMPANY),
-      isAuthenticated: Boolean(
-        session?.accessToken && session?.refreshToken && session?.user,
-      ),
+      isAuthenticated: Boolean(session?.accessToken && session?.user),
       loading,
       login,
       logout,
@@ -308,7 +294,6 @@ const AuthProvider = ({ children }) => {
     roles: value.roles,
     remembered: session?.remembered ?? false,
     hasAccessToken: Boolean(session?.accessToken),
-    hasRefreshToken: Boolean(session?.refreshToken),
   })
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

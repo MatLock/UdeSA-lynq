@@ -8,6 +8,7 @@ import com.lynq.bff.exceptions.ForbiddenException;
 import com.lynq.bff.exceptions.MethodNotAllowedException;
 import com.lynq.bff.exceptions.NotFoundException;
 import com.lynq.bff.exceptions.TooManyRequestsException;
+import com.lynq.bff.exceptions.UnauthorizedException;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -64,6 +65,14 @@ public class ControllerExceptionHandler extends ResponseEntityExceptionHandler {
     return ResponseEntity
         .status(HttpStatus.CONFLICT)
         .body(new ErrorRestResponse<>(null, ex.getMessage(), ex.getCode()));
+  }
+
+  @ExceptionHandler(UnauthorizedException.class)
+  public ResponseEntity<ErrorRestResponse<Void>> handleUnauthorized(UnauthorizedException ex) {
+    log.warn("message= Caller not authenticated, reason={}", ex.getMessage());
+    return ResponseEntity
+        .status(HttpStatus.UNAUTHORIZED)
+        .body(new ErrorRestResponse<>(null, ex.getMessage()));
   }
 
   @ExceptionHandler(ForbiddenException.class)

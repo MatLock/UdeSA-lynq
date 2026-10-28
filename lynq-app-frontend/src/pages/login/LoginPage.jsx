@@ -50,8 +50,8 @@ const LoginPage = () => {
       // and the app-backend profile fetch below share it so they trace together.
       const requestUuid = requestUuidUtil.newRequestUuid()
       const auth = isEmail(identifier)
-        ? await authService.email_authenticate(identifier, password, requestUuid)
-        : await authService.user_authenticate(identifier, password, requestUuid)
+        ? await authService.email_authenticate(identifier, password, requestUuid, rememberMe)
+        : await authService.user_authenticate(identifier, password, requestUuid, rememberMe)
 
       // Enrich the session with the user's profile (fullName, avatar, …).
       // Non-fatal: if the profile lookup fails, the user is still logged in.

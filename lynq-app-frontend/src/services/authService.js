@@ -17,12 +17,14 @@ import requestUuidUtil from '../utils/requestUuid';
  * @param {string} [requestUuid] - Correlation id for the `lynq-request-uuid`
  *   header; defaults to a fresh id. Pass a shared id to trace a multi-call
  *   functionality across services.
+ * @param {boolean} [remember] - Keep the refresh cookie across browser restarts.
  * @returns {Promise<object>} The parsed UserRestResponse payload.
  * @throws {Error} On a non-OK response. Carries `status` and `reason`.
  */
-const login = async (path, body, requestUuid = requestUuidUtil.newRequestUuid()) => {
-  const response = await fetch(apiBaseUrl.url(path), {
+const login = async (path, body, requestUuid = requestUuidUtil.newRequestUuid(), remember = false) => {
+  const response = await fetch(apiBaseUrl.url(`${path}?remember=${remember}`), {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       'lynq-request-uuid': requestUuid,
@@ -59,13 +61,13 @@ const login = async (path, body, requestUuid = requestUuidUtil.newRequestUuid())
  *   email: string,
  *   creationDate: string,
  *   accessToken: string,
- *   refreshToken: string,
- * }>} The authenticated user with access and refresh tokens.
+ * }>} The authenticated user with an access token. The refresh token is set as
+ *   the HttpOnly `lynq_refresh` cookie, never returned to scripts.
  * @throws {Error} If credentials are invalid or the request fails. The thrown
  *   error carries `status` (HTTP code) and `reason` (server-provided message).
  */
-const user_authenticate = async (username, password, requestUuid) =>
-  login('/auth/login/username', { username, password }, requestUuid);
+const user_authenticate = async (username, password, requestUuid, remember) =>
+  login('/auth/login/username', { username, password }, requestUuid, remember);
 
 /**
  * Authenticate a user with their email and password.
@@ -80,13 +82,13 @@ const user_authenticate = async (username, password, requestUuid) =>
  *   email: string,
  *   creationDate: string,
  *   accessToken: string,
- *   refreshToken: string,
- * }>} The authenticated user with access and refresh tokens.
+ * }>} The authenticated user with an access token. The refresh token is set as
+ *   the HttpOnly `lynq_refresh` cookie, never returned to scripts.
  * @throws {Error} If credentials are invalid or the request fails. The thrown
  *   error carries `status` (HTTP code) and `reason` (server-provided message).
  */
-const email_authenticate = async (email, password, requestUuid) =>
-  login('/auth/login/email', { email, password }, requestUuid);
+const email_authenticate = async (email, password, requestUuid, remember) =>
+  login('/auth/login/email', { email, password }, requestUuid, remember);
 
 /**
  * Register a new user.
@@ -109,14 +111,15 @@ const email_authenticate = async (email, password, requestUuid) =>
  *   email: string,
  *   creationDate: string,
  *   accessToken: string,
- *   refreshToken: string,
- * }>} The newly created user with access and refresh tokens.
+ * }>} The newly created user with an access token. The refresh token is set as
+ *   the HttpOnly `lynq_refresh` session cookie.
  * @throws {Error} On invalid fields (400) or duplicate username/email (409).
  *   The thrown error carries `status` (HTTP code) and `reason` (server message).
  */
 const user_register = async (userInfo, requestUuid = requestUuidUtil.newRequestUuid()) => {
   const response = await fetch(apiBaseUrl.url('/auth/register'), {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       'lynq-request-uuid': requestUuid,
@@ -136,7 +139,7 @@ const user_register = async (userInfo, requestUuid = requestUuidUtil.newRequestU
   }
 
   // Unwrap the GlobalRestResponse envelope ({ success, data }) so callers get the
-  // flat UserRestResponse with the new user's id and access/refresh tokens.
+  // flat UserRestResponse with the new user's id and access token.
   return payload?.data;
 }
 
@@ -145,7 +148,8 @@ const user_register = async (userInfo, requestUuid = requestUuidUtil.newRequestU
  *
  * Calls PATCH /auth/update-password (operationId: updatePassword). The endpoint
  * is secured, so a valid access token is required; on success it returns the
- * user with a freshly generated access and refresh token.
+ * user with a freshly generated access token, and the rotated refresh token in
+ * the HttpOnly `lynq_refresh` cookie.
  *
  * Goes through the caller's `authFetch` (see useApi) so an expired access token
  * is refreshed and the request retried once. Like every other secured call it
@@ -154,20 +158,22 @@ const user_register = async (userInfo, requestUuid = requestUuidUtil.newRequestU
  * @param {(path: string, options?: object) => Promise<object>} authFetch - The
  *   secured fetcher (useApi's authFetch).
  * @param {string} newPassword - The new password (min 8 chars).
+ * @param {boolean} [remember] - Whether the session was remembered, so the
+ *   rotated refresh cookie keeps the same lifetime.
  * @returns {Promise<{
  *   id: string,
  *   username: string,
  *   email: string,
  *   creationDate: string,
  *   accessToken: string,
- *   refreshToken: string,
- * }>} The user with the newly generated access and refresh tokens.
+ * }>} The user with the newly generated access token.
  * @throws {Error} On invalid fields (400), missing/invalid token (401), or user
  *   not found (403). The thrown error carries `status` and `reason`.
  */
-const user_update_password = async (authFetch, newPassword) => {
-  const payload = await authFetch('/auth/update-password', {
+const user_update_password = async (authFetch, newPassword, remember = false) => {
+  const payload = await authFetch(`/auth/update-password?remember=${remember}`, {
     method: 'PATCH',
+    credentials: 'include',
     body: JSON.stringify({ newPassword }),
   });
 
@@ -176,23 +182,23 @@ const user_update_password = async (authFetch, newPassword) => {
 }
 
 /**
- * Generate a new access token from a valid refresh token.
+ * Generate a new access token from the refresh cookie.
  *
- * Calls POST /auth/refresh (operationId: generateNewAccessToken). The endpoint
- * is secured: the refresh token is sent as the Bearer credential, and there is
- * no request body.
+ * Calls POST /auth/refresh (operationId: generateNewAccessToken). The refresh
+ * token travels in the HttpOnly `lynq_refresh` cookie the gateway set at login,
+ * so the request is sent with credentials and carries no Authorization header
+ * and no body.
  *
- * @param {string} refresh_token - A valid refresh token (Bearer auth).
  * @returns {Promise<string>} The newly generated access token.
- * @throws {Error} On a missing Authorization header (401) or an invalid/expired
+ * @throws {Error} On a missing refresh cookie (401) or an invalid/expired
  *   refresh token (403). The thrown error carries `status` and `reason`.
  */
-const refresh_access_token = async (refresh_token, requestUuid = requestUuidUtil.newRequestUuid()) => {
+const refresh_access_token = async (requestUuid = requestUuidUtil.newRequestUuid()) => {
   const response = await fetch(apiBaseUrl.url('/auth/refresh'), {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'lynq-request-uuid': requestUuid,
-      Authorization: `Bearer ${refresh_token}`,
     },
   });
 
@@ -287,12 +293,27 @@ const check_email = async (email, requestUuid = requestUuidUtil.newRequestUuid()
   return payload?.data;
 }
 
+const end_session = async (requestUuid = requestUuidUtil.newRequestUuid()) => {
+  try {
+    await fetch(apiBaseUrl.url('/auth/logout'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'lynq-request-uuid': requestUuid,
+      },
+    });
+  } catch {
+    return;
+  }
+}
+
 export default {
   user_authenticate,
   email_authenticate,
   user_register,
   user_update_password,
   refresh_access_token,
+  end_session,
   check_username,
   check_email,
 };

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Lynq BFF",
-    "description": "Endpoints of lynq-bff, the backend-for-frontend gateway the browser talks to: it verifies the caller's JWT and relays to lynq-iam, lynq-app-backend, lynq-llm, lynq-file-storage, lynq-agent and lynq-analytics. Every request needs the `lynq-request-uuid` header (403 without it); every route except the anonymous auth ones (register, logins, check-username, check-email) also needs `Authorization: Bearer <accessToken>` (the refresh takes the refresh token instead). Register and login auto-save `accessToken` and `refreshToken` into collection variables, and create requests save the ids later requests chain on.",
+    "description": "Endpoints of lynq-bff, the backend-for-frontend gateway the browser talks to: it verifies the caller's JWT and relays to lynq-iam, lynq-app-backend, lynq-llm, lynq-file-storage, lynq-agent and lynq-analytics. Every request needs the `lynq-request-uuid` header (403 without it); every route except the anonymous auth ones (register, logins, check-username, check-email) also needs `Authorization: Bearer <accessToken>` (the refresh and the logout take none: their credential is the HttpOnly `lynq_refresh` cookie, which Postman's cookie jar replays). Register and login auto-save `accessToken` into a collection variable, and create requests save the ids later requests chain on.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_postman_id": "lynq-bff-collection"
   },
@@ -18,11 +18,6 @@
     },
     {
       "key": "accessToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "refreshToken",
       "value": "",
       "type": "string"
     },
@@ -94,7 +89,7 @@
   "item": [
     {
       "name": "Auth",
-      "description": "Auth routes relayed to lynq-iam (`/auth`). Register, logins and availability checks are public; refresh takes the refresh token as bearer.",
+      "description": "Auth routes relayed to lynq-iam (`/auth`). Register, logins and availability checks are public; refresh and logout read the HttpOnly `lynq_refresh` cookie the logins set.",
       "item": [
         {
           "name": "Register user",
@@ -124,7 +119,7 @@
                 "register"
               ]
             },
-            "description": "Public. Relays the registration to lynq-iam: creates a user with a unique username and email and the role sent in the body (R_CANDIDATE or R_COMPANY), and auto-saves the returned access/refresh tokens. Returns 201; 400 for a missing or unknown role, 409 if the username or email is taken."
+            "description": "Public. Relays the registration to lynq-iam: creates a user with a unique username and email and the role sent in the body (R_CANDIDATE or R_COMPANY), and auto-saves the returned access token; the refresh token comes back as the HttpOnly `lynq_refresh` session cookie. Returns 201; 400 for a missing or unknown role, 409 if the username or email is taken."
           },
           "event": [
             {
@@ -134,8 +129,7 @@
                 "exec": [
                   "pm.test('status is 201', () => pm.response.to.have.status(201));",
                   "const data = pm.response.json().data;",
-                  "if (data && data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
-                  "if (data && data.refreshToken) pm.collectionVariables.set('refreshToken', data.refreshToken);"
+                  "if (data && data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);"
                 ]
               }
             }
@@ -170,7 +164,7 @@
                 "username"
               ]
             },
-            "description": "Public. Authenticates with username + password through lynq-iam and saves the returned access/refresh tokens into collection variables. Returns 200; 401 on bad credentials."
+            "description": "Public. Authenticates with username + password through lynq-iam and saves the returned access token into a collection variable; the refresh token comes back as the HttpOnly `lynq_refresh` cookie (persistent with `?remember=true`). Returns 200; 401 on bad credentials."
           },
           "event": [
             {
@@ -180,8 +174,7 @@
                 "exec": [
                   "pm.test('status is 200', () => pm.response.to.have.status(200));",
                   "const data = pm.response.json().data;",
-                  "pm.collectionVariables.set('accessToken', data.accessToken);",
-                  "pm.collectionVariables.set('refreshToken', data.refreshToken);"
+                  "pm.collectionVariables.set('accessToken', data.accessToken);"
                 ]
               }
             }
@@ -216,7 +209,7 @@
                 "email"
               ]
             },
-            "description": "Public. Authenticates with email + password through lynq-iam and saves the returned access/refresh tokens into collection variables. Returns 200; 401 on bad credentials."
+            "description": "Public. Authenticates with email + password through lynq-iam and saves the returned access token into a collection variable; the refresh token comes back as the HttpOnly `lynq_refresh` cookie (persistent with `?remember=true`). Returns 200; 401 on bad credentials."
           },
           "event": [
             {
@@ -226,8 +219,7 @@
                 "exec": [
                   "pm.test('status is 200', () => pm.response.to.have.status(200));",
                   "const data = pm.response.json().data;",
-                  "pm.collectionVariables.set('accessToken', data.accessToken);",
-                  "pm.collectionVariables.set('refreshToken', data.refreshToken);"
+                  "pm.collectionVariables.set('accessToken', data.accessToken);"
                 ]
               }
             }
@@ -238,10 +230,6 @@
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{refreshToken}}"
-              },
               {
                 "key": "lynq-request-uuid",
                 "value": "{{requestUuid}}"
@@ -257,7 +245,7 @@
                 "refresh"
               ]
             },
-            "description": "Exchanges the opaque refresh token (sent as the bearer credential; the gateway skips its JWT signature check and lynq-iam validates it) for a new access token, which is saved into `accessToken`. Returns 200; 401 if the refresh token is invalid or expired."
+            "description": "Exchanges the opaque refresh token in the HttpOnly `lynq_refresh` cookie (set by register/login; lynq-iam validates it) for a new access token, which is saved into `accessToken`. Returns 200; 401 without the cookie, 403 if the refresh token is invalid or expired."
           },
           "event": [
             {
@@ -268,6 +256,40 @@
                   "pm.test('status is 200', () => pm.response.to.have.status(200));",
                   "const data = pm.response.json().data;",
                   "if (data && data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "lynq-request-uuid",
+                "value": "{{requestUuid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Expires the `lynq_refresh` cookie. Public. Returns 204."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 204', () => pm.response.to.have.status(204));"
                 ]
               }
             }
@@ -305,7 +327,7 @@
                 "update-password"
               ]
             },
-            "description": "Updates the caller's password in lynq-iam and returns a fresh access/refresh token pair, which is auto-saved into collection variables. Returns 200."
+            "description": "Updates the caller's password in lynq-iam and returns a fresh access token, auto-saved into a collection variable, and rotates the `lynq_refresh` cookie. Returns 200."
           },
           "event": [
             {
@@ -315,8 +337,7 @@
                 "exec": [
                   "pm.test('status is 200', () => pm.response.to.have.status(200));",
                   "const data = pm.response.json().data;",
-                  "if (data && data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);",
-                  "if (data && data.refreshToken) pm.collectionVariables.set('refreshToken', data.refreshToken);"
+                  "if (data && data.accessToken) pm.collectionVariables.set('accessToken', data.accessToken);"
                 ]
               }
             }
