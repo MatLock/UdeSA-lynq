@@ -175,6 +175,11 @@ const en = {
   common: {
     close: 'Close',
   },
+  notFound: {
+    title: 'LYNQ couldn’t find this page',
+    message: 'The address you’re looking for doesn’t exist or has moved.',
+    backHome: 'Back to home',
+  },
   home: {
     searchPlaceholder: 'Search jobs by title, company or skill…',
     searchButton: 'Search',

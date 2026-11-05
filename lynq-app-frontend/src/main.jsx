@@ -25,6 +25,8 @@ import AuthProvider from "./context/AuthContext.jsx";
 import AppLayout from "./components/AppLayout/AppLayout.jsx";
 import RequireAuth from "./components/RequireAuth/RequireAuth.jsx";
 import RedirectIfAuthenticated from "./components/RedirectIfAuthenticated/RedirectIfAuthenticated.jsx";
+import NotFoundPage from "./pages/not-found/NotFoundPage.jsx";
+import { ROUTE_PATHS } from "./routePaths.js";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
@@ -33,7 +35,7 @@ createRoot(document.getElementById("root")).render(
         <BrowserRouter>
           <Routes>
             <Route
-              path="/"
+              path={ROUTE_PATHS.login}
               element={
                 <RedirectIfAuthenticated>
                   <LoginPage />
@@ -51,34 +53,34 @@ createRoot(document.getElementById("root")).render(
                 </RequireAuth>
               }
             >
-              <Route path="/home" element={<HomePage />} />
-              <Route path="/job/mine" element={<MyJobPostsPage />} />
-              <Route path="/job/:jobId/details" element={<JobDetailPage />} />
-              <Route path="/job/:jobId/edit" element={<EditJobPage />} />
+              <Route path={ROUTE_PATHS.home} element={<HomePage />} />
+              <Route path={ROUTE_PATHS.myJobPosts} element={<MyJobPostsPage />} />
+              <Route path={ROUTE_PATHS.jobDetail} element={<JobDetailPage />} />
+              <Route path={ROUTE_PATHS.editJob} element={<EditJobPage />} />
               <Route
-                path="/job/:jobId/candidates"
+                path={ROUTE_PATHS.jobCandidates}
                 element={<JobCandidatesPage />}
               />
-              <Route path="/user/application" element={<ApplicationsPage />} />
-              <Route path="/user/:userId" element={<UserProfilePage />} />
+              <Route path={ROUTE_PATHS.applications} element={<ApplicationsPage />} />
+              <Route path={ROUTE_PATHS.userProfile} element={<UserProfilePage />} />
               <Route
-                path="/company/:companyId"
+                path={ROUTE_PATHS.companyDetail}
                 element={<CompanyDetailPage />}
               />
               <Route
-                path="/company/:companyId/edit"
+                path={ROUTE_PATHS.companyEdit}
                 element={<CompanyEditPage />}
               />
-              <Route path="/create-job" element={<CreateJobPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
+              <Route path={ROUTE_PATHS.createJob} element={<CreateJobPage />} />
+              <Route path={ROUTE_PATHS.profile} element={<ProfilePage />} />
               {/* Candidate sections */}
-              <Route path="/my-resume" element={<MyResumePage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path={ROUTE_PATHS.myResume} element={<MyResumePage />} />
+              <Route path={ROUTE_PATHS.analytics} element={<AnalyticsPage />} />
             </Route>
             {/* The register flow is an in-place carousel: a single /register route
               wraps the wizard, which slides between steps without changing URL. */}
             <Route
-              path="/register"
+              path={ROUTE_PATHS.register}
               element={
                 <RedirectIfAuthenticated>
                   <RegisterProvider>
@@ -87,6 +89,7 @@ createRoot(document.getElementById("root")).render(
                 </RedirectIfAuthenticated>
               }
             />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

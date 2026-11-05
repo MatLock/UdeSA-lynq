@@ -175,6 +175,11 @@ const es = {
   common: {
     close: 'Cerrar',
   },
+  notFound: {
+    title: 'LYNQ no encontró esta página',
+    message: 'La dirección que buscás no existe o cambió de lugar.',
+    backHome: 'Volver al inicio',
+  },
   home: {
     searchPlaceholder: 'Buscá empleos por título, empresa o habilidad…',
     searchButton: 'Buscar',

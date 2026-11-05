@@ -1,0 +1,72 @@
+.not-found-bg {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: auto;
+  background: var(--page-bg);
+}
+
+.not-found-card {
+  width: 100%;
+  max-width: 480px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 32px;
+  background: var(--surface-raised);
+  border-radius: var(--radius-square);
+  border: var(--border-hairline) solid var(--border);
+  box-shadow: var(--shadow-modal);
+  text-align: center;
+}
+
+.not-found-code {
+  font-size: 72px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -2px;
+  background: var(--brand-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.not-found-title {
+  --lynq-logo-size: 1.2em;
+  color: var(--text-h);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
+  margin: 8px 0 0;
+}
+
+.not-found-message {
+  color: var(--text);
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+
+.not-found-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: var(--radius-square);
+  cursor: pointer;
+  color: var(--ink-on-action);
+  background: var(--brand-gradient);
+  transition: opacity 0.15s ease;
+}
+
+.not-found-action:hover {
+  opacity: 0.92;
+}
