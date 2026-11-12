@@ -16,6 +16,12 @@ Lynq is a thesis project for the Master's in Artificial Intelligence (Maestría 
 > * Sonar Board: https://sonarcloud.io/project/branches_list?id=MatLock_UdeSA-lynq 
 
 
+## Demo
+
+A walkthrough of the platform:
+
+https://github.com/user-attachments/assets/21339cbf-c9e0-4366-8ef7-d86d94183f70
+
 ## Modules
 
 ### lynq-iam &nbsp; [![CI](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-iam-test-workflow.yaml/badge.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-iam-test-workflow.yaml) [![Coverage](https://raw.githubusercontent.com/MatLock/UdeSA-lynq/main/.github/badges/jacoco.svg)](https://github.com/MatLock/UdeSA-lynq/actions/workflows/lynq-iam-test-workflow.yaml)
