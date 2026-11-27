@@ -49,8 +49,9 @@ public class ResumeImportService {
     try {
       Object resume = parse(readUrl(fileId, caller), caller);
       String language = language(resume, fallbackLanguage, caller);
-      List<String> similarityTags = similarityTags(resume, fallbackLanguage, fileId, caller);
-      Object stored = store(resume, language, similarityTags, fileId, caller);
+      SkillExtractionResponse extracted = extractSkills(resume, fallbackLanguage, fileId, caller);
+      Object completed = ParsedResume.withExtractedSkills(resume, extracted);
+      Object stored = store(completed, language, similarityTagsOf(extracted), fileId, caller);
 
       log.info("message= Finished resume import, user_id={}, file_id={}", caller.userId(), fileId);
 
@@ -100,37 +101,46 @@ public class ResumeImportService {
   }
 
   /**
-   * The transferable capabilities behind the resume's skills, best-effort.
+   * The skills and transferable capabilities lynq-llm reads in the parsed resume, best-effort.
    *
-   * <p>Parsing only recovers the skills the candidate literally wrote down. The
-   * generalized tags — "Asynchronous Messaging" rather than Kafka or RabbitMQ —
-   * have no other source, and without them an imported resume can only be
-   * matched on exact skill names, scoring below the same resume typed into the
-   * wizard, which asks lynq-llm for them explicitly.
+   * <p>Parsing only recovers the skills the candidate listed, and it can miss them
+   * entirely: a resume that groups its skills under headings ("Cloud / DevOps:
+   * Terraform, Azure") or comes from a non-software field may parse with few or
+   * no technical skills even though its experience is full of them. The wizard
+   * asks lynq-llm for the skills the resume implies and merges them into the
+   * buckets; this path does the same, so an imported resume and a typed one
+   * reach the candidate's profile with the same vocabulary. The generalized tags
+   * — "Asynchronous Messaging" rather than Kafka or RabbitMQ — come from the
+   * same call and have no other source.
    *
    * <p>This is a second LLM round-trip on a path that already made one, so a
-   * failure here degrades to no tags instead of losing the import: the tags can
-   * be regenerated from the stored resume later, the uploaded document cannot.
+   * failure here degrades to the parsed resume without extra skills or tags
+   * instead of losing the import: both can be regenerated from the stored
+   * resume later, the uploaded document cannot.
    *
-   * <p>{@code language} is the caller's UI language, passed for parity with the
-   * wizard. It only decides the wording of the soft skills, which this path does
-   * not read — the tags themselves are always English.
+   * <p>{@code language} is the caller's UI language, the one the wizard passes:
+   * it decides the wording of the soft skills. Technical skills and tools keep
+   * the resume's wording, and the tags are always English.
+   *
+   * @return the extraction, or {@code null} when lynq-llm could not produce one
    */
-  private List<String> similarityTags(Object resume, String language, String fileId,
-                                      Caller caller) {
+  private SkillExtractionResponse extractSkills(Object resume, String language, String fileId,
+                                                Caller caller) {
     try {
-      SkillExtractionResponse extracted = lynqLlmClient
+      return lynqLlmClient
           .extractResumeSkills(resume, language, caller.requestUuid(), caller.authorization())
           .getData();
-
-      return extracted == null || extracted.getSimilarityTags() == null
-          ? List.of()
-          : extracted.getSimilarityTags();
     } catch (RuntimeException e) {
-      log.warn("message= Could not derive the similarity tags of an imported resume, it is stored "
-          + "without them, user_id={}, file_id={}", caller.userId(), fileId, e);
-      return List.of();
+      log.warn("message= Could not extract the skills of an imported resume, it is stored with "
+          + "only its parsed skills and no tags, user_id={}, file_id={}", caller.userId(), fileId, e);
+      return null;
     }
+  }
+
+  private static List<String> similarityTagsOf(SkillExtractionResponse extracted) {
+    return extracted == null || extracted.getSimilarityTags() == null
+        ? List.of()
+        : extracted.getSimilarityTags();
   }
 
   private Object store(Object resume, String language, List<String> similarityTags, String fileId,
