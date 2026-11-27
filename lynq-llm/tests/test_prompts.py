@@ -9,6 +9,7 @@ from jinja2 import UndefinedError
 
 from llm_client import LLMProvider
 from prompt import skill_enhance as prompts_module
+from prompt.resume_extractor import render_resume_extractor_prompt
 from prompt.skill_enhance import render_key_extractor_prompt
 
 
@@ -89,6 +90,29 @@ class RenderKeyExtractorPromptTests(unittest.TestCase):
 
         with self.assertRaises(UndefinedError):
             template.render(job_title="only title")
+
+
+class ResumeExtractorSkillRulesTests(unittest.TestCase):
+    """The resume parser is told how to read skills that resumes write in many shapes."""
+
+    def test_templates_extract_the_items_under_a_heading_not_the_heading(self) -> None:
+        # A resume that writes "Cloud / DevOps: Terraform, Azure" once parsed into
+        # the skill "Cloud / DevOps": the labels matched no posting at all.
+        for provider in (LLMProvider.OLLAMA, LLMProvider.BEDROCK):
+            with self.subTest(provider=provider):
+                prompt = render_resume_extractor_prompt(provider, resume_text="CV")
+
+                self.assertIn("never the heading", prompt)
+                self.assertIn("Cloud / DevOps", prompt)
+
+    def test_templates_count_domain_techniques_as_technical_skills(self) -> None:
+        # A food-quality resume once parsed with no technical skills at all.
+        for provider in (LLMProvider.OLLAMA, LLMProvider.BEDROCK):
+            with self.subTest(provider=provider):
+                prompt = render_resume_extractor_prompt(provider, resume_text="CV")
+
+                self.assertIn("HACCP", prompt)
+                self.assertIn("ISO 9001", prompt)
 
 
 class TemplatesAreModelAgnosticTests(unittest.TestCase):

@@ -315,6 +315,65 @@ class ResumeImportServiceTest {
     assertThat(captor.getValue().getSimilarityTags(), is(List.of()));
   }
 
+  @Test
+  @SuppressWarnings("unchecked")
+  void importMergesTheSkillsLynqLlmExtractsIntoTheStoredResume() {
+    givenReadUrl();
+    givenParsedResume();
+    givenDetectedLanguage("EN");
+    when(lynqLlmClient.extractResumeSkills(any(), eq(UI_LANGUAGE), eq(REQUEST_UUID), eq(AUTHORIZATION)))
+        .thenReturn(new GlobalRestResponse<>(true, SkillExtractionResponse.builder()
+            .skills(List.of("java", "Kafka", " "))
+            .tools(List.of("Docker"))
+            .soft(List.of("Liderazgo"))
+            .similarityTags(SIMILARITY_TAGS)
+            .build()));
+    givenStoredResume();
+
+    resumeImportService.importUploadedDocument(FILE_ID, UI_LANGUAGE, CALLER);
+
+    ArgumentCaptor<CreateResumeRequest> captor = ArgumentCaptor.forClass(CreateResumeRequest.class);
+    verify(lynqBackendClient).createResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    Map<String, Object> resume = (Map<String, Object>) captor.getValue().getResume();
+    Map<String, Object> skills = (Map<String, Object>) resume.get("skills");
+    assertThat(skills.get("technical"), is(List.of("Java", "Kafka")));
+    assertThat(skills.get("tools"), is(List.of("Docker")));
+    assertThat(skills.get("soft"), is(List.of("Liderazgo")));
+    assertThat(resume.get("summary"), is(SUMMARY));
+    assertThat(captor.getValue().getName(), is(FULL_NAME));
+    assertThat(captor.getValue().getSimilarityTags(), is(SIMILARITY_TAGS));
+  }
+
+  @Test
+  void importLeavesTheParsedResumeUntouchedWhenItMergesTheExtractedSkills() {
+    givenReadUrl();
+    givenParsedResume();
+    givenDetectedLanguage("EN");
+    when(lynqLlmClient.extractResumeSkills(any(), eq(UI_LANGUAGE), eq(REQUEST_UUID), eq(AUTHORIZATION)))
+        .thenReturn(new GlobalRestResponse<>(true,
+            SkillExtractionResponse.builder().skills(List.of("Kafka")).build()));
+    givenStoredResume();
+
+    resumeImportService.importUploadedDocument(FILE_ID, UI_LANGUAGE, CALLER);
+
+    assertThat(((Map<?, ?>) PARSED_RESUME).get("skills"), is(Map.of("technical", List.of("Java"))));
+  }
+
+  @Test
+  void importStoresTheParsedResumeAsItIsWhenLynqLlmExtractsNoSkills() {
+    givenReadUrl();
+    givenParsedResume();
+    givenDetectedLanguage("EN");
+    givenExtractedTags(SIMILARITY_TAGS);
+    givenStoredResume();
+
+    resumeImportService.importUploadedDocument(FILE_ID, UI_LANGUAGE, CALLER);
+
+    ArgumentCaptor<CreateResumeRequest> captor = ArgumentCaptor.forClass(CreateResumeRequest.class);
+    verify(lynqBackendClient).createResume(captor.capture(), eq(REQUEST_UUID), eq(AUTHORIZATION));
+    assertThat(captor.getValue().getResume(), is(sameInstance(PARSED_RESUME)));
+  }
+
   private void givenReadUrl() {
     when(lynqFileStorageClient.createDownloadUrl(FILE_ID, REQUEST_UUID, AUTHORIZATION))
         .thenReturn(new GlobalRestResponse<>(true, CreateFileDownloadResponse.builder()
