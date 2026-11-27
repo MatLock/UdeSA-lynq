@@ -40,6 +40,16 @@ into the JSON schema described below.
 
 6. For `skills`, deduplicate and classify each skill into the right bucket
    (`technical`, `tools`, `soft`). Do not repeat the same skill across buckets.
+   - Many resumes group skills under category headings ("Cloud / DevOps:
+     Terraform, Azure", "Languages: C#, TypeScript"). Extract the ITEMS under
+     each heading, never the heading itself: "Cloud / DevOps", "Languages",
+     "Frameworks", "Testing" or "Data" are labels, not skills. The same applies
+     to `technologies` in `work_experience` and `projects`.
+   - `technical` is not only software. In any field it holds the techniques,
+     methods, standards and domain knowledge the person applies: HACCP, ISO 9001,
+     reservoir simulation, tax filing, payroll. A resume from a non-software
+     field still has technical skills; read them from the skills section and,
+     when there is none, from what the experience says the person did.
 
 7. Emails, phones and URLs must be copied exactly as written, without
    reformatting.

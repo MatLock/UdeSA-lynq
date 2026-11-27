@@ -16,6 +16,12 @@ Rules:
 - Drop the bullet glyph itself (`-`, `*`, `•`): the line is the content, the
   glyph is how the original document drew it.
 - Deduplicate skills and classify them into technical / tools / soft.
+- Skills grouped under headings ("Cloud / DevOps: Terraform, Azure"): extract
+  the ITEMS, never the heading. "Cloud / DevOps", "Languages", "Frameworks",
+  "Testing", "Data" are labels, not skills. Same for `technologies`.
+- `technical` is not only software: techniques, methods, standards and domain
+  knowledge of any field count (HACCP, ISO 9001, reservoir simulation, tax
+  filing). If there is no skills section, read them from the experience.
 - Copy emails, phones and URLs exactly as written.
 - Return ONLY valid JSON. No markdown, no comments, no explanations.
 
